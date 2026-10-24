@@ -650,6 +650,7 @@ body[data-route="shorts"] { overflow: hidden; }
 @container (max-width: 560px) {
   .ytp .b-theater, .ytp .b-mini, .ytp .b-pip, .ytp .ytp-chap { display: none !important; }
   .ytp-bar button { width: 40px; }
+  .ytp.native .b-pip { display: flex !important; }   /* iPhone's native player: the one PiP button, always */
   .ytp-bar .ic { width: 24px; height: 24px; }
   .ytp-bottom { padding: 0 6px; }
 }

@@ -54,6 +54,9 @@ export function parseT(t) {
 }
 
 // ---------------------------------------------------------------- settings (per device)
+// iPhone only (an iPad reports itself as a Mac): these play with Safari's own player, see player.js load()
+export const IPHONE = /iPhone|iPod/.test(navigator.userAgent);
+
 const DEFAULTS = {
   lang: "auto",           // interface language: auto = the browser's
   theme: "light",         // light | dark | system (default: light, like classic YouTube)
@@ -61,6 +64,7 @@ const DEFAULTS = {
   calm: false,            // calm mode: subscriptions only, no Shorts, trending or recommendations, no autoplay
   quality: "auto",        // auto | 2160 | 1440 | 1080 | 720 | 480 | 360
   dataSaver: false,
+  nativeIphone: true,     // iPhone: play with Safari's own player (Picture-in-Picture over other apps, AirPlay)
   captions: false,        // captions always on
   capLang: LANG,
   capSize: 100,           // %
