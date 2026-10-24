@@ -169,7 +169,8 @@ export class Player {
     v.muted = false;
     this.autoMuted = false;
     this.q = (s) => $(s, r);
-    if (!document.pictureInPictureEnabled && !IPHONE) this.q(".b-pip").remove();
+    // iOS offers no Picture-in-Picture to an app installed on the home screen (webkitSupportsPresentationMode is false there)
+    if ((!document.pictureInPictureEnabled && !IPHONE) || (IPHONE && navigator.standalone)) this.q(".b-pip").remove();
     this.bindVideo();
     this.bindControls();
     this.bindProgress();
