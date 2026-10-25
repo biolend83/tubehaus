@@ -35,7 +35,7 @@ import app.tubehaus.data.Transfer
 import app.tubehaus.rec.Learn
 import kotlin.math.abs
 
-const val VERSION = "0.3.9"
+const val VERSION = "0.4.0"
 
 @Composable
 fun SettingsScreen(app: AppState) {
@@ -79,6 +79,10 @@ fun SettingsScreen(app: AppState) {
             item { Toggle(tr("Turn off the subscription feed"), tr("Subscriptions shows your channels, not their new videos"), s.subsFeedOff) { b -> set { it.copy(subsFeedOff = b) } } }
             item { Toggle(tr("Hide Shorts"), tr("No Shorts tab, no Shorts in lists"), s.hideShorts || s.calm) { b -> set { it.copy(hideShorts = b) } } }
             item { Toggle(tr("Hide related videos"), tr("Nothing suggested next to or under a video"), s.hideRelated) { b -> set { it.copy(hideRelated = b) } } }
+            item {
+                val opts = listOf("0" to tr("Everything"), "1" to tr("Only the title"), "2" to tr("Nothing, just the player"))
+                Choice(tr("Under the video"), opts.getOrNull(s.underVideo)?.second ?: opts[0].second, opts) { c -> set { it.copy(underVideo = c.toInt()) } }
+            }
 
             item { Group(tr("Playback")) }
             item { Choice(tr("Quality"), hLabel(s.maxHeight), heights.map { "$it" to hLabel(it) }) { c -> set { it.copy(maxHeight = c.toInt()) } } }
