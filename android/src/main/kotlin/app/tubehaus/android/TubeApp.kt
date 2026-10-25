@@ -1,5 +1,8 @@
 package app.tubehaus.android
 
+import android.app.UiModeManager
+import android.content.res.Configuration
+import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.FileProvider
@@ -38,7 +41,20 @@ class AndroidPlatform(private val app: Application) : Platform {
     override val name = "android"
     override val dataDir: File = File(app.filesDir, "tubehaus")
     override val cacheDir: File = app.cacheDir
-    override val touch = true
+    /** a TV says so by its UI mode (Android TV, Google TV) or the leanback feature */
+    private val isTv: Boolean by lazy {
+        (app.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager).currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+            app.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    }
+    // Settings → TV mode can force it either way (a TV box that doesn't say it is one)
+    override val tv: Boolean
+        get() = when (runCatching { (app as TubeApp).state.store.settings.value.tvMode }.getOrDefault(0)) {
+            1 -> true
+            2 -> false
+            else -> isTv
+        }
+    // a TV has a remote, not a touch screen: it gets the wide layout and the keyboard player
+    override val touch: Boolean get() = !tv
     val androidPlayer by lazy {
         AndroidPlayer.longBuffer = runCatching { (app as TubeApp).state.store.settings.value.longBuffer }.getOrDefault(false)
         AndroidPlayer(app)

@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.sp
 // blue links and the red logo.
 val Red = Color(0xFFFF0033)
 val Blue = Color(0xFF065FD4)
+/** the TubeHaus teal (the house in the logo); on a TV it marks what the remote has selected */
+val Teal = Color(0xFF2DD4BF)
 
 private val light = lightColorScheme(
     primary = Color(0xFF0F0F0F), onPrimary = Color.White,

@@ -1,5 +1,14 @@
 package app.tubehaus.ui
 
+import androidx.compose.material3.LocalRippleConfiguration
+import androidx.compose.material3.RippleConfiguration
+import androidx.compose.material.ripple.RippleAlpha
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.automirrored.filled.MenuOpen
 import androidx.compose.animation.expandHorizontally
@@ -107,10 +116,18 @@ fun App(app: AppState) {
             .crossfade(true)
             .build()
     }
-    key(lang) {
+    key(lang, settings.tvMode) {
         TubeTheme(settings.dark) {
-            CompositionLocalProvider(LocalPlatform provides app.platform) {
-                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            val tv = app.platform.tv
+            CompositionLocalProvider(
+                LocalPlatform provides app.platform,
+                // TV: buttons, tabs and menu rows the remote has selected glow teal, clearly enough for the sofa
+                LocalRippleConfiguration provides if (tv) RippleConfiguration(Teal, RippleAlpha(0.16f, 0.34f, 0.08f, 0.2f)) else LocalRippleConfiguration.current,
+            ) {
+                Surface(
+                    Modifier.fillMaxSize().let { if (tv) it.onPreviewKeyEvent { e -> tvKey(app, e) } else it },
+                    color = MaterialTheme.colorScheme.background,
+                ) {
                     // phones get the phone layout; tablets and the desktop the wide one
                     BoxWithConstraints(Modifier.fillMaxSize()) {
                         val d = LocalDensity.current
@@ -137,6 +154,18 @@ fun App(app: AppState) {
             }
         }
     }
+}
+
+/** TV remote keys for every screen: the search key, and Shorts (up and down change the Short, OK pauses) */
+private fun tvKey(app: AppState, e: KeyEvent): Boolean {
+    if (e.type != KeyEventType.KeyDown) return false
+    if (e.key == Key.Search) { app.go(Screen.Search()); return true }
+    val shorts = app.shortsKeys
+    if (app.current is Screen.Shorts && shorts != null) return when (e.key) {
+        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> playerKey(app, Key.Spacebar)
+        else -> shorts(e.key)
+    }
+    return false
 }
 
 private data class Tab(val screen: Screen, val label: String, val on: ImageVector, val off: ImageVector)
@@ -367,7 +396,7 @@ private fun MiniPlayer(app: AppState) {
             }
         }
         Row(
-            Modifier.fillMaxWidth().clickable { app.go(Screen.Watch(v.id)) }.padding(end = 4.dp),
+            Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(0.dp)) { app.go(Screen.Watch(v.id)) }.padding(end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (!app.store.settings.value.hideThumbs) Img(v.thumb, Modifier.width(96.dp).aspectRatio(16f / 9f))

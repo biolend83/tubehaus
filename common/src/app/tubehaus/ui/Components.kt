@@ -1,5 +1,17 @@
 package app.tubehaus.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.runtime.MutableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.delay
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -62,6 +74,34 @@ import app.tubehaus.rec.Learn
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 
+/**
+ * TV: the remote moves a focus from card to card, and the selected one has to show from across
+ * the room: it gets a teal frame and grows a little. Elsewhere this does nothing.
+ */
+@Composable
+fun Modifier.tvFocus(shape: Shape = RoundedCornerShape(12.dp)): Modifier {
+    if (!LocalPlatform.current.tv) return this
+    var on by remember { mutableStateOf(false) }
+    val grow by animateFloatAsState(if (on) 1.04f else 1f)
+    return this.graphicsLayer { scaleX = grow; scaleY = grow }
+        .onFocusChanged { on = it.hasFocus }
+        .let { if (on) it.border(3.dp, Teal, shape) else it }
+}
+
+/**
+ * clickable, and on a TV with [tvFocus]'s frame instead of a tint over the whole card;
+ * [onLongClick] is holding OK on the remote (the card's ⋮ menu)
+ */
+@Composable
+fun Modifier.tvClickable(shape: Shape = RoundedCornerShape(12.dp), onLongClick: (() -> Unit)? = null, onClick: () -> Unit): Modifier {
+    if (!LocalPlatform.current.tv) return clickable(onClick = onClick)
+    return tvFocus(shape).combinedClickable(remember { MutableInteractionSource() }, indication = null, onLongClick = onLongClick, onClick = onClick)
+}
+
+/** on a TV the remote skips this (a button inside a card, reached by holding OK instead) */
+@Composable
+fun Modifier.notOnTv(): Modifier = if (LocalPlatform.current.tv) focusProperties { canFocus = false } else this
+
 @Composable
 fun Img(url: String, modifier: Modifier = Modifier, crop: Boolean = true) {
     AsyncImage(
@@ -117,11 +157,12 @@ fun Thumb(v: Video, app: AppState, modifier: Modifier = Modifier, rounded: Int =
 
 /** The ⋮ menu of a video: save, add to playlist, not interested, share. */
 @Composable
-fun VideoMenu(v: Video, app: AppState, extra: List<Pair<String, () -> Unit>> = emptyList()) {
-    var open by remember { mutableStateOf(false) }
+fun VideoMenu(v: Video, app: AppState, extra: List<Pair<String, () -> Unit>> = emptyList(), openState: MutableState<Boolean>? = null) {
+    val opener = openState ?: remember { mutableStateOf(false) }
+    var open by opener
     var pick by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { open = true }, modifier = Modifier.size(32.dp)) {
+        IconButton(onClick = { open = true }, modifier = Modifier.size(32.dp).notOnTv()) {
             Icon(Icons.Default.MoreVert, tr("More"), modifier = Modifier.size(18.dp))
         }
         DropdownMenu(open, onDismissRequest = { open = false }) {
@@ -149,12 +190,13 @@ fun VideoMenu(v: Video, app: AppState, extra: List<Pair<String, () -> Unit>> = e
 @Composable
 fun VideoCard(v: Video, app: AppState, queue: List<Video> = emptyList()) {
     val calm = app.store.settings.value.calm
-    Column(Modifier.fillMaxWidth().clickable { app.watch(v, queue) }.padding(bottom = 12.dp)) {
+    val menu = remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().tvClickable(onLongClick = { menu.value = true }) { app.watch(v, queue) }.padding(bottom = 12.dp)) {
         if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.fillMaxWidth(), rounded = if (LocalCompact.current) 0 else 12)
         Row(Modifier.padding(start = 12.dp, top = 10.dp, end = 4.dp)) {
             if (v.channelId.isNotEmpty()) {
                 Avatar(v.avatar.ifEmpty { app.store.lib.value.subs[v.channelId]?.thumb ?: "" }, 36,
-                    Modifier.clickable { app.go(Screen.Channel(v.channelId, v.author)) })
+                    Modifier.notOnTv().clickable { app.go(Screen.Channel(v.channelId, v.author)) })
                 Spacer(Modifier.width(12.dp))
             }
             Column(Modifier.weight(1f)) {
@@ -162,7 +204,7 @@ fun VideoCard(v: Video, app: AppState, queue: List<Video> = emptyList()) {
                 Text(v.details(app, calm), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
             }
-            VideoMenu(v, app)
+            VideoMenu(v, app, openState = menu)
         }
     }
 }
@@ -171,8 +213,9 @@ fun VideoCard(v: Video, app: AppState, queue: List<Video> = emptyList()) {
 @Composable
 fun VideoRow(v: Video, app: AppState, queue: List<Video> = emptyList(), extra: List<Pair<String, () -> Unit>> = emptyList(), thumbWidth: Dp = 168.dp, onClick: (() -> Unit)? = null) {
     val calm = app.store.settings.value.calm
+    val menu = remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().clickable { if (onClick != null) onClick() else app.watch(v, queue) }.padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(8.dp), onLongClick = { menu.value = true }) { if (onClick != null) onClick() else app.watch(v, queue) }.padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.width(thumbWidth), rounded = 8)
         Column(Modifier.weight(1f).padding(start = 10.dp)) {
@@ -180,14 +223,14 @@ fun VideoRow(v: Video, app: AppState, queue: List<Video> = emptyList(), extra: L
             Text(v.details(app, calm), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
         }
-        VideoMenu(v, app, extra)
+        VideoMenu(v, app, extra, openState = menu)
     }
 }
 
 @Composable
 fun ChannelRow(c: Channel, app: AppState) {
     Row(
-        Modifier.fillMaxWidth().clickable { app.go(Screen.Channel(c.id, c.name)) }.padding(horizontal = 12.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(8.dp)) { app.go(Screen.Channel(c.id, c.name)) }.padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(168.dp), contentAlignment = Alignment.Center) { Avatar(c.avatar, 88) }
@@ -203,7 +246,7 @@ fun ChannelRow(c: Channel, app: AppState) {
 @Composable
 fun PlaylistRow(p: Playlist, app: AppState) {
     Row(
-        Modifier.fillMaxWidth().clickable { app.go(Screen.Playlist(p.id, p.title)) }.padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(8.dp)) { app.go(Screen.Playlist(p.id, p.title)) }.padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         // with thumbnails off the box stays (it carries the video count) but is left plain
         Box(Modifier.width(if (app.store.settings.value.hideThumbs) 72.dp else 168.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))) {
@@ -322,6 +365,13 @@ fun ItemGrid(
         }
     }
     val list = items.distinctBy { it.id }
+    // TV: the first card takes the remote's focus when the list arrives, so the arrows work at once
+    val tv = LocalPlatform.current.tv
+    val first = remember { FocusRequester() }
+    var focused by remember { mutableStateOf(false) }
+    if (tv) LaunchedEffect(list.isNotEmpty()) {
+        if (list.isNotEmpty() && !focused) { delay(150); focused = runCatching { first.requestFocus() }.isSuccess }
+    }
     LazyVerticalGrid(
         columns = if (rows) GridCells.Adaptive(560.dp) else GridCells.Adaptive(320.dp),
         state = state,
@@ -331,10 +381,12 @@ fun ItemGrid(
     ) {
         if (header != null) item(span = { GridItemSpan(maxLineSpan) }) { header() }
         items(list, key = { it.id }, span = { if (it is Video && !rows) GridItemSpan(1) else GridItemSpan(maxLineSpan) }) {
-            when (it) {
-                is Video -> if (rows) VideoRow(it, app) else VideoCard(it, app)
-                is Channel -> ChannelRow(it, app)
-                is Playlist -> PlaylistRow(it, app)
+            Box(if (tv && it.id == list[0].id) Modifier.focusRequester(first) else Modifier) {
+                when (it) {
+                    is Video -> if (rows) VideoRow(it, app) else VideoCard(it, app)
+                    is Channel -> ChannelRow(it, app)
+                    is Playlist -> PlaylistRow(it, app)
+                }
             }
         }
         if (loading) item(span = { GridItemSpan(maxLineSpan) }) { Busy() }

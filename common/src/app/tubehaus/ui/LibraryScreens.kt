@@ -100,7 +100,7 @@ fun SubsScreen(app: AppState) {
             Column {
                 LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(lib.subs.entries.sortedByDescending { it.value.at }.toList(), key = { it.key }) { (cid, s) ->
-                        Column(Modifier.width(64.dp).clickable { app.go(Screen.Channel(cid, s.name)) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(Modifier.width(64.dp).tvClickable { app.go(Screen.Channel(cid, s.name)) }, horizontalAlignment = Alignment.CenterHorizontally) {
                             Avatar(s.thumb, 56)
                             Text(s.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
@@ -168,7 +168,7 @@ fun LibraryScreen(app: AppState) {
             LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(lib.hist.take(20), key = { it.id }) { m ->
                     val v = m.video()
-                    Column(Modifier.width(160.dp).clickable { app.watch(v) }) {
+                    Column(Modifier.width(160.dp).tvClickable { app.watch(v) }) {
                         if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.fillMaxWidth(), rounded = 8)
                         Text(v.title, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                     }
