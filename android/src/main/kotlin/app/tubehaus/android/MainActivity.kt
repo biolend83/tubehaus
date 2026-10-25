@@ -72,7 +72,8 @@ class MainActivity : ComponentActivity() {
         })
         // the media session service keeps playing in the background and shows the controls
         controller = MediaController.Builder(this, SessionToken(this, ComponentName(this, PlaybackService::class.java))).buildAsync()
-        if (Build.VERSION.SDK_INT >= 33) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        // the media notification; a TV has none worth asking for (and the question would take the remote's focus)
+        if (Build.VERSION.SDK_INT >= 33 && !state.platform.tv) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         handle(intent)
     }
 
@@ -123,6 +124,9 @@ class MainActivity : ComponentActivity() {
 
     fun setFullscreen(on: Boolean) {
         full = on
+        bars(!on && !immersive)
+        // a TV never turns
+        if (state.platform.tv) return
         // tablets keep whichever way they're held when leaving full screen; phones go back upright
         val tablet = resources.configuration.smallestScreenWidthDp >= 600
         requestedOrientation = when {
@@ -130,7 +134,6 @@ class MainActivity : ComponentActivity() {
             tablet -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             else -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
         }
-        bars(!on && !immersive)
     }
 
     private fun bars(show: Boolean) {
@@ -158,7 +161,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (tilt.canDetectOrientation()) tilt.enable()
+        if (!state.platform.tv && tilt.canDetectOrientation()) tilt.enable()
     }
 
     override fun onPause() {
@@ -168,7 +171,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (state.pip) return
+        if (state.pip || state.platform.tv) return
         val landscape = newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
         if (newConfig.smallestScreenWidthDp >= 600) return
         if (landscape && !state.fullscreen && state.current is Screen.Watch && state.playback.video != null) {

@@ -86,6 +86,13 @@ fun WatchScreen(app: AppState) {
     // the comments open beside (wide) or under (phone) the video, which keeps playing
     var side by remember(v.id) { mutableStateOf(if (hasRelated && set.sideTab != "comments") "next" else "comments") }
     var commentsOpen by remember(v.id) { mutableStateOf(false) }
+    // TV: the video fills the screen once it plays; Back comes here, to its details and what's next
+    if (app.platform.tv) {
+        val st by app.platform.player.state.collectAsState()
+        var filled by remember(v.id) { mutableStateOf(false) }
+        val playing = st.videoId == v.id && st.playing
+        LaunchedEffect(v.id, playing) { if (playing && !filled) { filled = true; app.setFull(true) } }
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth > 840.dp
         val tablet = app.platform.touch
@@ -338,7 +345,7 @@ private fun CommentsTeaser(open: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
-            .clickable(onClick = open).padding(12.dp),
+            .tvClickable(onClick = open).padding(12.dp),
     ) { Text(tr("Comments"), style = MaterialTheme.typography.titleSmall) }
 }
 
