@@ -1,5 +1,13 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.outlined.Comment
@@ -117,6 +125,13 @@ fun playerKey(app: AppState, key: Key): Boolean {
         Key.DirectionUp -> if (player.hasVolume) volumeBy(0.05f) else return false
         Key.DirectionDown -> if (player.hasVolume) volumeBy(-0.05f) else return false
         Key.Home, Key.Zero -> player.seekTo(0)
+        // media keys (TV remotes, keyboards)
+        Key.MediaPlayPause -> if (st.playing) player.pause() else player.play()
+        Key.MediaPlay -> player.play()
+        Key.MediaPause -> player.pause()
+        Key.MediaFastForward -> seekBy(10)
+        Key.MediaRewind -> seekBy(-10)
+        Key.MediaNext -> if (app.playback.next != null) app.playback.skipNext() else return false
         else -> return false
     }
     return true
@@ -137,6 +152,12 @@ private fun Controls(app: AppState, fullscreen: Boolean) {
     var jump by remember { mutableStateOf<Pair<Int, Int>?>(null) }   // side (-1/1), seconds
     var settings by remember { mutableStateOf(false) }
     var gesture by remember { mutableStateOf<Pair<String, Float>?>(null) }   // "brightness"/"volume", level
+    // TV: the video itself holds the remote's focus (OK, left/right); up or down moves it onto the buttons
+    val tv = app.platform.tv
+    val videoFocus = remember { FocusRequester() }
+    val playFocus = remember { FocusRequester() }
+    var toBar by remember { mutableStateOf(false) }
+    var eatBack by remember { mutableStateOf(false) }
 
     LaunchedEffect(shown, poke, st.playing, dragging, settings) {
         if (shown && st.playing && dragging == null && !settings) {
@@ -147,6 +168,14 @@ private fun Controls(app: AppState, fullscreen: Boolean) {
     LaunchedEffect(jump) {
         if (jump != null) { delay(700); jump = null }
     }
+    if (tv) {
+        LaunchedEffect(Unit) { runCatching { videoFocus.requestFocus() } }
+        // the buttons fade away: the focus goes back to the video instead of getting lost
+        LaunchedEffect(shown) { if (!shown) runCatching { videoFocus.requestFocus() } }
+        LaunchedEffect(toBar, shown) {
+            if (toBar && shown) { delay(60); runCatching { playFocus.requestFocus() }; toBar = false }
+        }
+    }
 
     fun seekBy(sec: Int) {
         val to = (st.positionMs + sec * 1000L).coerceIn(0, maxOf(0, st.durationMs - 500))
@@ -155,11 +184,47 @@ private fun Controls(app: AppState, fullscreen: Boolean) {
 
     fun toggle() { if (st.playing) player.pause() else player.play() }
 
+    /** the remote while the video has the focus; false lets the key move the focus instead */
+    fun remote(key: Key): Boolean {
+        when (key) {
+            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> when {
+                !fullscreen -> app.setFull(true)
+                st.ended -> if (app.playback.next != null) app.playback.skipNext() else { player.seekTo(0); player.play() }
+                else -> toggle()
+            }
+            Key.DirectionLeft, Key.DirectionRight -> {
+                if (!fullscreen) return false
+                val side = if (key == Key.DirectionLeft) -1 else 1
+                seekBy(side * 10)
+                jump = side to ((if (jump?.first == side) jump!!.second else 0) + 10)
+            }
+            Key.DirectionUp, Key.DirectionDown -> if (fullscreen) toBar = true else return false
+            else -> return playerKey(app, key)
+        }
+        shown = true; poke++
+        return true
+    }
+
     val blank = app.platform.blankPointer
     // the mouse: on the outer box, so moving over the buttons counts too
     BoxWithConstraints(
         Modifier.fillMaxSize()
             .let { if (blank != null && !shown && st.playing) it.pointerHoverIcon(blank) else it }
+            // TV: any key brings the controls back; Back hides them first, then leaves
+            .let {
+                if (!tv) it else it.onPreviewKeyEvent { e ->
+                    if (e.key == Key.Back) {
+                        when {
+                            e.type == KeyEventType.KeyDown && shown && st.playing && !settings -> { shown = false; eatBack = true; true }
+                            e.type == KeyEventType.KeyUp && eatBack -> { eatBack = false; true }
+                            else -> false
+                        }
+                    } else {
+                        if (e.type == KeyEventType.KeyDown) { shown = true; poke++ }
+                        false
+                    }
+                }
+            }
             .pointerInput(touch) {
                 if (touch) return@pointerInput
                 awaitPointerEventScope {
@@ -185,6 +250,7 @@ private fun Controls(app: AppState, fullscreen: Boolean) {
         // taps and clicks anywhere on the video
         Box(
             Modifier.fillMaxSize()
+                .let { if (tv) it.onKeyEvent { e -> e.type == KeyEventType.KeyDown && remote(e.key) }.focusRequester(videoFocus).focusable() else it }
                 .pointerInput(touch, st.durationMs, w) {
                     detectTapGestures(
                         onTap = { o ->
@@ -271,7 +337,7 @@ private fun Controls(app: AppState, fullscreen: Boolean) {
         }
         AnimatedVisibility(shown || st.ended || !st.playing && !touch, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             if (touch) TouchOverlay(app, st, fullscreen, dragging, { dragging = it; poke++ }, { dragging = null }, ::seekBy, { poke++ }, { settings = true })
-            else MouseOverlay(app, st, fullscreen, dragging, { dragging = it; poke++ }, { dragging = null }, settings, { settings = it; poke++ })
+            else MouseOverlay(app, st, fullscreen, dragging, { dragging = it; poke++ }, { dragging = null }, settings, { settings = it; poke++ }, playFocus.takeIf { tv })
         }
         // a thin progress line while the controls are hidden (not in full screen)
         if (!shown && !fullscreen && st.durationMs > 0 && st.playing) {
@@ -355,6 +421,7 @@ private fun CenterButton(icon: ImageVector, label: String, size: Int, onClick: (
 private fun MouseOverlay(
     app: AppState, st: PlayerState, fullscreen: Boolean, dragging: Float?,
     onDrag: (Float) -> Unit, onDragEnd: () -> Unit, settings: Boolean, setSettings: (Boolean) -> Unit,
+    playFocus: FocusRequester? = null,
 ) {
     val player = app.platform.player
     Box(Modifier.fillMaxSize()) {
@@ -390,7 +457,8 @@ private fun MouseOverlay(
         ) {
             SeekBar(st, dragging, onDrag) { f -> player.seekTo((f * st.durationMs).toLong()); onDragEnd() }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Bar(if (st.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, tr(if (st.playing) "Pause" else "Play")) {
+                Bar(if (st.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, tr(if (st.playing) "Pause" else "Play"),
+                    playFocus?.let { Modifier.focusRequester(it) } ?: Modifier) {
                     if (st.ended) { player.seekTo(0); player.play() } else if (st.playing) player.pause() else player.play()
                 }
                 if (app.playback.next != null) Bar(Icons.Filled.SkipNext, tr("Next")) { app.playback.skipNext() }
@@ -413,8 +481,8 @@ private fun MouseOverlay(
 }
 
 @Composable
-private fun Bar(icon: ImageVector, label: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick) { Icon(icon, label, tint = Color.White, modifier = Modifier.size(26.dp)) }
+private fun Bar(icon: ImageVector, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = modifier) { Icon(icon, label, tint = Color.White, modifier = Modifier.size(26.dp)) }
 }
 
 @Composable

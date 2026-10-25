@@ -35,7 +35,7 @@ import app.tubehaus.data.Transfer
 import app.tubehaus.rec.Learn
 import kotlin.math.abs
 
-const val VERSION = "0.4.0"
+const val VERSION = "0.5.0"
 
 @Composable
 fun SettingsScreen(app: AppState) {
@@ -59,6 +59,10 @@ fun SettingsScreen(app: AppState) {
                 val sizes = listOf(1f to tr("Normal"), 1.15f to tr("Large"), 1.3f to tr("Larger"), 1.5f to tr("Largest"))
                 Choice(tr("Text size"), sizes.firstOrNull { it.first == s.textScale }?.second ?: tr("Normal"),
                     sizes.map { "${it.first}" to it.second }) { c -> set { it.copy(textScale = c.toFloat()) } }
+            }
+            if (app.platform.name == "android") item {
+                val modes = listOf("0" to tr("Automatic"), "1" to tr("On"), "2" to tr("Off"))
+                Choice(tr("TV mode"), modes.getOrNull(s.tvMode)?.second ?: modes[0].second, modes) { c -> set { it.copy(tvMode = c.toInt()) } }
             }
             if (app.platform.touch) item {
                 Toggle(tr("Hide the tabs while scrolling"), tr("The tabs and the top bar slide away as you scroll down"), s.autoHideNav) { b -> set { it.copy(autoHideNav = b) } }

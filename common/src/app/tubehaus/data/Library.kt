@@ -111,6 +111,8 @@ data class Settings(
     val underVideo: Int = 0,
     /** desktop and tablets: the side menu folded into a small button */
     val railCollapsed: Boolean = false,
+    /** Android: the TV layout and remote keys; 0 when the device is a TV, 1 always, 2 never */
+    val tvMode: Int = 0,
     val checkedAt: Long = 0,
     val skipVersion: String = "",
 )

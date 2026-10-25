@@ -15,6 +15,8 @@ interface Platform {
     val cacheDir: File
     /** phones get the bottom bar and portrait layouts; desktops a wider grid */
     val touch: Boolean
+    /** a TV (Android TV, Google TV): the remote moves a visible focus, and videos fill the screen */
+    val tv: Boolean get() = false
     val player: VideoPlayer
 
     /** a share sheet where there is one; false when the link was copied to the clipboard instead */
