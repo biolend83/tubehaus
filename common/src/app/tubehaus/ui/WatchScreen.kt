@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.input.pointer.pointerInput
@@ -98,19 +99,19 @@ fun WatchScreen(app: AppState) {
                     // the description, buttons and channel move into the panel (Details)
                     Column(Modifier.weight(1f).fillMaxHeight().padding(12.dp), verticalArrangement = Arrangement.Center) {
                         PlayerBox(app)
-                        Text(v.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        if (set.underVideo != 2) Text(v.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 10.dp))
                     }
                 } else {
                     LazyColumn(Modifier.weight(1f).padding(16.dp)) {
                         item { PlayerBox(app) }
-                        item { Info(app, v) }
+                        under(app, v)
                     }
                 }
                 val tabs = buildList {
                     if (hasRelated) add("next" to tr("Up next"))
                     if (token != null) add("comments" to tr("Comments"))
-                    if (tablet) add("details" to tr("Details"))
+                    if (tablet && set.underVideo != 2) add("details" to tr("Details"))
                 }
                 if (tabs.isNotEmpty()) {
                     val shown = side.takeIf { s -> tabs.any { it.first == s } } ?: tabs.first().first
@@ -136,7 +137,7 @@ fun WatchScreen(app: AppState) {
                     CommentsPanel(app, token) { commentsOpen = false }
                 } else {
                     LazyColumn(Modifier.fillMaxSize()) {
-                        item { Info(app, v) }
+                        under(app, v)
                         if (token != null) item { CommentsTeaser { commentsOpen = true } }
                         related(app, big = true)
                     }
@@ -167,8 +168,10 @@ private fun PlayerBox(app: AppState) {
         val v = pb.video
         when {
             pb.error != null -> Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(pb.error!!, color = Color.White)
-                Button(onClick = { pb.retry() }, modifier = Modifier.padding(top = 12.dp)) { Text(tr("Try again")) }
+                Text(pb.error!!, color = Color.White, textAlign = TextAlign.Center)
+                if (pb.errorAge) Button(onClick = { app.platform.openExternal("https://www.youtube.com/watch?v=" + (v?.id ?: "")) },
+                    modifier = Modifier.padding(top = 12.dp)) { Text(tr("Open on YouTube")) }
+                else Button(onClick = { pb.retry() }, modifier = Modifier.padding(top = 12.dp)) { Text(tr("Try again")) }
             }
             pb.loading || st.videoId != v?.id -> {
                 if (v != null && !app.store.settings.value.hideThumbs) Img(v.thumbHigh, Modifier.fillMaxSize())
@@ -267,6 +270,17 @@ private fun Chip(icon: ImageVector, label: String, onClick: () -> Unit) {
         border = null,
         colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     )
+}
+
+/** What sits under the video, by Settings → Under the video: everything, only the title, or nothing. */
+private fun LazyListScope.under(app: AppState, v: Video) {
+    when (app.store.settings.value.underVideo) {
+        0 -> item { Info(app, v) }
+        1 -> item {
+            Text(v.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
+        }
+    }
 }
 
 /** The comments with a title and a close button: under the video on a phone, beside it in full screen. */
