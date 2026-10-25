@@ -28,6 +28,8 @@ class Playback(private val app: AppState) {
     var details by mutableStateOf<Details?>(null)
         private set
     var error by mutableStateOf<String?>(null)
+    /** the error is YouTube's age check, which needs a signed-in account: the player offers YouTube instead */
+    var errorAge by mutableStateOf(false)
         private set
     var loading by mutableStateOf(false)
         private set
@@ -69,7 +71,7 @@ class Playback(private val app: AppState) {
         queue = newQueue.filter { it.id != v.id }
         stream = null
         details = null
-        error = null
+        error = null; errorAge = false
         loading = true
         watchedMs = 0
         learned = false
@@ -97,7 +99,12 @@ class Playback(private val app: AppState) {
                 )
                 start(s, startSec ?: store.position(v.id))
             } catch (e: YtError) {
-                error = if (e.kind == YtError.Kind.LOGIN) tr(BOT_CHECK) else e.message
+                errorAge = e.kind == YtError.Kind.AGE
+                error = when (e.kind) {
+                    YtError.Kind.LOGIN -> tr(BOT_CHECK)
+                    YtError.Kind.AGE -> tr("This video has an age check, and YouTube only shows it to a signed-in account. You can watch it on YouTube.")
+                    else -> e.message
+                }
             } catch (e: Exception) {
                 error = e.message ?: e.toString()
             } finally {
@@ -186,7 +193,7 @@ class Playback(private val app: AppState) {
         finishCurrent()
         job?.cancel()
         player.stop()
-        video = null; stream = null; details = null; error = null; queue = emptyList()
+        video = null; stream = null; details = null; error = null; errorAge = false; queue = emptyList()
     }
 
     fun skipNext() {

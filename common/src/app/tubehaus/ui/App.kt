@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.automirrored.filled.MenuOpen
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.AnimatedVisibility
@@ -159,6 +161,9 @@ private fun Shell(app: AppState) {
     // while scrolling down and come back scrolling up
     val autoHide = app.platform.touch && app.store.settings.state.collectAsState().value.autoHideNav
     var navShown by remember { mutableStateOf(true) }
+    // the side menu folded away: a small menu button brings it back (in the top bar, or above the video)
+    val railCollapsed = !compact && app.store.settings.state.collectAsState().value.railCollapsed
+    val unfold = { app.store.settings.update { it.copy(railCollapsed = false) } }
     val navScroll = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
@@ -173,7 +178,7 @@ private fun Shell(app: AppState) {
         if (cur is Screen.Shorts) app.playback.close()
     }
     Scaffold(
-        topBar = { if (showTop) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) { TopBar(app) } },
+        topBar = { if (showTop) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) { TopBar(app, if (railCollapsed) unfold else null) } },
         bottomBar = {
             Column {
                 if (app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts) MiniPlayer(app)
@@ -195,8 +200,15 @@ private fun Shell(app: AppState) {
     ) { pad ->
         Row(Modifier.fillMaxSize().padding(pad).let { if (autoHide) it.nestedScroll(navScroll) else it }) {
             // tablets: the side rail steps aside while watching, so the video gets the room
-            if (!compact && !(cur is Screen.Watch && app.platform.touch)) AnimatedVisibility(navShown || !autoHide, enter = expandHorizontally(), exit = shrinkHorizontally()) {
-                NavigationRail(containerColor = MaterialTheme.colorScheme.background) {
+            if (!compact && !(cur is Screen.Watch && app.platform.touch) && !railCollapsed) AnimatedVisibility(navShown || !autoHide, enter = expandHorizontally(), exit = shrinkHorizontally()) {
+                NavigationRail(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    header = {
+                        IconButton(onClick = { app.store.settings.update { it.copy(railCollapsed = true) } }) {
+                            Icon(Icons.AutoMirrored.Filled.MenuOpen, tr("Fold the menu"))
+                        }
+                    },
+                ) {
                     for (t in tabs(app)) {
                         val sel = root == t.screen
                         NavigationRailItem(
@@ -207,7 +219,12 @@ private fun Shell(app: AppState) {
                     }
                 }
             }
-            Box(Modifier.weight(1f).fillMaxHeight()) {
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+              // the watch page has no top bar: the folded menu's button sits in a slim row above the video
+              if (railCollapsed && cur is Screen.Watch && !app.platform.touch) {
+                  IconButton(onClick = unfold, modifier = Modifier.padding(start = 4.dp).size(36.dp)) { Icon(Icons.Filled.Menu, tr("Menu")) }
+              }
+              Box(Modifier.weight(1f).fillMaxWidth()) {
                 key(cur) {
                     when (cur) {
                         Screen.Home -> HomeScreen(app)
@@ -225,6 +242,7 @@ private fun Shell(app: AppState) {
                         is Screen.Local -> LocalListScreen(app, cur.key)
                     }
                 }
+              }
             }
         }
     }
@@ -284,9 +302,10 @@ fun Logo(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TopBar(app: AppState) {
+private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null) {
     Column {
         Row(Modifier.fillMaxWidth().height(52.dp).padding(start = 14.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (onMenu != null) IconButton(onClick = onMenu) { Icon(Icons.Filled.Menu, tr("Menu")) }
             if (app.stack.size > 1) {
                 IconButton(onClick = { app.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) }
             }

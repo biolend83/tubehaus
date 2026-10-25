@@ -107,6 +107,10 @@ data class Settings(
     val sideTab: String = "next",
     /** phones: the search box at the bottom, within reach of a thumb */
     val searchAtBottom: Boolean = false,
+    /** under the video: 0 everything, 1 only the title, 2 nothing (just the player) */
+    val underVideo: Int = 0,
+    /** desktop and tablets: the side menu folded into a small button */
+    val railCollapsed: Boolean = false,
     val checkedAt: Long = 0,
     val skipVersion: String = "",
 )
