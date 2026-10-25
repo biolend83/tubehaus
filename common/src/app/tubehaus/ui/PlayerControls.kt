@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.outlined.Comment
 import androidx.compose.animation.AnimatedVisibility
@@ -162,10 +163,19 @@ private fun Controls(app: AppState, fullscreen: Boolean) {
             .pointerInput(touch) {
                 if (touch) return@pointerInput
                 awaitPointerEventScope {
+                    // only a real move counts: hiding the pointer makes Windows send move events
+                    // with the pointer where it was, which kept the controls up for good
+                    var last: Offset? = null
                     while (true) {
-                        when (awaitPointerEvent().type) {
-                            PointerEventType.Move, PointerEventType.Enter -> { shown = true; poke++ }
-                            PointerEventType.Exit -> if (st.playing && !settings) shown = false
+                        val e = awaitPointerEvent()
+                        val at = e.changes.firstOrNull()?.position
+                        when (e.type) {
+                            PointerEventType.Move, PointerEventType.Enter -> {
+                                val moved = at == null || last == null || (at - last!!).getDistance() > 3f
+                                last = at
+                                if (moved) { shown = true; poke++ }
+                            }
+                            PointerEventType.Exit -> { last = null; if (st.playing && !settings) shown = false }
                         }
                     }
                 }
