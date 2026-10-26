@@ -147,7 +147,7 @@ private val KO = mapOf(
     "Skip this version" to "이 버전 건너뛰기",
     "Later" to "나중에",
     "Check for updates" to "업데이트 확인",
-    "Once a day, on GitHub: a newer version, and fixes for when YouTube changes something. Nothing about you is sent." to "하루 한 번 GitHub에서 새 버전과, 유튜브가 바뀌었을 때의 수정 사항을 확인해요. 내 정보는 아무것도 보내지 않아요.",
+    "Each time the app opens, on GitHub: a newer version, and fixes for when YouTube changes something. Nothing about you is sent." to "앱을 열 때마다 GitHub에서 새 버전과, 유튜브가 바뀌었을 때의 수정 사항을 확인해요. 내 정보는 아무것도 보내지 않아요.",
     "Check now" to "지금 확인",
     "See if a newer version is out" to "새 버전이 나왔는지 확인해요",
     "TubeHaus is up to date" to "최신 버전이에요",
