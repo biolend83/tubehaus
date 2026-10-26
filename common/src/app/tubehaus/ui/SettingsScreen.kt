@@ -106,7 +106,7 @@ fun SettingsScreen(app: AppState) {
                 Choice(tr("Under the video"), opts.getOrNull(s.underVideo)?.second ?: opts[0].second, opts) { c -> set { it.copy(underVideo = c.toInt()) } }
             }
             // with "everything": each part on its own (grey while "nothing" or "only the title" is chosen)
-            items(UNDER_PARTS.filter { (k, _) -> k != "download" || app.platform.name == "android" }) { (k, label) ->
+            items(UNDER_PARTS) { (k, label) ->
                 Box(Modifier.padding(start = 24.dp).alpha(if (s.underVideo == 0) 1f else 0.4f)) {
                     Toggle(tr(label), "", k !in s.hideUnder, enabled = s.underVideo == 0) { b ->
                         set { it.copy(hideUnder = if (b) it.hideUnder - k else (it.hideUnder + k).distinct()) }

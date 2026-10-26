@@ -104,6 +104,31 @@ fun main() = runBlocking {
         val s = YouTube.stream("dQw4w9WgXcQ")
         Clients.PLAYERS.joinToString { "${it.name} ${it.version} ${it.extra}" } + " -> stream via " + s.client
     }
+    // offline saving: what it picks, and a whole short video downloaded the way the app does it (10 MB ranges)
+    check("offline pick") {
+        val s = YouTube.stream("aqz-KE-bpKQ")
+        val v = app.tubehaus.ui.Offline.pickVideo(s.video, 1080)!!
+        val a = app.tubehaus.ui.Offline.pickAudio(s.audio, v)!!
+        val v4 = app.tubehaus.ui.Offline.pickVideo(s.video, 2160)!!
+        "1080 -> ${v.height}p ${v.codecs}, audio ${a.codecs} ${a.bitrate / 1000}k; 2160 -> ${v4.height}p ${v4.codecs}"
+    }
+    check("offline fetch") {
+        val s = YouTube.stream("jNQXAC9IVRw")
+        val v = app.tubehaus.ui.Offline.pickVideo(s.video, 360)!!
+        val a = app.tubehaus.ui.Offline.pickAudio(s.audio, v)!!
+        fun whole(url: String, len: Long): Long {
+            var have = 0L
+            while (have < len) {
+                val r = Net.client.newCall(Request.Builder().url(url).header("Range", "bytes=$have-${minOf(len - 1, have + (10L shl 20) - 1)}").build()).execute()
+                r.use { require(r.code == 206) { "HTTP ${r.code}" }; have += r.body!!.bytes().size }
+            }
+            return have
+        }
+        val vb = whole(v.url, v.contentLength)
+        val ab = whole(a.url, a.contentLength)
+        require(vb == v.contentLength && ab == a.contentLength)
+        "video ${v.height}p ${v.codecs} $vb B, audio ${a.codecs} $ab B (index ${v.indexRange}, ${a.indexRange})"
+    }
     println(if (fails == 0) "\nall good" else "\n$fails failed")
     Net.client.dispatcher.executorService.shutdown()
 }

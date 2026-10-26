@@ -113,6 +113,8 @@ data class Settings(
     val hideUnder: List<String> = emptyList(),
     /** desktop and tablets: the side menu folded into a small button */
     val railCollapsed: Boolean = false,
+    /** the quality a download is saved in (the last one chosen) */
+    val offlineHeight: Int = 720,
     /** Android: the TV layout and remote keys; 0 when the device is a TV, 1 always, 2 never */
     val tvMode: Int = 0,
     val checkedAt: Long = 0,
