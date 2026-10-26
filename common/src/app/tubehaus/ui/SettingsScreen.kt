@@ -35,7 +35,7 @@ import app.tubehaus.data.Transfer
 import app.tubehaus.rec.Learn
 import kotlin.math.abs
 
-const val VERSION = "0.5.0"
+const val VERSION = "0.5.1"
 
 @Composable
 fun SettingsScreen(app: AppState) {
@@ -52,7 +52,9 @@ fun SettingsScreen(app: AppState) {
                 SItem(tr("Region"), s.region.ifEmpty { app.platform.deviceRegion() + " (" + tr("from this device") + ")" }) { dialog = "region" }
             }
             item {
-                val themes = listOf("0" to tr("Follow the system"), "1" to tr("Light"), "2" to tr("Dark"), "3" to tr("Black (AMOLED)"))
+                val themes = listOf("0" to tr("Follow the system"), "1" to tr("Light"), "2" to tr("Dark"), "3" to tr("Black (AMOLED)")) +
+                    // Android 12+: Material You, the colours of the wallpaper
+                    listOfNotNull(("4" to tr("Wallpaper colours")).takeIf { app.platform.wallpaperColors(false) != null })
                 Choice(tr("Theme"), themes.getOrNull(s.dark)?.second ?: themes[0].second, themes) { c -> set { it.copy(dark = c.toInt()) } }
             }
             item {

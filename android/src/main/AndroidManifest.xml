@@ -14,6 +14,13 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
+    <!-- the downloader apps a video link can be handed to (Download in a video's menu) -->
+    <queries>
+        <package android:name="com.deniscerri.ytdl" />
+        <package android:name="com.junkfood.seal" />
+        <package android:name="com.junkfood.seal.foss" />
+    </queries>
+
     <application
         android:name=".TubeApp"
         android:allowBackup="false"

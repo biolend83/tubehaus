@@ -299,22 +299,26 @@ private fun Controls(app: AppState, fullscreen: Boolean) {
                     )
                 },
         )
+        // a small round meter on the side being swiped, out of the middle of the picture
         gesture?.let { (kind, level) ->
-            Row(
-                Modifier.align(Alignment.Center).background(Color(0x99000000), RoundedCornerShape(24.dp)).padding(horizontal = 18.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                Modifier.align(if (kind == "brightness") Alignment.CenterStart else Alignment.CenterEnd).padding(horizontal = 40.dp)
+                    .background(Color(0x80000000), RoundedCornerShape(36.dp)).padding(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 val icon = when {
                     kind == "brightness" -> Icons.Filled.BrightnessMedium
                     level == 0f -> Icons.AutoMirrored.Filled.VolumeOff
                     else -> Icons.AutoMirrored.Filled.VolumeUp
                 }
-                Icon(icon, null, tint = Color.White)
-                LinearProgressIndicator(
-                    progress = { level }, color = Color.White, trackColor = Color(0x55FFFFFF),
-                    modifier = Modifier.padding(horizontal = 12.dp).width(120.dp),
-                )
-                Text("${(level * 100).toInt()}%", color = Color.White, fontSize = 13.sp)
+                Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        progress = { level }, color = Color.White, trackColor = Color(0x40FFFFFF), strokeWidth = 4.dp,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    Icon(icon, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                }
+                Text("${(level * 100).toInt()}", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
             }
         }
         // the "10 seconds" bubble of a double-tap

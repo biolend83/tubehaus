@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import androidx.compose.material3.ColorScheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
@@ -56,8 +57,15 @@ private val type = Typography(
 )
 
 @Composable
-fun TubeTheme(mode: Int, content: @Composable () -> Unit) {
-    // 0 follow the system, 1 light, 2 dark, 3 black (pure black for AMOLED screens)
+fun TubeTheme(mode: Int, wallpaper: ((Boolean) -> ColorScheme?)? = null, content: @Composable () -> Unit) {
+    // 0 follow the system, 1 light, 2 dark, 3 black (pure black for AMOLED screens),
+    // 4 the wallpaper's colours (Material You, Android 12+), light or dark with the system
     val darkOn = when (mode) { 1 -> false; 2, 3 -> true; else -> isSystemInDarkTheme() }
-    MaterialTheme(colorScheme = if (mode == 3) black else if (darkOn) dark else light, typography = type, content = content)
+    val scheme = when {
+        mode == 3 -> black
+        mode == 4 -> wallpaper?.invoke(darkOn) ?: if (darkOn) dark else light
+        darkOn -> dark
+        else -> light
+    }
+    MaterialTheme(colorScheme = scheme, typography = type, content = content)
 }

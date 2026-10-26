@@ -91,6 +91,8 @@ private val KO = mapOf(
     "Within reach of your thumb" to "엄지가 닿는 곳에 둬요",
     "Black (AMOLED)" to "블랙 (AMOLED)",
     "TV mode" to "TV 모드",
+    "Wallpaper colours" to "배경화면 색",
+    "Install YTDLnis or Seal to download videos" to "영상을 받으려면 YTDLnis 나 Seal 앱을 설치하세요",
     "Automatic" to "자동",
     "On" to "켜기",
     "This video has an age check, and YouTube only shows it to a signed-in account. You can watch it on YouTube." to "나이 확인이 필요한 영상이에요. 유튜브는 로그인한 계정에만 보여 줘요. 유튜브에서 볼 수 있어요.",
