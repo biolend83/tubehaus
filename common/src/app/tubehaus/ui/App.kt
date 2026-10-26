@@ -162,6 +162,7 @@ fun App(app: AppState) {
                     LaunchedEffect(settings.hideBars) { app.platform.setImmersive(settings.hideBars) }
                     LaunchedEffect(settings.longBuffer) { app.platform.player.setReadAhead(settings.longBuffer) }
                     app.update?.let { UpdateDialog(app, it) }
+                    app.offline.asking?.let { OfflineDialog(app, it) }
                 }
             }
         }
@@ -293,6 +294,7 @@ private fun Shell(app: AppState) {
                         is Screen.Channel -> ChannelScreen(app, cur.id, cur.name)
                         is Screen.Playlist -> PlaylistScreen(app, cur.id, cur.title)
                         is Screen.Local -> LocalListScreen(app, cur.key)
+                        Screen.Downloads -> DownloadsScreen(app)
                     }
                   }
                 }

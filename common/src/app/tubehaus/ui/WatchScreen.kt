@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.outlined.Downloading
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -267,10 +269,22 @@ private fun Actions(app: AppState, v: Video, has: (String) -> Boolean) {
         if (has("later")) item { Chip(if (saved) Icons.Filled.WatchLater else Icons.Outlined.WatchLater, tr("Watch later")) { app.store.setInList("wl", v, !saved) } }
         if (has("save")) item { Chip(Icons.Outlined.LibraryAdd, tr("Save")) { pick = true } }
         if (has("share")) item { Chip(Icons.Outlined.Share, tr("Share")) { app.share(v.title, "https://youtu.be/${v.id}") } }
-        if (app.platform.name == "android" && has("download")) item { Chip(Icons.Outlined.Download, tr("Download")) { app.download(v) } }
+        if (has("download") && !v.live) item { DownloadChip(app, v) }
         if (pb.next != null && has("next")) item { Chip(Icons.Outlined.SkipNext, tr("Next")) { pb.skipNext() } }
     }
     if (pick) PlaylistPicker(v, app) { pick = false }
+}
+
+/** Download → the percentage while it saves → Downloaded (it plays without internet) */
+@Composable
+private fun DownloadChip(app: AppState, v: Video) {
+    val saved by app.offline.saved.collectAsState()
+    val p = app.offline.progress[v.id]
+    when {
+        v.id in saved.items -> Chip(Icons.Filled.DownloadDone, tr("Downloaded")) { app.go(Screen.Downloads) }
+        p != null -> Chip(Icons.Outlined.Downloading, "${(p * 100).toInt()}%") { app.go(Screen.Downloads) }
+        else -> Chip(Icons.Outlined.Download, tr("Download")) { app.offline.asking = v }
+    }
 }
 
 @Composable

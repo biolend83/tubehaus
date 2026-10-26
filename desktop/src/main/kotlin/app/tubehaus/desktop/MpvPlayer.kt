@@ -274,6 +274,8 @@ class MpvPlayer : VideoPlayer {
         return main.filter { it.codecFamily == "opus" }.maxByOrNull { it.bitrate } ?: main.maxByOrNull { it.bitrate }
     }
 
+    private fun source(u: String) = if (u.startsWith("file:")) java.io.File(java.net.URI(u)).absolutePath else LocalProxy.wrap(u)
+
     private fun open(startMs: Long) {
         val s = stream ?: return
         if (mpv() == null) {
@@ -289,9 +291,10 @@ class MpvPlayer : VideoPlayer {
         } else {
             val cap = if (pinned > 0) pinned else opts.maxHeight
             val v = pickVideo(s, cap) ?: return
-            // through the local proxy, which fetches in 10 MB pieces (YouTube crawls on one long request)
-            url = LocalProxy.wrap(v.url)
-            pickAudio(s)?.let { a -> cmd("change-list", "audio-files", "append", LocalProxy.wrap(a.url)) }
+            // through the local proxy, which fetches in 10 MB pieces (YouTube crawls on one long request);
+            // a downloaded video is opened straight from its files
+            url = source(v.url)
+            pickAudio(s)?.let { a -> cmd("change-list", "audio-files", "append", source(a.url)) }
         }
         set("start", if (startMs > 0) "+%.1f".format(java.util.Locale.ROOT, startMs / 1000.0) else "none")
         set("loop-file", if (opts.loop) "inf" else "no")
