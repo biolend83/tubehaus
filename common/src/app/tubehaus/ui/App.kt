@@ -1,5 +1,9 @@
 package app.tubehaus.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.RippleConfiguration
 import androidx.compose.material.ripple.RippleAlpha
@@ -117,7 +121,7 @@ fun App(app: AppState) {
             .build()
     }
     key(lang, settings.tvMode) {
-        TubeTheme(settings.dark) {
+        TubeTheme(settings.dark, app.platform::wallpaperColors) {
             val tv = app.platform.tv
             CompositionLocalProvider(
                 LocalPlatform provides app.platform,
@@ -255,6 +259,11 @@ private fun Shell(app: AppState) {
               }
               Box(Modifier.weight(1f).fillMaxWidth()) {
                 key(cur) {
+                  // a new page fades in and rises a little (not the watch page or Shorts: a video surface
+                  // shouldn't be see-through while it starts)
+                  val shown = remember { Animatable(if (cur is Screen.Watch || cur is Screen.Shorts) 1f else 0f) }
+                  LaunchedEffect(Unit) { shown.animateTo(1f, tween(220, easing = FastOutSlowInEasing)) }
+                  Box(Modifier.fillMaxSize().graphicsLayer { alpha = shown.value; translationY = (1f - shown.value) * 24.dp.toPx() }) {
                     when (cur) {
                         Screen.Home -> HomeScreen(app)
                         Screen.Shorts -> ShortsScreen(app)
@@ -270,6 +279,7 @@ private fun Shell(app: AppState) {
                         is Screen.Playlist -> PlaylistScreen(app, cur.id, cur.title)
                         is Screen.Local -> LocalListScreen(app, cur.key)
                     }
+                  }
                 }
               }
             }

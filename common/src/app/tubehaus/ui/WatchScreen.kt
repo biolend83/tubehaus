@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.runtime.LaunchedEffect
@@ -263,6 +264,7 @@ private fun Actions(app: AppState, v: Video) {
         item { Chip(if (saved) Icons.Filled.WatchLater else Icons.Outlined.WatchLater, tr("Watch later")) { app.store.setInList("wl", v, !saved) } }
         item { Chip(Icons.Outlined.LibraryAdd, tr("Save")) { pick = true } }
         item { Chip(Icons.Outlined.Share, tr("Share")) { app.share(v.title, "https://youtu.be/${v.id}") } }
+        if (app.platform.name == "android") item { Chip(Icons.Outlined.Download, tr("Download")) { app.download(v) } }
         if (pb.next != null) item { Chip(Icons.Outlined.SkipNext, tr("Next")) { pb.skipNext() } }
     }
     if (pick) PlaylistPicker(v, app) { pick = false }
