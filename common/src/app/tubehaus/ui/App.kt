@@ -153,7 +153,12 @@ fun App(app: AppState) {
                             }
                         }
                     }
-                    LaunchedEffect(Unit) { app.checkForUpdates(); app.fillSubInfo() }
+                    LaunchedEffect(Unit) {
+                        app.fillSubInfo()
+                        // at start, and every hour for a window left open (Android also asks each time
+                        // the app comes back to the front: MainActivity.onStart)
+                        while (true) { app.checkForUpdates(); kotlinx.coroutines.delay(3_600_000) }
+                    }
                     LaunchedEffect(settings.hideBars) { app.platform.setImmersive(settings.hideBars) }
                     LaunchedEffect(settings.longBuffer) { app.platform.player.setReadAhead(settings.longBuffer) }
                     app.update?.let { UpdateDialog(app, it) }

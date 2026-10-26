@@ -165,6 +165,12 @@ class MainActivity : ComponentActivity() {
     private fun autoRotate() =
         android.provider.Settings.System.getInt(contentResolver, android.provider.Settings.System.ACCELEROMETER_ROTATION, 0) == 1
 
+    override fun onStart() {
+        super.onStart()
+        // opening the app again (it often stays alive in the background): look for a new version
+        state.checkForUpdates()
+    }
+
     override fun onResume() {
         super.onResume()
         if (!state.platform.tv && tilt.canDetectOrientation()) tilt.enable()
