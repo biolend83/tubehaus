@@ -53,8 +53,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: libmpv
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $rel = Invoke-RestMethod https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest
+          # with the workflow's token: GitHub's anonymous API limit is shared by all runners and sometimes runs out
+          $rel = Invoke-RestMethod https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }
           # the plain x86_64 build, not -v3: that one needs AVX2 and won't start on older PCs
           $asset = $rel.assets | Where-Object { $_.name -like 'mpv-dev-x86_64-*.7z' -and $_.name -notlike '*-v3-*' } | Select-Object -First 1
           Invoke-WebRequest $asset.browser_download_url -OutFile mpv-dev.7z
