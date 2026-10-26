@@ -92,6 +92,8 @@ private val KO = mapOf(
     "Black (AMOLED)" to "블랙 (AMOLED)",
     "TV mode" to "TV 모드",
     "Resume" to "이어보기",
+    "Immersive mode" to "몰입 모드",
+    "Choose what shows under a video while you watch: everything, only the title, or just the player. With everything, switch off the parts you don't want one by one." to "영상을 볼 때 아래에 무엇을 보일지 골라요: 모두, 제목만, 플레이어만. '모두 보이기'에서는 필요 없는 항목을 하나씩 끌 수 있어요.",
     "Title" to "제목",
     "View count" to "조회수",
     "Upload date" to "올린 날짜",

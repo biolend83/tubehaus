@@ -82,6 +82,13 @@ class DesktopPlatform : Platform {
 }
 
 fun main() {
+    // macOS: the title bar's light or dark look is fixed when the window system starts, so it is
+    // chosen here from the saved theme (dark and black: dark; light: light; otherwise the system's)
+    if (isMac) {
+        val dir = File("$home/Library/Application Support", "TubeHaus")
+        val theme = runCatching { Regex(""""dark"\s*:\s*(\d)""").find(File(dir, "settings.json").readText())?.groupValues?.get(1) }.getOrNull()
+        System.setProperty("apple.awt.application.appearance", when (theme) { "2", "3" -> "NSAppearanceNameDarkAqua"; "1" -> "NSAppearanceNameAqua"; else -> "system" })
+    }
     // libmpv-2.dll: next to the installed app, or in desktop/resources/windows when run from Gradle;
     // on macOS Homebrew's mpv (Apple Silicon /opt/homebrew, Intel /usr/local), which isn't on the default search path
     val bundled = System.getProperty("compose.application.resources.dir") ?: File("resources/windows").absolutePath
