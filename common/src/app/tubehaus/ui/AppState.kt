@@ -84,10 +84,10 @@ class AppState(val platform: Platform, val store: Store) {
     /** a newer version to offer, found by [checkForUpdates] */
     var update by mutableStateOf<Remote.Release?>(null)
 
-    /** at most once a day unless [now]; [quiet]: say nothing when there is nothing new */
+    /** each time the app opens (at most every 10 minutes) unless [now]; [quiet]: say nothing when there is nothing new */
     fun checkForUpdates(now: Boolean = false, quiet: Boolean = true) {
         val set = store.settings.value
-        if (!now && (!set.checkUpdates || System.currentTimeMillis() - set.checkedAt < Remote.DAY)) return
+        if (!now && (!set.checkUpdates || System.currentTimeMillis() - set.checkedAt < 10 * 60_000L)) return
         scope.launch {
             store.settings.update { it.copy(checkedAt = System.currentTimeMillis()) }
             Remote.refreshClients()

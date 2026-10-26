@@ -139,7 +139,7 @@ fun SettingsScreen(app: AppState) {
 
             item { Group(tr("About")) }
             item {
-                Toggle(tr("Check for updates"), tr("Once a day, on GitHub: a newer version, and fixes for when YouTube changes something. Nothing about you is sent."), s.checkUpdates) { b -> set { it.copy(checkUpdates = b) } }
+                Toggle(tr("Check for updates"), tr("Each time the app opens, on GitHub: a newer version, and fixes for when YouTube changes something. Nothing about you is sent."), s.checkUpdates) { b -> set { it.copy(checkUpdates = b) } }
             }
             item {
                 SItem(tr("Check now"), tr("See if a newer version is out")) { app.checkForUpdates(now = true, quiet = false) }
