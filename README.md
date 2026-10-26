@@ -10,7 +10,7 @@ there too.
 
 For Apple Silicon Macs (M1 and later). There's no Intel build yet.
 
-**[⬇ macOS (Apple Silicon)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.0/TubeHaus-0.5.0-mac-arm64.dmg)** (0.5.0, beta)
+**[⬇ macOS (Apple Silicon)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.1/TubeHaus-0.5.1-mac-arm64.dmg)** (0.5.1, beta)
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · **macOS** · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
@@ -58,7 +58,7 @@ ExoPlayer (Media3) on Android, libmpv on Windows, macOS and Linux.
    brew install mpv
    ```
    If mpv is missing, the app tells you when you first play a video.
-2. Download the [.dmg](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.0/TubeHaus-0.5.0-mac-arm64.dmg), open it and drag TubeHaus into *Applications*.
+2. Download the [.dmg](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.1/TubeHaus-0.5.1-mac-arm64.dmg), open it and drag TubeHaus into *Applications*.
 3. The app isn't signed by Apple yet, so macOS blocks a plain double-click the first time:
    right-click TubeHaus → *Open* → *Open*. After that it opens normally.
 
