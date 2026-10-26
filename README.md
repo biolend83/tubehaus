@@ -8,7 +8,7 @@ No server, no account, no Google sign-in, no tracking. The app talks to YouTube 
 keeps your subscriptions, history and playlists on the device, and works out recommendations
 there too.
 
-**[⬇ .deb (Debian, Ubuntu, Mint)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.1/TubeHaus-0.5.1-linux-amd64.deb)** · **[⬇ .rpm (Fedora, openSUSE)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.1/TubeHaus-0.5.1-linux-x86_64.rpm)** · **[⬇ tar.gz (Arch, CachyOS, any distro)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.1/TubeHaus-0.5.1-linux-x64.tar.gz)** (0.5.1, beta)
+**[⬇ .deb (Debian, Ubuntu, Mint)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2-linux-amd64.deb)** · **[⬇ .rpm (Fedora, openSUSE)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2-linux-x86_64.rpm)** · **[⬇ tar.gz (Arch, CachyOS, any distro)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2-linux-x64.tar.gz)** (0.5.2, beta)
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · **Linux** · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
@@ -16,6 +16,8 @@ there too.
 
 ## What it does
 
+- **Offline downloads** — save a video in the quality you pick and watch it without internet
+  (Library → Downloads). Nothing is converted: the app keeps YouTube's own files.
 - **Android TV / Google TV** — the Android APK runs on TVs too: it shows on the TV's home
   screen, the remote moves a highlighted selection from card to card, and videos fill the screen
   (OK pauses, left and right jump 10 seconds, hold OK on a card for its menu).
