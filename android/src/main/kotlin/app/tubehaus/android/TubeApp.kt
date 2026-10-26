@@ -1,5 +1,9 @@
 package app.tubehaus.android
 
+import android.os.Build
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import android.app.UiModeManager
 import android.content.res.Configuration
 import android.content.pm.PackageManager
@@ -154,6 +158,21 @@ class AndroidPlatform(private val app: Application) : Platform {
             main.post { done(ok) }
         }.start()
         return true
+    }
+
+    override fun wallpaperColors(dark: Boolean): ColorScheme? =
+        if (Build.VERSION.SDK_INT < 31) null else if (dark) dynamicDarkColorScheme(app) else dynamicLightColorScheme(app)
+
+    /** YTDLnis and Seal take a shared link and download it; the first one installed gets it */
+    override fun externalDownload(url: String): Boolean {
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url)
+        val pm = app.packageManager
+        for (pkg in listOf("com.deniscerri.ytdl", "com.junkfood.seal", "com.junkfood.seal.foss")) {
+            val target = Intent(send).setPackage(pkg)
+            if (pm.queryIntentActivities(target, 0).isEmpty()) continue
+            return try { app.startActivity(target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true } catch (_: ActivityNotFoundException) { false }
+        }
+        return false
     }
 
     override fun metered(): Boolean =

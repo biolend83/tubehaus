@@ -47,6 +47,13 @@ interface Platform {
     /** the device language, e.g. "ko" */
     fun deviceLanguage(): String = java.util.Locale.getDefault().language
     fun deviceRegion(): String = java.util.Locale.getDefault().country.ifEmpty { "US" }
+    /** Android 12+: colours taken from the wallpaper (Material You); null where there are none */
+    fun wallpaperColors(dark: Boolean): androidx.compose.material3.ColorScheme? = null
+    /**
+     * Hands a video link to a downloader app (YTDLnis, Seal, ...): false when there is none
+     * installed, or the platform has no such thing
+     */
+    fun externalDownload(url: String): Boolean = false
 }
 
 data class PlayerState(

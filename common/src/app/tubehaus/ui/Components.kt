@@ -174,6 +174,9 @@ fun VideoMenu(v: Video, app: AppState, extra: List<Pair<String, () -> Unit>> = e
             DropdownMenuItem(text = { Text(tr("Share")) }, onClick = {
                 open = false; app.share(v.title, "https://youtu.be/${v.id}")
             })
+            if (app.platform.name == "android") DropdownMenuItem(text = { Text(tr("Download")) }, onClick = {
+                open = false; app.download(v)
+            })
             for ((label, act) in extra) DropdownMenuItem(text = { Text(label) }, onClick = { open = false; act() })
             DropdownMenuItem(text = { Text(tr("Not interested")) }, onClick = {
                 open = false; Learn.notInterested(app.store, v, channel = false); app.toast(tr("Got it. You'll see less like this"))

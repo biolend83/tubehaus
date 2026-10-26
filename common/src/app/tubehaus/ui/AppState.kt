@@ -143,6 +143,11 @@ class AppState(val platform: Platform, val store: Store) {
         go(Screen.Watch(v.id))
     }
 
+    /** a downloader app (YTDLnis, Seal) takes the link; without one, say which to get */
+    fun download(v: Video) {
+        if (!platform.externalDownload("https://www.youtube.com/watch?v=${v.id}")) toast(tr("Install YTDLnis or Seal to download videos"))
+    }
+
     fun share(title: String, url: String) {
         if (!platform.share(title, url)) toast(tr("Link copied"))
     }
