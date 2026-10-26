@@ -33,6 +33,8 @@ sealed interface Screen {
     data class Local(val key: String) : Screen
     /** the subscribed channels, to remove some or all */
     data object ManageSubs : Screen
+    /** videos saved on this device */
+    data object Downloads : Screen
 }
 
 val TABS = listOf(Screen.Home, Screen.Shorts, Screen.Subs, Screen.Library)
@@ -104,6 +106,8 @@ class AppState(val platform: Platform, val store: Store) {
     val feed = Feed(store)
     val rec = Recommender(store, feed)
     val playback = Playback(this)
+    /** videos saved to watch without internet */
+    val offline by lazy { Offline(this) }
     val snackbar = SnackbarHostState()
 
     var fullscreen by mutableStateOf(false)

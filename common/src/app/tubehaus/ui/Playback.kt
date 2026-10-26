@@ -88,7 +88,8 @@ class Playback(private val app: AppState) {
                 } catch (_: Exception) {}
             }
             try {
-                val s = YouTube.stream(v.id)
+                // a saved copy plays from the device, also without internet
+                val s = app.offline.stream(v.id) ?: YouTube.stream(v.id)
                 if (video?.id != v.id) return@launch
                 stream = s
                 // the player response knows the exact title, channel and length

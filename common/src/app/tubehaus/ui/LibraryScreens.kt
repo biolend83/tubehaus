@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import androidx.compose.material.icons.outlined.DownloadForOffline
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.foundation.clickable
@@ -179,6 +180,11 @@ fun LibraryScreen(app: AppState) {
         item { LibRow(Icons.Outlined.History, tr("History"), "${lib.hist.size}") { app.go(Screen.History) } }
         item { LibRow(Icons.Outlined.WatchLater, tr("Watch later"), "${lib.wl.size}") { app.go(Screen.Local("wl")) } }
         item { LibRow(Icons.Outlined.ThumbUp, tr("Liked videos"), "${lib.likes.size}") { app.go(Screen.Local("likes")) } }
+        item {
+            val saved by app.offline.saved.collectAsState()
+            val busy = app.offline.progress.size
+            LibRow(Icons.Outlined.DownloadForOffline, tr("Downloads"), "${saved.items.size}" + if (busy > 0) " (+$busy)" else "") { app.go(Screen.Downloads) }
+        }
         item { SectionTitle(tr("Playlists")) }
         items(lib.playlists.entries.sortedByDescending { it.value.updated }.toList(), key = { it.key }) { (id, p) ->
             LibRow(Icons.AutoMirrored.Outlined.PlaylistPlay, p.title, "${p.items.size}") { app.go(Screen.Local(id)) }
