@@ -111,7 +111,9 @@ class Offline(private val app: AppState) {
     var asking by mutableStateOf<Video?>(null)
 
     private val jobs = HashMap<String, Job>()
-    private val slots = Semaphore(2)    // two at a time; more would only share the same line
+    // four at a time, the rest wait their turn: more would only split the same connection, and many
+    // parallel streams from one address is what makes YouTube ask for a sign-in
+    private val slots = Semaphore(4)
 
     fun has(id: String) = id in index.value.items
     fun downloading(id: String) = id in progress
