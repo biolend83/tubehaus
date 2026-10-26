@@ -54,6 +54,8 @@ interface Platform {
      * installed, or the platform has no such thing
      */
     fun externalDownload(url: String): Boolean = false
+    /** desktop: the window's own title bar in the app's background colour (light, dark or black) */
+    fun titleBar(background: androidx.compose.ui.graphics.Color) {}
 }
 
 data class PlayerState(

@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -34,6 +35,14 @@ import app.tubehaus.data.Settings
 import app.tubehaus.data.Transfer
 import app.tubehaus.rec.Learn
 import kotlin.math.abs
+
+/** the parts under a video that Settings → Focus can hide one by one */
+val UNDER_PARTS = listOf(
+    "title" to "Title", "views" to "View count", "date" to "Upload date", "channel" to "Channel",
+    "subscribers" to "Subscriber count", "subscribe" to "Subscribe button", "likes" to "Like and dislike",
+    "later" to "Watch later", "save" to "Save to playlist", "share" to "Share", "download" to "Download",
+    "next" to "Next", "description" to "Description",
+)
 
 const val VERSION = "0.5.1"
 
@@ -88,6 +97,14 @@ fun SettingsScreen(app: AppState) {
             item {
                 val opts = listOf("0" to tr("Everything"), "1" to tr("Only the title"), "2" to tr("Nothing, just the player"))
                 Choice(tr("Under the video"), opts.getOrNull(s.underVideo)?.second ?: opts[0].second, opts) { c -> set { it.copy(underVideo = c.toInt()) } }
+            }
+            // with "everything": each part on its own (grey while "nothing" or "only the title" is chosen)
+            items(UNDER_PARTS.filter { (k, _) -> k != "download" || app.platform.name == "android" }) { (k, label) ->
+                Box(Modifier.padding(start = 24.dp).alpha(if (s.underVideo == 0) 1f else 0.4f)) {
+                    Toggle(tr(label), "", k !in s.hideUnder, enabled = s.underVideo == 0) { b ->
+                        set { it.copy(hideUnder = if (b) it.hideUnder - k else (it.hideUnder + k).distinct()) }
+                    }
+                }
             }
 
             item { Group(tr("Playback")) }
@@ -197,13 +214,13 @@ private fun SItem(title: String, sub: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Toggle(title: String, sub: String, on: Boolean, set: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable { set(!on) }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun Toggle(title: String, sub: String, on: Boolean, enabled: Boolean = true, set: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(enabled = enabled) { set(!on) }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyMedium)
             if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(on, set)
+        Switch(on, set, enabled = enabled)
     }
 }
 
