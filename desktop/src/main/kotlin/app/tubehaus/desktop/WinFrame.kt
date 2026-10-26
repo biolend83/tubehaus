@@ -46,12 +46,25 @@ object WinFrame {
     private fun hwnd(f: Frame): Pointer? = if (windows && f.isDisplayable) Native.getComponentPointer(f) else null
 
     /** a title bar that matches the app instead of a white one */
-    fun darkTitleBar(f: Frame) {
+    fun darkTitleBar(f: Frame) = titleBar(f, 0x0F, 0x0F, 0x0F)
+
+    /**
+     * The title bar in the app's background colour: Windows 10/11 dark or light title bar (and the
+     * exact colour on Windows 11); macOS the dark or light window appearance.
+     */
+    fun titleBar(f: Frame, r: Int, g: Int, b: Int) {
+        val dark = (r * 299 + g * 587 + b * 114) / 1000 < 128
+        if (isMacOs) {
+            (f as? javax.swing.JFrame)?.rootPane?.putClientProperty("apple.awt.windowAppearance", if (dark) "NSAppearanceNameDarkAqua" else "NSAppearanceNameAqua")
+            return
+        }
         val h = hwnd(f) ?: return
         val d = dwm ?: return
-        d.DwmSetWindowAttribute(h, 20, IntByReference(1), 4)            // DWMWA_USE_IMMERSIVE_DARK_MODE
-        d.DwmSetWindowAttribute(h, 35, IntByReference(0x000F0F0F), 4)   // DWMWA_CAPTION_COLOR (Windows 11), 0x00BBGGRR
+        d.DwmSetWindowAttribute(h, 20, IntByReference(if (dark) 1 else 0), 4)              // DWMWA_USE_IMMERSIVE_DARK_MODE
+        d.DwmSetWindowAttribute(h, 35, IntByReference((b shl 16) or (g shl 8) or r), 4)     // DWMWA_CAPTION_COLOR (Windows 11), 0x00BBGGRR
     }
+
+    private val isMacOs = System.getProperty("os.name").startsWith("Mac")
 
     /** false where it can't be done (not Windows): the caller falls back to Java's full screen */
     fun fullscreen(f: Frame, on: Boolean): Boolean {

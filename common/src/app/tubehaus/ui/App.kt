@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -122,6 +123,8 @@ fun App(app: AppState) {
     }
     key(lang, settings.tvMode) {
         TubeTheme(settings.dark, app.platform::wallpaperColors) {
+            val bg = MaterialTheme.colorScheme.background
+            LaunchedEffect(bg) { app.platform.titleBar(bg) }
             val tv = app.platform.tv
             CompositionLocalProvider(
                 LocalPlatform provides app.platform,
@@ -250,6 +253,13 @@ private fun Shell(app: AppState) {
                             label = { Text(t.label, fontSize = 11.sp) },
                         )
                     }
+                    // below a line, smaller: back to the last video, and the settings
+                    HorizontalDivider(Modifier.width(40.dp).padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outline)
+                    val last = app.playback.video ?: app.store.lib.state.collectAsState().value.hist.firstOrNull()?.video()
+                    if (last != null) SmallRailItem(Icons.Outlined.History, tr("Resume"), cur is Screen.Watch) {
+                        if (app.playback.video?.id == last.id) app.go(Screen.Watch(last.id)) else app.watch(last)
+                    }
+                    SmallRailItem(Icons.Outlined.Settings, tr("Settings"), cur == Screen.Settings) { app.go(Screen.Settings) }
                 }
             }
             Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -284,6 +294,18 @@ private fun Shell(app: AppState) {
               }
             }
         }
+    }
+}
+
+/** A quieter item at the bottom of the side menu (Resume, Settings): a smaller icon and label */
+@Composable
+private fun SmallRailItem(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.width(72.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(icon, null, Modifier.size(20.dp), tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
     }
 }
 
@@ -351,7 +373,7 @@ private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null) {
             Logo(Modifier.clickable { app.go(Screen.Home) })
             Spacer(Modifier.weight(1f))
             IconButton(onClick = { app.go(Screen.Search()) }) { Icon(Icons.Outlined.Search, tr("Search")) }
-            IconButton(onClick = { app.go(Screen.Settings) }) { Icon(Icons.Outlined.Settings, tr("Settings")) }
+            if (LocalCompact.current || onMenu != null) IconButton(onClick = { app.go(Screen.Settings) }) { Icon(Icons.Outlined.Settings, tr("Settings")) }
         }
         if (!LocalCompact.current) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
     }

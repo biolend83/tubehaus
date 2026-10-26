@@ -109,6 +109,8 @@ data class Settings(
     val searchAtBottom: Boolean = false,
     /** under the video: 0 everything, 1 only the title, 2 nothing (just the player) */
     val underVideo: Int = 0,
+    /** with "everything" under the video: the parts switched off one by one (see UNDER_PARTS) */
+    val hideUnder: List<String> = emptyList(),
     /** desktop and tablets: the side menu folded into a small button */
     val railCollapsed: Boolean = false,
     /** Android: the TV layout and remote keys; 0 when the device is a TV, 1 always, 2 never */

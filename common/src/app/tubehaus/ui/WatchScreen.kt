@@ -204,28 +204,31 @@ private fun Info(app: AppState, v: Video) {
     val s = pb.stream
     val lib by app.store.lib.state.collectAsState()
     val calm = app.store.settings.value.calm
+    val hidden = app.store.settings.state.collectAsState().value.hideUnder
+    fun has(part: String) = part !in hidden
     var expanded by remember { mutableStateOf(false) }
     Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-        Text(v.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = if (expanded) 10 else 2, overflow = TextOverflow.Ellipsis)
+        if (has("title")) Text(v.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = if (expanded) 10 else 2, overflow = TextOverflow.Ellipsis)
         val line = listOfNotNull(
-            (d?.viewsText?.takeIf { it.isNotEmpty() } ?: v.views.takeIf { it > 0 }?.let { tr("{n} views").replace("{n}", compact(it)) }).takeIf { !calm },
-            d?.publishedText?.takeIf { it.isNotEmpty() },
+            (d?.viewsText?.takeIf { it.isNotEmpty() } ?: v.views.takeIf { it > 0 }?.let { tr("{n} views").replace("{n}", compact(it)) }).takeIf { !calm && has("views") },
+            d?.publishedText?.takeIf { it.isNotEmpty() && has("date") },
         ).joinToString(" · ")
         if (line.isNotEmpty()) Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
         // channel
-        Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f).clickable { if (v.channelId.isNotEmpty()) app.go(Screen.Channel(v.channelId, v.author)) }, verticalAlignment = Alignment.CenterVertically) {
+        val showSub = v.channelId.isNotEmpty() && has("subscribe")
+        if (has("channel") || showSub) Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (has("channel")) Row(Modifier.weight(1f).clickable { if (v.channelId.isNotEmpty()) app.go(Screen.Channel(v.channelId, v.author)) }, verticalAlignment = Alignment.CenterVertically) {
                 Avatar(d?.avatar ?: lib.subs[v.channelId]?.thumb ?: "", 40)
                 Column(Modifier.padding(start = 10.dp)) {
                     Text(v.author, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (!calm && !d?.subsText.isNullOrEmpty()) Text(d!!.subsText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!calm && has("subscribers") && !d?.subsText.isNullOrEmpty()) Text(d!!.subsText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            }
-            if (v.channelId.isNotEmpty()) SubscribeButton(v.channelId, v.author, d?.avatar ?: "", app)
+            } else Spacer(Modifier.weight(1f))
+            if (showSub) SubscribeButton(v.channelId, v.author, d?.avatar ?: "", app)
         }
-        Actions(app, v)
+        Actions(app, v, ::has)
         // description
-        val desc = s?.description ?: ""
+        val desc = s?.description?.takeIf { has("description") } ?: ""
         if (desc.isNotEmpty()) {
             Column(
                 Modifier.fillMaxWidth().padding(top = 12.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
@@ -240,7 +243,7 @@ private fun Info(app: AppState, v: Video) {
 }
 
 @Composable
-private fun Actions(app: AppState, v: Video) {
+private fun Actions(app: AppState, v: Video, has: (String) -> Boolean) {
     val pb = app.playback
     val lib by app.store.lib.state.collectAsState()
     val liked = lib.likes.any { it.id == v.id }
@@ -249,23 +252,23 @@ private fun Actions(app: AppState, v: Video) {
     var pick by remember { mutableStateOf(false) }
     val calm = app.store.settings.value.calm
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        item {
+        if (has("likes")) item {
             Chip(if (liked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp, (pb.details?.likesText?.takeIf { !calm } ?: "").ifEmpty { tr("Like") }) {
                 app.store.setInList("likes", v, !liked)
                 if (!liked) Learn.nudgeChannel(app.store, v.channelId, v.author, 1.0)
             }
         }
-        item {
+        if (has("likes")) item {
             Chip(if (disliked) Icons.Filled.ThumbDown else Icons.Outlined.ThumbDown, tr("Dislike")) {
                 app.store.setInList("dislikes", v, !disliked)
                 if (!disliked) Learn.nudgeChannel(app.store, v.channelId, v.author, -1.5)
             }
         }
-        item { Chip(if (saved) Icons.Filled.WatchLater else Icons.Outlined.WatchLater, tr("Watch later")) { app.store.setInList("wl", v, !saved) } }
-        item { Chip(Icons.Outlined.LibraryAdd, tr("Save")) { pick = true } }
-        item { Chip(Icons.Outlined.Share, tr("Share")) { app.share(v.title, "https://youtu.be/${v.id}") } }
-        if (app.platform.name == "android") item { Chip(Icons.Outlined.Download, tr("Download")) { app.download(v) } }
-        if (pb.next != null) item { Chip(Icons.Outlined.SkipNext, tr("Next")) { pb.skipNext() } }
+        if (has("later")) item { Chip(if (saved) Icons.Filled.WatchLater else Icons.Outlined.WatchLater, tr("Watch later")) { app.store.setInList("wl", v, !saved) } }
+        if (has("save")) item { Chip(Icons.Outlined.LibraryAdd, tr("Save")) { pick = true } }
+        if (has("share")) item { Chip(Icons.Outlined.Share, tr("Share")) { app.share(v.title, "https://youtu.be/${v.id}") } }
+        if (app.platform.name == "android" && has("download")) item { Chip(Icons.Outlined.Download, tr("Download")) { app.download(v) } }
+        if (pb.next != null && has("next")) item { Chip(Icons.Outlined.SkipNext, tr("Next")) { pb.skipNext() } }
     }
     if (pick) PlaylistPicker(v, app) { pick = false }
 }
