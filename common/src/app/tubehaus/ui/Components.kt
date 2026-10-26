@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
@@ -273,7 +274,8 @@ fun PlaylistRow(p: Playlist, app: AppState) {
 
 @Composable
 fun SubscribeButton(cid: String, name: String, thumb: String, app: AppState) {
-    val subbed = cid in app.store.lib.state.value.subs
+    // collected, so the button turns over the moment you press it (it used to wait for the page to reload)
+    val subbed = cid in app.store.lib.state.collectAsState().value.subs
     Button(
         onClick = { app.store.subscribe(cid, name, thumb, !subbed) },
         colors = if (subbed) androidx.compose.material3.ButtonDefaults.buttonColors(

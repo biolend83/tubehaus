@@ -70,6 +70,11 @@ class DesktopPlatform : Platform {
         window?.placement = if (on) WindowPlacement.Fullscreen else WindowPlacement.Floating
     }
 
+    override fun titleBar(background: androidx.compose.ui.graphics.Color) {
+        val f = frame ?: return
+        WinFrame.titleBar(f, (background.red * 255).toInt(), (background.green * 255).toInt(), (background.blue * 255).toInt())
+    }
+
     // an invisible pointer while the video plays with its controls hidden
     override val blankPointer = PointerIcon(
         Toolkit.getDefaultToolkit().createCustomCursor(BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB), Point(0, 0), "none"),
