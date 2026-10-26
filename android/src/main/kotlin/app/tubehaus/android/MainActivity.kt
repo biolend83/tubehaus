@@ -151,6 +151,9 @@ class MainActivity : ComponentActivity() {
                 if (angle == ORIENTATION_UNKNOWN) return
                 val sideways = angle in 60..120 || angle in 240..300
                 val upright = angle <= 30 || angle >= 330
+                // with the system's auto-rotate off, letting go would snap back to the locked
+                // (portrait) way and leave full screen: then the button's direction stays
+                if (!autoRotate()) return
                 when (requestedOrientation) {
                     ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE -> if (sideways) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT -> if (upright) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -158,6 +161,9 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun autoRotate() =
+        android.provider.Settings.System.getInt(contentResolver, android.provider.Settings.System.ACCELEROMETER_ROTATION, 0) == 1
 
     override fun onResume() {
         super.onResume()
