@@ -8,7 +8,7 @@ No server, no account, no Google sign-in, no tracking. The app talks to YouTube 
 keeps your subscriptions, history and playlists on the device, and works out recommendations
 there too.
 
-**[⬇ Windows 10/11 installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.1/TubeHaus-0.5.1.msi)** (0.5.1, beta)
+**[⬇ Windows 10/11 installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2.msi)** (0.5.2, beta)
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · **Windows** · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
@@ -16,6 +16,8 @@ there too.
 
 ## What it does
 
+- **Offline downloads** — save a video in the quality you pick and watch it without internet
+  (Library → Downloads). Nothing is converted: the app keeps YouTube's own files.
 - **Android TV / Google TV** — the Android APK runs on TVs too: it shows on the TV's home
   screen, the remote moves a highlighted selection from card to card, and videos fill the screen
   (OK pauses, left and right jump 10 seconds, hold OK on a card for its menu).
@@ -51,7 +53,7 @@ ExoPlayer (Media3) on Android, libmpv on Windows, macOS and Linux.
 
 ## Install
 
-[Download the installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.1/TubeHaus-0.5.1.msi) and run it. mpv is built in, so there's nothing else to install.
+[Download the installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2.msi) and run it. mpv is built in, so there's nothing else to install.
 
 Windows may warn that the publisher is unknown, because the installer isn't code-signed:
 choose *More info* → *Run anyway*. Each new version installs over the previous one and keeps
