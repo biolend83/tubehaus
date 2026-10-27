@@ -299,6 +299,8 @@ fun OfflineDialog(app: AppState, v: Video) {
                 }
                 Text(tr("If the video isn't that sharp, the best it has is saved."), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+                Text(tr("For your own viewing only. Sharing or re-uploading it is your own responsibility."), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
             }
         },
         confirmButton = {
