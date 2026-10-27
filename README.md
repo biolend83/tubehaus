@@ -85,6 +85,19 @@ JDK 21+ and libmpv (see above).
 ./gradlew :desktop:packageDeb        # or packageRpm, packageAppImage (needs a JDK with jpackage)
 ```
 
+## Disclaimer
+
+TubeHaus is independent, free, open-source software. It is not affiliated with, endorsed by or
+sponsored by YouTube or Google. "YouTube" is a trademark of Google LLC.
+
+- TubeHaus does not host, store or distribute any videos. They come straight from YouTube to your
+  own device (the app) or to a server you run yourself (the server version).
+- It is provided "as is", without warranty of any kind, as the license says. The authors and
+  contributors are not responsible for how it is used.
+- You are responsible for using it in line with the laws where you live and the terms of the
+  services you connect to.
+- The app talks only to YouTube (for videos) and GitHub (to check for updates). The maintainer runs no server for it.
+
 ## License
 
-GPL-3.0. Not affiliated with YouTube or Google.
+GPL-3.0.
