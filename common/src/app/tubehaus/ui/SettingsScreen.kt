@@ -157,6 +157,7 @@ fun SettingsScreen(app: AppState) {
                 }
             }
             item { SItem(tr("Source code and updates"), "github.com/biolend83/tubehaus") { app.platform.openExternal("https://github.com/biolend83/tubehaus/releases") } }
+            item { SItem(tr("Disclaimer"), tr("TubeHaus is independent, free, open-source software, not affiliated with YouTube or Google. It doesn't host any videos and comes with no warranty. Downloaded videos are for your own viewing: sharing or re-uploading them is your own responsibility. Use it in line with your local laws and the terms of the services it connects to.")) { app.platform.openExternal("https://github.com/biolend83/tubehaus#disclaimer") } }
         }
     }
     when (dialog) {
