@@ -69,8 +69,10 @@ ExoPlayer (Media3) on Android, libmpv on Windows.
 
 - **Android 8.0+** — [the APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3.apk)
   (beta). Open it on the phone and allow installing from your browser when asked.
-  Updates: [Obtainium](https://obtainium.imranr.dev) with `https://github.com/biolend83/tubehaus`
-  (each "TubeHaus 0.x" release has every platform's file).
+  Updates: the app tells you itself, or use [Obtainium](https://obtainium.imranr.dev):
+  *Add app* → source URL `https://github.com/biolend83/tubehaus` → under *Filter release titles by
+  regular expression* enter `^TubeHaus ` and turn on *Fallback to older releases*. The filter
+  matters: the same repository also has server releases ("Server 0.7.x") with no APK in them.
 - **Android TV / Google TV** — the same APK. Install it with an app like *Downloader* or
   *Send Files to TV*; TubeHaus then shows on the TV's home screen. Settings → *TV mode* turns the
   TV layout on for boxes that don't say they are a TV.
