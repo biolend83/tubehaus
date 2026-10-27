@@ -19,7 +19,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.awaitVerticalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -72,6 +73,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,10 +98,10 @@ import kotlinx.coroutines.delay
  * and the bottom bar has volume and a settings menu, like YouTube on a computer.
  */
 @Composable
-fun VideoArea(app: AppState, modifier: Modifier = Modifier, fullscreen: Boolean = false) {
+fun VideoArea(app: AppState, modifier: Modifier = Modifier, fullscreen: Boolean = false, sideGestures: Boolean = false) {
     Box(modifier.background(Color.Black)) {
         app.platform.player.View(Modifier.fillMaxSize())
-        Controls(app, fullscreen)
+        Controls(app, fullscreen, sideGestures)
     }
 }
 
@@ -142,7 +144,7 @@ private fun perceived(b: Float) = Math.pow(b.coerceIn(0f, 1f).toDouble(), 1 / 2.
 private fun actual(p: Float) = Math.pow(p.coerceIn(0f, 1f).toDouble(), 2.2).toFloat().coerceAtLeast(0.004f)
 
 @Composable
-private fun Controls(app: AppState, fullscreen: Boolean) {
+private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) {
     val touch = app.platform.touch
     val player = app.platform.player
     val st by player.state.collectAsState()
@@ -158,6 +160,9 @@ private fun Controls(app: AppState, fullscreen: Boolean) {
     val playFocus = remember { FocusRequester() }
     var toBar by remember { mutableStateOf(false) }
     var eatBack by remember { mutableStateOf(false) }
+    // read inside the pointer loops, which outlive the composition they started in
+    val playingNow by rememberUpdatedState(st.playing)
+    val settingsNow by rememberUpdatedState(settings)
 
     LaunchedEffect(shown, poke, st.playing, dragging, settings) {
         if (shown && st.playing && dragging == null && !settings) {
@@ -228,8 +233,9 @@ private fun Controls(app: AppState, fullscreen: Boolean) {
             .pointerInput(touch) {
                 if (touch) return@pointerInput
                 awaitPointerEventScope {
-                    // only a real move counts: hiding the pointer makes Windows send move events
-                    // with the pointer where it was, which kept the controls up for good
+                    // only a real move counts: hiding the pointer, and the controls fading in or out
+                    // under a still pointer, send move, exit and enter events with the pointer where
+                    // it was, which kept the controls up for good
                     var last: Offset? = null
                     while (true) {
                         val e = awaitPointerEvent()
@@ -237,10 +243,14 @@ private fun Controls(app: AppState, fullscreen: Boolean) {
                         when (e.type) {
                             PointerEventType.Move, PointerEventType.Enter -> {
                                 val moved = at == null || last == null || (at - last!!).getDistance() > 3f
-                                last = at
+                                if (at != null) last = at
                                 if (moved) { shown = true; poke++ }
                             }
-                            PointerEventType.Exit -> { last = null; if (st.playing && !settings) shown = false }
+                            PointerEventType.Exit -> {
+                                // a real exit: the pointer is outside the video now
+                                val out = at == null || at.x < 0 || at.y < 0 || at.x >= size.width || at.y >= size.height
+                                if (out) { last = null; if (playingNow && !settingsNow) shown = false }
+                            }
                         }
                     }
                 }
@@ -276,27 +286,28 @@ private fun Controls(app: AppState, fullscreen: Boolean) {
                         },
                     )
                 }
-                // full screen on a phone: swipe up or down on the left for brightness, on the right for volume
-                .pointerInput(touch, fullscreen) {
-                    if (!touch || !fullscreen) return@pointerInput
-                    var kind = ""
-                    var level = -1f
-                    detectVerticalDragGestures(
-                        onDragStart = { o ->
-                            kind = if (o.x < size.width / 2) "brightness" else "volume"
-                            level = (if (kind == "brightness") app.platform.brightness()?.let { perceived(it) } else app.platform.mediaVolume()) ?: -1f
-                        },
-                        onVerticalDrag = { change, dy ->
-                            if (level >= 0) {
-                                change.consume()
-                                level = (level - dy / (size.height * 0.8f)).coerceIn(0f, 1f)
+                // full screen on a phone: swipe up or down on the left for brightness, on the right for volume;
+                // beside the comments on a tablet the same, on the outer thirds (the middle still
+                // swipes the video down into the mini player)
+                .pointerInput(touch, fullscreen, sideGestures) {
+                    if (!touch || !(fullscreen || sideGestures)) return@pointerInput
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val x = down.position.x
+                        if (!fullscreen && x in size.width / 3f..size.width * 2f / 3f) return@awaitEachGesture
+                        val kind = if (x < size.width / 2) "brightness" else "volume"
+                        var level = (if (kind == "brightness") app.platform.brightness()?.let { perceived(it) } else app.platform.mediaVolume()) ?: return@awaitEachGesture
+                        val start = awaitVerticalTouchSlopOrCancellation(down.id) { c, _ -> c.consume() } ?: return@awaitEachGesture
+                        val h = size.height * if (fullscreen) 0.8f else 1.2f
+                        try {
+                            verticalDrag(start.id) { c ->
+                                level = (level - (c.position.y - c.previousPosition.y) / h).coerceIn(0f, 1f)
+                                c.consume()
                                 if (kind == "brightness") app.platform.setBrightness(actual(level)) else app.platform.setMediaVolume(level)
                                 gesture = kind to level
                             }
-                        },
-                        onDragEnd = { gesture = null },
-                        onDragCancel = { gesture = null },
-                    )
+                        } finally { gesture = null }
+                    }
                 },
         )
         // a small round meter on the side being swiped, out of the middle of the picture
