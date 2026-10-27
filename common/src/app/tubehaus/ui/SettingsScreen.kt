@@ -45,7 +45,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "0.5.2"
+const val VERSION = "0.5.3"
 
 @Composable
 fun SettingsScreen(app: AppState) {
