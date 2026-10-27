@@ -108,7 +108,7 @@ fun WatchScreen(app: AppState) {
                     // tablets: the video as large as the screen allows, with only its title under it;
                     // the description, buttons and channel move into the panel (Details)
                     Column(Modifier.weight(1f).fillMaxHeight().padding(12.dp), verticalArrangement = Arrangement.Center) {
-                        PlayerBox(app)
+                        PlayerBox(app, sideGestures = true)
                         if (set.underVideo != 2) Text(v.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 10.dp))
                     }
@@ -158,7 +158,7 @@ fun WatchScreen(app: AppState) {
 }
 
 @Composable
-private fun PlayerBox(app: AppState) {
+private fun PlayerBox(app: AppState, sideGestures: Boolean = false) {
     val pb = app.playback
     val st by app.platform.player.state.collectAsState()
     val touch = app.platform.touch
@@ -187,7 +187,7 @@ private fun PlayerBox(app: AppState) {
                 if (v != null && !app.store.settings.value.hideThumbs) Img(v.thumbHigh, Modifier.fillMaxSize())
                 CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
             }
-            else -> VideoArea(app, Modifier.fillMaxSize())
+            else -> VideoArea(app, Modifier.fillMaxSize(), sideGestures = sideGestures)
         }
         // while loading there are no controls yet: keep a way back
         if ((pb.error != null || pb.loading || st.videoId != v?.id)) {
