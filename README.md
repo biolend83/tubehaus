@@ -26,6 +26,7 @@ For Apple Silicon Macs (M1 and later). There's no Intel build yet.
 > - It is provided "as is", without warranty of any kind, as the license says. The authors and contributors are not responsible for how it is used or for anything that results from using it.
 > - You are responsible for using it in line with the laws where you live and the terms of the services you connect to.
 > - The app talks only to YouTube (for videos) and GitHub (to check for updates). The maintainer runs no server for it.
+> - **Rights holders:** if you believe something in this repository infringes your rights, [open an issue](https://github.com/biolend83/tubehaus/issues/new) with the details (or ask there for a private contact). It will be looked at and, where justified, removed promptly.
 
 ## What it does
 
