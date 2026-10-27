@@ -95,7 +95,9 @@ class AppState(val platform: Platform, val store: Store) {
             Remote.refreshClients()
             val os = System.getProperty("os.name")
             // Linux: the release page, to pick deb/rpm/tar.gz
-            val desktopFile = when { os.startsWith("Windows") -> ".msi"; os.startsWith("Mac") -> ".dmg"; else -> null }
+            // macOS: the Apple Silicon or the Intel build, whichever this Mac runs
+            val mac = if (System.getProperty("os.arch") == "aarch64") "-mac-arm64.dmg" else "-mac-x64.dmg"
+            val desktopFile = when { os.startsWith("Windows") -> ".msi"; os.startsWith("Mac") -> mac; else -> null }
             // one release per version (app-v*) carries every platform's file
             val r = Remote.newerRelease("app-v", VERSION, if (platform.name == "android") ".apk" else desktopFile)
             if (r != null && (now || r.version != store.settings.value.skipVersion)) update = r
