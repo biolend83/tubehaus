@@ -8,7 +8,7 @@ No server, no account, no Google sign-in, no tracking. The app talks to YouTube 
 keeps your subscriptions, history and playlists on the device, and works out recommendations
 there too.
 
-**[⬇ Android APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2.apk)** · **[⬇ Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2.msi)** · **[⬇ macOS](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2-mac-arm64.dmg)** · **[⬇ Linux .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2-linux-amd64.deb)** (0.5.2, beta)
+**[⬇ Android APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3.apk)** · **[⬇ Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3.msi)** · **[⬇ macOS](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3-mac-arm64.dmg)** · **[⬇ Linux .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3-linux-amd64.deb)** (0.5.3, beta)
 
 **Android** · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
@@ -55,21 +55,21 @@ ExoPlayer (Media3) on Android, libmpv on Windows.
 
 ## Install
 
-- **Android 8.0+** — [the APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2.apk)
+- **Android 8.0+** — [the APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3.apk)
   (beta). Open it on the phone and allow installing from your browser when asked.
   Updates: [Obtainium](https://obtainium.imranr.dev) with `https://github.com/biolend83/tubehaus`
   (each "TubeHaus 0.x" release has every platform's file).
 - **Android TV / Google TV** — the same APK. Install it with an app like *Downloader* or
   *Send Files to TV*; TubeHaus then shows on the TV's home screen. Settings → *TV mode* turns the
   TV layout on for boxes that don't say they are a TV.
-- **Windows 10/11 (64-bit)** — [the installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2.msi)
+- **Windows 10/11 (64-bit)** — [the installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3.msi)
   (beta, mpv built in). Windows may warn that the publisher is unknown, because the installer
   isn't code-signed: choose *More info* → *Run anyway*.
-- **macOS (Apple Silicon)** — [the .dmg](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2-mac-arm64.dmg) (beta, new and barely tested).
+- **macOS (Apple Silicon)** — [the .dmg](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3-mac-arm64.dmg) (beta, new and barely tested).
   It uses Homebrew's mpv: `brew install mpv`. The app isn't signed by Apple yet, so the first time
   right-click it → *Open* → *Open*.
-- **Linux (x86-64)** — [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2-linux-amd64.deb) for Debian/Ubuntu, [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2-linux-x86_64.rpm)
-  for Fedora/openSUSE, or [a tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.2/TubeHaus-0.5.2-linux-x64.tar.gz) to unpack anywhere and run `TubeHaus/bin/TubeHaus`.
+- **Linux (x86-64)** — [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3-linux-amd64.deb) for Debian/Ubuntu, [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3-linux-x86_64.rpm)
+  for Fedora/openSUSE, or [a tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3-linux-x64.tar.gz) to unpack anywhere and run `TubeHaus/bin/TubeHaus`.
   It uses your system's mpv: `sudo apt install libmpv2` (Fedora: `sudo dnf install mpv-libs`, Arch: `mpv`). New and not yet tested much: reports welcome.
 
 There is no iOS version: apps outside the App Store can't be installed on an iPhone without
