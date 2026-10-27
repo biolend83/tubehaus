@@ -43,7 +43,16 @@ jobs:
           path: TubeHaus-*.apk
 
   windows:
-    runs-on: windows-latest
+    # x64: the .msi (older apps update from it), a setup .exe and a portable .zip;
+    # arm64: a portable .zip (best effort: Windows-on-ARM runners and libmpv builds are newer)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, runner: windows-latest, mpv: x86_64, vk: x64 }
+          - { arch: arm64, runner: windows-11-arm, mpv: aarch64, vk: ARM64 }
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.arch == 'arm64' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -58,26 +67,50 @@ jobs:
         run: |
           # with the workflow's token: GitHub's anonymous API limit is shared by all runners and sometimes runs out
           $rel = Invoke-RestMethod https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }
-          # the plain x86_64 build, not -v3: that one needs AVX2 and won't start on older PCs
-          $asset = $rel.assets | Where-Object { $_.name -like 'mpv-dev-x86_64-*.7z' -and $_.name -notlike '*-v3-*' } | Select-Object -First 1
+          # the plain build, not -v3: that one needs AVX2 and won't start on older PCs
+          $asset = $rel.assets | Where-Object { $_.name -like 'mpv-dev-${{ matrix.mpv }}-*.7z' -and $_.name -notlike '*-v3-*' } | Select-Object -First 1
           Invoke-WebRequest $asset.browser_download_url -OutFile mpv-dev.7z
           7z e mpv-dev.7z libmpv-2.dll -odesktop/resources/windows -y
           # libmpv needs vulkan-1.dll, which only comes with some graphics drivers: ship the official
           # Khronos loader (Apache-2.0) next to it, or mpv won't load on PCs without one
           Invoke-WebRequest 'https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-runtime-components.zip?u=' -OutFile vkrt.zip
           7z x vkrt.zip -ovkrt -y | Out-Null
-          Copy-Item (Get-ChildItem vkrt -Recurse -Filter vulkan-1.dll | Where-Object { $_.FullName -like '*\x64\*' } | Select-Object -First 1).FullName desktop/resources/windows/
+          $vk = Get-ChildItem vkrt -Recurse -Filter vulkan-1.dll | Where-Object { $_.FullName -like '*\${{ matrix.vk }}\*' } | Select-Object -First 1
+          if ($vk) { Copy-Item $vk.FullName desktop/resources/windows/ } else { Write-Warning "no ${{ matrix.vk }} vulkan-1.dll in the runtime components" }
           Copy-Item (Get-ChildItem vkrt -Recurse -Filter VulkanRT-License.txt | Select-Object -First 1).FullName desktop/resources/windows/
           Get-ChildItem desktop/resources/windows
-      - name: Build installer
-        run: ./gradlew --no-daemon :desktop:packageReleaseMsi
+      - name: Build
+        shell: bash
+        run: |
+          ver=$(sed -n 's/^app.version=//p' gradle.properties)
+          out=desktop/build/compose/binaries/main-release
+          if [ "${{ matrix.arch }}" = x64 ]; then
+            ./gradlew --no-daemon :desktop:packageReleaseMsi :desktop:packageReleaseExe :desktop:createReleaseDistributable
+            cp "$(find $out/msi -name '*.msi' | head -1)" "TubeHaus-$ver.msi"
+            cp "$(find $out/exe -name '*.exe' | head -1)" "TubeHaus-$ver-win-x64-setup.exe"
+          else
+            ./gradlew --no-daemon :desktop:createReleaseDistributable
+          fi
+          # portable: unzip anywhere and run TubeHaus.exe
+          (cd $out/app && 7z a -tzip "$GITHUB_WORKSPACE/TubeHaus-$ver-win-${{ matrix.arch }}-portable.zip" TubeHaus >/dev/null)
+          ls -la TubeHaus-*
       - uses: actions/upload-artifact@v4
         with:
-          name: windows
-          path: desktop/build/compose/binaries/main-release/msi/*.msi
+          name: windows-${{ matrix.arch }}
+          path: |
+            TubeHaus-*.msi
+            TubeHaus-*.exe
+            TubeHaus-*.zip
 
   linux:
-    runs-on: ubuntu-latest
+    # the system's libmpv (libmpv2 / mpv-libs) is used, nothing is bundled
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, deb: amd64, rpm: x86_64, tar: x64 }
+          - { runner: ubuntu-24.04-arm, deb: arm64, rpm: aarch64, tar: arm64 }
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -85,29 +118,34 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build .deb, .rpm and app image
-        # libmpv isn't bundled: the app uses the system's (libmpv2 / mpv-libs)
+      - name: Build .deb, .rpm and .tar.gz
         run: |
           sudo apt-get install -y rpm
           ./gradlew --no-daemon :desktop:packageReleaseDeb :desktop:packageReleaseRpm :desktop:packageReleaseAppImage
           ver=$(sed -n 's/^app.version=//p' gradle.properties)
           out=desktop/build/compose/binaries/main-release
-          cp "$(find $out/deb -name '*.deb' | head -1)" "TubeHaus-$ver-linux-amd64.deb"
-          cp "$(find $out/rpm -name '*.rpm' | head -1)" "TubeHaus-$ver-linux-x86_64.rpm"
+          cp "$(find $out/deb -name '*.deb' | head -1)" "TubeHaus-$ver-linux-${{ matrix.deb }}.deb"
+          cp "$(find $out/rpm -name '*.rpm' | head -1)" "TubeHaus-$ver-linux-${{ matrix.rpm }}.rpm"
           app=$(find $out/app -mindepth 1 -maxdepth 1 -type d | head -1)
-          tar -C "$(dirname "$app")" -czf "TubeHaus-$ver-linux-x64.tar.gz" "$(basename "$app")"
+          tar -C "$(dirname "$app")" -czf "TubeHaus-$ver-linux-${{ matrix.tar }}.tar.gz" "$(basename "$app")"
           ls -la TubeHaus-*
       - uses: actions/upload-artifact@v4
         with:
-          name: linux
+          name: linux-${{ matrix.tar }}
           path: |
             TubeHaus-*.deb
             TubeHaus-*.rpm
             TubeHaus-*.tar.gz
 
   mac:
-    # Apple Silicon; mpv comes from Homebrew on the user's Mac (brew install mpv), nothing is bundled
-    runs-on: macos-14
+    # mpv comes from Homebrew on the user's Mac (brew install mpv), nothing is bundled
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: arm64, runner: macos-14 }
+          - { arch: x64, runner: macos-15-intel }
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -115,7 +153,7 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build .dmg
+      - name: Build .dmg and .zip
         run: |
           # the app icon as .icns, made from the PNG
           mkdir -p icon.iconset
@@ -124,17 +162,22 @@ jobs:
             sips -z $((s*2)) $((s*2)) desktop/src/main/resources/icon.png --out icon.iconset/icon_${s}x${s}@2x.png >/dev/null
           done
           iconutil -c icns icon.iconset -o desktop/icon.icns
-          ./gradlew --no-daemon :desktop:packageReleaseDmg
+          ./gradlew --no-daemon :desktop:packageReleaseDmg :desktop:createReleaseDistributable
           ver=$(sed -n 's/^app.version=//p' gradle.properties)
-          cp "$(find desktop/build/compose/binaries/main-release/dmg -name '*.dmg' | head -1)" "TubeHaus-$ver-mac-arm64.dmg"
+          out=desktop/build/compose/binaries/main-release
+          cp "$(find $out/dmg -name '*.dmg' | head -1)" "TubeHaus-$ver-mac-${{ matrix.arch }}.dmg"
+          ditto -c -k --keepParent "$(find $out/app -maxdepth 1 -name '*.app' | head -1)" "TubeHaus-$ver-mac-${{ matrix.arch }}.zip"
           ls -la TubeHaus-*
       - uses: actions/upload-artifact@v4
         with:
-          name: mac
-          path: TubeHaus-*.dmg
+          name: mac-${{ matrix.arch }}
+          path: |
+            TubeHaus-*.dmg
+            TubeHaus-*.zip
 
   release:
-    if: startsWith(github.ref, 'refs/tags/app-v') || startsWith(github.ref, 'refs/tags/desktop-v')
+    # also when a best-effort build (Windows on ARM) failed: that file is then just missing
+    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/app-v') || startsWith(github.ref, 'refs/tags/desktop-v')) && needs.android.result == 'success' && needs.linux.result == 'success' && needs.mac.result == 'success' }}
     needs: [android, windows, linux, mac]
     runs-on: ubuntu-latest
     permissions:
@@ -147,11 +190,16 @@ jobs:
         # only the desktop files: APKs built here are signed with a throwaway key and could
         # not update the ones already installed, so the APK is always uploaded by hand
         run: |
-          files="windows/*.msi mac/*.dmg linux/*.deb linux/*.rpm linux/*.tar.gz"
+          # whatever was built (a best-effort build that failed is simply missing), plus their checksums
+          files=$(find windows-* mac-* linux-* -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.zip' -o -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' \) 2>/dev/null | sort)
+          # the x64 Windows build is not optional: older apps update from its .msi
+          echo "$files" | grep -q '\.msi$' || { echo 'no .msi was built'; exit 1; }
+          for f in $files; do (cd "$(dirname "$f")" && sha256sum "$(basename "$f")"); done > SHA256SUMS-desktop.txt
+          cat SHA256SUMS-desktop.txt
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" $files --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$GITHUB_REF_NAME" $files SHA256SUMS-desktop.txt --repo "$GITHUB_REPOSITORY" --clobber
           else
             # a pre-release, so it never becomes the server's "latest release"
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "TubeHaus ${GITHUB_REF_NAME#*-v} · Android, Windows, macOS, Linux" \
-              --prerelease --latest=false --notes "Android, Windows, macOS and Linux" $files
+              --prerelease --latest=false --notes "Android, Windows, macOS and Linux" $files SHA256SUMS-desktop.txt
           fi
