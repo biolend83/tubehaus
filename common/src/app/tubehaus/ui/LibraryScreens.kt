@@ -329,6 +329,7 @@ fun importFile(app: AppState, done: (Boolean) -> Unit = {}) {
         }
         val r = Transfer.merge(app.store, p)
         app.fillSubInfo()
+        app.sync.importedLocally()
         app.toast(
             tr("Imported from {f}: {s} subscriptions, {h} history, {p} playlists")
                 .replace("{f}", r.format).replace("{s}", "${r.subs}").replace("{h}", "${r.hist}").replace("{p}", "${r.playlists}"),
