@@ -155,6 +155,7 @@ fun App(app: AppState) {
                     }
                     LaunchedEffect(Unit) {
                         app.fillSubInfo()
+                        app.sync.refreshSoon()
                         // at start, and every hour for a window left open (Android also asks each time
                         // the app comes back to the front: MainActivity.onStart)
                         while (true) { app.checkForUpdates(); kotlinx.coroutines.delay(3_600_000) }

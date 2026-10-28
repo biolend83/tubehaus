@@ -169,6 +169,8 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         // opening the app again (it often stays alive in the background): look for a new version
         state.checkForUpdates()
+        // and what the other devices changed, when a server is connected
+        state.sync.refreshSoon()
     }
 
     override fun onResume() {
