@@ -89,6 +89,10 @@ data class Settings(
     val subsFeedOff: Boolean = false,
     val hideShorts: Boolean = false,
     val hideRelated: Boolean = false,
+    /** a TubeHaus server the library syncs with ("" = none, see ServerSync), and its login if it has one */
+    val server: String = "",
+    val serverUser: String = "",
+    val serverPass: String = "",
     /** once a day: a newer app version, and the stream client list (engine/Remote.kt) */
     val checkUpdates: Boolean = true,
     /** text size: 1 normal, up to 1.5 */
