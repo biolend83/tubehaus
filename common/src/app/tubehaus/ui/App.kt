@@ -1,9 +1,11 @@
 package app.tubehaus.ui
 
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.RippleConfiguration
@@ -14,8 +16,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.automirrored.filled.MenuOpen
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.AnimatedVisibility
@@ -50,21 +50,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Subscriptions
-import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Subscriptions
-import androidx.compose.material.icons.outlined.VideoLibrary
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -187,10 +172,10 @@ private data class Tab(val screen: Screen, val label: String, val on: ImageVecto
 @Composable
 private fun tabs(app: AppState): List<Tab> {
     return listOfNotNull(
-        Tab(Screen.Home, tr("Home"), Icons.Filled.Home, Icons.Outlined.Home),
-        if (app.noShorts) null else Tab(Screen.Shorts, tr("Shorts"), Icons.Filled.Bolt, Icons.Outlined.Bolt),
-        Tab(Screen.Subs, tr("Subscriptions"), Icons.Filled.Subscriptions, Icons.Outlined.Subscriptions),
-        Tab(Screen.Library, tr("Library"), Icons.Filled.VideoLibrary, Icons.Outlined.VideoLibrary),
+        Tab(Screen.Home, tr("Home"), Sym.Home.fill, Sym.Home.outline),
+        if (app.noShorts) null else Tab(Screen.Shorts, tr("Shorts"), Sym.Bolt.fill, Sym.Bolt.outline),
+        Tab(Screen.Subs, tr("Subscriptions"), Sym.Subscriptions.fill, Sym.Subscriptions.outline),
+        Tab(Screen.Library, tr("Library"), Sym.VideoLibrary.fill, Sym.VideoLibrary.outline),
     )
 }
 
@@ -224,7 +209,12 @@ private fun Shell(app: AppState) {
         topBar = { if (showTop) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) { TopBar(app, if (railCollapsed) unfold else null) } },
         bottomBar = {
             Column {
-                if (app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts) MiniPlayer(app)
+                // the mini player rises from the bottom edge and sinks back into it
+                AnimatedVisibility(
+                    app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts,
+                    enter = slideInVertically(tween(Motion.MEDIUM, easing = Motion.emphasizedIn)) { it } + fadeIn(tween(Motion.SHORT)),
+                    exit = slideOutVertically(tween(Motion.SHORT, easing = Motion.emphasizedOut)) { it } + fadeOut(tween(Motion.SHORT)),
+                ) { MiniPlayer(app) }
                 if (compact && cur !is Screen.Watch) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) {
                     NavigationBar(containerColor = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
                         for (t in tabs(app)) {
@@ -248,7 +238,7 @@ private fun Shell(app: AppState) {
                     containerColor = MaterialTheme.colorScheme.background,
                     header = {
                         IconButton(onClick = { app.store.settings.update { it.copy(railCollapsed = true) } }) {
-                            Icon(Icons.AutoMirrored.Filled.MenuOpen, tr("Fold the menu"))
+                            Icon(Sym.MenuOpen.fill, tr("Fold the menu"))
                         }
                     },
                 ) {
@@ -263,24 +253,34 @@ private fun Shell(app: AppState) {
                     // below a line, smaller: back to the last video, and the settings
                     HorizontalDivider(Modifier.width(40.dp).padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outline)
                     val last = app.playback.video ?: app.store.lib.state.collectAsState().value.hist.firstOrNull()?.video()
-                    if (last != null) SmallRailItem(Icons.Outlined.History, tr("Resume"), cur is Screen.Watch) {
+                    if (last != null) SmallRailItem(Sym.History.outline, tr("Resume"), cur is Screen.Watch) {
                         if (app.playback.video?.id == last.id) app.go(Screen.Watch(last.id)) else app.watch(last)
                     }
-                    SmallRailItem(Icons.Outlined.Settings, tr("Settings"), cur == Screen.Settings) { app.go(Screen.Settings) }
+                    SmallRailItem(Sym.Settings.outline, tr("Settings"), cur == Screen.Settings) { app.go(Screen.Settings) }
                 }
             }
             Column(Modifier.weight(1f).fillMaxHeight()) {
               // the watch page has no top bar: the folded menu's button sits in a slim row above the video
               if (railCollapsed && cur is Screen.Watch && !app.platform.touch) {
-                  IconButton(onClick = unfold, modifier = Modifier.padding(start = 4.dp).size(36.dp)) { Icon(Icons.Filled.Menu, tr("Menu")) }
+                  IconButton(onClick = unfold, modifier = Modifier.padding(start = 4.dp).size(36.dp)) { Icon(Sym.Menu.fill, tr("Menu")) }
               }
               Box(Modifier.weight(1f).fillMaxWidth()) {
                 key(cur) {
-                  // a new page fades in and rises a little (not the watch page or Shorts: a video surface
-                  // shouldn't be see-through while it starts)
+                  // a new page fades in: going forward it slides in from the right, going back from the
+                  // left, a tab settles from a touch smaller (not the watch page or Shorts: a video
+                  // surface shouldn't be see-through or moving while it starts)
+                  val move = remember { app.lastMove }
                   val shown = remember { Animatable(if (cur is Screen.Watch || cur is Screen.Shorts) 1f else 0f) }
-                  LaunchedEffect(Unit) { shown.animateTo(1f, tween(220, easing = FastOutSlowInEasing)) }
-                  Box(Modifier.fillMaxSize().graphicsLayer { alpha = shown.value; translationY = (1f - shown.value) * 24.dp.toPx() }) {
+                  LaunchedEffect(Unit) { shown.animateTo(1f, tween(if (move == 0) Motion.SHORT + 50 else Motion.MEDIUM, easing = Motion.emphasizedIn)) }
+                  Box(Modifier.fillMaxSize().graphicsLayer {
+                      val rest = 1f - shown.value
+                      alpha = shown.value
+                      when (move) {
+                          1 -> translationX = rest * 40.dp.toPx()
+                          -1 -> translationX = -rest * 24.dp.toPx()
+                          else -> { scaleX = 1f - rest * 0.03f; scaleY = scaleX }
+                      }
+                  }) {
                     when (cur) {
                         Screen.Home -> HomeScreen(app)
                         Screen.Shorts -> ShortsScreen(app)
@@ -374,14 +374,14 @@ fun Logo(modifier: Modifier = Modifier) {
 private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null) {
     Column {
         Row(Modifier.fillMaxWidth().height(52.dp).padding(start = 14.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (onMenu != null) IconButton(onClick = onMenu) { Icon(Icons.Filled.Menu, tr("Menu")) }
+            if (onMenu != null) IconButton(onClick = onMenu) { Icon(Sym.Menu.fill, tr("Menu")) }
             if (app.stack.size > 1) {
-                IconButton(onClick = { app.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) }
+                IconButton(onClick = { app.back() }) { Icon(Sym.ArrowBack.fill, tr("Back")) }
             }
             Logo(Modifier.clickable { app.go(Screen.Home) })
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { app.go(Screen.Search()) }) { Icon(Icons.Outlined.Search, tr("Search")) }
-            if (LocalCompact.current || onMenu != null) IconButton(onClick = { app.go(Screen.Settings) }) { Icon(Icons.Outlined.Settings, tr("Settings")) }
+            IconButton(onClick = { app.go(Screen.Search()) }) { Icon(Sym.Search.outline, tr("Search")) }
+            if (LocalCompact.current || onMenu != null) IconButton(onClick = { app.go(Screen.Settings) }) { Icon(Sym.Settings.outline, tr("Settings")) }
         }
         if (!LocalCompact.current) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
     }
@@ -446,9 +446,9 @@ private fun MiniPlayer(app: AppState) {
                 Text(v.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
             IconButton(onClick = { if (st.playing) app.platform.player.pause() else app.platform.player.play() }) {
-                Icon(if (st.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, tr(if (st.playing) "Pause" else "Play"))
+                Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"))
             }
-            IconButton(onClick = { app.playback.close() }) { Icon(Icons.Filled.Close, tr("Close")) }
+            IconButton(onClick = { app.playback.close() }) { Icon(Sym.Close.fill, tr("Close")) }
         }
     }
 }

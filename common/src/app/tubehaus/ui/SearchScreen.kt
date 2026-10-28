@@ -2,8 +2,6 @@ package app.tubehaus.ui
 
 import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.material.icons.automirrored.outlined.ViewList
-import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,10 +15,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -86,7 +80,7 @@ fun SearchScreen(app: AppState, initial: String) {
     @Composable
     fun SearchBox(modifier: Modifier = Modifier) {
         Row(modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { app.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) }
+            IconButton(onClick = { app.back() }) { Icon(Sym.ArrowBack.fill, tr("Back")) }
             OutlinedTextField(
                 text, { text = it },
                 Modifier.weight(1f).focusRequester(focus),
@@ -95,10 +89,10 @@ fun SearchScreen(app: AppState, initial: String) {
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { submit(text) }),
                 trailingIcon = {
-                    if (text.isNotEmpty()) IconButton(onClick = { text = ""; runCatching { focus.requestFocus() } }) { Icon(Icons.Outlined.Close, tr("Clear")) }
+                    if (text.isNotEmpty()) IconButton(onClick = { text = ""; runCatching { focus.requestFocus() } }) { Icon(Sym.Close.outline, tr("Clear")) }
                 },
             )
-            IconButton(onClick = { submit(text) }) { Icon(Icons.Outlined.Search, tr("Search")) }
+            IconButton(onClick = { submit(text) }) { Icon(Sym.Search.outline, tr("Search")) }
         }
     }
 
@@ -111,7 +105,7 @@ fun SearchScreen(app: AppState, initial: String) {
             LazyColumn(Modifier.fillMaxSize()) {
                 items(suggestions) { s ->
                     Row(Modifier.fillMaxWidth().clickable { text = s; submit(s) }.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Search, null)
+                        Icon(Sym.Search.outline, null)
                         Text(s, Modifier.padding(start = 16.dp))
                     }
                 }
@@ -129,8 +123,8 @@ fun SearchScreen(app: AppState, initial: String) {
             }
             // phones always show one card per row; wider screens can pick a list or a grid
             if (!compact) IconButton(onClick = { app.store.settings.update { it.copy(searchGrid = !grid) } }) {
-                if (grid) Icon(Icons.AutoMirrored.Outlined.ViewList, tr("Show as a list"))
-                else Icon(Icons.Outlined.GridView, tr("Show as a grid"))
+                if (grid) Icon(Sym.ViewList.outline, tr("Show as a list"))
+                else Icon(Sym.GridView.outline, tr("Show as a grid"))
             }
         }
         val pager = rememberPager(query to filter, { YouTube.search(query, filter) }, { YouTube.searchMore(it) })
