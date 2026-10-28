@@ -8,7 +8,7 @@ No server, no account, no Google sign-in, no tracking. The app talks to YouTube 
 keeps your subscriptions, history and playlists on the device, and works out recommendations
 there too.
 
-**[⬇ Windows 10/11 installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3.msi)** (0.5.3, beta)
+**[⬇ Windows 10/11 installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4.msi)** (0.5.4, beta)
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · **Windows** · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
@@ -65,7 +65,7 @@ ExoPlayer (Media3) on Android, libmpv on Windows, macOS and Linux.
 
 ## Install
 
-[Download the installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.3/TubeHaus-0.5.3.msi) and run it. mpv is built in, so there's nothing else to install.
+[Download the installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4.msi) and run it. mpv is built in, so there's nothing else to install.
 
 Windows may warn that the publisher is unknown, because the installer isn't code-signed:
 choose *More info* → *Run anyway*. Each new version installs over the previous one and keeps
