@@ -317,6 +317,10 @@ private val KO = mapOf(
     "{n} replies" to "답글 {n}개",
     "{n} videos" to "동영상 {n}개",
     "{n} views" to "조회수 {n}회",
+    "Likes" to "좋아요",
+    "Views" to "조회수",
+    "Uploaded" to "게시일",
+    "Minimize" to "작게 보기",
     // starter topics
     "Music" to "음악", "Gaming" to "게임", "News" to "뉴스", "Science" to "과학", "Technology" to "기술",
     "Cooking" to "요리", "Travel" to "여행", "Sports" to "스포츠", "Comedy" to "코미디", "Movies" to "영화",

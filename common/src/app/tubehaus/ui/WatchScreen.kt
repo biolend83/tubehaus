@@ -1,9 +1,9 @@
 package app.tubehaus.ui
 
-import androidx.compose.material.icons.filled.DownloadDone
-import androidx.compose.material.icons.outlined.Downloading
-import androidx.compose.material.icons.outlined.Download
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.input.pointer.pointerInput
@@ -30,18 +30,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ThumbDown
-import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.filled.WatchLater
-import androidx.compose.material.icons.outlined.LibraryAdd
-import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.SkipNext
-import androidx.compose.material.icons.outlined.ThumbDown
-import androidx.compose.material.icons.outlined.ThumbUp
-import androidx.compose.material.icons.outlined.WatchLater
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -89,18 +77,13 @@ fun WatchScreen(app: AppState) {
     // the comments open beside (wide) or under (phone) the video, which keeps playing
     var side by remember(v.id) { mutableStateOf(if (hasRelated && set.sideTab != "comments") "next" else "comments") }
     var commentsOpen by remember(v.id) { mutableStateOf(false) }
-    // TV: the video fills the screen once it plays; Back comes here, to its details and what's next
-    if (app.platform.tv) {
-        val st by app.platform.player.state.collectAsState()
-        var filled by remember(v.id) { mutableStateOf(false) }
-        val playing = st.videoId == v.id && st.playing
-        LaunchedEffect(v.id, playing) { if (playing && !filled) { filled = true; app.setFull(true) } }
-    }
+    // TV: the video plays on this page, beside what's next; OK on the video fills the screen
+    // and Back comes back here (it used to fill the screen by itself, which got in the way)
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth > 840.dp
         val tablet = app.platform.touch
-        // tablets: a narrower panel, so the video gets most of the width
-        val sideWidth = if (tablet) minOf(380.dp, maxWidth * 0.32f) else minOf(420.dp, maxWidth * 0.4f)
+        // tablets and TVs: a narrower panel, so the video gets most of the width
+        val sideWidth = if (tablet || app.platform.tv) minOf(380.dp, maxWidth * 0.32f) else minOf(420.dp, maxWidth * 0.4f)
         if (wide) {
             // tablets and the desktop: the video and its details on the left; up next or the comments on the right
             Row(Modifier.fillMaxSize()) {
@@ -148,7 +131,7 @@ fun WatchScreen(app: AppState) {
                 } else {
                     LazyColumn(Modifier.fillMaxSize()) {
                         under(app, v)
-                        if (token != null) item { CommentsTeaser { commentsOpen = true } }
+                        if (token != null) item { CommentsTeaser(token) { commentsOpen = true } }
                         related(app, big = true)
                     }
                 }
@@ -192,7 +175,7 @@ private fun PlayerBox(app: AppState, sideGestures: Boolean = false) {
         // while loading there are no controls yet: keep a way back
         if ((pb.error != null || pb.loading || st.videoId != v?.id)) {
             IconButton(onClick = { app.back() }, modifier = Modifier.align(Alignment.TopStart)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back"), tint = Color.White)
+                Icon(Sym.ArrowBack.fill, tr("Back"), tint = Color.White)
             }
         }
     }
@@ -203,47 +186,91 @@ private fun PlayerBox(app: AppState, sideGestures: Boolean = false) {
 private fun Info(app: AppState, v: Video) {
     val pb = app.playback
     val d = pb.details
-    val s = pb.stream
     val lib by app.store.lib.state.collectAsState()
     val calm = app.store.settings.value.calm
     val hidden = app.store.settings.state.collectAsState().value.hideUnder
     fun has(part: String) = part !in hidden
-    var expanded by remember { mutableStateOf(false) }
+    var sheet by remember(v.id) { mutableStateOf(false) }
+    val viewsText = d?.viewsText?.takeIf { it.isNotEmpty() } ?: v.views.takeIf { it > 0 }?.let { tr("{n} views").replace("{n}", compact(it)) } ?: ""
     Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-        if (has("title")) Text(v.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = if (expanded) 10 else 2, overflow = TextOverflow.Ellipsis)
-        val line = listOfNotNull(
-            (d?.viewsText?.takeIf { it.isNotEmpty() } ?: v.views.takeIf { it > 0 }?.let { tr("{n} views").replace("{n}", compact(it)) }).takeIf { !calm && has("views") },
-            d?.publishedText?.takeIf { it.isNotEmpty() && has("date") },
-        ).joinToString(" · ")
-        if (line.isNotEmpty()) Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
-        // channel
+        // the title and one quiet line under it; either opens the description
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { sheet = true }) {
+            if (has("title")) Text(v.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val line = listOfNotNull(
+                viewsText.takeIf { !calm && has("views") },
+                d?.publishedText?.takeIf { has("date") },
+            ).filter { it.isNotEmpty() }.joinToString("  ")
+            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (has("description") && !pb.stream?.description.isNullOrEmpty())
+                    Text(tr("...more"), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 6.dp))
+            }
+        }
+        // the channel and its subscribe button side by side, then the buttons
         val showSub = v.channelId.isNotEmpty() && has("subscribe")
-        if (has("channel") || showSub) Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (has("channel")) Row(Modifier.weight(1f).clickable { if (v.channelId.isNotEmpty()) app.go(Screen.Channel(v.channelId, v.author)) }, verticalAlignment = Alignment.CenterVertically) {
-                Avatar(d?.avatar ?: lib.subs[v.channelId]?.thumb ?: "", 40)
-                Column(Modifier.padding(start = 10.dp)) {
+        if (has("channel") || showSub) Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (has("channel")) {
+                val open = { if (v.channelId.isNotEmpty()) app.go(Screen.Channel(v.channelId, v.author)) }
+                Avatar(d?.avatar ?: lib.subs[v.channelId]?.thumb ?: "", 36, Modifier.clickable { open() })
+                Column(Modifier.weight(1f, fill = false).padding(start = 10.dp).clickable { open() }) {
                     Text(v.author, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (!calm && has("subscribers") && !d?.subsText.isNullOrEmpty()) Text(d!!.subsText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!calm && has("subscribers") && !d?.subsText.isNullOrEmpty())
+                        Text(d!!.subsText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
-            } else Spacer(Modifier.weight(1f))
+                Spacer(Modifier.width(12.dp))
+            }
             if (showSub) SubscribeButton(v.channelId, v.author, d?.avatar ?: "", app)
         }
         Actions(app, v, ::has)
-        // description
-        val desc = s?.description?.takeIf { has("description") } ?: ""
-        if (desc.isNotEmpty()) {
-            Column(
-                Modifier.fillMaxWidth().padding(top = 12.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
-                    .clickable { expanded = !expanded }.padding(12.dp).animateContentSize(),
-            ) {
-                if (expanded) SelectionContainer { Text(desc, style = MaterialTheme.typography.bodyMedium) }
-                else Text(desc, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                Text(tr(if (expanded) "Show less" else "...more"), fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 4.dp))
+    }
+    if (sheet) DescriptionSheet(app, v, viewsText) { sheet = false }
+}
+
+/** The description in a sheet from the bottom: the title, the channel, likes, views and date, then the full text. */
+@Composable
+private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose: () -> Unit) {
+    val d = app.playback.details
+    val calm = app.store.settings.value.calm
+    val desc = app.playback.stream?.description ?: ""
+    ModalBottomSheet(onDismissRequest = onClose, shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)) {
+        LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            item {
+                Text(v.title, style = MaterialTheme.typography.titleLarge)
+                if (v.author.isNotEmpty()) Row(
+                    Modifier.padding(vertical = 12.dp).clip(RoundedCornerShape(8.dp))
+                        .clickable { onClose(); if (v.channelId.isNotEmpty()) app.go(Screen.Channel(v.channelId, v.author)) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Avatar(d?.avatar ?: app.store.lib.value.subs[v.channelId]?.thumb ?: "", 28)
+                    Text(v.author, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 10.dp))
+                }
+                // likes, views and the date side by side, the numbers large
+                val stats = listOfNotNull(
+                    d?.likesText?.takeIf { it.isNotEmpty() && !calm }?.let { it to tr("Likes") },
+                    (if (v.views > 0) compact(v.views) else viewsText).takeIf { it.isNotEmpty() && !calm }?.let { it to tr("Views") },
+                    d?.publishedText?.takeIf { it.isNotEmpty() }?.let { it to tr("Uploaded") },
+                )
+                if (stats.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    for ((big, small) in stats) Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(big, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text(small, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (desc.isNotEmpty()) SelectionContainer {
+                    Text(desc, style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 32.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)).padding(14.dp))
+                }
             }
         }
     }
 }
 
+/**
+ * The buttons under the video: like (with its count) and dislike in one pill, then watch later,
+ * save, share, download and next, whichever Settings → Under the video keeps.
+ */
 @Composable
 private fun Actions(app: AppState, v: Video, has: (String) -> Boolean) {
     val pb = app.playback
@@ -253,24 +280,32 @@ private fun Actions(app: AppState, v: Video, has: (String) -> Boolean) {
     val saved = lib.wl.any { it.id == v.id }
     var pick by remember { mutableStateOf(false) }
     val calm = app.store.settings.value.calm
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (has("likes")) item {
-            Chip(if (liked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp, (pb.details?.likesText?.takeIf { !calm } ?: "").ifEmpty { tr("Like") }) {
-                app.store.setInList("likes", v, !liked)
-                if (!liked) Learn.nudgeChannel(app.store, v.channelId, v.author, 1.0)
+            Row(Modifier.height(36.dp).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+                verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxHeight().tvClickable(RoundedCornerShape(18.dp)) {
+                    app.store.setInList("likes", v, !liked)
+                    if (!liked) Learn.nudgeChannel(app.store, v.channelId, v.author, 1.0)
+                }.padding(start = 12.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(if (liked) Sym.ThumbUp.fill else Sym.ThumbUp.outline, tr("Like"), Modifier.size(20.dp))
+                    val n = pb.details?.likesText?.takeIf { !calm } ?: ""
+                    if (n.isNotEmpty()) Text(n, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 6.dp))
+                }
+                Box(Modifier.width(1.dp).height(20.dp).background(MaterialTheme.colorScheme.outline))
+                Box(Modifier.fillMaxHeight().tvClickable(RoundedCornerShape(18.dp)) {
+                    app.store.setInList("dislikes", v, !disliked)
+                    if (!disliked) Learn.nudgeChannel(app.store, v.channelId, v.author, -1.5)
+                }.padding(start = 10.dp, end = 12.dp), contentAlignment = Alignment.Center) {
+                    Icon(if (disliked) Sym.ThumbDown.fill else Sym.ThumbDown.outline, tr("Dislike"), Modifier.size(20.dp))
+                }
             }
         }
-        if (has("likes")) item {
-            Chip(if (disliked) Icons.Filled.ThumbDown else Icons.Outlined.ThumbDown, tr("Dislike")) {
-                app.store.setInList("dislikes", v, !disliked)
-                if (!disliked) Learn.nudgeChannel(app.store, v.channelId, v.author, -1.5)
-            }
-        }
-        if (has("later")) item { Chip(if (saved) Icons.Filled.WatchLater else Icons.Outlined.WatchLater, tr("Watch later")) { app.store.setInList("wl", v, !saved) } }
-        if (has("save")) item { Chip(Icons.Outlined.LibraryAdd, tr("Save")) { pick = true } }
-        if (has("share")) item { Chip(Icons.Outlined.Share, tr("Share")) { app.share(v.title, "https://youtu.be/${v.id}") } }
+        if (has("later")) item { Chip(if (saved) Sym.WatchLater.fill else Sym.WatchLater.outline, tr("Watch later")) { app.store.setInList("wl", v, !saved) } }
+        if (has("save")) item { Chip(Sym.LibraryAdd.outline, tr("Save")) { pick = true } }
+        if (has("share")) item { Chip(Sym.Share.outline, tr("Share")) { app.share(v.title, "https://youtu.be/${v.id}") } }
         if (has("download") && !v.live) item { DownloadChip(app, v) }
-        if (pb.next != null && has("next")) item { Chip(Icons.Outlined.SkipNext, tr("Next")) { pb.skipNext() } }
+        if (pb.next != null && has("next")) item { Chip(Sym.SkipNext.outline, tr("Next")) { pb.skipNext() } }
     }
     if (pick) PlaylistPicker(v, app) { pick = false }
 }
@@ -281,21 +316,23 @@ private fun DownloadChip(app: AppState, v: Video) {
     val saved by app.offline.saved.collectAsState()
     val p = app.offline.progress[v.id]
     when {
-        v.id in saved.items -> Chip(Icons.Filled.DownloadDone, tr("Downloaded")) { app.go(Screen.Downloads) }
-        p != null -> Chip(Icons.Outlined.Downloading, "${(p * 100).toInt()}%") { app.go(Screen.Downloads) }
-        else -> Chip(Icons.Outlined.Download, tr("Download")) { app.offline.asking = v }
+        v.id in saved.items -> Chip(Sym.DownloadDone.fill, tr("Downloaded")) { app.go(Screen.Downloads) }
+        p != null -> Chip(Sym.Downloading.outline, "${(p * 100).toInt()}%") { app.go(Screen.Downloads) }
+        else -> Chip(Sym.Download.outline, tr("Download")) { app.offline.asking = v }
     }
 }
 
+/** A grey pill, 36dp tall: an icon and a short label */
 @Composable
 private fun Chip(icon: ImageVector, label: String, onClick: () -> Unit) {
-    AssistChip(
-        onClick = onClick, label = { Text(label, maxLines = 1) },
-        leadingIcon = { Icon(icon, null, Modifier.size(18.dp)) },
-        shape = RoundedCornerShape(18.dp),
-        border = null,
-        colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-    )
+    Row(
+        Modifier.height(36.dp).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+            .tvClickable(RoundedCornerShape(18.dp), onClick = onClick).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, Modifier.size(20.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, modifier = Modifier.padding(start = 6.dp))
+    }
 }
 
 /** What sits under the video, by Settings → Under the video: everything, only the title, or nothing. */
@@ -315,7 +352,7 @@ fun CommentsPanel(app: AppState, token: String, onClose: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(tr("Comments"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            IconButton(onClick = onClose) { Icon(Icons.Filled.Close, tr("Close")) }
+            IconButton(onClick = onClose) { Icon(Sym.Close.fill, tr("Close")) }
         }
         HorizontalDivider()
         Comments(app, token)
@@ -359,13 +396,23 @@ private fun LazyListScope.related(app: AppState, big: Boolean) {
     }
 }
 
+/** A card under the buttons: "Comments" and two lines of the first one; a tap opens them all. */
 @Composable
-private fun CommentsTeaser(open: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+private fun CommentsTeaser(token: String, open: () -> Unit) {
+    val pager = rememberPager(token, { YouTube.comments(token) }, { YouTube.comments(it) })
+    val first = pager.items.firstOrNull()
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .tvClickable(onClick = open).padding(12.dp),
-    ) { Text(tr("Comments"), style = MaterialTheme.typography.titleSmall) }
+    ) {
+        Text(tr("Comments"), style = MaterialTheme.typography.titleSmall)
+        if (first != null) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Avatar(first.avatar, 24)
+            Text(first.text, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 10.dp))
+        }
+    }
 }
 
 
@@ -384,7 +431,7 @@ private fun CommentView(app: AppState, c: Comment, reply: Boolean = false) {
             SelectionContainer { Text(c.text, style = MaterialTheme.typography.bodyMedium) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (!calm && c.likes.isNotEmpty()) {
-                    Icon(Icons.Outlined.ThumbUp, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Sym.ThumbUp.outline, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(c.likes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
                     Spacer(Modifier.width(16.dp))
                 }

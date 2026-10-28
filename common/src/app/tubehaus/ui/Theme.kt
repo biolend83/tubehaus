@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.material3.ColorScheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -48,13 +49,29 @@ private val dark = darkColorScheme(
 )
 
 private val type = Typography(
-    titleLarge = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold, lineHeight = 26.sp),
+    titleLarge = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold, lineHeight = 26.sp, letterSpacing = (-0.2).sp),
     titleMedium = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium, lineHeight = 22.sp),
     titleSmall = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 20.sp),
+    bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 22.sp),
     bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
     bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 17.sp),
     labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+    labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, lineHeight = 16.sp),
+    labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, lineHeight = 14.sp),
 )
+
+/**
+ * How things move (the Material 3 motion tokens): short for presses and small things, medium for
+ * pages, long for big surfaces. Pages arrive on the emphasized curve: quick out, a soft landing.
+ */
+object Motion {
+    const val SHORT = 150
+    const val MEDIUM = 250
+    const val LONG = 350
+    val standard = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+    val emphasizedIn = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+    val emphasizedOut = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
+}
 
 @Composable
 fun TubeTheme(mode: Int, wallpaper: ((Boolean) -> ColorScheme?)? = null, content: @Composable () -> Unit) {

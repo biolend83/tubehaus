@@ -1,8 +1,6 @@
 package app.tubehaus.ui
 
-import androidx.compose.material.icons.outlined.DownloadForOffline
 import androidx.compose.material3.IconButton
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,14 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Psychology
-import androidx.compose.material.icons.outlined.SwapVert
-import androidx.compose.material.icons.outlined.ThumbUp
-import androidx.compose.material.icons.outlined.WatchLater
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -142,7 +132,7 @@ fun ManageSubsScreen(app: AppState) {
                 Text(s.name.ifEmpty { cid }, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 14.dp).weight(1f))
                 IconButton(onClick = { app.store.subscribe(cid, s.name, s.thumb, false) }) {
-                    Icon(Icons.Outlined.Close, tr("Unsubscribe"))
+                    Icon(Sym.Close.outline, tr("Unsubscribe"))
                 }
             }
         }
@@ -177,22 +167,22 @@ fun LibraryScreen(app: AppState) {
             }
             if (lib.hist.isEmpty()) Text(tr("Videos you watch show up here"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
         }
-        item { LibRow(Icons.Outlined.History, tr("History"), "${lib.hist.size}") { app.go(Screen.History) } }
-        item { LibRow(Icons.Outlined.WatchLater, tr("Watch later"), "${lib.wl.size}") { app.go(Screen.Local("wl")) } }
-        item { LibRow(Icons.Outlined.ThumbUp, tr("Liked videos"), "${lib.likes.size}") { app.go(Screen.Local("likes")) } }
+        item { LibRow(Sym.History.outline, tr("History"), "${lib.hist.size}") { app.go(Screen.History) } }
+        item { LibRow(Sym.WatchLater.outline, tr("Watch later"), "${lib.wl.size}") { app.go(Screen.Local("wl")) } }
+        item { LibRow(Sym.ThumbUp.outline, tr("Liked videos"), "${lib.likes.size}") { app.go(Screen.Local("likes")) } }
         item {
             val saved by app.offline.saved.collectAsState()
             val busy = app.offline.progress.size
-            LibRow(Icons.Outlined.DownloadForOffline, tr("Downloads"), "${saved.items.size}" + if (busy > 0) " (+$busy)" else "") { app.go(Screen.Downloads) }
+            LibRow(Sym.DownloadForOffline.outline, tr("Downloads"), "${saved.items.size}" + if (busy > 0) " (+$busy)" else "") { app.go(Screen.Downloads) }
         }
         item { SectionTitle(tr("Playlists")) }
         items(lib.playlists.entries.sortedByDescending { it.value.updated }.toList(), key = { it.key }) { (id, p) ->
-            LibRow(Icons.AutoMirrored.Outlined.PlaylistPlay, p.title, "${p.items.size}") { app.go(Screen.Local(id)) }
+            LibRow(Sym.PlaylistPlay.outline, p.title, "${p.items.size}") { app.go(Screen.Local(id)) }
         }
-        item { LibRow(Icons.Outlined.Add, tr("New playlist"), "") { newPl = true } }
+        item { LibRow(Sym.Add.outline, tr("New playlist"), "") { newPl = true } }
         item { SectionTitle(tr("Your data")) }
-        item { LibRow(Icons.Outlined.Psychology, tr("What TubeHaus learned about you"), "") { app.go(Screen.Learned) } }
-        item { LibRow(Icons.Outlined.SwapVert, tr("Import and export"), "") { app.go(Screen.Settings) } }
+        item { LibRow(Sym.Psychology.outline, tr("What TubeHaus learned about you"), "") { app.go(Screen.Learned) } }
+        item { LibRow(Sym.SwapVert.outline, tr("Import and export"), "") { app.go(Screen.Settings) } }
     }
     if (newPl) NameDialog(tr("New playlist"), "", { newPl = false }) { app.store.newPlaylist(it, null) }
 }
@@ -309,7 +299,7 @@ fun PlaylistPicker(v: Video, app: AppState, dismiss: () -> Unit) {
                     }
                 }
                 TextButton(onClick = { making = true }) {
-                    Icon(Icons.Outlined.Add, null, Modifier.size(18.dp)); Text(tr("New playlist"), Modifier.padding(start = 6.dp))
+                    Icon(Sym.Add.outline, null, Modifier.size(18.dp)); Text(tr("New playlist"), Modifier.padding(start = 6.dp))
                 }
             }
         },

@@ -6,6 +6,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -17,7 +18,25 @@ object Net {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
+        // subtitles arrive cleaned (Vtt): the player never sees YouTube's repeated lines
+        .addInterceptor { chain ->
+            val r = chain.proceed(chain.request())
+            if (!r.isSuccessful || !Vtt.isCaption(chain.request().url.toString())) return@addInterceptor r
+            val text = r.body?.string() ?: ""
+            r.newBuilder().body(Vtt.clean(text).toResponseBody("text/vtt".toMediaType())).build()
+        }
         .build()
+
+    /** a subtitle track, cleaned, as a file the desktop player can open; null when it can't be fetched */
+    fun captionFile(url: String): String? = runCatching {
+        client.newCall(Request.Builder().url(url).build()).execute().use { r ->
+            if (!r.isSuccessful) return null
+            val f = java.io.File.createTempFile("tubehaus-subs", ".vtt")
+            f.deleteOnExit()
+            f.writeText(r.body?.string() ?: "")
+            f.absolutePath
+        }
+    }.getOrNull()
 
     private val JSON = "application/json".toMediaType()
 

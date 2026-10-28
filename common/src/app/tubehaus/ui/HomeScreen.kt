@@ -4,9 +4,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Explore
-import androidx.compose.material.icons.outlined.Public
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -99,7 +96,7 @@ fun HomeScreen(app: AppState) {
                     RegionPicker(app) { HomeCache.items.clear(); app.rec.clearCache(); scope.launch { load(false) } }
                     FilterChip(app.discover, onClick = {
                         app.discover = !app.discover; HomeCache.items.clear(); scope.launch { load(false) }
-                    }, label = { Text(tr("Discover")) }, leadingIcon = { Icon(Icons.Outlined.Explore, null, Modifier.size(18.dp)) },
+                    }, label = { Text(tr("Discover")) }, leadingIcon = { Icon(Sym.Explore.outline, null, Modifier.size(18.dp)) },
                         modifier = Modifier.padding(start = 8.dp))
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = { app.rec.clearCache(); scope.launch { load(false) } }) { Text(tr("Refresh")) }
@@ -120,7 +117,7 @@ private fun RegionPicker(app: AppState, changed: () -> Unit) {
     val now = s.region.ifEmpty { app.platform.deviceRegion() }.uppercase()
     Box {
         val name = java.util.Locale("", now).getDisplayCountry(java.util.Locale(InnerTube.hl)).ifEmpty { now }
-        AssistChip(onClick = { open = true }, label = { Text(name) }, leadingIcon = { Icon(Icons.Outlined.Public, null, Modifier.size(18.dp)) })
+        AssistChip(onClick = { open = true }, label = { Text(name) }, leadingIcon = { Icon(Sym.Public.outline, null, Modifier.size(18.dp)) })
         DropdownMenu(open, onDismissRequest = { open = false }) {
             val common = listOf("US", "GB", "CA", "AU", "IN", "DE", "FR", "ES", "IT", "NL", "TR", "BR", "MX", "JP", "KR", "ID")
             DropdownMenuItem(text = { Text(tr("This device") + " (" + app.platform.deviceRegion().uppercase() + ")") }, onClick = {

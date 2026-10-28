@@ -2,6 +2,9 @@ package app.tubehaus.ui
 
 import androidx.compose.runtime.collectAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.focus.focusProperties
@@ -38,9 +41,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.PlaylistPlay
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -83,7 +83,7 @@ import kotlinx.coroutines.launch
 fun Modifier.tvFocus(shape: Shape = RoundedCornerShape(12.dp)): Modifier {
     if (!LocalPlatform.current.tv) return this
     var on by remember { mutableStateOf(false) }
-    val grow by animateFloatAsState(if (on) 1.04f else 1f)
+    val grow by animateFloatAsState(if (on) 1.04f else 1f, tween(Motion.SHORT, easing = Motion.standard))
     return this.graphicsLayer { scaleX = grow; scaleY = grow }
         .onFocusChanged { on = it.hasFocus }
         .let { if (on) it.border(3.dp, Teal, shape) else it }
@@ -91,11 +91,17 @@ fun Modifier.tvFocus(shape: Shape = RoundedCornerShape(12.dp)): Modifier {
 
 /**
  * clickable, and on a TV with [tvFocus]'s frame instead of a tint over the whole card;
- * [onLongClick] is holding OK on the remote (the card's ⋮ menu)
+ * [onLongClick] is holding OK on the remote (the card's ⋮ menu). On a touch screen or with a mouse
+ * the card sinks a little while it is pressed.
  */
 @Composable
 fun Modifier.tvClickable(shape: Shape = RoundedCornerShape(12.dp), onLongClick: (() -> Unit)? = null, onClick: () -> Unit): Modifier {
-    if (!LocalPlatform.current.tv) return clickable(onClick = onClick)
+    if (!LocalPlatform.current.tv) {
+        val touch = remember { MutableInteractionSource() }
+        val pressed by touch.collectIsPressedAsState()
+        val sink by animateFloatAsState(if (pressed) 0.98f else 1f, tween(Motion.SHORT, easing = Motion.standard))
+        return graphicsLayer { scaleX = sink; scaleY = sink }.clickable(touch, LocalIndication.current, onClick = onClick)
+    }
     return tvFocus(shape).combinedClickable(remember { MutableInteractionSource() }, indication = null, onLongClick = onLongClick, onClick = onClick)
 }
 
@@ -164,7 +170,7 @@ fun VideoMenu(v: Video, app: AppState, extra: List<Pair<String, () -> Unit>> = e
     var pick by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.size(32.dp).notOnTv()) {
-            Icon(Icons.Default.MoreVert, tr("More"), modifier = Modifier.size(18.dp))
+            Icon(Sym.MoreVert.fill, tr("More"), modifier = Modifier.size(18.dp))
         }
         DropdownMenu(open, onDismissRequest = { open = false }) {
             val inWl = app.store.inList("wl", v.id)
@@ -266,7 +272,7 @@ fun PlaylistRow(p: Playlist, app: AppState) {
                 Modifier.align(Alignment.BottomEnd).padding(6.dp).background(Color(0xCC000000), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Outlined.PlaylistPlay, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                Icon(Sym.PlaylistPlay.outline, null, tint = Color.White, modifier = Modifier.size(14.dp))
                 Text(p.countText, color = Color.White, fontSize = 12.sp)
             }
         }

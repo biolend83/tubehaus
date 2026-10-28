@@ -16,6 +16,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import app.tubehaus.engine.Caption
 import app.tubehaus.engine.Format
+import app.tubehaus.engine.Net
 import app.tubehaus.engine.Stream
 import app.tubehaus.engine.YouTube
 import app.tubehaus.ui.PlayOptions
@@ -218,7 +219,7 @@ class MpvPlayer : VideoPlayer {
                 LibMpv.EVENT_FILE_LOADED -> {
                     st.update { it.copy(ended = false, error = null) }
                     // mpv downloads the track here, on this thread, never on the UI's
-                    loadedCaption?.let { c -> cmd("sub-add", YouTube.captionUrl(c, loadedTranslate), "select", c.name) }
+                    loadedCaption?.let { c -> YouTube.captionUrl(c, loadedTranslate).let { u -> cmd("sub-add", Net.captionFile(u) ?: u, "select", c.name) } }
                 }
             }
         }
@@ -352,7 +353,7 @@ class MpvPlayer : VideoPlayer {
         // another track: mpv downloads it, so not on the UI thread
         thread(isDaemon = true, name = "mpv-subs") {
             cmd("sub-remove")
-            cmd("sub-add", YouTube.captionUrl(c, translateTo), "select", c.name)
+            YouTube.captionUrl(c, translateTo).let { u -> cmd("sub-add", Net.captionFile(u) ?: u, "select", c.name) }
             set("sub-visibility", "yes")
         }
     }
