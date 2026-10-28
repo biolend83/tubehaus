@@ -84,9 +84,8 @@ ExoPlayer (Media3) on Android, libmpv on Windows, macOS and Linux.
   regular expression* enter `^TubeHaus `, turn on *Fallback to older releases*, and under
   *Filter APKs by regular expression* enter `TubeHaus-\d`. The filter
   matters: the same repository also has server releases ("Server 0.7.x") with no APK in them.
-- **Android TV / Google TV** — the same APK. In *Downloader*, enter
-  `https://github.com/biolend83/tubehaus/releases/latest/download/TubeHaus.apk` (it always gives the newest version), or use
-  *Send Files to TV*; TubeHaus then shows on the TV's home screen. Settings → *TV mode* turns the
+- **Android TV / Google TV** — the same APK. In the *Downloader* app, enter the code **3155410**
+  (or the address `aftv.news/3155410`): it always gives the newest version. Or use *Send Files to TV*; TubeHaus then shows on the TV's home screen. Settings → *TV mode* turns the
   TV layout on for boxes that don't say they are a TV.
 - **Windows 10/11** — [the installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4.msi) or [setup .exe](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-win-x64-setup.exe), or a
   [portable .zip](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-win-x64-portable.zip) that needs no install; on Windows on ARM, the
