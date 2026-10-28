@@ -9,8 +9,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.material.icons.filled.Comment
-import androidx.compose.material.icons.outlined.Comment
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -25,6 +23,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.draw.clip
+import app.tubehaus.rec.Learn
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,25 +39,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.BrightnessMedium
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ClosedCaption
-import androidx.compose.material.icons.filled.Forward10
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Replay10
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.outlined.ClosedCaptionOff
-import androidx.compose.material.icons.outlined.HighQuality
-import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
@@ -318,9 +299,9 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 val icon = when {
-                    kind == "brightness" -> Icons.Filled.BrightnessMedium
-                    level == 0f -> Icons.AutoMirrored.Filled.VolumeOff
-                    else -> Icons.AutoMirrored.Filled.VolumeUp
+                    kind == "brightness" -> Sym.BrightnessMedium.fill
+                    level == 0f -> Sym.VolumeOff.fill
+                    else -> Sym.VolumeUp.fill
                 }
                 Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(
@@ -342,7 +323,7 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
                     Modifier.background(Color(0x66000000), CircleShape).padding(horizontal = 18.dp, vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Icon(if (side < 0) Icons.Filled.Replay10 else Icons.Filled.Forward10, null, tint = Color.White)
+                    Icon(if (side < 0) Sym.Replay10.fill else Sym.Forward10.fill, null, tint = Color.White)
                     Text(tr("{n} seconds").replace("{n}", "$secs"), color = Color.White, fontSize = 12.sp)
                 }
             }
@@ -377,34 +358,37 @@ private fun TouchOverlay(
 ) {
     val player = app.platform.player
     Box(Modifier.fillMaxSize().background(Color(0x66000000))) {
-        // top: back and title in full screen; captions and settings on the right
+        // top: a chevron that folds the video into the mini player (in full screen: back out of it),
+        // the title and channel in full screen; captions and settings on the right
         Row(
             Modifier.fillMaxWidth().align(Alignment.TopStart).padding(horizontal = 4.dp, vertical = if (fullscreen) 8.dp else 0.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = { app.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back"), tint = Color.White) }
-            Text(
-                if (fullscreen) app.playback.video?.title ?: "" else "",
-                color = Color.White, style = MaterialTheme.typography.titleMedium,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
-            )
+            IconButton(onClick = { app.back() }) { Icon(Sym.KeyboardArrowDown.fill, tr(if (fullscreen) "Exit full screen" else "Minimize"), tint = Color.White, modifier = Modifier.size(28.dp)) }
+            Column(Modifier.weight(1f)) {
+                if (fullscreen) {
+                    val v = app.playback.video
+                    Text(v?.title ?: "", color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (!v?.author.isNullOrEmpty()) Text(v!!.author, color = Color(0xCCFFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                }
+            }
             CaptionsButton(app, st) { poke() }
-            IconButton(onClick = openSettings) { Icon(Icons.Filled.Settings, tr("Settings"), tint = Color.White) }
+            IconButton(onClick = openSettings) { Icon(Sym.Settings.outline, tr("Settings"), tint = Color.White) }
         }
         // centre: back 10s, play/pause, forward 10s (or next when it has ended)
-        Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(36.dp)) {
-            CenterButton(Icons.Filled.Replay10, tr("Back 10 seconds"), 40) { seekBy(-10); poke() }
+        Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (fullscreen) 56.dp else 32.dp)) {
+            CenterButton(Sym.Replay10.fill, tr("Back 10 seconds"), 48) { seekBy(-10); poke() }
             Box(Modifier.size(64.dp), contentAlignment = Alignment.Center) {
                 when {
                     st.buffering && !st.ended -> CircularProgressIndicator(Modifier.size(48.dp), color = Color.White, strokeWidth = 3.dp)
-                    st.ended -> CenterButton(Icons.Filled.Replay, tr("Replay"), 56) { player.seekTo(0); player.play() }
-                    else -> CenterButton(if (st.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, tr(if (st.playing) "Pause" else "Play"), 56) {
+                    st.ended -> CenterButton(Sym.Replay.fill, tr("Replay"), 64) { player.seekTo(0); player.play() }
+                    else -> CenterButton(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"), 64) {
                         if (st.playing) player.pause() else player.play(); poke()
                     }
                 }
             }
-            if (st.ended && app.playback.next != null) CenterButton(Icons.Filled.SkipNext, tr("Next"), 40) { app.playback.skipNext() }
-            else CenterButton(Icons.Filled.Forward10, tr("Forward 10 seconds"), 40) { seekBy(10); poke() }
+            if (st.ended && app.playback.next != null) CenterButton(Sym.SkipNext.fill, tr("Next"), 48) { app.playback.skipNext() }
+            else CenterButton(Sym.Forward10.fill, tr("Forward 10 seconds"), 48) { seekBy(10); poke() }
         }
         // bottom: time, full screen, seek bar
         Column(
@@ -418,16 +402,41 @@ private fun TouchOverlay(
                 FullscreenButton(app, fullscreen)
             }
             SeekBar(st, dragging, onDrag) { f -> player.seekTo((f * st.durationMs).toLong()); onDragEnd() }
+            if (fullscreen) FullscreenActions(app) { poke() }
         }
+    }
+}
+
+/** Full screen on a phone: like, dislike, watch later and share under the seek bar, without leaving the video */
+@Composable
+private fun FullscreenActions(app: AppState, poke: () -> Unit) {
+    val v = app.playback.video ?: return
+    val lib by app.store.lib.state.collectAsState()
+    val liked = lib.likes.any { it.id == v.id }
+    val disliked = v.id in lib.dislikes
+    val saved = lib.wl.any { it.id == v.id }
+    Row(Modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+        Bar(if (liked) Sym.ThumbUp.fill else Sym.ThumbUp.outline, tr("Like")) {
+            app.store.setInList("likes", v, !liked)
+            if (!liked) Learn.nudgeChannel(app.store, v.channelId, v.author, 1.0)
+            poke()
+        }
+        Bar(if (disliked) Sym.ThumbDown.fill else Sym.ThumbDown.outline, tr("Dislike")) {
+            app.store.setInList("dislikes", v, !disliked)
+            if (!disliked) Learn.nudgeChannel(app.store, v.channelId, v.author, -1.5)
+            poke()
+        }
+        Bar(if (saved) Sym.WatchLater.fill else Sym.WatchLater.outline, tr("Watch later")) { app.store.setInList("wl", v, !saved); poke() }
+        Bar(Sym.Share.outline, tr("Share")) { app.share(v.title, "https://youtu.be/${v.id}") }
     }
 }
 
 @Composable
 private fun CenterButton(icon: ImageVector, label: String, size: Int, onClick: () -> Unit) {
     Box(
-        Modifier.size(size.dp).background(Color(0x44000000), CircleShape).clickable(onClick = onClick),
+        Modifier.size(size.dp).clip(CircleShape).background(Color(0x4D000000)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, label, tint = Color.White, modifier = Modifier.size((size * 0.62f).dp)) }
+    ) { Icon(icon, label, tint = Color.White, modifier = Modifier.size((size * 0.58f).dp)) }
 }
 
 // ---------------------------------------------------------------------- mouse and keyboard
@@ -448,20 +457,20 @@ private fun MouseOverlay(
                     .padding(horizontal = 8.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = { app.setFull(false) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back"), tint = Color.White) }
+                IconButton(onClick = { app.setFull(false) }) { Icon(Sym.ArrowBack.fill, tr("Back"), tint = Color.White) }
                 Text(
                     app.playback.video?.title ?: "", color = Color.White, style = MaterialTheme.typography.titleMedium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                 )
                 if (LocalSideComments.current) IconButton(onClick = { app.fsComments = !app.fsComments }) {
-                    Icon(if (app.fsComments) Icons.Filled.Comment else Icons.Outlined.Comment, tr("Comments"), tint = Color.White)
+                    Icon(if (app.fsComments) Sym.Comment.fill else Sym.Comment.outline, tr("Comments"), tint = Color.White)
                 }
             }
         }
         if (st.ended) {
             Row(Modifier.align(Alignment.Center), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                CenterButton(Icons.Filled.Replay, tr("Replay"), 64) { player.seekTo(0); player.play() }
-                if (app.playback.next != null) CenterButton(Icons.Filled.SkipNext, tr("Next"), 64) { app.playback.skipNext() }
+                CenterButton(Sym.Replay.fill, tr("Replay"), 64) { player.seekTo(0); player.play() }
+                if (app.playback.next != null) CenterButton(Sym.SkipNext.fill, tr("Next"), 64) { app.playback.skipNext() }
             }
         }
         // bottom: seek bar, then the buttons
@@ -472,11 +481,11 @@ private fun MouseOverlay(
         ) {
             SeekBar(st, dragging, onDrag) { f -> player.seekTo((f * st.durationMs).toLong()); onDragEnd() }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Bar(if (st.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, tr(if (st.playing) "Pause" else "Play"),
+                Bar(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"),
                     playFocus?.let { Modifier.focusRequester(it) } ?: Modifier) {
                     if (st.ended) { player.seekTo(0); player.play() } else if (st.playing) player.pause() else player.play()
                 }
-                if (app.playback.next != null) Bar(Icons.Filled.SkipNext, tr("Next")) { app.playback.skipNext() }
+                if (app.playback.next != null) Bar(Sym.SkipNext.fill, tr("Next")) { app.playback.skipNext() }
                 if (player.hasVolume) Volume(app, st)
                 Spacer(Modifier.width(8.dp))
                 TimeText(app, st, dragging)
@@ -484,7 +493,7 @@ private fun MouseOverlay(
                 if (st.speed != 1f) Text("${st.speed}x", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(end = 4.dp))
                 CaptionsButton(app, st) {}
                 Box {
-                    Bar(Icons.Filled.Settings, tr("Settings")) { setSettings(!settings) }
+                    Bar(Sym.Settings.fill, tr("Settings")) { setSettings(!settings) }
                     DropdownMenu(settings, { setSettings(false) }) {
                         Column(Modifier.width(260.dp)) { SettingsPages(app) { setSettings(false) } }
                     }
@@ -503,7 +512,7 @@ private fun Bar(icon: ImageVector, label: String, modifier: Modifier = Modifier,
 @Composable
 private fun Volume(app: AppState, st: PlayerState) {
     val player = app.platform.player
-    Bar(if (st.muted || st.volume == 0f) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp, tr(if (st.muted) "Unmute" else "Mute")) {
+    Bar(if (st.muted || st.volume == 0f) Sym.VolumeOff.fill else Sym.VolumeUp.fill, tr(if (st.muted) "Unmute" else "Mute")) {
         player.setMuted(!st.muted)
     }
     Track(
@@ -528,7 +537,7 @@ private fun TimeText(app: AppState, st: PlayerState, dragging: Float?) {
 @Composable
 private fun FullscreenButton(app: AppState, fullscreen: Boolean) {
     IconButton(onClick = { app.setFull(!fullscreen) }) {
-        Icon(if (fullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen, tr(if (fullscreen) "Exit full screen" else "Full screen"), tint = Color.White)
+        Icon(if (fullscreen) Sym.FullscreenExit.fill else Sym.Fullscreen.fill, tr(if (fullscreen) "Exit full screen" else "Full screen"), tint = Color.White)
     }
 }
 
@@ -548,7 +557,7 @@ private fun CaptionsButton(app: AppState, st: PlayerState, onPress: () -> Unit) 
             app.store.settings.update { it.copy(captions = true) }
         }
     }) {
-        Icon(if (st.captions != null) Icons.Filled.ClosedCaption else Icons.Outlined.ClosedCaptionOff, tr("Captions"), tint = Color.White)
+        Icon(if (st.captions != null) Sym.ClosedCaption.fill else Sym.ClosedCaptionOff.outline, tr("Captions"), tint = Color.White)
     }
 }
 
@@ -614,7 +623,8 @@ internal fun Track(
             if (buffered > 0f) Box(Modifier.fillMaxWidth(buffered).height(thick).background(Color(0x77FFFFFF)))
             Box(Modifier.fillMaxWidth(shown).height(thick).background(color))
         }
-        val knob = if (active) 14.dp else 10.dp
+        // the handle: 12dp, 20dp while dragging (YouTube's sizes)
+        val knob = if (held != null) 20.dp else if (active) 14.dp else 12.dp
         Box(Modifier.offset(x = maxWidth * shown - knob / 2).size(knob).background(color, CircleShape))
     }
 }
@@ -627,10 +637,10 @@ private fun ColumnScope.SettingsPages(app: AppState, dismiss: () -> Unit) {
     var page by remember { mutableStateOf("") }
     when (page) {
         "" -> {
-            SheetRow(Icons.Outlined.HighQuality, tr("Quality"), if (st.height > 0) "${st.height}p" else tr("Auto")) { page = "q" }
-            SheetRow(Icons.Outlined.Speed, tr("Speed"), if (st.speed == 1f) tr("Normal") else "${st.speed}x") { page = "s" }
+            SheetRow(Sym.HighQuality.outline, tr("Quality"), if (st.height > 0) "${st.height}p" else tr("Auto")) { page = "q" }
+            SheetRow(Sym.Speed.outline, tr("Speed"), if (st.speed == 1f) tr("Normal") else "${st.speed}x") { page = "s" }
             if (!app.playback.stream?.captions.isNullOrEmpty()) {
-                SheetRow(Icons.Filled.ClosedCaption, tr("Captions"), st.captions?.name ?: tr("Off")) { page = "c" }
+                SheetRow(Sym.ClosedCaption.fill, tr("Captions"), st.captions?.name ?: tr("Off")) { page = "c" }
             }
         }
         "q" -> {
@@ -672,7 +682,7 @@ private fun SheetRow(icon: ImageVector, label: String, value: String, onClick: (
 @Composable
 private fun Pick(label: String, on: Boolean, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.width(40.dp)) { if (on) Icon(Icons.Filled.Check, null) }
+        Box(Modifier.width(40.dp)) { if (on) Icon(Sym.Check.fill, null) }
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }
