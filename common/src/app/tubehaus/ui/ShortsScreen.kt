@@ -21,16 +21,6 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.ThumbDown
-import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.ThumbDown
-import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -188,8 +178,8 @@ fun ShortsScreen(app: AppState) {
         // the desktop's way through them, beside the Short
         if (!app.platform.touch && list.isNotEmpty()) {
             Column(Modifier.align(Alignment.CenterEnd).padding(end = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                RoundAction(Icons.Filled.KeyboardArrowUp, tr("Previous")) { go(-1) }
-                RoundAction(Icons.Filled.KeyboardArrowDown, tr("Next")) { go(1) }
+                RoundAction(Sym.KeyboardArrowUp.fill, tr("Previous")) { go(-1) }
+                RoundAction(Sym.KeyboardArrowDown.fill, tr("Next")) { go(1) }
             }
         }
     }
@@ -244,13 +234,13 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
             if (!app.store.settings.value.hideThumbs) Img(v.thumb, Modifier.fillMaxSize())
             if (mine) player.View(Modifier.fillMaxSize())
             if (mine && !st.playing && !st.buffering) {
-                Icon(Icons.Filled.PlayArrow, null, tint = Color.White, modifier = Modifier.size(72.dp).align(Alignment.Center))
+                Icon(Sym.PlayArrow.fill, null, tint = Color.White, modifier = Modifier.size(72.dp).align(Alignment.Center))
             }
             if (active && st.buffering) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center).size(40.dp), color = Color.White, strokeWidth = 3.dp)
             }
             AnimatedVisibility(heart, Modifier.align(Alignment.Center), enter = scaleIn(initialScale = 0.4f), exit = fadeOut()) {
-                Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(96.dp))
+                Icon(Sym.Favorite.fill, null, tint = Color.White, modifier = Modifier.size(96.dp))
             }
             // the bottom: channel, title, and a seek bar you can drag
             Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Color(0x55000000)).padding(horizontal = 12.dp).padding(top = 12.dp, bottom = 4.dp)) {
@@ -270,9 +260,9 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
                 }
             }
             Column(Modifier.align(Alignment.CenterEnd).padding(end = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                RoundAction(if (liked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp, tr("Like")) { app.store.setInList("likes", full, !liked) }
-                RoundAction(if (disliked) Icons.Filled.ThumbDown else Icons.Outlined.ThumbDown, tr("Dislike")) { app.store.setInList("dislikes", full, !disliked) }
-                RoundAction(Icons.Outlined.Share, tr("Share")) { app.share(v.title, "https://youtube.com/shorts/${v.id}") }
+                RoundAction(if (liked) Sym.ThumbUp.fill else Sym.ThumbUp.outline, tr("Like")) { app.store.setInList("likes", full, !liked) }
+                RoundAction(if (disliked) Sym.ThumbDown.fill else Sym.ThumbDown.outline, tr("Dislike")) { app.store.setInList("dislikes", full, !disliked) }
+                RoundAction(Sym.Share.outline, tr("Share")) { app.share(v.title, "https://youtube.com/shorts/${v.id}") }
             }
         }
     }

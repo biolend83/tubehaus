@@ -124,11 +124,17 @@ class AppState(val platform: Platform, val store: Store) {
     /** Shorts are hidden everywhere: by their own switch or by calm mode */
     val noShorts: Boolean get() = store.settings.value.let { it.calm || it.hideShorts }
 
+    /** how the last page change went, for its animation: 1 forward, -1 back, 0 to a tab */
+    var lastMove = 0
+        private set
+
     fun go(s: Screen) {
         if (s in TABS) {
+            lastMove = 0
             stack.clear(); stack.add(s)
             return
         }
+        lastMove = 1
         // opening the video that is already open just returns to it
         if (s is Screen.Watch) stack.removeAll { it is Screen.Watch }
         stack.add(s)
@@ -137,8 +143,8 @@ class AppState(val platform: Platform, val store: Store) {
     /** false when there is nowhere to go back to (the app may close) */
     fun back(): Boolean {
         if (fullscreen) { setFull(false); return true }
-        if (stack.size > 1) { stack.removeAt(stack.size - 1); return true }
-        if (stack.last() != Screen.Home) { stack[0] = Screen.Home; return true }
+        if (stack.size > 1) { lastMove = -1; stack.removeAt(stack.size - 1); return true }
+        if (stack.last() != Screen.Home) { lastMove = 0; stack[0] = Screen.Home; return true }
         return false
     }
 
