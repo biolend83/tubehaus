@@ -8,7 +8,10 @@ No server, no account, no Google sign-in, no tracking. The app talks to YouTube 
 keeps your subscriptions, history and playlists on the device, and works out recommendations
 there too.
 
-**[⬇ Windows 10/11 installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4.msi)** (0.5.4, beta)
+Have a TubeHaus server at home? Connect it in Settings and your library is shared with your other
+devices and the web version (optional).
+
+**[⬇ Windows 10/11 installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4.msi)** · [setup .exe](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-win-x64-setup.exe) · [portable .zip](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-win-x64-portable.zip) · [Windows on ARM .zip](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-win-arm64-portable.zip) (0.5.4, beta)
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · **Windows** · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
@@ -23,7 +26,7 @@ there too.
 > - **Downloaded videos are for your own personal viewing.** Their copyright belongs to their owners. If you share, upload, sell or otherwise distribute them, that is entirely your own responsibility, and the authors are not liable for it.
 > - It is provided "as is", without warranty of any kind, as the license says. The authors and contributors are not responsible for how it is used or for anything that results from using it.
 > - You are responsible for using it in line with the laws where you live and the terms of the services you connect to.
-> - The app talks only to YouTube (for videos) and GitHub (to check for updates). The maintainer runs no server for it.
+> - The app talks only to YouTube (for videos), GitHub (to check for updates) and, if you connect one, your own TubeHaus server. The maintainer runs no server for it.
 > - **Rights holders:** if you believe something in this repository infringes your rights, [open an issue](https://github.com/biolend83/tubehaus/issues/new) with the details (or ask there for a private contact). It will be looked at and, where justified, removed promptly.
 
 ## What it does
@@ -49,6 +52,10 @@ there too.
 - **Calm mode** — no view counts, no Shorts, nothing starts by itself.
 - **Focus switches** — hide thumbnails, comments, Shorts or related videos, and turn off the home
   feed or the subscription feed, each on its own (Settings → Focus).
+- **Sync with your own TubeHaus server (optional)** — Settings → *TubeHaus server*: subscriptions,
+  history and resume points, watch later, likes and playlists stay the same on your phone, TV,
+  computer and the web version. Changes wait while you're offline. Without a server the app works
+  on its own, as before.
 - **Your data moves freely** — export a TubeHaus backup (also readable by the TubeHaus web app),
   Invidious, CSV or OPML.
 
@@ -56,8 +63,9 @@ there too.
 
 The app has its own small YouTube engine (`common/src/app/tubehaus/engine`). It calls InnerTube,
 the JSON API YouTube's own apps use: the web client for search, channels, playlists, related
-videos and comments; for streams, clients whose answers carry ready-to-play URLs. Nothing goes
-through a TubeHaus server, because there isn't one.
+videos and comments; for streams, clients whose answers carry ready-to-play URLs. Videos never go
+through a TubeHaus server. If you connect your own (Settings → *TubeHaus server*), only your library
+(subscriptions, history, playlists) is synced with it.
 
 One set of Kotlin sources (`common/src`) is compiled twice: by the Android app with Jetpack
 Compose and by the desktop app with Compose for Desktop. Only the player differs —
@@ -65,7 +73,9 @@ ExoPlayer (Media3) on Android, libmpv on Windows, macOS and Linux.
 
 ## Install
 
-[Download the installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4.msi) and run it. mpv is built in, so there's nothing else to install.
+[Download the installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4.msi) (or the [setup .exe](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-win-x64-setup.exe)) and run it.
+Don't want to install anything? Unzip the [portable .zip](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-win-x64-portable.zip) anywhere and run `TubeHaus.exe`.
+On Windows on ARM (Snapdragon laptops), use the [ARM .zip](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-win-arm64-portable.zip) (new, barely tested). mpv is built in, so there's nothing else to install.
 
 Windows may warn that the publisher is unknown, because the installer isn't code-signed:
 choose *More info* → *Run anyway*. Each new version installs over the previous one and keeps
