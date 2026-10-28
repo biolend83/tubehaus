@@ -1,6 +1,7 @@
 package app.tubehaus.data
 
 import app.tubehaus.engine.Video
+import app.tubehaus.engine.str
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -13,7 +14,13 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import java.security.SecureRandom
 
@@ -56,22 +63,41 @@ class JsonFile<T>(private val file: File, private val ser: KSerializer<T>, empty
 
 private fun now() = System.currentTimeMillis() / 1000
 
+/** A change the TubeHaus server (ServerSync) hasn't taken yet: its endpoint and body; a newer one with the same [key] replaces it. */
+@Serializable
+data class SyncOp(val path: String, val body: JsonObject, val key: String = "")
+
 /** The app's data: library, learned taste and settings, each in its own file. */
 class Store(dir: File) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val lib = JsonFile(File(dir, "library.json"), Library.serializer(), Library(), scope)
     val taste = JsonFile(File(dir, "taste.json"), Taste.serializer(), Taste(), scope)
     val settings = JsonFile(File(dir, "settings.json"), Settings.serializer(), Settings(), scope)
+    /** changes for the connected server, kept on disk until it has them */
+    val queue = JsonFile(File(dir, "sync-queue.json"), ListSerializer(SyncOp.serializer()), emptyList(), scope)
+    /** set by ServerSync: something was queued */
+    var onQueued: (() -> Unit)? = null
 
     fun flush() {
-        lib.flushNow(); taste.flushNow(); settings.flushNow()
+        lib.flushNow(); taste.flushNow(); settings.flushNow(); queue.flushNow()
     }
+
+    /** with a server connected: the same change for it (the endpoints the web version uses) */
+    private fun push(path: String, key: String = "", body: JsonObjectBuilder.() -> Unit) {
+        if (settings.value.server.isEmpty()) return
+        val op = SyncOp(path, buildJsonObject(body), key)
+        queue.update { q -> (if (key.isEmpty()) q else q.filter { it.key != key }) + op }
+        onQueued?.invoke()
+    }
+
+    private fun JsonObjectBuilder.video(m: Meta) = put("video", storeJson.encodeToJsonElement(Meta.serializer(), m))
 
     // ---------------------------------------------------------- subscriptions
     fun isSubbed(cid: String) = cid in lib.value.subs
 
-    fun subscribe(cid: String, name: String, thumb: String, on: Boolean) = lib.update { l ->
-        l.copy(subs = if (on) l.subs + (cid to Sub(name, thumb, now())) else l.subs - cid)
+    fun subscribe(cid: String, name: String, thumb: String, on: Boolean) {
+        lib.update { l -> l.copy(subs = if (on) l.subs + (cid to Sub(name, thumb, now())) else l.subs - cid) }
+        push("/yt/sub", "sub:$cid") { put("id", cid); put("on", on); put("name", name); put("thumb", thumb) }
     }
 
     /** fills in a channel's name and picture (imports often come without them); keeps the subscription date */
@@ -80,7 +106,11 @@ class Store(dir: File) {
         l.copy(subs = l.subs + (cid to s.copy(name = name.ifEmpty { s.name }, thumb = thumb.ifEmpty { s.thumb })))
     }
 
-    fun unsubscribeAll() = lib.update { it.copy(subs = emptyMap()) }
+    fun unsubscribeAll() {
+        val all = lib.value.subs.keys
+        lib.update { it.copy(subs = emptyMap()) }
+        for (cid in all) push("/yt/sub", "sub:$cid") { put("id", cid); put("on", false) }
+    }
 
     // ---------------------------------------------------------- history and resume points
     fun savePosition(v: Video, seconds: Long, length: Long) {
@@ -93,6 +123,10 @@ class Store(dir: File) {
             val m = v.meta(now()).let { if (old != null && it.title.isEmpty()) old.copy(at = now()) else it }
             l.copy(pos = pos, hist = (listOf(m) + l.hist.filter { it.id != v.id }).take(3000))
         }
+        push("/yt/pos", "pos:${v.id}") {
+            put("id", v.id); put("t", seconds); put("len", length)
+            put("meta", storeJson.encodeToJsonElement(Meta.serializer(), v.meta()))
+        }
     }
 
     fun position(id: String): Long? = lib.value.pos[id]?.let { p ->
@@ -102,9 +136,15 @@ class Store(dir: File) {
         if (t < 10 || (len > 0 && t > len - 15)) null else t
     }
 
-    fun removeFromHistory(id: String) = lib.update { it.copy(hist = it.hist.filter { h -> h.id != id }, pos = it.pos - id) }
+    fun removeFromHistory(id: String) {
+        lib.update { it.copy(hist = it.hist.filter { h -> h.id != id }, pos = it.pos - id) }
+        push("/yt/hist/del") { put("id", id) }
+    }
 
-    fun clearHistory() = lib.update { it.copy(hist = emptyList(), pos = emptyMap()) }
+    fun clearHistory() {
+        lib.update { it.copy(hist = emptyList(), pos = emptyMap()) }
+        push("/yt/hist/del") { put("all", true) }
+    }
 
     // ---------------------------------------------------------- lists
     fun inList(list: String, id: String): Boolean = when (list) {
@@ -114,7 +154,12 @@ class Store(dir: File) {
         else -> lib.value.playlists[list]?.items?.any { it.id == id } == true
     }
 
-    fun setInList(list: String, v: Video, on: Boolean) = lib.update { l ->
+    fun setInList(list: String, v: Video, on: Boolean) {
+        setInListHere(list, v, on)
+        push("/yt/list", "list:$list:${v.id}") { put("list", list); put("on", on); video(v.meta()) }
+    }
+
+    private fun setInListHere(list: String, v: Video, on: Boolean) = lib.update { l ->
         val m = v.meta()
         when (list) {
             "wl" -> l.copy(wl = (if (on) listOf(m) else emptyList()) + l.wl.filter { it.id != v.id })
@@ -137,16 +182,45 @@ class Store(dir: File) {
         val b = ByteArray(8).also { SecureRandom().nextBytes(it) }
         val id = "HP" + b.joinToString("") { "%02x".format(it) }
         lib.update { it.copy(playlists = it.playlists + (id to PlaylistData(title.take(150), listOfNotNull(first?.meta()), now()))) }
+        push("/yt/pl/new") { put("id", id); put("title", title.take(150)); first?.let { video(it.meta()) } }
         return id
     }
 
-    fun renamePlaylist(id: String, title: String) = lib.update { l ->
-        l.playlists[id]?.let { l.copy(playlists = l.playlists + (id to it.copy(title = title.take(150), updated = now()))) } ?: l
+    fun renamePlaylist(id: String, title: String) {
+        lib.update { l ->
+            l.playlists[id]?.let { l.copy(playlists = l.playlists + (id to it.copy(title = title.take(150), updated = now()))) } ?: l
+        }
+        push("/yt/pl/rename", "rename:$id") { put("id", id); put("title", title.take(150)) }
     }
 
-    fun deletePlaylist(id: String) = lib.update { it.copy(playlists = it.playlists - id) }
+    fun deletePlaylist(id: String) {
+        lib.update { it.copy(playlists = it.playlists - id) }
+        push("/yt/pl/del") { put("id", id) }
+    }
 
-    fun movePlaylistItem(id: String, from: Int, to: Int) = lib.update { l ->
+    /** an older server chose another ID for a playlist made here: use its ID, here and in what's still queued */
+    fun renamePlaylistId(mine: String, theirs: String) {
+        lib.update { l -> l.playlists[mine]?.let { l.copy(playlists = l.playlists - mine + (theirs to it)) } ?: l }
+        queue.update { q ->
+            q.map { op ->
+                val b = op.body
+                when {
+                    b["id"].str == mine -> op.copy(body = JsonObject(b + ("id" to kotlinx.serialization.json.JsonPrimitive(theirs))))
+                    b["list"].str == mine -> op.copy(body = JsonObject(b + ("list" to kotlinx.serialization.json.JsonPrimitive(theirs))))
+                    else -> op
+                }
+            }
+        }
+    }
+
+    fun movePlaylistItem(id: String, from: Int, to: Int) {
+        val n = lib.value.playlists[id]?.items?.size ?: return
+        if (from !in 0 until n || to !in 0 until n) return
+        moveHere(id, from, to)
+        push("/yt/pl/move") { put("id", id); put("from", from); put("to", to) }
+    }
+
+    private fun moveHere(id: String, from: Int, to: Int) = lib.update { l ->
         val pl = l.playlists[id] ?: return@update l
         val items = pl.items.toMutableList()
         if (from !in items.indices || to !in items.indices) return@update l

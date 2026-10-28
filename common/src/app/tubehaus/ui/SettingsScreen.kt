@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import app.tubehaus.data.Settings
 import app.tubehaus.data.Transfer
 import app.tubehaus.rec.Learn
@@ -136,6 +137,9 @@ fun SettingsScreen(app: AppState) {
                 Toggle(tr("Background play"), tr("Keep playing with the screen off or in another app"), s.backgroundPlay) { b -> set { it.copy(backgroundPlay = b) } }
             }
 
+            item { Group(tr("TubeHaus server")) }
+            item { ServerItems(app) { dialog = "server" } }
+
             item { Group(tr("Your data")) }
             item { Toggle(tr("Pause watch history"), tr("Videos you watch aren't added to history and don't shape recommendations"), s.historyOff) { b -> set { it.copy(historyOff = b) } } }
             item { SItem(tr("What TubeHaus learned about you"), tr("See and change what your recommendations are based on")) { app.go(Screen.Learned) } }
@@ -198,6 +202,7 @@ fun SettingsScreen(app: AppState) {
             },
             confirmButton = { TextButton(onClick = { dialog = null }) { Text(tr("Cancel")) } },
         )
+        "server" -> ServerDialog(app) { dialog = null }
         "clear" -> AlertDialog(
             onDismissRequest = { dialog = null },
             title = { Text(tr("Clear all watch history?")) },
@@ -206,6 +211,77 @@ fun SettingsScreen(app: AppState) {
             dismissButton = { TextButton(onClick = { dialog = null }) { Text(tr("Cancel")) } },
         )
     }
+}
+
+/** Not connected: one line that opens [ServerDialog]. Connected: where, how the last sync went, sync now, disconnect. */
+@Composable
+private fun ServerItems(app: AppState, open: () -> Unit) {
+    val s by app.store.settings.state.collectAsState()
+    val problem by app.sync.problem.collectAsState()
+    val at by app.sync.syncedAt.collectAsState()
+    if (s.server.isEmpty()) {
+        SItem(tr("Connect to a TubeHaus server"),
+            tr("Share subscriptions, history and playlists with TubeHaus on your own server and your other devices"), open)
+        return
+    }
+    Column {
+        val status = when {
+            !problem.isNullOrEmpty() -> serverProblem(problem!!)
+            at > 0 -> tr("Synced at {t}").replace("{t}", java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(at)))
+            else -> tr("Syncing…")
+        }
+        SItem(tr("Connected to {s}").replace("{s}", s.server.substringAfter("://")), status, open)
+        SItem(tr("Sync now"), tr("Changes on this device go to the server within seconds; changes elsewhere arrive when the app opens and every few minutes")) {
+            app.sync.refreshSoon()
+        }
+        SItem(tr("Disconnect"), tr("This device keeps its copy of the library")) { app.sync.disconnect() }
+    }
+}
+
+private fun serverProblem(code: String) = when (code) {
+    "address" -> tr("That doesn't look like a web address")
+    "login" -> tr("The user name or password is wrong")
+    "public" -> tr("This is a public instance: it keeps libraries in each browser, so there is nothing to sync")
+    "notTubeHaus" -> tr("No TubeHaus server answered there (or its login is a web page the app can't fill in: use TUBEHAUS_AUTH=basic)")
+    else -> tr("Couldn't reach the server")
+}
+
+@Composable
+private fun ServerDialog(app: AppState, close: () -> Unit) {
+    val s = app.store.settings.value
+    var address by remember { mutableStateOf(s.server) }
+    var user by remember { mutableStateOf(s.serverUser) }
+    var pass by remember { mutableStateOf(s.serverPass) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = { if (!busy) close() },
+        title = { Text(tr("TubeHaus server")) },
+        text = {
+            Column {
+                Text(tr("The address of your TubeHaus server (the web version). Your subscriptions, history and playlists from here are added to it, and from then on both stay the same."),
+                    style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(address, { address = it.trim() }, Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true,
+                    placeholder = { Text("tube.example.com") })
+                Text(tr("If the server asks for a login:"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
+                OutlinedTextField(user, { user = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(tr("User name")) })
+                OutlinedTextField(pass, { pass = it }, Modifier.fillMaxWidth().padding(top = 4.dp), singleLine = true,
+                    placeholder = { Text(tr("Password")) }, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+                error?.let { Text(serverProblem(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)) }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !busy && address.isNotBlank(), onClick = {
+                busy = true; error = null
+                app.scope.launch {
+                    val e = app.sync.connect(address, user, pass)
+                    busy = false
+                    if (e == null) { app.toast(tr("Connected: the library is shared with the server")); close() } else error = e
+                }
+            }) { Text(if (busy) tr("Connecting…") else tr("Connect")) }
+        },
+        dismissButton = { TextButton(enabled = !busy, onClick = close) { Text(tr("Cancel")) } },
+    )
 }
 
 @Composable

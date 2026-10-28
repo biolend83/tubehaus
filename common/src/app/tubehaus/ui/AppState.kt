@@ -83,6 +83,9 @@ class AppState(val platform: Platform, val store: Store) {
     /** Home shows things outside what you usually watch */
     var discover by mutableStateOf(false)
 
+    /** the library shared with a TubeHaus server, when one is connected in Settings */
+    val sync by lazy { app.tubehaus.data.ServerSync(store, scope) }
+
     /** a newer version to offer, found by [checkForUpdates] */
     var update by mutableStateOf<Remote.Release?>(null)
 
