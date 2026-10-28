@@ -38,6 +38,8 @@ devices and the web version (optional).
 - **Android TV / Google TV** — the Android APK runs on TVs too: it shows on the TV's home
   screen, the remote moves a highlighted selection from card to card, and videos fill the screen
   (OK pauses, left and right jump 10 seconds, hold OK on a card for its menu).
+
+  <img src="docs/tv-home.jpg" alt="TubeHaus home screen on Android TV, a video card highlighted by the remote" width="720">
 - **Home that learns on your device** — built from videos related to what you watched, new uploads
   from your subscriptions and the topics you like, with room for something new so it doesn't
   collapse into one subject. Settings → *What TubeHaus learned about you* shows every score and
