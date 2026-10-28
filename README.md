@@ -8,7 +8,12 @@ No server, no account, no Google sign-in, no tracking. The app talks to YouTube 
 keeps your subscriptions, history and playlists on the device, and works out recommendations
 there too.
 
+Have a TubeHaus server at home? Connect it in Settings and your library is shared with your other
+devices and the web version (optional).
+
 **[⬇ .deb (Debian, Ubuntu, Mint)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-linux-amd64.deb)** · **[⬇ .rpm (Fedora, openSUSE)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-linux-x86_64.rpm)** · **[⬇ tar.gz (Arch, CachyOS, any distro)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-linux-x64.tar.gz)** (0.5.4, beta)
+
+ARM64 (Raspberry Pi 4/5 and others): [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-linux-arm64.deb) · [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-linux-aarch64.rpm) · [tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.4/TubeHaus-0.5.4-linux-arm64.tar.gz)
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · **Linux** · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
@@ -23,7 +28,7 @@ there too.
 > - **Downloaded videos are for your own personal viewing.** Their copyright belongs to their owners. If you share, upload, sell or otherwise distribute them, that is entirely your own responsibility, and the authors are not liable for it.
 > - It is provided "as is", without warranty of any kind, as the license says. The authors and contributors are not responsible for how it is used or for anything that results from using it.
 > - You are responsible for using it in line with the laws where you live and the terms of the services you connect to.
-> - The app talks only to YouTube (for videos) and GitHub (to check for updates). The maintainer runs no server for it.
+> - The app talks only to YouTube (for videos), GitHub (to check for updates) and, if you connect one, your own TubeHaus server. The maintainer runs no server for it.
 > - **Rights holders:** if you believe something in this repository infringes your rights, [open an issue](https://github.com/biolend83/tubehaus/issues/new) with the details (or ask there for a private contact). It will be looked at and, where justified, removed promptly.
 
 ## What it does
@@ -49,6 +54,10 @@ there too.
 - **Calm mode** — no view counts, no Shorts, nothing starts by itself.
 - **Focus switches** — hide thumbnails, comments, Shorts or related videos, and turn off the home
   feed or the subscription feed, each on its own (Settings → Focus).
+- **Sync with your own TubeHaus server (optional)** — Settings → *TubeHaus server*: subscriptions,
+  history and resume points, watch later, likes and playlists stay the same on your phone, TV,
+  computer and the web version. Changes wait while you're offline. Without a server the app works
+  on its own, as before.
 - **Your data moves freely** — export a TubeHaus backup (also readable by the TubeHaus web app),
   Invidious, CSV or OPML.
 
@@ -56,8 +65,9 @@ there too.
 
 The app has its own small YouTube engine (`common/src/app/tubehaus/engine`). It calls InnerTube,
 the JSON API YouTube's own apps use: the web client for search, channels, playlists, related
-videos and comments; for streams, clients whose answers carry ready-to-play URLs. Nothing goes
-through a TubeHaus server, because there isn't one.
+videos and comments; for streams, clients whose answers carry ready-to-play URLs. Videos never go
+through a TubeHaus server. If you connect your own (Settings → *TubeHaus server*), only your library
+(subscriptions, history, playlists) is synced with it.
 
 One set of Kotlin sources (`common/src`) is compiled twice: by the Android app with Jetpack
 Compose and by the desktop app with Compose for Desktop. Only the player differs —
@@ -65,22 +75,22 @@ ExoPlayer (Media3) on Android, libmpv on Windows, macOS and Linux.
 
 ## Install
 
-TubeHaus uses your system's mpv library for playback, so install that first. x86-64 only for now.
+TubeHaus uses your system's mpv library for playback, so install that first. Builds for x86-64 and ARM64; on ARM64 the files end in `-linux-arm64.deb`, `-linux-aarch64.rpm` and `-linux-arm64.tar.gz`.
 
 **Debian, Ubuntu, Mint, Pop!_OS**
 ```sh
-sudo apt install libmpv2 ./TubeHaus-0.3.9-linux-amd64.deb
+sudo apt install libmpv2 ./TubeHaus-0.5.4-linux-amd64.deb
 ```
 
 **Fedora, openSUSE**
 ```sh
-sudo dnf install mpv-libs ./TubeHaus-0.3.9-linux-x86_64.rpm
+sudo dnf install mpv-libs ./TubeHaus-0.5.4-linux-x86_64.rpm
 ```
 
 **Arch, CachyOS, Manjaro, and anything else**
 ```sh
 sudo pacman -S mpv            # or your distro's mpv / libmpv package
-tar xzf TubeHaus-0.3.9-linux-x64.tar.gz
+tar xzf TubeHaus-0.5.4-linux-x64.tar.gz
 ./TubeHaus/bin/TubeHaus
 ```
 
