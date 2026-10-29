@@ -185,7 +185,7 @@ fun VideoMenu(v: Video, app: AppState, extra: List<Pair<String, () -> Unit>> = e
             when {
                 app.offline.has(v.id) -> DropdownMenuItem(text = { Text(tr("Remove download")) }, onClick = { open = false; app.offline.remove(v.id) })
                 app.offline.downloading(v.id) -> DropdownMenuItem(text = { Text(tr("Cancel download")) }, onClick = { open = false; app.offline.cancel(v.id) })
-                !v.live -> DropdownMenuItem(text = { Text(tr("Download")) }, onClick = { open = false; app.offline.asking = v })
+                !v.live && app.platform.canDownload -> DropdownMenuItem(text = { Text(tr("Download")) }, onClick = { open = false; app.offline.asking = v })
             }
             if (app.platform.name == "android") DropdownMenuItem(text = { Text(tr("Download with another app")) }, onClick = {
                 open = false; app.download(v)

@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.Sys
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -76,13 +77,13 @@ fun HomeScreen(app: AppState) {
             val got = if (app.discover) app.rec.discover(40, skip) else app.rec.home(40, skip)
             if (!more) HomeCache.items.clear()
             HomeCache.items.addAll(got.filter { g -> HomeCache.items.none { it.id == g.id } })
-            HomeCache.at = System.currentTimeMillis()
+            HomeCache.at = Sys.nowMs()
         } catch (e: Exception) {
             error = e.message ?: tr("Something went wrong")
         } finally { loading = false }
     }
     LaunchedEffect(Unit) {
-        if (HomeCache.items.isEmpty() || System.currentTimeMillis() - HomeCache.at > 30 * 60_000) load(false)
+        if (HomeCache.items.isEmpty() || Sys.nowMs() - HomeCache.at > 30 * 60_000) load(false)
     }
     when {
         HomeCache.items.isEmpty() && loading -> Busy()
@@ -116,7 +117,7 @@ private fun RegionPicker(app: AppState, changed: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     val now = s.region.ifEmpty { app.platform.deviceRegion() }.uppercase()
     Box {
-        val name = java.util.Locale("", now).getDisplayCountry(java.util.Locale(InnerTube.hl)).ifEmpty { now }
+        val name = Sys.countryName(now, InnerTube.hl)
         AssistChip(onClick = { open = true }, label = { Text(name) }, leadingIcon = { Icon(Sym.Public.outline, null, Modifier.size(18.dp)) })
         DropdownMenu(open, onDismissRequest = { open = false }) {
             val common = listOf("US", "GB", "CA", "AU", "IN", "DE", "FR", "ES", "IT", "NL", "TR", "BR", "MX", "JP", "KR", "ID")
@@ -124,7 +125,7 @@ private fun RegionPicker(app: AppState, changed: () -> Unit) {
                 open = false; app.store.settings.update { it.copy(region = "") }; changed()
             })
             for (c in common) DropdownMenuItem(
-                text = { Text(java.util.Locale("", c).getDisplayCountry(java.util.Locale(InnerTube.hl)) + "  ·  " + c) },
+                text = { Text(Sys.countryName(c, InnerTube.hl) + "  ·  " + c) },
                 onClick = { open = false; app.store.settings.update { it.copy(region = c) }; changed() },
             )
             DropdownMenuItem(text = { Text(tr("Other...")) }, onClick = { open = false; app.go(Screen.Settings) })

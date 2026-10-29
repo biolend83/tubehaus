@@ -12,8 +12,9 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
-import java.security.SecureRandom
-import java.time.LocalDate
+import app.tubehaus.engine.Sys
+import app.tubehaus.engine.hex
+import kotlin.random.Random
 
 // Import and export, so your data is never stuck in the app. The same formats the TubeHaus
 // server reads and writes: a full TubeHaus backup, Invidious' export, the CSV Google Takeout
@@ -31,6 +32,8 @@ data class Imported(
     val likes: List<Meta> = emptyList(),
     val dislikes: List<String> = emptyList(),
     val pos: Map<String, List<Long>> = emptyMap(),
+    /** subscription groups: name → channel ids */
+    val groups: List<Pair<String, List<String>>> = emptyList(),
 ) {
     val empty get() = subs.isEmpty() && hist.isEmpty() && playlists.isEmpty() && wl.isEmpty() && likes.isEmpty()
 }
@@ -39,7 +42,7 @@ data class ImportResult(val format: String, val subs: Int, val hist: Int, val pl
 
 object Transfer {
     fun exportFile(lib: Library, format: String): Pair<String, ByteArray> {
-        val day = LocalDate.now().toString()
+        val day = Sys.today()
         return when (format) {
             "invidious" -> {
                 val o = buildJsonObject {
@@ -55,12 +58,12 @@ object Transfer {
                         }
                     })
                 }
-                "invidious-export-$day.json" to o.toString().toByteArray()
+                "invidious-export-$day.json" to o.toString().encodeToByteArray()
             }
             "csv" -> {
                 val sb = StringBuilder("Channel Id,Channel Url,Channel Title\n")
                 lib.subs.forEach { (cid, s) -> sb.append("$cid,http://www.youtube.com/channel/$cid,${csv(s.name)}\n") }
-                "subscriptions-$day.csv" to sb.toString().toByteArray()
+                "subscriptions-$day.csv" to sb.toString().encodeToByteArray()
             }
             "opml" -> {
                 val rows = lib.subs.entries.joinToString("") { (cid, s) ->
@@ -69,7 +72,7 @@ object Transfer {
                 }
                 val x = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<opml version=\"1.1\">\n  <head><title>TubeHaus subscriptions</title></head>\n" +
                     "  <body>\n    <outline text=\"YouTube\" title=\"YouTube\">$rows\n    </outline>\n  </body>\n</opml>\n"
-                "subscriptions-$day.opml" to x.toByteArray()
+                "subscriptions-$day.opml" to x.encodeToByteArray()
             }
             else -> {
                 val body = storeJson.encodeToJsonElement(lib) as JsonObject
@@ -77,10 +80,10 @@ object Transfer {
                     mapOf(
                         "format" to JsonPrimitive("tubehaus-backup"),
                         "version" to JsonPrimitive(1),
-                        "exported" to JsonPrimitive(System.currentTimeMillis() / 1000),
+                        "exported" to JsonPrimitive(Sys.nowMs() / 1000),
                     ) + body,
                 )
-                "tubehaus-backup-$day.json" to o.toString().toByteArray()
+                "tubehaus-backup-$day.json" to o.toString().encodeToByteArray()
             }
         }
     }
@@ -130,7 +133,15 @@ object Transfer {
                 likes = data["likes"].arr.mapNotNull(::meta),
                 dislikes = data["dislikes"].arr.mapNotNull { it.str?.takeIf { s -> VID.matches(s) } },
                 pos = pos,
+                groups = data["groups"].arr.mapNotNull { g ->
+                    val name = g.at("name").str?.trim()?.take(60) ?: return@mapNotNull null
+                    name to g.at("channels").arr.mapNotNull { it.str?.takeIf { s -> UCID.matches(s) } }
+                },
             )
+        }
+        pocketTube(data)?.let { groups ->
+            groups.forEach { (_, ids) -> ids.forEach { sub(it) } }
+            return Imported("pockettube", subs, groups = groups)
         }
         if (data is JsonObject && data["subscriptions"] is JsonArray) {
             val list = data["subscriptions"].arr
@@ -145,7 +156,7 @@ object Transfer {
                 "freetube" -> sub(s.at("id").str, s.at("name").str, s.at("thumbnail").str)
                 else -> sub(s.str)
             }
-            val t = System.currentTimeMillis() / 1000
+            val t = Sys.nowMs() / 1000
             val hist = data["watch_history"].arr.mapNotNull { it.str?.takeIf { s -> VID.matches(s) } }.take(3000)
                 .mapIndexed { i, id -> Meta(id, at = t - i) }
             val pls = data["playlists"].arr.mapNotNull { p ->
@@ -161,7 +172,7 @@ object Transfer {
                 val hist = data.take(20000).mapNotNull { x ->
                     val id = Regex("[?&]v=([\\w-]{11})").find(x.at("titleUrl").str ?: "")?.groupValues?.get(1) ?: return@mapNotNull null
                     val ch = x.at("subtitles.0")
-                    val at = runCatching { java.time.OffsetDateTime.parse(x.at("time").str).toEpochSecond() }.getOrDefault(0)
+                    val at = (Sys.isoSeconds(x.at("time").str ?: "") ?: 0)
                     Meta(id, (x.at("title").str ?: "").removePrefix("Watched "), ch.at("name").str ?: "",
                         UCID.find(ch.at("url").str ?: "")?.value ?: "", at = at)
                 }
@@ -191,9 +202,27 @@ object Transfer {
         return Imported(null)
     }
 
+    /**
+     * PocketTube's backup (youtube_subscription_manager_<date>.json): one key per group with its
+     * channel ids; a group over 250 channels comes in several "_ysm_" pieces, joined again here.
+     * Its own settings (other keys) are skipped. Null when the file isn't that.
+     */
+    private fun pocketTube(data: JsonElement?): List<Pair<String, List<String>>>? {
+        if (data !is JsonObject || "format" in data || "subscriptions" in data) return null
+        val groups = LinkedHashMap<String, MutableList<String>>()
+        for ((key, value) in data) {
+            if (value !is JsonArray) continue
+            val ids = value.mapNotNull { v -> (v.str ?: v.at("id").str ?: v.at("channelId").str)?.takeIf { UCID.matches(it) } }
+            if (ids.isEmpty()) continue
+            val name = key.replace(Regex("_ysm_\\d*$"), "").replace(Regex("^_?ysm_"), "").trim().ifEmpty { key }.take(60)
+            groups.getOrPut(name) { mutableListOf() }.addAll(ids)
+        }
+        return groups.map { (k, v) -> k to v.distinct() }.takeIf { it.isNotEmpty() }
+    }
+
     /** Merges an import into the library without losing anything already there. */
     fun merge(store: Store, p: Imported): ImportResult {
-        val t = System.currentTimeMillis() / 1000
+        val t = Sys.nowMs() / 1000
         var n = ImportResult(p.format ?: "?", 0, 0, 0, 0)
         store.lib.update { l ->
             val subs = l.subs.toMutableMap()
@@ -209,12 +238,18 @@ object Transfer {
             val existing = pls.values.map { it.title to it.items.map { m -> m.id } }.toSet()
             for ((title, items) in p.playlists) {
                 if (items.isEmpty() || (title to items.map { it.id }) in existing) continue
-                val b = ByteArray(8).also { SecureRandom().nextBytes(it) }
-                pls["HP" + b.joinToString("") { "%02x".format(it) }] = PlaylistData(title.ifEmpty { "Imported" }, items.take(5000), t)
+
+                pls["HP" + Random.nextBytes(8).hex()] = PlaylistData(title.ifEmpty { "Imported" }, items.take(5000), t)
                 n = n.copy(playlists = n.playlists + 1, videos = n.videos + items.size)
             }
+            // groups: a new name is added, one already there gets the channels it didn't have
+            val groups = l.groups.toMutableList()
+            for ((name, ids) in p.groups) {
+                val i = groups.indexOfFirst { it.name == name }
+                if (i < 0) groups += SubGroup(name, ids) else groups[i] = groups[i].copy(channels = (groups[i].channels + ids).distinct())
+            }
             l.copy(
-                subs = subs, hist = hist, pos = pos, playlists = pls,
+                subs = subs, hist = hist, pos = pos, playlists = pls, groups = groups,
                 wl = add(l.wl, p.wl), likes = add(l.likes, p.likes),
                 dislikes = (l.dislikes + p.dislikes).distinct(),
             )

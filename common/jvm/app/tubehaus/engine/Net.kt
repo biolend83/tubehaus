@@ -7,10 +7,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.ResponseBody.Companion.toResponseBody
-import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-class HttpError(val code: Int, msg: String) : IOException(msg)
+
 
 /** The one HTTP client of the app. Everything goes straight from this device to YouTube. */
 object Net {

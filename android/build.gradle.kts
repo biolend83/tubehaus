@@ -21,7 +21,7 @@ android {
     }
 
     // The shared code (engine, library, screens) is compiled into this module as plain sources.
-    sourceSets["main"].java.srcDirs("src/main/kotlin", "../common/src")
+    sourceSets["main"].java.srcDirs("src/main/kotlin", "../common/src", "../common/jvm")
 
     signingConfigs {
         // the release key lives outside the repository; without it the APK is signed with the debug key
@@ -93,5 +93,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("io.coil-kt.coil3:coil-compose:3.2.0")
+    implementation("com.squareup.okio:okio:3.10.2")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.2.0")
 }

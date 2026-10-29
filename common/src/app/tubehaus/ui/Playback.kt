@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.Sys
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -55,7 +56,7 @@ class Playback(private val app: AppState) {
                 val v = video ?: return@collectLatest
                 if (s.videoId != v.id) return@collectLatest
                 if (s.positionMs > watchedMs) watchedMs = s.positionMs
-                val now = System.currentTimeMillis()
+                val now = Sys.nowMs()
                 if (s.playing && now - lastSave > 5000) {
                     lastSave = now
                     store.savePosition(v.copy(lengthSec = v.lengthSec.takeIf { it > 0 } ?: (s.durationMs / 1000).toInt()), s.positionMs / 1000, s.durationMs / 1000)
