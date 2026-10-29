@@ -36,6 +36,7 @@ import platform.AVFAudio.AVAudioSession
 import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.setActive
 import platform.AVFoundation.AVLayerVideoGravityResizeAspect
+import platform.AVKit.AVPictureInPictureController
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
 import platform.AVFoundation.AVPlayerItemStatusFailed
@@ -231,15 +232,21 @@ class IosPlayer : VideoPlayer {
     }
 }
 
-/** the picture: an AVPlayerLayer that follows the view's size; taps go through to the controls */
+/**
+ * The picture: an AVPlayerLayer that follows the view's size; taps go through to the controls.
+ * Going to the home screen while it plays moves the video into a picture-in-picture window.
+ */
 private class PlayerView(player: AVPlayer) : UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)) {
     private val picture = AVPlayerLayer.playerLayerWithPlayer(player)
+    private val pip: AVPictureInPictureController? =
+        if (AVPictureInPictureController.isPictureInPictureSupported()) AVPictureInPictureController(playerLayer = picture) else null
 
     init {
         backgroundColor = UIColor.blackColor
         userInteractionEnabled = false
         picture.videoGravity = AVLayerVideoGravityResizeAspect
         layer.addSublayer(picture)
+        pip?.canStartPictureInPictureAutomaticallyFromInline = true
     }
 
     override fun layoutSubviews() {
