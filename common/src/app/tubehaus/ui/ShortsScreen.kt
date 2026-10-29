@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.Sys
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -116,7 +117,7 @@ fun ShortsScreen(app: AppState) {
         val st = player.state.value
         if (st.videoId != v.id) return
         // time actually spent on it, which counts the loops
-        val spent = (System.currentTimeMillis() - watchStart) / 1000.0
+        val spent = (Sys.nowMs() - watchStart) / 1000.0
         Learn.learn(
             app.store, v.copy(channelId = s.channelId, author = s.author), s.keywords, spent, s.lengthSec.toDouble().coerceAtLeast(1.0),
             liked = app.store.inList("likes", v.id), disliked = app.store.inList("dislikes", v.id), short = true,
@@ -139,7 +140,7 @@ fun ShortsScreen(app: AppState) {
             try {
                 val s = streamOf(v.id)
                 if (current?.id != v.id) return@collect
-                watchStart = System.currentTimeMillis()
+                watchStart = Sys.nowMs()
                 player.load(s, PlayOptions(maxHeight = 720, loop = true, volume = app.store.settings.value.volume, title = s.title, artist = s.author, artwork = v.thumb))
             } catch (e: Exception) {
                 app.toast(if ((e as? YtError)?.kind == YtError.Kind.LOGIN) tr(BOT_CHECK) else e.message ?: tr("This video can't be played"))
@@ -195,7 +196,7 @@ private fun Modifier.wheelPages(pager: PagerState, scope: CoroutineScope): Modif
             if (e.type != PointerEventType.Scroll) continue
             val dy = e.changes.sumOf { it.scrollDelta.y.toDouble() }
             e.changes.forEach { it.consume() }
-            val now = System.currentTimeMillis()
+            val now = Sys.nowMs()
             if (dy == 0.0 || now - last < 350 || pager.isScrollInProgress) continue
             last = now
             val to = (pager.currentPage + if (dy > 0) 1 else -1).coerceIn(0, maxOf(0, pager.pageCount - 1))

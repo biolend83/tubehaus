@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.Sys
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -46,7 +47,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "0.5.5"
+const val VERSION = "0.5.6"
 
 @Composable
 fun SettingsScreen(app: AppState) {
@@ -94,6 +95,7 @@ fun SettingsScreen(app: AppState) {
             item { Toggle(tr("Hide comments"), tr("No comments under videos"), s.hideComments) { b -> set { it.copy(hideComments = b) } } }
             item { Toggle(tr("Turn off the home feed"), tr("Home becomes a search page"), s.homeOff) { b -> set { it.copy(homeOff = b) } } }
             item { Toggle(tr("Turn off the subscription feed"), tr("Subscriptions shows your channels, not their new videos"), s.subsFeedOff) { b -> set { it.copy(subsFeedOff = b) } } }
+            item { Toggle(tr("Only my groups in Subscriptions"), tr("With subscription groups: no \"All\" tab, just the groups"), s.subsHideAll) { b -> set { it.copy(subsHideAll = b) } } }
             item { Toggle(tr("Hide Shorts"), tr("No Shorts tab, no Shorts in lists"), s.hideShorts || s.calm) { b -> set { it.copy(hideShorts = b) } } }
             item { Toggle(tr("Hide related videos"), tr("Nothing suggested next to or under a video"), s.hideRelated) { b -> set { it.copy(hideRelated = b) } } }
             // immersive mode: what is left under the video, down to just the player
@@ -227,7 +229,7 @@ private fun ServerItems(app: AppState, open: () -> Unit) {
     Column {
         val status = when {
             !problem.isNullOrEmpty() -> serverProblem(problem!!)
-            at > 0 -> tr("Synced at {t}").replace("{t}", java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(at)))
+            at > 0 -> tr("Synced at {t}").replace("{t}", Sys.shortTime(at))
             else -> tr("Syncing…")
         }
         SItem(tr("Connected to {s}").replace("{s}", s.server.substringAfter("://")), status, open)

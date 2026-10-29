@@ -26,6 +26,8 @@ import app.tubehaus.ui.AppState
 import app.tubehaus.ui.Platform
 import app.tubehaus.ui.VideoPlayer
 import java.io.File
+import okio.Path
+import okio.Path.Companion.toOkioPath
 import kotlin.math.roundToInt
 
 class TubeApp : Application() {
@@ -43,8 +45,8 @@ val Context.tube: TubeApp get() = applicationContext as TubeApp
 
 class AndroidPlatform(private val app: Application) : Platform {
     override val name = "android"
-    override val dataDir: File = File(app.filesDir, "tubehaus")
-    override val cacheDir: File = app.cacheDir
+    override val dataDir: Path = File(app.filesDir, "tubehaus").toOkioPath()
+    override val cacheDir: Path = app.cacheDir.toOkioPath()
     /** a TV says so by its UI mode (Android TV, Google TV) or the leanback feature */
     private val isTv: Boolean by lazy {
         (app.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager).currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||

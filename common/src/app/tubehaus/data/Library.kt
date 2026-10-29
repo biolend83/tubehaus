@@ -31,6 +31,10 @@ data class Sub(val name: String = "", val thumb: String = "", val at: Long = 0)
 @Serializable
 data class PlaylistData(val title: String, val items: List<Meta> = emptyList(), val updated: Long = 0)
 
+/** A named set of subscribed channels (like PocketTube's), shown as its own tab in Subscriptions. */
+@Serializable
+data class SubGroup(val name: String, val channels: List<String> = emptyList())
+
 @Serializable
 data class Library(
     val subs: Map<String, Sub> = emptyMap(),
@@ -41,6 +45,8 @@ data class Library(
     val likes: List<Meta> = emptyList(),
     val dislikes: List<String> = emptyList(),
     val playlists: Map<String, PlaylistData> = emptyMap(),
+    /** subscription groups, in the order of their tabs (kept on this device; a server doesn't have them) */
+    val groups: List<SubGroup> = emptyList(),
 )
 
 /** What the recommenders learned. Everything here can be seen and wiped in Settings. */
@@ -87,6 +93,10 @@ data class Settings(
     val hideComments: Boolean = false,
     val homeOff: Boolean = false,
     val subsFeedOff: Boolean = false,
+    /** with groups: Subscriptions shows only the groups' tabs, not the feed of every channel */
+    val subsHideAll: Boolean = false,
+    /** the tab Subscriptions opens on: a group's name, "" = all */
+    val subsGroup: String = "",
     val hideShorts: Boolean = false,
     val hideRelated: Boolean = false,
     /** a TubeHaus server the library syncs with ("" = none, see ServerSync), and its login if it has one */

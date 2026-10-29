@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import kotlin.concurrent.Volatile
+import app.tubehaus.engine.Sys
 import app.tubehaus.engine.YouTube
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.getValue
@@ -45,8 +47,8 @@ class AppState(val platform: Platform, val store: Store) {
     val current: Screen get() = stack.last()
     init {
         // the YouTube visitor identity is kept with the app's data (never in backups or exports)
-        InnerTube.identityFile = java.io.File(platform.dataDir, "identity.json")
-        Remote.clientsFile = java.io.File(platform.dataDir, "clients.json")
+        InnerTube.identityFile = platform.dataDir / "identity.json"
+        Remote.clientsFile = platform.dataDir / "clients.json"
         Remote.restoreClients()
     }
 
@@ -92,14 +94,16 @@ class AppState(val platform: Platform, val store: Store) {
     /** each time the app opens (at most every 10 minutes) unless [now]; [quiet]: say nothing when there is nothing new */
     fun checkForUpdates(now: Boolean = false, quiet: Boolean = true) {
         val set = store.settings.value
-        if (!now && (!set.checkUpdates || System.currentTimeMillis() - set.checkedAt < 10 * 60_000L)) return
+        // iOS: installed by hand (SideStore), there is no file to offer
+        if (platform.name == "ios") return
+        if (!now && (!set.checkUpdates || Sys.nowMs() - set.checkedAt < 10 * 60_000L)) return
         scope.launch {
-            store.settings.update { it.copy(checkedAt = System.currentTimeMillis()) }
+            store.settings.update { it.copy(checkedAt = Sys.nowMs()) }
             Remote.refreshClients()
-            val os = System.getProperty("os.name")
+            val os = Sys.osName()
             // Linux: the release page, to pick deb/rpm/tar.gz
             // macOS: the Apple Silicon or the Intel build, whichever this Mac runs
-            val mac = if (System.getProperty("os.arch") == "aarch64") "-mac-arm64.dmg" else "-mac-x64.dmg"
+            val mac = if (Sys.osArch() == "aarch64") "-mac-arm64.dmg" else "-mac-x64.dmg"
             val desktopFile = when { os.startsWith("Windows") -> ".msi"; os.startsWith("Mac") -> mac; else -> null }
             // one release per version (app-v*) carries every platform's file
             val r = Remote.newerRelease("app-v", VERSION, if (platform.name == "android") ".apk" else desktopFile)
