@@ -1,7 +1,8 @@
 name: iPad
 
 # The iPad app for personal use: an unsigned .ipa as a build artifact (not a release). SideStore
-# signs it with your own Apple ID when you install it.
+# signs it with your own Apple ID when you install it. A second job runs the app in an iPad
+# simulator and keeps screenshots and the log, as a check that it starts and draws.
 on:
   push:
     branches: [ios-app]
@@ -10,13 +11,14 @@ on:
 permissions:
   contents: read
 
+env:
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx4g
+
 jobs:
   ipa:
     # Intel runners have twice the memory; linking Compose for iOS needs it
     runs-on: macos-15-intel
     timeout-minutes: 90
-    env:
-      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx4g
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -25,7 +27,9 @@ jobs:
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v4
       - name: Kotlin → TubeHausKit.framework
-        run: ./gradlew :ios:linkReleaseFrameworkIosArm64 --no-configuration-cache --stacktrace
+        run: |
+          ./gradlew :ios:linkReleaseFrameworkIosArm64 --no-configuration-cache --stacktrace
+          mkdir -p ios/build/kit && cp -R ios/build/bin/iosArm64/releaseFramework/TubeHausKit.framework ios/build/kit/
       - name: Xcode project
         run: |
           brew install xcodegen
@@ -47,3 +51,54 @@ jobs:
           name: TubeHaus-iPad
           path: out/TubeHaus.ipa
           if-no-files-found: error
+
+  simulator:
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Kotlin → TubeHausKit.framework (simulator)
+        run: |
+          ./gradlew :ios:linkDebugFrameworkIosX64 --no-configuration-cache --stacktrace
+          mkdir -p ios/build/kit && cp -R ios/build/bin/iosX64/debugFramework/TubeHausKit.framework ios/build/kit/
+      - name: Build for the simulator
+        run: |
+          brew install xcodegen
+          (cd ios/app && xcodegen generate)
+          xcodebuild -project ios/app/TubeHaus.xcodeproj -scheme TubeHaus -sdk iphonesimulator -configuration Debug \
+            -derivedDataPath build/xcode ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO build
+      - name: Run it on an iPad
+        run: |
+          set -x
+          app=build/xcode/Build/Products/Debug-iphonesimulator/TubeHaus.app
+          udid=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k,v in sorted(d.items(), reverse=True) if 'iOS' in k for x in v if 'iPad' in x['name']))")
+          xcrun simctl boot "$udid"; xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" "$app"
+          mkdir -p shots
+          # first start: the language question
+          xcrun simctl launch "$udid" io.github.biolend83.tubehaus; sleep 25
+          xcrun simctl io "$udid" screenshot shots/1-first-start.png
+          xcrun simctl terminate "$udid" io.github.biolend83.tubehaus || true
+          # past the first questions, in English
+          data=$(xcrun simctl get_app_container "$udid" io.github.biolend83.tubehaus data)
+          mkdir -p "$data/Library/Application Support/tubehaus"
+          echo '{"lang":"en","welcomed":true}' > "$data/Library/Application Support/tubehaus/settings.json"
+          xcrun simctl launch "$udid" io.github.biolend83.tubehaus; sleep 40
+          xcrun simctl io "$udid" screenshot shots/2-home.png
+          xcrun simctl terminate "$udid" io.github.biolend83.tubehaus || true
+          # straight to a video
+          xcrun simctl launch "$udid" io.github.biolend83.tubehaus -open jNQXAC9IVRw; sleep 45
+          xcrun simctl io "$udid" screenshot shots/3-video.png
+          xcrun simctl spawn "$udid" log show --last 5m --style compact --predicate 'process == "TubeHaus"' > shots/app.log 2>&1 || true
+          tail -60 shots/app.log
+          ls ~/Library/Logs/DiagnosticReports/ | grep -i tubehaus && cp ~/Library/Logs/DiagnosticReports/*TubeHaus* shots/ || echo "no crash report"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iPad-simulator-check
+          path: shots/

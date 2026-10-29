@@ -113,7 +113,10 @@ fun main() {
             onPreviewKeyEvent = { e ->
                 if (e.type != KeyEventType.KeyDown) false
                 else when (e.key) {
-                    Key.Escape -> state.back()
+                    // Esc leaves the window's own full screen too (macOS's green button) before it goes back
+                    Key.Escape -> if (!state.fullscreen && ws.placement == WindowPlacement.Fullscreen) {
+                        ws.placement = WindowPlacement.Floating; true
+                    } else state.back()
                     Key.F11 -> { state.setFull(!state.fullscreen); true }
                     // the player's keys (space, arrows, J/K/L, F, M) where a video is on screen
                     else -> when {

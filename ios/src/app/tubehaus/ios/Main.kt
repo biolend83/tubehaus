@@ -13,10 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.ComposeUIViewController
 import app.tubehaus.data.Store
+import app.tubehaus.engine.Video
 import app.tubehaus.ui.App
 import app.tubehaus.ui.AppState
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
+import platform.Foundation.NSProcessInfo
 import platform.UIKit.UIApplicationDidEnterBackgroundNotification
 import platform.UIKit.UIApplicationWillEnterForegroundNotification
 import platform.UIKit.UIViewController
@@ -29,6 +31,9 @@ fun MainViewController(): UIViewController {
     // written to disk before iOS may end the app; synced when it comes back
     center.addObserverForName(UIApplicationDidEnterBackgroundNotification, null, NSOperationQueue.mainQueue) { _ -> state.store.flush() }
     center.addObserverForName(UIApplicationWillEnterForegroundNotification, null, NSOperationQueue.mainQueue) { _ -> state.sync.refreshSoon() }
+    // for the simulator check in CI: `-open <video id>` starts on that video
+    val args = NSProcessInfo.processInfo.arguments.map { it.toString() }
+    args.indexOf("-open").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { id -> state.watch(Video(id, "", "", "", 0)) }
     return ComposeUIViewController {
         val settings by state.store.settings.state.collectAsState()
         // outside full screen the app stays clear of the status bar and the home indicator;

@@ -9,8 +9,9 @@ plugins {
 }
 
 kotlin {
-    iosArm64 {
-        binaries.framework {
+    // iosArm64: iPads and iPhones; iosX64: the simulator on an Intel Mac (the CI check)
+    listOf(iosArm64(), iosX64()).forEach {
+        it.binaries.framework {
             baseName = "TubeHausKit"
             isStatic = true
         }

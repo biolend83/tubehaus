@@ -1,5 +1,6 @@
 # XcodeGen: `xcodegen generate` here makes TubeHaus.xcodeproj (not kept in git).
-# The Kotlin side is built first: ./gradlew :ios:linkReleaseFrameworkIosArm64
+# The Kotlin side is built first (./gradlew :ios:linkReleaseFrameworkIosArm64) and its
+# TubeHausKit.framework copied to ios/build/kit (the workflow does both).
 name: TubeHaus
 options:
   deploymentTarget:
@@ -12,7 +13,7 @@ targets:
       - App.swift
       - Assets.xcassets
     dependencies:
-      - framework: ../build/bin/iosArm64/releaseFramework/TubeHausKit.framework
+      - framework: ../build/kit/TubeHausKit.framework
         embed: false
     settings:
       base:
@@ -22,7 +23,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_VERSION: "5.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        FRAMEWORK_SEARCH_PATHS: "$(inherited) $(SRCROOT)/../build/bin/iosArm64/releaseFramework"
+        FRAMEWORK_SEARCH_PATHS: "$(inherited) $(SRCROOT)/../build/kit"
         ENABLE_BITCODE: NO
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGNING_REQUIRED: NO
