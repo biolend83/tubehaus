@@ -21,14 +21,23 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.io.File
-import java.security.SecureRandom
+import app.tubehaus.engine.Sys
+import app.tubehaus.engine.SysLock
+import app.tubehaus.engine.hex
+import okio.FileSystem
+import okio.Path
+import okio.Path.Companion.toPath
+import kotlin.random.Random
 
 val storeJson = Json { ignoreUnknownKeys = true; encodeDefaults = false; explicitNulls = false }
 
 /** One JSON file kept in memory as a StateFlow and written back (atomically) shortly after each change. */
 @OptIn(FlowPreview::class)
-class JsonFile<T>(private val file: File, private val ser: KSerializer<T>, empty: T, scope: CoroutineScope) {
+class JsonFile<T>(private val file: Path, private val ser: KSerializer<T>, empty: T, scope: CoroutineScope) {
+    // a getter, not a field: load() runs in the first initializer below, before fields after it are set
+    private val fs: FileSystem get() = FileSystem.SYSTEM
+    // the debounced save (a background thread) and flushNow (the main one) may meet
+    private val writing = SysLock()
     private val flow = MutableStateFlow(load() ?: empty)
     val state: StateFlow<T> get() = flow
     val value: T get() = flow.value
@@ -38,22 +47,18 @@ class JsonFile<T>(private val file: File, private val ser: KSerializer<T>, empty
     }
 
     private fun load(): T? = try {
-        if (file.exists()) storeJson.decodeFromString(ser, file.readText()) else null
+        if (fs.exists(file)) storeJson.decodeFromString(ser, fs.read(file) { readUtf8() }) else null
     } catch (e: Exception) {
         // keep the unreadable file for the user instead of overwriting it with nothing
-        file.copyTo(File(file.path + ".broken-" + System.currentTimeMillis()), overwrite = true)
+        runCatching { fs.copy(file, (file.toString() + ".broken-" + Sys.nowMs()).toPath()) }
         null
     }
 
-    @Synchronized
-    private fun save(v: T) {
-        file.parentFile?.mkdirs()
-        val tmp = File(file.path + ".tmp")
-        tmp.writeText(storeJson.encodeToString(ser, v))
-        if (!tmp.renameTo(file)) {
-            file.delete()
-            tmp.renameTo(file)
-        }
+    private fun save(v: T) = writing.run {
+        file.parent?.let { fs.createDirectories(it) }
+        val tmp = (file.toString() + ".tmp").toPath()
+        fs.write(tmp) { writeUtf8(storeJson.encodeToString(ser, v)) }
+        fs.atomicMove(tmp, file)
     }
 
     fun update(f: (T) -> T) = flow.update(f)
@@ -61,20 +66,20 @@ class JsonFile<T>(private val file: File, private val ser: KSerializer<T>, empty
     fun flushNow() = save(flow.value)
 }
 
-private fun now() = System.currentTimeMillis() / 1000
+private fun now() = Sys.nowMs() / 1000
 
 /** A change the TubeHaus server (ServerSync) hasn't taken yet: its endpoint and body; a newer one with the same [key] replaces it. */
 @Serializable
 data class SyncOp(val path: String, val body: JsonObject, val key: String = "")
 
 /** The app's data: library, learned taste and settings, each in its own file. */
-class Store(dir: File) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    val lib = JsonFile(File(dir, "library.json"), Library.serializer(), Library(), scope)
-    val taste = JsonFile(File(dir, "taste.json"), Taste.serializer(), Taste(), scope)
-    val settings = JsonFile(File(dir, "settings.json"), Settings.serializer(), Settings(), scope)
+class Store(dir: Path) {
+    private val scope = CoroutineScope(SupervisorJob() + Sys.IO)
+    val lib = JsonFile(dir / "library.json", Library.serializer(), Library(), scope)
+    val taste = JsonFile(dir / "taste.json", Taste.serializer(), Taste(), scope)
+    val settings = JsonFile(dir / "settings.json", Settings.serializer(), Settings(), scope)
     /** changes for the connected server, kept on disk until it has them */
-    val queue = JsonFile(File(dir, "sync-queue.json"), ListSerializer(SyncOp.serializer()), emptyList(), scope)
+    val queue = JsonFile(dir / "sync-queue.json", ListSerializer(SyncOp.serializer()), emptyList(), scope)
     /** set by ServerSync: something was queued */
     var onQueued: (() -> Unit)? = null
 
@@ -104,6 +109,31 @@ class Store(dir: File) {
     fun updateSub(cid: String, name: String, thumb: String) = lib.update { l ->
         val s = l.subs[cid] ?: return@update l
         l.copy(subs = l.subs + (cid to s.copy(name = name.ifEmpty { s.name }, thumb = thumb.ifEmpty { s.thumb })))
+    }
+
+    // ---------------------------------------------------------- subscription groups (this device only)
+    fun newGroup(name: String) {
+        val n = name.trim().take(60)
+        if (n.isEmpty()) return
+        lib.update { l -> if (l.groups.any { it.name == n }) l else l.copy(groups = l.groups + SubGroup(n)) }
+    }
+
+    fun renameGroup(old: String, name: String) {
+        val n = name.trim().take(60)
+        if (n.isEmpty() || n == old) return
+        lib.update { l -> if (l.groups.any { it.name == n }) l else l.copy(groups = l.groups.map { if (it.name == old) it.copy(name = n) else it }) }
+        if (settings.value.subsGroup == old) settings.update { it.copy(subsGroup = n) }
+    }
+
+    fun deleteGroup(name: String) {
+        lib.update { l -> l.copy(groups = l.groups.filter { it.name != name }) }
+        if (settings.value.subsGroup == name) settings.update { it.copy(subsGroup = "") }
+    }
+
+    fun setInGroup(name: String, cid: String, on: Boolean) = lib.update { l ->
+        l.copy(groups = l.groups.map { g ->
+            if (g.name != name) g else g.copy(channels = if (on) (g.channels - cid) + cid else g.channels - cid)
+        })
     }
 
     fun unsubscribeAll() {
@@ -179,8 +209,7 @@ class Store(dir: File) {
     }
 
     fun newPlaylist(title: String, first: Video?): String {
-        val b = ByteArray(8).also { SecureRandom().nextBytes(it) }
-        val id = "HP" + b.joinToString("") { "%02x".format(it) }
+        val id = "HP" + Random.nextBytes(8).hex()
         lib.update { it.copy(playlists = it.playlists + (id to PlaylistData(title.take(150), listOfNotNull(first?.meta()), now()))) }
         push("/yt/pl/new") { put("id", id); put("title", title.take(150)); first?.let { video(it.meta()) } }
         return id

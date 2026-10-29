@@ -15,3 +15,6 @@ hs_err_pid*.log
 
 # made by CI on macOS from icon.png
 desktop/icon.icns
+
+# made by XcodeGen in CI (ios/app/project.yml)
+ios/app/TubeHaus.xcodeproj/

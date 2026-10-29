@@ -1,8 +1,11 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.Sys
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -85,9 +88,7 @@ import app.tubehaus.engine.Net
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.disk.DiskCache
-import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
-import okio.Path.Companion.toOkioPath
 
 /** true on a phone-sized touch screen: the bottom bar, edge-to-edge cards; false on tablets and desktops */
 val LocalCompact = compositionLocalOf { true }
@@ -101,8 +102,8 @@ fun App(app: AppState) {
     InnerTube.gl = settings.region.ifEmpty { app.platform.deviceRegion() }.uppercase()
     setSingletonImageLoaderFactory { ctx ->
         ImageLoader.Builder(ctx)
-            .components { add(OkHttpNetworkFetcherFactory(callFactory = { Net.client })) }
-            .diskCache { DiskCache.Builder().directory(java.io.File(app.platform.cacheDir, "images").toOkioPath()).maxSizeBytes(150L shl 20).build() }
+            .components { Sys.imageNetwork(this) }
+            .diskCache { DiskCache.Builder().directory(app.platform.cacheDir / "images").maxSizeBytes(150L shl 20).build() }
             .crossfade(true)
             .build()
     }
@@ -185,6 +186,8 @@ private fun Shell(app: AppState) {
     val compact = LocalCompact.current
     val root = app.stack.firstOrNull()
     val showTop = cur !is Screen.Watch && cur !is Screen.Shorts && cur !is Screen.Search
+    // the desktop: while you browse, the video keeps playing in a small window at the bottom right
+    val floating = !app.platform.touch && !app.platform.tv
     // touch screens: the tabs (bottom on phones, the side rail on tablets) and the top bar slide away
     // while scrolling down and come back scrolling up
     val autoHide = app.platform.touch && app.store.settings.state.collectAsState().value.autoHideNav
@@ -209,9 +212,10 @@ private fun Shell(app: AppState) {
         topBar = { if (showTop) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) { TopBar(app, if (railCollapsed) unfold else null) } },
         bottomBar = {
             Column {
-                // the mini player rises from the bottom edge and sinks back into it
+                // the mini player rises from the bottom edge and sinks back into it (phones, tablets, TVs;
+                // the desktop has a floating one with the picture, below)
                 AnimatedVisibility(
-                    app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts,
+                    app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts && !floating,
                     enter = slideInVertically(tween(Motion.MEDIUM, easing = Motion.emphasizedIn)) { it } + fadeIn(tween(Motion.SHORT)),
                     exit = slideOutVertically(tween(Motion.SHORT, easing = Motion.emphasizedOut)) { it } + fadeOut(tween(Motion.SHORT)),
                 ) { MiniPlayer(app) }
@@ -257,6 +261,8 @@ private fun Shell(app: AppState) {
                         if (app.playback.video?.id == last.id) app.go(Screen.Watch(last.id)) else app.watch(last)
                     }
                     SmallRailItem(Sym.Settings.outline, tr("Settings"), cur == Screen.Settings) { app.go(Screen.Settings) }
+                    // the video page has no top bar, so search sits here too
+                    if (!showTop) SmallRailItem(Sym.Search.outline, tr("Search"), cur is Screen.Search) { app.go(Screen.Search()) }
                 }
             }
             Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -299,6 +305,13 @@ private fun Shell(app: AppState) {
                     }
                   }
                 }
+                // the plain one: inside a Box that sits in a Column, the Column version would be picked
+                androidx.compose.animation.AnimatedVisibility(
+                    floating && app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                    enter = fadeIn(tween(Motion.MEDIUM)) + scaleIn(tween(Motion.MEDIUM, easing = Motion.emphasizedIn), initialScale = 0.9f),
+                    exit = fadeOut(tween(Motion.SHORT)) + scaleOut(tween(Motion.SHORT), targetScale = 0.9f),
+                ) { FloatingPlayer(app) }
               }
             }
         }
@@ -425,6 +438,37 @@ private fun UpdateDialog(app: AppState, r: app.tubehaus.engine.Remote.Release) {
 }
 
 /** The bar above the tabs while a video plays and you look at something else. */
+/** The desktop's mini player: the playing video, small, over the page; a click goes back to it. */
+@Composable
+private fun FloatingPlayer(app: AppState) {
+    val v = app.playback.video ?: return
+    val st by app.platform.player.state.collectAsState()
+    Surface(
+        Modifier.width(360.dp), shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer, shadowElevation = 8.dp,
+    ) {
+        Column {
+            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black).clickable { app.go(Screen.Watch(v.id)) }) {
+                if (st.videoId == v.id) app.platform.player.View(Modifier.fillMaxSize())
+                else if (!app.store.settings.value.hideThumbs) Img(v.thumb, Modifier.fillMaxSize())
+                if (st.durationMs > 0) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color(0x55FFFFFF))) {
+                    Box(Modifier.fillMaxWidth((st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f)).height(3.dp).background(Red))
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(vertical = 8.dp).clickable { app.go(Screen.Watch(v.id)) }) {
+                    Text(v.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(v.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
+                IconButton(onClick = { if (st.playing) app.platform.player.pause() else app.platform.player.play() }) {
+                    Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"))
+                }
+                IconButton(onClick = { app.playback.close() }) { Icon(Sym.Close.fill, tr("Close")) }
+            }
+        }
+    }
+}
+
 @Composable
 private fun MiniPlayer(app: AppState) {
     val v = app.playback.video ?: return
