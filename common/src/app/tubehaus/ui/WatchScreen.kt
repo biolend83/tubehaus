@@ -81,8 +81,11 @@ fun WatchScreen(app: AppState) {
     // TV: the video plays on this page, beside what's next; OK on the video fills the screen
     // and Back comes back here (it used to fill the screen by itself, which got in the way)
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth > 840.dp
         val tablet = app.platform.touch
+        // a tablet held upright stacks like a phone (the video across the top, everything under it);
+        // side by side would leave the video small in the middle of a tall screen
+        val wide = maxWidth > 840.dp && !(tablet && maxHeight > maxWidth)
+        val narrow = maxWidth < 600.dp
         // tablets and TVs: a narrower panel, so the video gets most of the width
         val sideWidth = if (tablet || app.platform.tv) minOf(380.dp, maxWidth * 0.32f) else minOf(420.dp, maxWidth * 0.4f)
         if (wide) {
@@ -133,7 +136,8 @@ fun WatchScreen(app: AppState) {
                     LazyColumn(Modifier.fillMaxSize()) {
                         under(app, v)
                         if (token != null) item { CommentsTeaser(token) { commentsOpen = true } }
-                        related(app, big = true)
+                        // phones: full-width cards; an upright tablet: rows with a larger picture
+                        if (narrow) related(app, big = true) else related(app, big = false, thumb = 240.dp)
                     }
                 }
             }
