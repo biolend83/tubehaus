@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.Sys
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -227,7 +228,7 @@ private fun ServerItems(app: AppState, open: () -> Unit) {
     Column {
         val status = when {
             !problem.isNullOrEmpty() -> serverProblem(problem!!)
-            at > 0 -> tr("Synced at {t}").replace("{t}", java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(at)))
+            at > 0 -> tr("Synced at {t}").replace("{t}", Sys.shortTime(at))
             else -> tr("Syncing…")
         }
         SItem(tr("Connected to {s}").replace("{s}", s.server.substringAfter("://")), status, open)

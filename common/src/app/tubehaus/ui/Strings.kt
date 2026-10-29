@@ -93,6 +93,7 @@ private val KO = mapOf(
     "TV mode" to "TV 모드",
     "Resume" to "이어보기",
     "Downloads" to "오프라인 저장",
+    "Downloads aren't available on iPad" to "iPad에서는 오프라인 저장을 할 수 없어요",
     "Downloaded" to "저장됨",
     "Remove download" to "저장한 영상 삭제",
     "Cancel download" to "저장 취소",

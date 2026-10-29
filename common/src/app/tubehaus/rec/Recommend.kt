@@ -13,7 +13,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
+import app.tubehaus.engine.Sys
+import kotlin.concurrent.Volatile
+import kotlin.math.PI
+import kotlin.math.pow
 import kotlin.math.abs
 import kotlin.math.log10
 import kotlin.math.sqrt
@@ -32,7 +35,7 @@ private const val DECAY = 0.98          // per day: old tastes fade
 private const val CAP = 10.0
 private const val SHORT_MAX = 180       // seconds: what counts as a Short among search results
 
-private fun now() = System.currentTimeMillis() / 1000
+private fun now() = Sys.nowMs() / 1000
 
 object Learn {
     private val STOP = setOf("shorts", "short", "youtubeshorts", "viral", "fyp", "trending", "video", "youtube", "new", "official")
@@ -62,7 +65,7 @@ object Learn {
     private fun decayed(t: Taste): Taste {
         val days = (now() - (if (t.decayed == 0L) now() else t.decayed)) / 86400.0
         if (days < 0.25) return if (t.decayed == 0L) t.copy(decayed = now()) else t
-        val f = Math.pow(DECAY, days)
+        val f = DECAY.pow(days)
         fun m(x: Map<String, Double>) = x.mapValues { it.value * f }.filterValues { abs(it) >= 0.05 }
         return t.copy(ch = m(t.ch), kw = m(t.kw), decayed = now())
     }
@@ -118,7 +121,7 @@ object Learn {
 
 /** New uploads of every subscription, from their RSS feeds (fast, no API quota, no account). */
 class Feed(private val store: Store) {
-    private val cache = ConcurrentHashMap<String, Pair<Long, List<Video>>>()
+    private val cache = Sys.concurrentMap<String, Pair<Long, List<Video>>>()
     @Volatile var updated = 0L
         private set
 
@@ -131,7 +134,7 @@ class Feed(private val store: Store) {
         }
     }
 
-    suspend fun all(force: Boolean = false): List<Video> = withContext(Dispatchers.IO) {
+    suspend fun all(force: Boolean = false): List<Video> = withContext(Sys.IO) {
         val subs = store.lib.value.subs
         val gate = Semaphore(8)
         val lists = coroutineScope {
@@ -150,8 +153,8 @@ class Feed(private val store: Store) {
 private data class Cand(val v: Video, val src: String, val tag: String? = null)
 
 class Recommender(private val store: Store, private val feed: Feed) {
-    private val pools = ConcurrentHashMap<String, Pair<Long, List<Cand>>>()
-    private val rnd = Random(System.nanoTime())
+    private val pools = Sys.concurrentMap<String, Pair<Long, List<Cand>>>()
+    private val rnd = Random(Sys.nowMs())
 
     private suspend fun pool(key: String, ttl: Long, fetch: suspend () -> List<Cand>): List<Cand> {
         pools[key]?.let { (t, v) -> if (now() - t < ttl) return v }
@@ -277,7 +280,7 @@ class Recommender(private val store: Store, private val feed: Feed) {
         // Box-Muller
         val u = rnd.nextDouble().coerceAtLeast(1e-9)
         val v = rnd.nextDouble()
-        return sqrt(-2.0 * kotlin.math.ln(u)) * kotlin.math.cos(2 * Math.PI * v)
+        return sqrt(-2.0 * kotlin.math.ln(u)) * kotlin.math.cos(2 * PI * v)
     }
 
     fun clearCache() = pools.clear()

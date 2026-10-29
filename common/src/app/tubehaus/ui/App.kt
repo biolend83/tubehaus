@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.Sys
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -85,9 +86,7 @@ import app.tubehaus.engine.Net
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.disk.DiskCache
-import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
-import okio.Path.Companion.toOkioPath
 
 /** true on a phone-sized touch screen: the bottom bar, edge-to-edge cards; false on tablets and desktops */
 val LocalCompact = compositionLocalOf { true }
@@ -101,8 +100,8 @@ fun App(app: AppState) {
     InnerTube.gl = settings.region.ifEmpty { app.platform.deviceRegion() }.uppercase()
     setSingletonImageLoaderFactory { ctx ->
         ImageLoader.Builder(ctx)
-            .components { add(OkHttpNetworkFetcherFactory(callFactory = { Net.client })) }
-            .diskCache { DiskCache.Builder().directory(java.io.File(app.platform.cacheDir, "images").toOkioPath()).maxSizeBytes(150L shl 20).build() }
+            .components { Sys.imageNetwork(this) }
+            .diskCache { DiskCache.Builder().directory(app.platform.cacheDir / "images").maxSizeBytes(150L shl 20).build() }
             .crossfade(true)
             .build()
     }

@@ -304,7 +304,7 @@ private fun Actions(app: AppState, v: Video, has: (String) -> Boolean) {
         if (has("later")) item { Chip(if (saved) Sym.WatchLater.fill else Sym.WatchLater.outline, tr("Watch later")) { app.store.setInList("wl", v, !saved) } }
         if (has("save")) item { Chip(Sym.LibraryAdd.outline, tr("Save")) { pick = true } }
         if (has("share")) item { Chip(Sym.Share.outline, tr("Share")) { app.share(v.title, "https://youtu.be/${v.id}") } }
-        if (has("download") && !v.live) item { DownloadChip(app, v) }
+        if (has("download") && !v.live && app.platform.canDownload) item { DownloadChip(app, v) }
         if (pb.next != null && has("next")) item { Chip(Sym.SkipNext.outline, tr("Next")) { pb.skipNext() } }
     }
     if (pick) PlaylistPicker(v, app) { pick = false }

@@ -26,6 +26,8 @@ import java.awt.Frame
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
+import okio.Path
+import okio.Path.Companion.toOkioPath
 import java.net.URI
 
 private val home = System.getProperty("user.home")
@@ -34,8 +36,8 @@ val isMac = System.getProperty("os.name").startsWith("Mac")
 class DesktopPlatform : Platform {
     override val name = "desktop"
     // Windows: %APPDATA%; macOS: ~/Library/Application Support (and Caches); Linux: ~/.config, ~/.cache
-    override val dataDir: File = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else "$home/.config", "TubeHaus")
-    override val cacheDir: File = File(System.getenv("LOCALAPPDATA") ?: if (isMac) "$home/Library/Caches" else "$home/.cache", "TubeHaus")
+    override val dataDir: Path = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else "$home/.config", "TubeHaus").toOkioPath()
+    override val cacheDir: Path = File(System.getenv("LOCALAPPDATA") ?: if (isMac) "$home/Library/Caches" else "$home/.cache", "TubeHaus").toOkioPath()
     override val touch = false
     val mpv = MpvPlayer()
     override val player get() = mpv

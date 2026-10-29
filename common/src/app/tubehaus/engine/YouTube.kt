@@ -1,7 +1,7 @@
 package app.tubehaus.engine
 
 import kotlinx.serialization.json.JsonElement
-import java.net.URLEncoder
+import kotlin.concurrent.Volatile
 
 /** Everything the app asks YouTube, straight from this device. */
 object YouTube {
@@ -21,11 +21,11 @@ object YouTube {
         PLAYLISTS("EglwbGF5bGlzdHPyBgQKAkIA"),
     }
 
-    private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
+    private fun enc(s: String) = urlEncode(s)
 
     // ------------------------------------------------------------------ search
     suspend fun search(query: String, filter: Filter = Filter.ALL): Page<Item> {
-        val d = InnerTube.call("search", mapOf("query" to query, "params" to filter.params?.let { java.net.URLDecoder.decode(it, "UTF-8") }))
+        val d = InnerTube.call("search", mapOf("query" to query, "params" to filter.params?.let { urlDecode(it) }))
         val root = d.at("contents")
         return Page(parseItems(root), continuationOf(root))
     }
@@ -100,7 +100,7 @@ object YouTube {
             video = formats.filter { it.isVideo },
             audio = formats.filter { !it.isVideo },
             captions = caps,
-            expiresAt = System.currentTimeMillis() / 1000 + (sd.at("expiresInSeconds").long ?: 18000),
+            expiresAt = Sys.nowMs() / 1000 + (sd.at("expiresInSeconds").long ?: 18000),
             client = c.name,
         )
     }
@@ -213,7 +213,7 @@ object YouTube {
 
     // ------------------------------------------------------------------ channels and playlists
     suspend fun channel(id: String, tab: Tab = Tab.VIDEOS): ChannelPage {
-        val d = InnerTube.call("browse", mapOf("browseId" to id, "params" to java.net.URLDecoder.decode(tab.params, "UTF-8")))
+        val d = InnerTube.call("browse", mapOf("browseId" to id, "params" to urlDecode(tab.params)))
         val tabs = d.at("contents.twoColumnBrowseResultsRenderer.tabs").arr
         val sel = tabs.firstOrNull { (it.at("tabRenderer.selected").bool) }?.at("tabRenderer.content")
             ?: tabs.firstOrNull()?.at("tabRenderer.content")
@@ -280,16 +280,16 @@ object YouTube {
      * fails its Videos tab, with the times worked out from "3 days ago".
      */
     suspend fun feed(channelId: String): List<Video> {
-        if (System.currentTimeMillis() > rssDownUntil) {
+        if (Sys.nowMs() > rssDownUntil) {
             try {
                 return rss(channelId)
-            } catch (e: java.io.IOException) {
+            } catch (e: okio.IOException) {
                 if (e is HttpError && e.code !in 500..599 && e.code != 404) throw e
-                rssDownUntil = System.currentTimeMillis() + 3_600_000
+                rssDownUntil = Sys.nowMs() + 3_600_000
             }
         }
         val c = channel(channelId, Tab.VIDEOS)
-        val now = System.currentTimeMillis() / 1000
+        val now = Sys.nowMs() / 1000
         return c.items.items.filterIsInstance<Video>().map { v ->
             v.copy(author = v.author.ifEmpty { c.name }, channelId = channelId, publishedAt = ago(v.publishedText)?.let { now - it } ?: 0)
         }
@@ -324,7 +324,7 @@ object YouTube {
             Video(
                 id, title, author, channelId,
                 views = views,
-                publishedAt = pub?.let { runCatching { java.time.OffsetDateTime.parse(it).toEpochSecond() }.getOrNull() } ?: 0,
+                publishedAt = pub?.let { Sys.isoSeconds(it) } ?: 0,
                 short = short,
             )
         }.toList()

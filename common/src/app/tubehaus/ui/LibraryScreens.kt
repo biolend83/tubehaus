@@ -173,7 +173,7 @@ fun LibraryScreen(app: AppState) {
         item {
             val saved by app.offline.saved.collectAsState()
             val busy = app.offline.progress.size
-            LibRow(Sym.DownloadForOffline.outline, tr("Downloads"), "${saved.items.size}" + if (busy > 0) " (+$busy)" else "") { app.go(Screen.Downloads) }
+            if (app.platform.canDownload) LibRow(Sym.DownloadForOffline.outline, tr("Downloads"), "${saved.items.size}" + if (busy > 0) " (+$busy)" else "") { app.go(Screen.Downloads) }
         }
         item { SectionTitle(tr("Playlists")) }
         items(lib.playlists.entries.sortedByDescending { it.value.updated }.toList(), key = { it.key }) { (id, p) ->

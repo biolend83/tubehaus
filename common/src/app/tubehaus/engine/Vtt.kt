@@ -18,7 +18,7 @@ object Vtt {
     }
 
     private fun stamp(v: Long): String =
-        "%02d:%02d:%02d.%03d".format(v / 3_600_000, v / 60_000 % 60, v / 1000 % 60, v % 1000)
+        "${pad2(v / 3_600_000)}:${pad2(v / 60_000 % 60)}:${pad2(v / 1000 % 60)}.${(v % 1000).toString().padStart(3, '0')}"
 
     fun clean(src: String): String {
         val cues = mutableListOf<Cue>()

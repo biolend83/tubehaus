@@ -1,0 +1,49 @@
+name: iPad
+
+# The iPad app for personal use: an unsigned .ipa as a build artifact (not a release). SideStore
+# signs it with your own Apple ID when you install it.
+on:
+  push:
+    branches: [ios-app]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ipa:
+    # Intel runners have twice the memory; linking Compose for iOS needs it
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    env:
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx4g
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Kotlin → TubeHausKit.framework
+        run: ./gradlew :ios:linkReleaseFrameworkIosArm64 --no-configuration-cache --stacktrace
+      - name: Xcode project
+        run: |
+          brew install xcodegen
+          cd ios/app && xcodegen generate
+      - name: Build the app (unsigned)
+        run: >-
+          xcodebuild -project ios/app/TubeHaus.xcodeproj -scheme TubeHaus -sdk iphoneos -configuration Release
+          -derivedDataPath build/xcode CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Package TubeHaus.ipa
+        run: |
+          set -e
+          app=build/xcode/Build/Products/Release-iphoneos/TubeHaus.app
+          test -x "$app/TubeHaus"
+          mkdir -p out/Payload && cp -R "$app" out/Payload/
+          cd out && zip -qr TubeHaus.ipa Payload && unzip -l TubeHaus.ipa | tail -3
+          du -h TubeHaus.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TubeHaus-iPad
+          path: out/TubeHaus.ipa
+          if-no-files-found: error

@@ -6,17 +6,20 @@ import androidx.compose.ui.Modifier
 import app.tubehaus.engine.Caption
 import app.tubehaus.engine.Stream
 import kotlinx.coroutines.flow.StateFlow
-import java.io.File
+import app.tubehaus.engine.Sys
+import okio.Path
 
-/** What each platform (Android, Windows) supplies; everything else is shared. */
+/** What each platform (Android, the desktop, iOS) supplies; everything else is shared. */
 interface Platform {
-    val name: String               // "android" / "desktop"
-    val dataDir: File
-    val cacheDir: File
+    val name: String               // "android" / "desktop" / "ios"
+    val dataDir: Path
+    val cacheDir: Path
     /** phones get the bottom bar and portrait layouts; desktops a wider grid */
     val touch: Boolean
     /** a TV (Android TV, Google TV): the remote moves a visible focus, and videos fill the screen */
     val tv: Boolean get() = false
+    /** videos can be saved to watch without internet (not on iOS, whose player takes only HLS) */
+    val canDownload: Boolean get() = true
     val player: VideoPlayer
 
     /** a share sheet where there is one; false when the link was copied to the clipboard instead */
@@ -45,8 +48,8 @@ interface Platform {
     /** true on a metered connection (mobile data): the lower quality cap applies */
     fun metered(): Boolean = false
     /** the device language, e.g. "ko" */
-    fun deviceLanguage(): String = java.util.Locale.getDefault().language
-    fun deviceRegion(): String = java.util.Locale.getDefault().country.ifEmpty { "US" }
+    fun deviceLanguage(): String = Sys.deviceLanguage()
+    fun deviceRegion(): String = Sys.deviceRegion().ifEmpty { "US" }
     /** Android 12+: colours taken from the wallpaper (Material You); null where there are none */
     fun wallpaperColors(dark: Boolean): androidx.compose.material3.ColorScheme? = null
     /**

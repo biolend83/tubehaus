@@ -17,7 +17,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.util.Base64
+import app.tubehaus.engine.Sys
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Optional: keeps the library in step with a TubeHaus server (the self-hosted web version), so
@@ -56,10 +58,13 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
         if (connected) scope.launch { runCatching { sync() } }
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun basic(userPass: String) = Base64.encode(userPass.encodeToByteArray())
+
     private fun headers(s: Settings = store.settings.value): Map<String, String> = buildMap {
         put("Accept", "application/json")
         if (s.serverUser.isNotEmpty()) {
-            put("Authorization", "Basic " + Base64.getEncoder().encodeToString("${s.serverUser}:${s.serverPass}".toByteArray()))
+            put("Authorization", "Basic " + basic("${s.serverUser}:${s.serverPass}"))
         }
     }
 
@@ -102,7 +107,7 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
         val lib = storeJson.decodeFromString(Library.serializer(), text)
         // a change made while it was on its way goes first; the next sync brings it back
         if (store.queue.value.isEmpty()) store.lib.update { lib }
-        syncedAt.value = System.currentTimeMillis()
+        syncedAt.value = Sys.nowMs()
     }
 
     /** the whole library to the server, which merges it with its own (adds, never removes) */
@@ -182,7 +187,7 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
             var u = raw.trim().trimEnd('/')
             if (u.isEmpty() || ' ' in u) return null
             if (!u.startsWith("http://") && !u.startsWith("https://")) u = "https://$u"
-            return runCatching { java.net.URI(u).takeIf { !it.host.isNullOrEmpty() }?.let { u } }.getOrNull()
+            return u.takeIf { Regex("^https?://[^/?#:]+(:[0-9]+)?([/?#].*)?$").matches(it) }
         }
     }
 }

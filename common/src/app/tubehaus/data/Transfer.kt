@@ -12,8 +12,9 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
-import java.security.SecureRandom
-import java.time.LocalDate
+import app.tubehaus.engine.Sys
+import app.tubehaus.engine.hex
+import kotlin.random.Random
 
 // Import and export, so your data is never stuck in the app. The same formats the TubeHaus
 // server reads and writes: a full TubeHaus backup, Invidious' export, the CSV Google Takeout
@@ -39,7 +40,7 @@ data class ImportResult(val format: String, val subs: Int, val hist: Int, val pl
 
 object Transfer {
     fun exportFile(lib: Library, format: String): Pair<String, ByteArray> {
-        val day = LocalDate.now().toString()
+        val day = Sys.today()
         return when (format) {
             "invidious" -> {
                 val o = buildJsonObject {
@@ -77,7 +78,7 @@ object Transfer {
                     mapOf(
                         "format" to JsonPrimitive("tubehaus-backup"),
                         "version" to JsonPrimitive(1),
-                        "exported" to JsonPrimitive(System.currentTimeMillis() / 1000),
+                        "exported" to JsonPrimitive(Sys.nowMs() / 1000),
                     ) + body,
                 )
                 "tubehaus-backup-$day.json" to o.toString().toByteArray()
@@ -145,7 +146,7 @@ object Transfer {
                 "freetube" -> sub(s.at("id").str, s.at("name").str, s.at("thumbnail").str)
                 else -> sub(s.str)
             }
-            val t = System.currentTimeMillis() / 1000
+            val t = Sys.nowMs() / 1000
             val hist = data["watch_history"].arr.mapNotNull { it.str?.takeIf { s -> VID.matches(s) } }.take(3000)
                 .mapIndexed { i, id -> Meta(id, at = t - i) }
             val pls = data["playlists"].arr.mapNotNull { p ->
@@ -161,7 +162,7 @@ object Transfer {
                 val hist = data.take(20000).mapNotNull { x ->
                     val id = Regex("[?&]v=([\\w-]{11})").find(x.at("titleUrl").str ?: "")?.groupValues?.get(1) ?: return@mapNotNull null
                     val ch = x.at("subtitles.0")
-                    val at = runCatching { java.time.OffsetDateTime.parse(x.at("time").str).toEpochSecond() }.getOrDefault(0)
+                    val at = (Sys.isoSeconds(x.at("time").str ?: "") ?: 0)
                     Meta(id, (x.at("title").str ?: "").removePrefix("Watched "), ch.at("name").str ?: "",
                         UCID.find(ch.at("url").str ?: "")?.value ?: "", at = at)
                 }
@@ -193,7 +194,7 @@ object Transfer {
 
     /** Merges an import into the library without losing anything already there. */
     fun merge(store: Store, p: Imported): ImportResult {
-        val t = System.currentTimeMillis() / 1000
+        val t = Sys.nowMs() / 1000
         var n = ImportResult(p.format ?: "?", 0, 0, 0, 0)
         store.lib.update { l ->
             val subs = l.subs.toMutableMap()
@@ -209,8 +210,8 @@ object Transfer {
             val existing = pls.values.map { it.title to it.items.map { m -> m.id } }.toSet()
             for ((title, items) in p.playlists) {
                 if (items.isEmpty() || (title to items.map { it.id }) in existing) continue
-                val b = ByteArray(8).also { SecureRandom().nextBytes(it) }
-                pls["HP" + b.joinToString("") { "%02x".format(it) }] = PlaylistData(title.ifEmpty { "Imported" }, items.take(5000), t)
+
+                pls["HP" + Random.nextBytes(8).hex()] = PlaylistData(title.ifEmpty { "Imported" }, items.take(5000), t)
                 n = n.copy(playlists = n.playlists + 1, videos = n.videos + items.size)
             }
             l.copy(

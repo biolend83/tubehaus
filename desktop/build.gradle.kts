@@ -20,7 +20,7 @@ kotlin {
         optIn.addAll("androidx.compose.material3.ExperimentalMaterial3Api", "androidx.compose.foundation.layout.ExperimentalLayoutApi")
     }
     // the shared code (engine, library, screens) is compiled into this module as plain sources
-    sourceSets["main"].kotlin.srcDirs("src/main/kotlin", "../common/src")
+    sourceSets["main"].kotlin.srcDirs("src/main/kotlin", "../common/src", "../common/jvm")
 }
 
 dependencies {
@@ -30,6 +30,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("io.coil-kt.coil3:coil-compose:3.2.0")
+    implementation("com.squareup.okio:okio:3.10.2")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.2.0")
     implementation("net.java.dev.jna:jna:5.17.0")
 }

@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import kotlin.math.pow
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -121,8 +122,8 @@ fun playerKey(app: AppState, key: Key): Boolean {
 }
 
 /** brightness the swipe works in (what the eye sees, gamma 2.2) and the screen's own value */
-private fun perceived(b: Float) = Math.pow(b.coerceIn(0f, 1f).toDouble(), 1 / 2.2).toFloat()
-private fun actual(p: Float) = Math.pow(p.coerceIn(0f, 1f).toDouble(), 2.2).toFloat().coerceAtLeast(0.004f)
+private fun perceived(b: Float) = b.coerceIn(0f, 1f).toDouble().pow(1 / 2.2).toFloat()
+private fun actual(p: Float) = p.coerceIn(0f, 1f).toDouble().pow(2.2).toFloat().coerceAtLeast(0.004f)
 
 @Composable
 private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) {
