@@ -56,12 +56,12 @@ object Transfer {
                         }
                     })
                 }
-                "invidious-export-$day.json" to o.toString().toByteArray()
+                "invidious-export-$day.json" to o.toString().encodeToByteArray()
             }
             "csv" -> {
                 val sb = StringBuilder("Channel Id,Channel Url,Channel Title\n")
                 lib.subs.forEach { (cid, s) -> sb.append("$cid,http://www.youtube.com/channel/$cid,${csv(s.name)}\n") }
-                "subscriptions-$day.csv" to sb.toString().toByteArray()
+                "subscriptions-$day.csv" to sb.toString().encodeToByteArray()
             }
             "opml" -> {
                 val rows = lib.subs.entries.joinToString("") { (cid, s) ->
@@ -70,7 +70,7 @@ object Transfer {
                 }
                 val x = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<opml version=\"1.1\">\n  <head><title>TubeHaus subscriptions</title></head>\n" +
                     "  <body>\n    <outline text=\"YouTube\" title=\"YouTube\">$rows\n    </outline>\n  </body>\n</opml>\n"
-                "subscriptions-$day.opml" to x.toByteArray()
+                "subscriptions-$day.opml" to x.encodeToByteArray()
             }
             else -> {
                 val body = storeJson.encodeToJsonElement(lib) as JsonObject
@@ -81,7 +81,7 @@ object Transfer {
                         "exported" to JsonPrimitive(Sys.nowMs() / 1000),
                     ) + body,
                 )
-                "tubehaus-backup-$day.json" to o.toString().toByteArray()
+                "tubehaus-backup-$day.json" to o.toString().encodeToByteArray()
             }
         }
     }

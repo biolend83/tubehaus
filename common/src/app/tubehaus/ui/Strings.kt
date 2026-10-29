@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import kotlin.concurrent.Volatile
+
 // Interface text. English is the key; other languages map it. A missing translation shows English.
 
 object L {

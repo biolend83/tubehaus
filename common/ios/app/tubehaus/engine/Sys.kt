@@ -88,3 +88,12 @@ private class SnapshotMap<K : Any, V : Any> : AbstractMutableMap<K, V>() {
     /** a copy: reading it is safe, changing it changes nothing */
     override val entries: MutableSet<MutableMap.MutableEntry<K, V>> get() = ref.value.toMutableMap().entries
 }
+
+/** a lock for a few lines of blocking code (a file write) */
+class SysLock {
+    private val lock = platform.Foundation.NSRecursiveLock()
+    fun <T> run(block: () -> T): T {
+        lock.lock()
+        try { return block() } finally { lock.unlock() }
+    }
+}

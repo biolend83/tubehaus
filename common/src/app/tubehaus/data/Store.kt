@@ -22,6 +22,7 @@ import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import app.tubehaus.engine.Sys
+import app.tubehaus.engine.SysLock
 import app.tubehaus.engine.hex
 import okio.FileSystem
 import okio.Path
@@ -35,6 +36,8 @@ val storeJson = Json { ignoreUnknownKeys = true; encodeDefaults = false; explici
 class JsonFile<T>(private val file: Path, private val ser: KSerializer<T>, empty: T, scope: CoroutineScope) {
     // a getter, not a field: load() runs in the first initializer below, before fields after it are set
     private val fs: FileSystem get() = FileSystem.SYSTEM
+    // the debounced save (a background thread) and flushNow (the main one) may meet
+    private val writing = SysLock()
     private val flow = MutableStateFlow(load() ?: empty)
     val state: StateFlow<T> get() = flow
     val value: T get() = flow.value
@@ -51,8 +54,7 @@ class JsonFile<T>(private val file: Path, private val ser: KSerializer<T>, empty
         null
     }
 
-    @Synchronized
-    private fun save(v: T) {
+    private fun save(v: T) = writing.run {
         file.parent?.let { fs.createDirectories(it) }
         val tmp = (file.toString() + ".tmp").toPath()
         fs.write(tmp) { writeUtf8(storeJson.encodeToString(ser, v)) }

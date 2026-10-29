@@ -43,3 +43,8 @@ object Sys {
         b.add(OkHttpNetworkFetcherFactory(callFactory = { Net.client }))
     }
 }
+
+/** a lock for a few lines of blocking code (a file write) */
+class SysLock {
+    fun <T> run(block: () -> T): T = synchronized(this) { block() }
+}

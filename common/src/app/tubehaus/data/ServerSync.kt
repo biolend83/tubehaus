@@ -114,7 +114,7 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
     private suspend fun pushAll(base: String, s: Settings) {
         val l = store.lib.value
         if (l.subs.isEmpty() && l.hist.isEmpty() && l.wl.isEmpty() && l.likes.isEmpty() && l.playlists.isEmpty()) return
-        val text = String(Transfer.exportFile(l, "tubehaus").second)
+        val text = Transfer.exportFile(l, "tubehaus").second.decodeToString()
         val body = buildJsonObject { put("text", text) }
         try {
             Net.post("$base/api/p/yt/import", body.toString(), headers(s))
