@@ -7,7 +7,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.io.File
+import kotlin.concurrent.Volatile
 
 /**
  * InnerTube is the JSON API YouTube's own apps talk to. Each request names a "client"
@@ -58,7 +58,7 @@ object InnerTube {
     @Volatile var gl = "US"
 
     /** where the visitor identity is kept between starts; set by the app */
-    @Volatile var identityFile: File? = null
+    @Volatile var identityFile: okio.Path? = null
     @Volatile private var visitorData: String? = null
     private val visitorLock = Mutex()
     private val rerolls = ArrayList<Long>()
@@ -66,7 +66,7 @@ object InnerTube {
     private const val REROLL_LIMIT = 2
     private const val REROLL_WINDOW = 6 * 3600L
 
-    private fun now() = System.currentTimeMillis() / 1000
+    private fun now() = Sys.nowMs() / 1000
 
     /** The visitor identity in use: the saved one while it is under a week old, else a new one. */
     suspend fun visitor(): String? {
@@ -77,7 +77,7 @@ object InnerTube {
     }
 
     private fun restore(): String? = try {
-        val o = identityFile?.takeIf { it.exists() }?.readText()?.let(::parse)
+        val o = identityFile?.readTextOrNull()?.let(::parse)
         val v = o.at("visitorData").str
         val at = o.at("at").long ?: 0
         v?.takeIf { it.isNotBlank() && now() - at in 0 until VISITOR_MAX_AGE }
@@ -86,7 +86,6 @@ object InnerTube {
     private fun save(v: String) {
         val f = identityFile ?: return
         runCatching {
-            f.parentFile?.mkdirs()
             f.writeText(buildJsonObject { put("visitorData", v); put("at", now()) }.toString())
         }
     }
@@ -151,7 +150,7 @@ object InnerTube {
             Net.post("https://www.youtube.com/youtubei/v1/$endpoint?prettyPrint=false", payload.toString(), headers)
         } catch (e: HttpError) {
             throw YtError("YouTube answered ${e.code}", YtError.Kind.NETWORK)
-        } catch (e: java.io.IOException) {
+        } catch (e: okio.IOException) {
             throw YtError("No connection to YouTube", YtError.Kind.NETWORK)
         }
         return parse(text)

@@ -41,8 +41,9 @@ devices and the web version (optional).
   collapse into one subject. Settings → *What TubeHaus learned about you* shows every score and
   lets you change or wipe it.
 - **Shorts with their own engine** — learns from skipping, finishing, looping and likes.
-- **Subscriptions without an account** — from each channel's public feed. Import from YouTube
-  (Google Takeout), NewPipe, FreeTube, Invidious, TubeHaus or OPML.
+- **Subscriptions without an account** — from each channel's public feed, sorted into groups if
+  you like (a tab each, like PocketTube's). Import from YouTube (Google Takeout), NewPipe, FreeTube,
+  Invidious, PocketTube (with its groups), TubeHaus or OPML.
 - **A real player** — adaptive quality up to 4K/8K (AV1, VP9, H.264 picked by what your hardware
   decodes), captions with auto-translate, speed, resume where you stopped.
   - Android: background play with notification controls, picture-in-picture, opens YouTube links.

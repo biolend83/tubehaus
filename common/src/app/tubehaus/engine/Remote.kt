@@ -1,7 +1,7 @@
 package app.tubehaus.engine
 
 import kotlinx.serialization.json.JsonPrimitive
-import java.io.File
+import kotlin.concurrent.Volatile
 
 /**
  * The app's one look outside YouTube, at most once a day and only when the setting is on:
@@ -18,11 +18,11 @@ object Remote {
     const val DAY = 86_400_000L
 
     /** where the last good client list is kept; set by the app */
-    @Volatile var clientsFile: File? = null
+    @Volatile var clientsFile: okio.Path? = null
 
     /** the list saved by an earlier check, if any; called once at start */
     fun restoreClients() {
-        runCatching { clientsFile?.takeIf { it.exists() }?.readText()?.let(::clients) }?.getOrNull()?.let { Clients.PLAYERS = it }
+        runCatching { clientsFile?.readTextOrNull()?.let(::clients) }?.getOrNull()?.let { Clients.PLAYERS = it }
     }
 
     /** fetches the client list; keeps the current one when the file is missing or doesn't make sense */

@@ -38,6 +38,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.tubehaus.data.Transfer
+import app.tubehaus.data.SubGroup
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
 import app.tubehaus.engine.Video
 import kotlinx.coroutines.launch
 
@@ -53,6 +56,12 @@ fun SubsScreen(app: AppState) {
         try { items = app.feed.all(force) } finally { loading = false }
     }
     LaunchedEffect(lib.subs.size) { if (!app.store.settings.value.subsFeedOff) load(false) }
+    // groups: one tab each; "All" first unless it's switched off
+    val set by app.store.settings.state.collectAsState()
+    val hideAll = set.subsHideAll && lib.groups.isNotEmpty()
+    val group = lib.groups.firstOrNull { it.name == set.subsGroup } ?: if (hideAll) lib.groups.first() else null
+    val shown: Set<String> = group?.channels?.filter { it in lib.subs }?.toSet() ?: lib.subs.keys
+    val tabs: @Composable () -> Unit = { GroupTabs(app, lib.groups, group?.name, hideAll) }
     if (lib.subs.isEmpty()) {
         Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(tr("Channels you subscribe to show up here. Subscriptions are kept on this device - no account needed."),
@@ -73,7 +82,8 @@ fun SubsScreen(app: AppState) {
             item {
                 TextButton(onClick = { app.go(Screen.ManageSubs) }, modifier = Modifier.padding(horizontal = 8.dp)) { Text(tr("Manage subscriptions")) }
             }
-            items(lib.subs.entries.sortedBy { it.value.name.lowercase() }.toList(), key = { it.key }) { (cid, s) ->
+            if (lib.groups.isNotEmpty()) item { tabs() }
+            items(lib.subs.entries.filter { it.key in shown }.sortedBy { it.value.name.lowercase() }.toList(), key = { it.key }) { (cid, s) ->
                 Row(
                     Modifier.fillMaxWidth().clickable { app.go(Screen.Channel(cid, s.name)) }.padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -86,11 +96,12 @@ fun SubsScreen(app: AppState) {
         return
     }
     ItemGrid(
-        items.filter { !it.short || !app.noShorts }, app, loading = loading,
+        items.filter { (!it.short || !app.noShorts) && it.channelId in shown }, app, loading = loading,
         header = {
             Column {
+                if (lib.groups.isNotEmpty()) tabs()
                 LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(lib.subs.entries.sortedByDescending { it.value.at }.toList(), key = { it.key }) { (cid, s) ->
+                    items(lib.subs.entries.filter { it.key in shown }.sortedByDescending { it.value.at }.toList(), key = { it.key }) { (cid, s) ->
                         Column(Modifier.width(64.dp).tvClickable { app.go(Screen.Channel(cid, s.name)) }, horizontalAlignment = Alignment.CenterHorizontally) {
                             Avatar(s.thumb, 56)
                             Text(s.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -106,14 +117,51 @@ fun SubsScreen(app: AppState) {
     )
 }
 
-/** Every subscribed channel, to remove one or all of them. */
+/** The groups as tabs above the subscriptions: All (unless switched off), then each group. */
+@Composable
+private fun GroupTabs(app: AppState, groups: List<SubGroup>, selected: String?, hideAll: Boolean) {
+    fun pick(name: String) = app.store.settings.update { it.copy(subsGroup = name) }
+    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!hideAll) item { FilterChip(selected == null, onClick = { pick("") }, label = { Text(tr("All")) }) }
+        items(groups, key = { "g" + it.name }) { g ->
+            FilterChip(selected == g.name, onClick = { pick(g.name) }, label = { Text(g.name) })
+        }
+    }
+}
+
+/** Every subscribed channel, to remove one or all of them, and the groups they are sorted into. */
 @Composable
 fun ManageSubsScreen(app: AppState) {
     val lib by app.store.lib.state.collectAsState()
     var confirm by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { app.fillSubInfo() }
     val subs = lib.subs.entries.sortedBy { it.value.name.lowercase() }.toList()
+    var newGroup by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf<String?>(null) }
+    var deleting by remember { mutableStateOf<String?>(null) }
+    var sorting by remember { mutableStateOf<String?>(null) }    // the channel whose groups are being picked
     LazyColumn(Modifier.fillMaxSize()) {
+        item {
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(tr("Groups"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                TextButton(onClick = { newGroup = true }) { Text(tr("New group")) }
+            }
+            if (lib.groups.isEmpty()) Text(
+                tr("Sort channels into groups and Subscriptions gets a tab for each. A PocketTube backup brings its groups along (Library → Import)."),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+        items(lib.groups, key = { "g" + it.name }) { g ->
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(g.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(tr("{n} channels").replace("{n}", "${g.channels.count { it in lib.subs }}"), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = { renaming = g.name }) { Text(tr("Rename")) }
+                IconButton(onClick = { deleting = g.name }) { Icon(Sym.Close.outline, tr("Delete")) }
+            }
+        }
+        item { HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline) }
         item {
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("{n} channels").replace("{n}", "${subs.size}"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -129,14 +177,31 @@ fun ManageSubsScreen(app: AppState) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Avatar(s.thumb, 40)
-                Text(s.name.ifEmpty { cid }, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 14.dp).weight(1f))
+                Column(Modifier.padding(start = 14.dp).weight(1f)) {
+                    Text(s.name.ifEmpty { cid }, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val inGroups = lib.groups.filter { cid in it.channels }.joinToString(", ") { it.name }
+                    if (inGroups.isNotEmpty()) Text(inGroups, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                IconButton(onClick = { sorting = cid }) { Icon(Sym.LibraryAdd.outline, tr("Groups")) }
                 IconButton(onClick = { app.store.subscribe(cid, s.name, s.thumb, false) }) {
                     Icon(Sym.Close.outline, tr("Unsubscribe"))
                 }
             }
         }
     }
+    if (newGroup) NameDialog(tr("New group"), "", { newGroup = false }) { app.store.newGroup(it); newGroup = false }
+    renaming?.let { old -> NameDialog(tr("Rename"), old, { renaming = null }) { app.store.renameGroup(old, it); renaming = null } }
+    deleting?.let { name ->
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text(tr("Delete the group \"{g}\"?").replace("{g}", name)) },
+            text = { Text(tr("The channels stay subscribed.")) },
+            confirmButton = { TextButton(onClick = { app.store.deleteGroup(name); deleting = null }) { Text(tr("Delete"), color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text(tr("Cancel")) } },
+        )
+    }
+    sorting?.let { cid -> GroupPicker(app, cid) { sorting = null } }
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
         title = { Text(tr("Unsubscribe from all {n} channels?").replace("{n}", "${subs.size}")) },
@@ -173,7 +238,7 @@ fun LibraryScreen(app: AppState) {
         item {
             val saved by app.offline.saved.collectAsState()
             val busy = app.offline.progress.size
-            LibRow(Sym.DownloadForOffline.outline, tr("Downloads"), "${saved.items.size}" + if (busy > 0) " (+$busy)" else "") { app.go(Screen.Downloads) }
+            if (app.platform.canDownload) LibRow(Sym.DownloadForOffline.outline, tr("Downloads"), "${saved.items.size}" + if (busy > 0) " (+$busy)" else "") { app.go(Screen.Downloads) }
         }
         item { SectionTitle(tr("Playlists")) }
         items(lib.playlists.entries.sortedByDescending { it.value.updated }.toList(), key = { it.key }) { (id, p) ->
@@ -266,6 +331,36 @@ fun LocalListScreen(app: AppState, key: String) {
         title = { Text(tr("Delete this playlist?")) },
         confirmButton = { TextButton(onClick = { delete = false; app.back(); app.store.deletePlaylist(key) }) { Text(tr("Delete")) } },
         dismissButton = { TextButton(onClick = { delete = false }) { Text(tr("Cancel")) } },
+    )
+}
+
+/** Ticks the groups a channel is in; a new group can be made right here. */
+@Composable
+private fun GroupPicker(app: AppState, cid: String, dismiss: () -> Unit) {
+    val lib by app.store.lib.state.collectAsState()
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text(lib.subs[cid]?.name?.ifEmpty { null } ?: tr("Groups")) },
+        text = {
+            Column {
+                for (g in lib.groups) Row(
+                    Modifier.fillMaxWidth().clickable { app.store.setInGroup(g.name, cid, cid !in g.channels) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(cid in g.channels, onCheckedChange = { on -> app.store.setInGroup(g.name, cid, on) })
+                    Text(g.name)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(name, { name = it }, singleLine = true, placeholder = { Text(tr("New group")) }, modifier = Modifier.weight(1f))
+                    TextButton(onClick = {
+                        val n = name.trim()
+                        if (n.isNotEmpty()) { app.store.newGroup(n); app.store.setInGroup(n, cid, true); name = "" }
+                    }) { Text(tr("Add")) }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = dismiss) { Text(tr("Done")) } },
     )
 }
 

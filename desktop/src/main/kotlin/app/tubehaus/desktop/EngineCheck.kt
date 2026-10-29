@@ -14,7 +14,7 @@ import okhttp3.Request
 
 /** `./gradlew :desktop:engineCheck` - runs every engine call against YouTube and prints what came back. */
 fun main() = runBlocking {
-    app.tubehaus.engine.InnerTube.identityFile = java.io.File(System.getProperty("java.io.tmpdir"), "tubehaus-check-identity.json")
+    app.tubehaus.engine.InnerTube.identityFile = okio.Path.Companion.run { java.io.File(System.getProperty("java.io.tmpdir"), "tubehaus-check-identity.json").toOkioPath() }
     var fails = 0
     suspend fun check(name: String, f: suspend () -> String) {
         val t = System.currentTimeMillis()
@@ -97,7 +97,7 @@ fun main() = runBlocking {
         // the repository's clients.json, read the way an installed app reads its saved copy
         val f = java.io.File(System.getProperty("java.io.tmpdir"), "tubehaus-check-clients.json")
         f.writeText(java.io.File("../clients.json").readText())
-        Remote.clientsFile = f
+        Remote.clientsFile = okio.Path.Companion.run { f.toOkioPath() }
         Clients.PLAYERS = emptyList()
         Remote.restoreClients()
         require(Clients.PLAYERS.size >= 2) { "list not read" }

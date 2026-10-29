@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.tubehaus.engine.Channel
 import app.tubehaus.engine.Comment
@@ -117,7 +118,7 @@ fun WatchScreen(app: AppState) {
                         when {
                             shown == "comments" && token != null -> Comments(app, token)
                             shown == "details" -> LazyColumn(Modifier.fillMaxSize()) { item { Info(app, v) } }
-                            else -> LazyColumn(Modifier.fillMaxSize()) { related(app, big = false) }
+                            else -> LazyColumn(Modifier.fillMaxSize()) { related(app, big = false, thumb = if (sideWidth < 340.dp) 128.dp else 200.dp) }
                         }
                     }
                 }
@@ -304,7 +305,7 @@ private fun Actions(app: AppState, v: Video, has: (String) -> Boolean) {
         if (has("later")) item { Chip(if (saved) Sym.WatchLater.fill else Sym.WatchLater.outline, tr("Watch later")) { app.store.setInList("wl", v, !saved) } }
         if (has("save")) item { Chip(Sym.LibraryAdd.outline, tr("Save")) { pick = true } }
         if (has("share")) item { Chip(Sym.Share.outline, tr("Share")) { app.share(v.title, "https://youtu.be/${v.id}") } }
-        if (has("download") && !v.live) item { DownloadChip(app, v) }
+        if (has("download") && !v.live && app.platform.canDownload) item { DownloadChip(app, v) }
         if (pb.next != null && has("next")) item { Chip(Sym.SkipNext.outline, tr("Next")) { pb.skipNext() } }
     }
     if (pick) PlaylistPicker(v, app) { pick = false }
@@ -376,20 +377,20 @@ private fun Comments(app: AppState, token: String) {
 }
 
 /** big: phones show related videos as full-width cards, wide screens as rows with larger pictures */
-private fun LazyListScope.related(app: AppState, big: Boolean) {
+private fun LazyListScope.related(app: AppState, big: Boolean, thumb: Dp = 200.dp) {
     val pb = app.playback
     val queue = pb.queue
     if (queue.isNotEmpty()) {
         item { SectionTitle(tr("Up next")) }
         items(queue, key = { "q" + it.id }) { v ->
-            VideoRow(v, app) { pb.open(v, queue.dropWhile { it.id != v.id }.drop(1)); app.stack[app.stack.size - 1] = Screen.Watch(v.id) }
+            VideoRow(v, app, thumbWidth = minOf(thumb, 168.dp)) { pb.open(v, queue.dropWhile { it.id != v.id }.drop(1)); app.stack[app.stack.size - 1] = Screen.Watch(v.id) }
         }
     }
     if (app.store.settings.value.hideRelated) return
     val d = pb.details ?: run { item { Busy() }; return }
     items(d.related.filter { !(app.noShorts && it is Video && it.short) }, key = { "r" + it.id }) {
         when (it) {
-            is Video -> if (big) VideoCard(it, app) else VideoRow(it, app, thumbWidth = 200.dp)
+            is Video -> if (big) VideoCard(it, app) else VideoRow(it, app, thumbWidth = thumb)
             is Playlist -> PlaylistRow(it, app)
             is Channel -> ChannelRow(it, app)
         }

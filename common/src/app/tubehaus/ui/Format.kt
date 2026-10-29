@@ -1,5 +1,8 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.pad2
+import app.tubehaus.engine.oneDecimal
+import app.tubehaus.engine.Sys
 import app.tubehaus.engine.Video
 
 fun duration(sec: Int): String {
@@ -7,7 +10,7 @@ fun duration(sec: Int): String {
     val h = sec / 3600
     val m = sec % 3600 / 60
     val s = sec % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+    return if (h > 0) "$h:${pad2(m)}:${pad2(s)}" else "$m:${pad2(s)}"
 }
 
 fun durationMs(ms: Long) = duration((ms / 1000).toInt()).ifEmpty { "0:00" }
@@ -15,7 +18,7 @@ fun durationMs(ms: Long) = duration((ms / 1000).toInt()).ifEmpty { "0:00" }
 /** "3 days ago" from epoch seconds. */
 fun ago(epoch: Long): String {
     if (epoch <= 0) return ""
-    val d = System.currentTimeMillis() / 1000 - epoch
+    val d = Sys.nowMs() / 1000 - epoch
     val (n, unit) = when {
         d < 3600 -> maxOf(1, d / 60) to "minute"
         d < 86400 -> d / 3600 to "hour"
@@ -28,9 +31,9 @@ fun ago(epoch: Long): String {
 }
 
 fun compact(n: Long): String = when {
-    n >= 1_000_000_000 -> "%.1fB".format(n / 1e9).replace(".0B", "B")
-    n >= 1_000_000 -> "%.1fM".format(n / 1e6).replace(".0M", "M")
-    n >= 1_000 -> "%.1fK".format(n / 1e3).replace(".0K", "K")
+    n >= 1_000_000_000 -> (oneDecimal(n / 1e9) + "B").replace(".0B", "B")
+    n >= 1_000_000 -> (oneDecimal(n / 1e6) + "M").replace(".0M", "M")
+    n >= 1_000 -> (oneDecimal(n / 1e3) + "K").replace(".0K", "K")
     else -> n.toString()
 }
 

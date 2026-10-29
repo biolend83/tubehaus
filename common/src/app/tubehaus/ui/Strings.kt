@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import kotlin.concurrent.Volatile
+
 // Interface text. English is the key; other languages map it. A missing translation shows English.
 
 object L {
@@ -93,6 +95,15 @@ private val KO = mapOf(
     "TV mode" to "TV 모드",
     "Resume" to "이어보기",
     "Downloads" to "오프라인 저장",
+    "Groups" to "그룹",
+    "New group" to "새 그룹",
+    "Add" to "추가",
+    "Delete the group \"{g}\"?" to "\"{g}\" 그룹을 지울까요?",
+    "The channels stay subscribed." to "채널 구독은 그대로예요.",
+    "Sort channels into groups and Subscriptions gets a tab for each. A PocketTube backup brings its groups along (Library → Import)." to "채널을 그룹으로 나누면 구독 화면에 그룹마다 탭이 생겨요. PocketTube 백업 파일을 가져오면 그룹도 함께 들어와요 (보관함 → 가져오기).",
+    "Only my groups in Subscriptions" to "구독에 내 그룹만 보기",
+    "With subscription groups: no \"All\" tab, just the groups" to "구독 그룹이 있을 때 \"전체\" 탭 없이 그룹만 보여줘요",
+    "Downloads aren't available on iPad" to "iPad에서는 오프라인 저장을 할 수 없어요",
     "Downloaded" to "저장됨",
     "Remove download" to "저장한 영상 삭제",
     "Cancel download" to "저장 취소",
