@@ -106,7 +106,8 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
         val text = Net.get("$base/api/p/yt/export?format=tubehaus", headers())
         val lib = storeJson.decodeFromString(Library.serializer(), text)
         // a change made while it was on its way goes first; the next sync brings it back
-        if (store.queue.value.isEmpty()) store.lib.update { lib }
+        // the groups stay: the server doesn't keep them
+        if (store.queue.value.isEmpty()) store.lib.update { cur -> lib.copy(groups = cur.groups) }
         syncedAt.value = Sys.nowMs()
     }
 

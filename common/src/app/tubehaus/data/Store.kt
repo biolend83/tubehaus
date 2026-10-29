@@ -111,6 +111,31 @@ class Store(dir: Path) {
         l.copy(subs = l.subs + (cid to s.copy(name = name.ifEmpty { s.name }, thumb = thumb.ifEmpty { s.thumb })))
     }
 
+    // ---------------------------------------------------------- subscription groups (this device only)
+    fun newGroup(name: String) {
+        val n = name.trim().take(60)
+        if (n.isEmpty()) return
+        lib.update { l -> if (l.groups.any { it.name == n }) l else l.copy(groups = l.groups + SubGroup(n)) }
+    }
+
+    fun renameGroup(old: String, name: String) {
+        val n = name.trim().take(60)
+        if (n.isEmpty() || n == old) return
+        lib.update { l -> if (l.groups.any { it.name == n }) l else l.copy(groups = l.groups.map { if (it.name == old) it.copy(name = n) else it }) }
+        if (settings.value.subsGroup == old) settings.update { it.copy(subsGroup = n) }
+    }
+
+    fun deleteGroup(name: String) {
+        lib.update { l -> l.copy(groups = l.groups.filter { it.name != name }) }
+        if (settings.value.subsGroup == name) settings.update { it.copy(subsGroup = "") }
+    }
+
+    fun setInGroup(name: String, cid: String, on: Boolean) = lib.update { l ->
+        l.copy(groups = l.groups.map { g ->
+            if (g.name != name) g else g.copy(channels = if (on) (g.channels - cid) + cid else g.channels - cid)
+        })
+    }
+
     fun unsubscribeAll() {
         val all = lib.value.subs.keys
         lib.update { it.copy(subs = emptyMap()) }

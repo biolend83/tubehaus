@@ -32,6 +32,8 @@ data class Imported(
     val likes: List<Meta> = emptyList(),
     val dislikes: List<String> = emptyList(),
     val pos: Map<String, List<Long>> = emptyMap(),
+    /** subscription groups: name → channel ids */
+    val groups: List<Pair<String, List<String>>> = emptyList(),
 ) {
     val empty get() = subs.isEmpty() && hist.isEmpty() && playlists.isEmpty() && wl.isEmpty() && likes.isEmpty()
 }
@@ -131,7 +133,15 @@ object Transfer {
                 likes = data["likes"].arr.mapNotNull(::meta),
                 dislikes = data["dislikes"].arr.mapNotNull { it.str?.takeIf { s -> VID.matches(s) } },
                 pos = pos,
+                groups = data["groups"].arr.mapNotNull { g ->
+                    val name = g.at("name").str?.trim()?.take(60) ?: return@mapNotNull null
+                    name to g.at("channels").arr.mapNotNull { it.str?.takeIf { s -> UCID.matches(s) } }
+                },
             )
+        }
+        pocketTube(data)?.let { groups ->
+            groups.forEach { (_, ids) -> ids.forEach { sub(it) } }
+            return Imported("pockettube", subs, groups = groups)
         }
         if (data is JsonObject && data["subscriptions"] is JsonArray) {
             val list = data["subscriptions"].arr
@@ -192,6 +202,24 @@ object Transfer {
         return Imported(null)
     }
 
+    /**
+     * PocketTube's backup (youtube_subscription_manager_<date>.json): one key per group with its
+     * channel ids; a group over 250 channels comes in several "_ysm_" pieces, joined again here.
+     * Its own settings (other keys) are skipped. Null when the file isn't that.
+     */
+    private fun pocketTube(data: JsonElement?): List<Pair<String, List<String>>>? {
+        if (data !is JsonObject || "format" in data || "subscriptions" in data) return null
+        val groups = LinkedHashMap<String, MutableList<String>>()
+        for ((key, value) in data) {
+            if (value !is JsonArray) continue
+            val ids = value.mapNotNull { v -> (v.str ?: v.at("id").str ?: v.at("channelId").str)?.takeIf { UCID.matches(it) } }
+            if (ids.isEmpty()) continue
+            val name = key.replace(Regex("_ysm_\\d*$"), "").replace(Regex("^_?ysm_"), "").trim().ifEmpty { key }.take(60)
+            groups.getOrPut(name) { mutableListOf() }.addAll(ids)
+        }
+        return groups.map { (k, v) -> k to v.distinct() }.takeIf { it.isNotEmpty() }
+    }
+
     /** Merges an import into the library without losing anything already there. */
     fun merge(store: Store, p: Imported): ImportResult {
         val t = Sys.nowMs() / 1000
@@ -214,8 +242,14 @@ object Transfer {
                 pls["HP" + Random.nextBytes(8).hex()] = PlaylistData(title.ifEmpty { "Imported" }, items.take(5000), t)
                 n = n.copy(playlists = n.playlists + 1, videos = n.videos + items.size)
             }
+            // groups: a new name is added, one already there gets the channels it didn't have
+            val groups = l.groups.toMutableList()
+            for ((name, ids) in p.groups) {
+                val i = groups.indexOfFirst { it.name == name }
+                if (i < 0) groups += SubGroup(name, ids) else groups[i] = groups[i].copy(channels = (groups[i].channels + ids).distinct())
+            }
             l.copy(
-                subs = subs, hist = hist, pos = pos, playlists = pls,
+                subs = subs, hist = hist, pos = pos, playlists = pls, groups = groups,
                 wl = add(l.wl, p.wl), likes = add(l.likes, p.likes),
                 dislikes = (l.dislikes + p.dislikes).distinct(),
             )
