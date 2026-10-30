@@ -1,10 +1,12 @@
 package app.tubehaus.ui
 
+import app.tubehaus.patch.Patchable
 import app.tubehaus.engine.pad2
 import app.tubehaus.engine.oneDecimal
 import app.tubehaus.engine.Sys
 import app.tubehaus.engine.Video
 
+@Patchable
 fun duration(sec: Int): String {
     if (sec <= 0) return ""
     val h = sec / 3600
@@ -16,6 +18,7 @@ fun duration(sec: Int): String {
 fun durationMs(ms: Long) = duration((ms / 1000).toInt()).ifEmpty { "0:00" }
 
 /** "3 days ago" from epoch seconds. */
+@Patchable
 fun ago(epoch: Long): String {
     if (epoch <= 0) return ""
     val d = Sys.nowMs() / 1000 - epoch
@@ -30,6 +33,7 @@ fun ago(epoch: Long): String {
     return tr("{n} ${unit}s ago").replace("{n}", n.toString()).let { if (n == 1L) tr("1 $unit ago") else it }
 }
 
+@Patchable
 fun compact(n: Long): String = when {
     n >= 1_000_000_000 -> (oneDecimal(n / 1e9) + "B").replace(".0B", "B")
     n >= 1_000_000 -> (oneDecimal(n / 1e6) + "M").replace(".0M", "M")

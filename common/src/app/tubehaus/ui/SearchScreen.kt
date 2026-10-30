@@ -1,5 +1,8 @@
 package app.tubehaus.ui
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.clickable
@@ -68,7 +71,12 @@ fun SearchScreen(app: AppState, initial: String) {
         }
         query = t
         app.stack[app.stack.size - 1] = Screen.Search(t)
+        if (!app.store.settings.value.historyOff) app.store.settings.update { s ->
+            s.copy(recentSearches = (listOf(t) + s.recentSearches.filter { !it.equals(t, true) }).take(30))
+        }
     }
+
+    fun forget(q: String) = app.store.settings.update { s -> s.copy(recentSearches = s.recentSearches - q) }
 
     LaunchedEffect(text) {
         if (text == query || text.isBlank()) { suggestions = emptyList(); return@LaunchedEffect }
@@ -101,9 +109,26 @@ fun SearchScreen(app: AppState, initial: String) {
         if (!bottom) SearchBox()
         // the suggestions or the results; with the box at the bottom it sits under them
         Column(Modifier.weight(1f).fillMaxWidth()) {
-        if (suggestions.isNotEmpty()) {
+        // recent searches: all of them in an empty box, the ones that match above the suggestions while typing
+        val recent = prefs.recentSearches.filter { text.isBlank() || (it.startsWith(text.trim(), true) && !it.equals(text.trim(), true)) }
+            .take(if (text.isBlank()) 30 else 3)
+        val typing = text.isNotBlank() && text != query
+        if (suggestions.isNotEmpty() || (recent.isNotEmpty() && (text.isBlank() || typing))) {
             LazyColumn(Modifier.fillMaxSize()) {
-                items(suggestions) { s ->
+                if (text.isBlank()) item {
+                    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(tr("Recent searches"), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { app.store.settings.update { it.copy(recentSearches = emptyList()) } }) { Text(tr("Clear all")) }
+                    }
+                }
+                items(recent, key = { "r$it" }) { s ->
+                    Row(Modifier.fillMaxWidth().clickable { text = s; submit(s) }.padding(start = 20.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Sym.History.outline, null)
+                        Text(s, Modifier.weight(1f).padding(start = 16.dp, top = 12.dp, bottom = 12.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        IconButton(onClick = { forget(s) }) { Icon(Sym.Close.outline, tr("Remove")) }
+                    }
+                }
+                items(suggestions.filter { s -> recent.none { it.equals(s, true) } }, key = { "s$it" }) { s ->
                     Row(Modifier.fillMaxWidth().clickable { text = s; submit(s) }.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Sym.Search.outline, null)
                         Text(s, Modifier.padding(start = 16.dp))
