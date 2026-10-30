@@ -15,7 +15,7 @@ devices and the web version (optional).
 
 ARM64 (Raspberry Pi 4/5 and others): [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-arm64.deb) · [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-aarch64.rpm) · [tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-arm64.tar.gz)
 
-[Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · **Linux** · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
+[Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · **Linux** · [iPad / iPhone](https://github.com/biolend83/tubehaus/tree/ios-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
 </div>
 
