@@ -42,6 +42,7 @@ import app.tubehaus.data.SubGroup
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilterChip
 import app.tubehaus.engine.Video
+import app.tubehaus.engine.Sys
 import kotlinx.coroutines.launch
 
 // ---------------------------------------------------------------- subscriptions
@@ -62,6 +63,9 @@ fun SubsScreen(app: AppState) {
     val group = lib.groups.firstOrNull { it.name == set.subsGroup } ?: if (hideAll) lib.groups.first() else null
     val shown: Set<String> = group?.channels?.filter { it in lib.subs }?.toSet() ?: lib.subs.keys
     val tabs: @Composable () -> Unit = { GroupTabs(app, lib.groups, group?.name, hideAll) }
+    // typed words narrow the feed as you type (title or channel)
+    var query by remember { mutableStateOf("") }
+    val words = query.lowercase().split(' ').filter { it.isNotBlank() }
     if (lib.subs.isEmpty()) {
         Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(tr("Channels you subscribe to show up here. Subscriptions are kept on this device - no account needed."),
@@ -95,11 +99,26 @@ fun SubsScreen(app: AppState) {
         }
         return
     }
+    val base = items.filter { (!it.short || !app.noShorts) && it.channelId in shown }
+    // a group: its own short feed (unwatched, the last 7 days, every channel's newest first, at most 20)
+    val feed = if (group != null) groupFeed(base, lib.hist.mapTo(HashSet()) { it.id }) else base
     ItemGrid(
-        items.filter { (!it.short || !app.noShorts) && it.channelId in shown }, app, loading = loading,
+        feed.filter { v -> words.all { w -> w in v.title.lowercase() || w in v.author.lowercase() } }, app, loading = loading,
         header = {
             Column {
                 if (lib.groups.isNotEmpty()) tabs()
+                if (group != null) Text(
+                    tr("Unwatched, from the last 7 days: each channel's newest first, up to {n}").replace("{n}", "$GROUP_FEED_MAX"),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                OutlinedTextField(
+                    query, { query = it }, singleLine = true,
+                    placeholder = { Text(tr("Search this feed")) },
+                    leadingIcon = { Icon(Sym.Search.outline, null) },
+                    trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Sym.Close.outline, tr("Clear")) } },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                )
                 LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(lib.subs.entries.filter { it.key in shown }.sortedByDescending { it.value.at }.toList(), key = { it.key }) { (cid, s) ->
                         Column(Modifier.width(64.dp).tvClickable { app.go(Screen.Channel(cid, s.name)) }, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -115,6 +134,28 @@ fun SubsScreen(app: AppState) {
             }
         },
     )
+}
+
+private const val GROUP_FEED_MAX = 20
+
+/**
+ * A group's feed (asked for by a PocketTube user): only what you haven't watched from the last
+ * 7 days, the newest video of every channel first, then each one's second newest and so on, so one
+ * busy channel can't fill it; at most [GROUP_FEED_MAX], so it ends instead of scrolling on.
+ */
+private fun groupFeed(items: List<Video>, watched: Set<String>): List<Video> {
+    val since = Sys.nowMs() / 1000 - 7 * 86400
+    val byChannel = items.filter { it.id !in watched && (it.publishedAt == 0L || it.publishedAt >= since) }
+        .distinctBy { it.id }.groupBy { it.channelId }.values.map { l -> l.sortedByDescending { it.publishedAt } }
+    val out = ArrayList<Video>()
+    var round = 0
+    while (out.size < GROUP_FEED_MAX) {
+        val layer = byChannel.mapNotNull { it.getOrNull(round) }.sortedByDescending { it.publishedAt }
+        if (layer.isEmpty()) break
+        out += layer.take(GROUP_FEED_MAX - out.size)
+        round++
+    }
+    return out
 }
 
 /** The groups as tabs above the subscriptions: All (unless switched off), then each group. */
