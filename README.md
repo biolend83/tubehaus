@@ -11,7 +11,7 @@ there too.
 Have a TubeHaus server at home? Connect it in Settings and your library is shared with your other
 devices and the web version (optional).
 
-**[⬇ Android APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7.apk)** · **[⬇ Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7.msi)** · **[⬇ macOS](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-mac-arm64.dmg)** · **[⬇ Linux .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-amd64.deb)** · **[⬇ iPad / iPhone](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-ipad.ipa)** (0.5.7, beta)
+**[⬇ Android APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8.apk)** · **[⬇ Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8.msi)** · **[⬇ macOS](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-mac-arm64.dmg)** · **[⬇ Linux .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-linux-amd64.deb)** · **[⬇ iPad / iPhone](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-ipad.ipa)** (0.5.8, beta)
 
 [<img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="54">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%20%22io.github.biolend83.tubehaus%22%2C%20%22url%22%3A%20%22https%3A%2F%2Fgithub.com%2Fbiolend83%2Ftubehaus%22%2C%20%22author%22%3A%20%22biolend83%22%2C%20%22name%22%3A%20%22TubeHaus%22%2C%20%22additionalSettings%22%3A%20%22%7B%5C%22filterReleaseTitlesByRegEx%5C%22%3A%20%5C%22%5ETubeHaus%20%5C%22%2C%20%5C%22fallbackToOlderReleases%5C%22%3A%20true%2C%20%5C%22includePrereleases%5C%22%3A%20false%2C%20%5C%22apkFilterRegEx%5C%22%3A%20%5C%22TubeHaus-%5C%5C%5C%5Cd%5C%22%7D%22%7D)
 
@@ -84,7 +84,7 @@ libmpv on Windows, macOS and Linux, AVPlayer on iOS. Details for iOS are on the
 
 ## Install
 
-- **Android 8.0+** — [the APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7.apk)
+- **Android 8.0+** — [the APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8.apk)
   (beta). Open it on the phone and allow installing from your browser when asked.
   Updates: the app tells you itself, or use Obtainium: [one tap to add it](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%20%22io.github.biolend83.tubehaus%22%2C%20%22url%22%3A%20%22https%3A%2F%2Fgithub.com%2Fbiolend83%2Ftubehaus%22%2C%20%22author%22%3A%20%22biolend83%22%2C%20%22name%22%3A%20%22TubeHaus%22%2C%20%22additionalSettings%22%3A%20%22%7B%5C%22filterReleaseTitlesByRegEx%5C%22%3A%20%5C%22%5ETubeHaus%20%5C%22%2C%20%5C%22fallbackToOlderReleases%5C%22%3A%20true%2C%20%5C%22includePrereleases%5C%22%3A%20false%2C%20%5C%22apkFilterRegEx%5C%22%3A%20%5C%22TubeHaus-%5C%5C%5C%5Cd%5C%22%7D%22%7D) (already set up), or by hand:
   *Add app* → source URL `https://github.com/biolend83/tubehaus` → under *Filter release titles by
@@ -94,15 +94,15 @@ libmpv on Windows, macOS and Linux, AVPlayer on iOS. Details for iOS are on the
 - **Android TV / Google TV** — the same APK. In the *Downloader* app, enter the code **3155410**
   (or the address `aftv.news/3155410`): it always gives the newest version. Or use *Send Files to TV*; TubeHaus then shows on the TV's home screen. Settings → *TV mode* turns the
   TV layout on for boxes that don't say they are a TV.
-- **Windows 10/11** — [the installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7.msi) or [setup .exe](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-win-x64-setup.exe), or a
-  [portable .zip](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-win-x64-portable.zip) that needs no install; on Windows on ARM, the
-  [ARM .zip](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-win-arm64-portable.zip) (beta, mpv built in). Windows may warn that the publisher is unknown, because the installer
+- **Windows 10/11** — [the installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8.msi) or [setup .exe](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-win-x64-setup.exe), or a
+  [portable .zip](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-win-x64-portable.zip) that needs no install; on Windows on ARM, the
+  [ARM .zip](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-win-arm64-portable.zip) (beta, mpv built in). Windows may warn that the publisher is unknown, because the installer
   isn't code-signed: choose *More info* → *Run anyway*.
-- **macOS** — [Apple Silicon .dmg](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-mac-arm64.dmg) or [Intel .dmg](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-mac-x64.dmg) (beta;
+- **macOS** — [Apple Silicon .dmg](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-mac-arm64.dmg) or [Intel .dmg](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-mac-x64.dmg) (beta;
   .zip versions are on the release page).
   It uses Homebrew's mpv: `brew install mpv`. The app isn't signed by Apple yet, so the first time
   right-click it → *Open* → *Open*.
-- **iPad / iPhone (iOS 16+)** — [the .ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-ipad.ipa) (beta). Apple installs only apps it signed, so
+- **iPad / iPhone (iOS 16+)** — [the .ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-ipad.ipa) (beta). Apple installs only apps it signed, so
   you sign it yourself with **[Sideloadly](https://sideloadly.io/)** (free, Windows or Mac) and your Apple ID: connect the
   iPad with a cable, drop the .ipa into Sideloadly, enter your Apple ID, press *Start*. Then on the
   iPad: Settings → General → *VPN & Device Management* → trust your Apple ID, and turn on
@@ -110,10 +110,10 @@ libmpv on Windows, macOS and Linux, AVPlayer on iOS. Details for iOS are on the
   re-signed every 7 days (Sideloadly can do that by itself over Wi-Fi). It's the same app, built for
   iOS: Apple's player with picture-in-picture, background play and offline downloads. More on the
   [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app) branch.
-- **Linux (x86-64 and ARM64)** — [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-amd64.deb) for Debian/Ubuntu, [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-x86_64.rpm)
-  for Fedora/openSUSE, or [a tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-x64.tar.gz) to unpack anywhere and run `TubeHaus/bin/TubeHaus`.
-  ARM64 (Raspberry Pi 4/5 and others): [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-arm64.deb), [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-aarch64.rpm),
-  [tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-arm64.tar.gz).
+- **Linux (x86-64 and ARM64)** — [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-linux-amd64.deb) for Debian/Ubuntu, [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-linux-x86_64.rpm)
+  for Fedora/openSUSE, or [a tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-linux-x64.tar.gz) to unpack anywhere and run `TubeHaus/bin/TubeHaus`.
+  ARM64 (Raspberry Pi 4/5 and others): [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-linux-arm64.deb), [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-linux-aarch64.rpm),
+  [tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-linux-arm64.tar.gz).
   It uses your system's mpv: `sudo apt install libmpv2` (Fedora: `sudo dnf install mpv-libs`, Arch: `mpv`). New and not yet tested much: reports welcome.
 
 Don't want to re-sign every week? On iPhone and iPad the TubeHaus web app (the server version) needs no

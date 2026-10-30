@@ -24,7 +24,14 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,7 +54,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "0.5.7"
+const val VERSION = "0.5.8"
 
 @Composable
 fun SettingsScreen(app: AppState) {
@@ -267,8 +274,7 @@ private fun ServerDialog(app: AppState, close: () -> Unit) {
                     placeholder = { Text("tube.example.com") })
                 Text(tr("If the server asks for a login:"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
                 OutlinedTextField(user, { user = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(tr("User name")) })
-                OutlinedTextField(pass, { pass = it }, Modifier.fillMaxWidth().padding(top = 4.dp), singleLine = true,
-                    placeholder = { Text(tr("Password")) }, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+                PasswordField(app, pass, { pass = it }, Modifier.fillMaxWidth().padding(top = 4.dp))
                 error?.let { Text(serverProblem(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)) }
             }
         },
@@ -284,6 +290,24 @@ private fun ServerDialog(app: AppState, close: () -> Unit) {
         },
         dismissButton = { TextButton(enabled = !busy, onClick = close) { Text(tr("Cancel")) } },
     )
+}
+
+/**
+ * A password box that takes keys as typed: on the desktop the input method is off while it has
+ * the focus (with a Korean one on, a letter only arrived with the next key), and phones show
+ * their password keyboard, without suggestions.
+ */
+@Composable
+private fun PasswordField(app: AppState, value: String, onChange: (String) -> Unit, modifier: Modifier) {
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(focused) {
+        // after the text field has started its own input, which turns the input method back on
+        if (focused) { delay(80); app.platform.plainKeys(true) } else app.platform.plainKeys(false)
+    }
+    DisposableEffect(Unit) { onDispose { app.platform.plainKeys(false) } }
+    OutlinedTextField(value, onChange, modifier.onFocusChanged { focused = it.isFocused }, singleLine = true,
+        placeholder = { Text(tr("Password")) }, visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Password))
 }
 
 @Composable
