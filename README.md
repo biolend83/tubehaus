@@ -17,6 +17,8 @@ ARM64 (Raspberry Pi 4/5 and others): [.deb](https://github.com/biolend83/tubehau
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · **Linux** · [iPad / iPhone](https://github.com/biolend83/tubehaus/tree/ios-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
+<img src="docs/home.jpg" alt="TubeHaus home screen on Linux" width="800">
+
 </div>
 
 ## Disclaimer
