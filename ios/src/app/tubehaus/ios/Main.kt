@@ -55,22 +55,13 @@ fun MainViewController(): UIViewController {
 }
 
 /** what the TubeHaus folder in Files is for */
-private fun writeFolderNote() = runCatching {
-    okio.Path.Companion.run { (Engine.folder + "/README.txt").toPath() }.let { p ->
-        if (!okio.FileSystem.SYSTEM.exists(p)) okio.FileSystem.SYSTEM.write(p) {
-            writeUtf8(
-                "TubeHaus keeps its YouTube engine here (engine.js).
-
-" +
-                    "The app checks GitHub every few hours and puts a newer engine.js here by itself, so a fix for YouTube
-" +
-                    "reaches the iPad without reinstalling the app. You can also put an engine.js here yourself: the one
-" +
-                    "with the higher ENGINE_VERSION (this one or the app's built-in one) is used. Delete it to go back to
-" +
-                    "the built-in engine.
-",
-            )
-        }
-    }
+private fun writeFolderNote() {
+    val path = with(okio.Path.Companion) { (Engine.folder + "/README.txt").toPath() }
+    if (okio.FileSystem.SYSTEM.exists(path)) return
+    val note = "TubeHaus keeps its YouTube engine here (engine.js).\n\n" +
+        "The app checks GitHub every few hours and puts a newer engine.js here by itself, so a fix for YouTube\n" +
+        "reaches the iPad without reinstalling the app. You can also put an engine.js here yourself: the one\n" +
+        "with the higher ENGINE_VERSION (this one or the app's built-in one) is used. Delete it to go back to\n" +
+        "the built-in engine.\n"
+    runCatching { okio.FileSystem.SYSTEM.write(path) { writeUtf8(note) } }
 }

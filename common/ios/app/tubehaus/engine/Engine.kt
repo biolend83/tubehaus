@@ -110,9 +110,8 @@ object Engine {
         val id = lock.withLock {
             val c = ctx ?: load().also { ctx = it }
             val n = ++nextCall
-            c.globalObject?.setValue(args.toString(), forProperty = "__args")
-            c.globalObject?.setValue(env(), forProperty = "__env")
-            c.run("__run($n, ${JsonPrimitive(op)}, __args, __env)")
+            // strings go in as JSON string literals (valid JavaScript), so nothing crosses the bridge but text
+            c.run("__run($n, ${JsonPrimitive(op)}, ${JsonPrimitive(args.toString())}, ${JsonPrimitive(env())})")
             n
         }
         var idle = 0
@@ -135,10 +134,7 @@ object Engine {
             val answers = coroutineScope { reqs.map { r -> async { r.at("rid").str to answer(r) } }.awaitAll() }
             lock.withLock {
                 val c = ctx ?: return@withLock
-                for ((rid, a) in answers) {
-                    c.globalObject?.setValue(a, forProperty = "__in")
-                    c.run("__reply($rid, __in)")
-                }
+                for ((rid, a) in answers) c.run("__reply($rid, ${JsonPrimitive(a)})")
             }
         }
     }
