@@ -44,6 +44,17 @@ fun MainViewController(): UIViewController {
     // for the simulator check in CI: `-open <video id>` starts on that video
     val args = NSProcessInfo.processInfo.arguments.map { it.toString() }
     args.indexOf("-open").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { id -> state.watch(Video(id, "", "", "", 0)) }
+    // `-stress`: what a person does over and over (another video, full screen on and off), for the CI's screenshots
+    if ("-stress" in args) state.scope.launch {
+        kotlinx.coroutines.delay(5_000)
+        repeat(2) {
+            for (id in listOf("jNQXAC9IVRw", "aqz-KE-bpKQ", "dQw4w9WgXcQ")) {
+                state.watch(Video(id, "", "", "", 0)); kotlinx.coroutines.delay(12_000)
+                state.setFull(true); kotlinx.coroutines.delay(4_000)
+                state.setFull(false); kotlinx.coroutines.delay(3_000)
+            }
+        }
+    }
     return ComposeUIViewController {
         val settings by state.store.settings.state.collectAsState()
         // outside full screen the app stays clear of the status bar and the home indicator;

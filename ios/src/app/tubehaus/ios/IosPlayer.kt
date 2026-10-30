@@ -86,6 +86,29 @@ class IosPlayer : VideoPlayer {
     private var heightsJob: Job? = null
     private var capsJob: Job? = null
     private var cues by mutableStateOf<List<Cue>>(emptyList())
+    private var readAhead = false
+
+    /**
+     * The one picture of the player (one AVPlayerLayer, one picture-in-picture controller), moved into
+     * whichever place shows the video now: the video page, full screen, Shorts. A new layer and PiP
+     * controller each time the video changed place piled up on the same AVPlayer and fought over it
+     * (a black or misplaced picture, PiP that stopped working) after going back and forth a few times.
+     */
+    private val picture by lazy { PlayerView(av) }
+    /** the places on screen, newest last: the newest one gets the picture */
+    private val hosts = ArrayList<PlayerHost>()
+
+    private fun place() {
+        val h = hosts.lastOrNull() ?: return
+        if (picture.superview !== h) h.addSubview(picture)
+        picture.setFrame(h.bounds)
+    }
+
+    private fun hostMoved(h: PlayerHost, onScreen: Boolean) {
+        hosts.remove(h)
+        if (onScreen) hosts.add(h)
+        place()
+    }
 
     init {
         // sound even with the silent switch on, and the audio keeps playing with the screen locked
@@ -142,6 +165,7 @@ class IosPlayer : VideoPlayer {
         val item = if (headers == null) AVPlayerItem(uRL = NSURL(string = hls))
             else AVPlayerItem(asset = AVURLAsset(uRL = NSURL(string = hls), options = mapOf<Any?, Any>("AVURLAssetHTTPHeaderFieldsKey" to headers)))
         limit(item, o.maxHeight)
+        if (readAhead) item.preferredForwardBufferDuration = 1200.0
         av.replaceCurrentItemWithPlayerItem(item)
         startAt = o.startMs
         st.value = PlayerState(videoId = s.id, buffering = true, positionMs = o.startMs, durationMs = s.lengthSec * 1000L,
@@ -210,6 +234,7 @@ class IosPlayer : VideoPlayer {
 
     override fun setReadAhead(long: Boolean) {
         // 0 lets AVPlayer choose (a few seconds to a minute)
+        readAhead = long
         av.currentItem?.preferredForwardBufferDuration = if (long) 1200.0 else 0.0
     }
 
@@ -227,7 +252,7 @@ class IosPlayer : VideoPlayer {
     override fun View(modifier: Modifier) {
         val s by st.collectAsState()
         BoxWithConstraints(modifier.background(Color.Black)) {
-            UIKitView(factory = { PlayerView(av) }, modifier = Modifier.fillMaxSize())
+            UIKitView(factory = { PlayerHost(::hostMoved) }, modifier = Modifier.fillMaxSize())
             val line = if (s.captions != null) cues.lastOrNull { s.positionMs >= it.start && s.positionMs < it.end }?.text else null
             // sized to the player like Android's (about 1/19 of its height): a fixed size was tiny on an iPad in full screen
             val size = (maxHeight.value / 19f).coerceIn(16f, 44f)
@@ -237,6 +262,24 @@ class IosPlayer : VideoPlayer {
                     .background(Color(0xB3000000)).padding(horizontal = (size / 2).dp, vertical = 2.dp),
             )
         }
+    }
+}
+
+/** a place for the player's picture; it tells the player when it comes onto the screen or leaves it, and when it changes size */
+private class PlayerHost(private val moved: (PlayerHost, Boolean) -> Unit) : UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)) {
+    init {
+        backgroundColor = UIColor.blackColor
+        userInteractionEnabled = false
+    }
+
+    override fun didMoveToWindow() {
+        super.didMoveToWindow()
+        moved(this, window != null)
+    }
+
+    override fun layoutSubviews() {
+        super.layoutSubviews()
+        subviews.forEach { (it as? UIView)?.setFrame(bounds) }
     }
 }
 

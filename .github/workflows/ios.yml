@@ -101,7 +101,12 @@ jobs:
           xcrun simctl launch "$udid" io.github.biolend83.tubehaus -open jNQXAC9IVRw; sleep 45
           xcrun simctl io "$udid" screenshot shots/4-patched.png
           ls "$data/Documents"
-          xcrun simctl spawn "$udid" log show --last 5m --style compact --predicate 'process == "TubeHaus"' > shots/app.log 2>&1 || true
+          # over and over: three videos, full screen on and off, twice (the app does it by itself with -stress)
+          rm -f "$data/Documents/patch.js"
+          xcrun simctl launch "$udid" io.github.biolend83.tubehaus -stress
+          for i in $(seq -w 1 16); do sleep 8; xcrun simctl io "$udid" screenshot shots/5-stress-$i.png; done
+          xcrun simctl terminate "$udid" io.github.biolend83.tubehaus || true
+          xcrun simctl spawn "$udid" log show --last 8m --style compact --predicate 'process == "TubeHaus"' > shots/app.log 2>&1 || true
           tail -60 shots/app.log
           ls ~/Library/Logs/DiagnosticReports/ | grep -i tubehaus && cp ~/Library/Logs/DiagnosticReports/*TubeHaus* shots/ || echo "no crash report"
       - uses: actions/upload-artifact@v4
