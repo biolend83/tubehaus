@@ -14,7 +14,7 @@
 // collects those with __drain(), answers each with __reply(rid, json), and reads the outcome
 // with __take(id).
 
-var ENGINE_VERSION = 1;
+var ENGINE_VERSION = 2;
 
 // ------------------------------------------------------------------------------ host bridge
 var ENV = { hl: "en", gl: "US", players: null };
@@ -198,6 +198,8 @@ var ITEM_KEYS = {
 };
 var ID = /^[\w-]{11}$/;
 var UC = /^UC[\w-]{22}$/;
+var VIEWS = /\bviews?\b|\bwatching\b|조회수|시청 ?중/i;
+var AGO = /\bago\b|전$|^streamed|스트리밍/i;
 
 function video(o) {
   return {
@@ -306,10 +308,14 @@ function lockup(v) {
     var author = "", stats = [];
     if (rows && rows.length === 1) stats = rows[0];
     else if (rows && rows.length > 1) { author = rows[0][0]; stats = rows[1]; }
+    // where the views and the date sit differs by page and experiment: by what they say first, position second
+    var parts = rows ? [].concat.apply([], rows) : [];
+    var viewsText = parts.filter(function (p) { return VIEWS.test(p); })[0] || stats[0] || "";
+    var dateText = parts.filter(function (p) { return p !== viewsText && AGO.test(p); })[0] || (stats[1] !== viewsText ? stats[1] : "") || "";
     return video({
       id: id, title: title, author: author, channelId: channelId,
       lengthSec: badgeText.indexOf(":") >= 0 ? secondsOf(badgeText) : 0,
-      viewsText: stats[0] || "", views: countOf(stats[0]), publishedText: stats[1] || "",
+      viewsText: viewsText, views: countOf(viewsText), publishedText: dateText,
       live: live, avatar: bestImage(at(meta, "image")),
     });
   }
