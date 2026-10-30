@@ -2,6 +2,7 @@ package app.tubehaus.ios
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -225,13 +226,15 @@ class IosPlayer : VideoPlayer {
     @Composable
     override fun View(modifier: Modifier) {
         val s by st.collectAsState()
-        Box(modifier.background(Color.Black)) {
+        BoxWithConstraints(modifier.background(Color.Black)) {
             UIKitView(factory = { PlayerView(av) }, modifier = Modifier.fillMaxSize())
             val line = if (s.captions != null) cues.lastOrNull { s.positionMs >= it.start && s.positionMs < it.end }?.text else null
+            // sized to the player like Android's (about 1/19 of its height): a fixed size was tiny on an iPad in full screen
+            val size = (maxHeight.value / 19f).coerceIn(16f, 44f)
             if (line != null) Text(
-                line, color = Color.White, fontSize = 18.sp, textAlign = TextAlign.Center,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 24.dp, end = 24.dp, bottom = 28.dp)
-                    .background(Color(0xB3000000)).padding(horizontal = 8.dp, vertical = 2.dp),
+                line, color = Color.White, fontSize = size.sp, lineHeight = (size * 1.25f).sp, textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 24.dp, end = 24.dp, bottom = (size * 1.4f).dp)
+                    .background(Color(0xB3000000)).padding(horizontal = (size / 2).dp, vertical = 2.dp),
             )
         }
     }
