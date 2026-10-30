@@ -97,6 +97,8 @@ data class Settings(
     val subsHideAll: Boolean = false,
     /** the tab Subscriptions opens on: a group's name, "" = all */
     val subsGroup: String = "",
+    /** what you searched for lately, newest first (none kept while history is off) */
+    val recentSearches: List<String> = emptyList(),
     val hideShorts: Boolean = false,
     val hideRelated: Boolean = false,
     /** a TubeHaus server the library syncs with ("" = none, see ServerSync), and its login if it has one */
