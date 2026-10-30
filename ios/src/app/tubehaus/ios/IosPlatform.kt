@@ -35,7 +35,6 @@ class IosPlatform : Platform {
     override val dataDir: Path = folder(NSApplicationSupportDirectory) / "tubehaus"
     override val cacheDir: Path = folder(NSCachesDirectory)
     override val touch = true
-    override val canDownload = false
     override val player = IosPlayer()
 
     /** the window's view controller, to present sheets from; set by MainViewController */
