@@ -58,6 +58,7 @@ import platform.AVFoundation.rate
 import platform.AVFoundation.replaceCurrentItemWithPlayerItem
 import platform.AVFoundation.seekToTime
 import platform.AVFoundation.timeControlStatus
+import platform.CoreGraphics.CGRectEqualToRect
 import platform.CoreGraphics.CGRectMake
 import platform.CoreGraphics.CGSizeMake
 import platform.CoreMedia.CMTime
@@ -101,7 +102,7 @@ class IosPlayer : VideoPlayer {
     private fun place() {
         val h = hosts.lastOrNull() ?: return
         if (picture.superview !== h) h.addSubview(picture)
-        picture.setFrame(h.bounds)
+        if (!CGRectEqualToRect(picture.frame, h.bounds)) picture.setFrame(h.bounds)
     }
 
     private fun hostMoved(h: PlayerHost, onScreen: Boolean) {
@@ -279,7 +280,8 @@ private class PlayerHost(private val moved: (PlayerHost, Boolean) -> Unit) : UIV
 
     override fun layoutSubviews() {
         super.layoutSubviews()
-        subviews.forEach { (it as? UIView)?.setFrame(bounds) }
+        // only when the size really changed: setting a frame lays things out again
+        subviews.forEach { v -> (v as? UIView)?.takeIf { !CGRectEqualToRect(it.frame, bounds) }?.setFrame(bounds) }
     }
 }
 
@@ -302,6 +304,7 @@ private class PlayerView(player: AVPlayer) : UIView(frame = CGRectMake(0.0, 0.0,
 
     override fun layoutSubviews() {
         super.layoutSubviews()
+        if (CGRectEqualToRect(picture.frame, bounds)) return
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         picture.frame = bounds

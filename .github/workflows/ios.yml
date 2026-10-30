@@ -73,6 +73,8 @@ jobs:
           xcodebuild -project ios/app/TubeHaus.xcodeproj -scheme TubeHaus -sdk iphonesimulator -configuration Debug \
             -derivedDataPath build/xcode ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO build
       - name: Run it on an iPad
+        # stopped here if it hangs, so the screenshots taken so far still get uploaded
+        timeout-minutes: 25
         run: |
           set -x
           app=build/xcode/Build/Products/Debug-iphonesimulator/TubeHaus.app
@@ -80,6 +82,8 @@ jobs:
           xcrun simctl boot "$udid"; xcrun simctl bootstatus "$udid" -b
           xcrun simctl install "$udid" "$app"
           mkdir -p shots
+          # how busy the Mac is, every 20 s (a hang that starved the runner left no log at all)
+          (while true; do date >> shots/top.txt; top -l 1 -o cpu -n 6 -stats pid,command,cpu,mem | tail -8 >> shots/top.txt; sleep 20; done) &
           # first start: the language question
           xcrun simctl launch "$udid" io.github.biolend83.tubehaus; sleep 25
           xcrun simctl io "$udid" screenshot shots/1-first-start.png
@@ -103,8 +107,10 @@ jobs:
           ls "$data/Documents"
           # over and over: three videos, full screen on and off, twice (the app does it by itself with -stress)
           rm -f "$data/Documents/patch.js"
+          # 360p: this checks the picture moving between places, not how fast the simulator decodes
+          echo '{"lang":"en","welcomed":true,"maxHeight":360}' > "$data/Library/Application Support/tubehaus/settings.json"
           xcrun simctl launch "$udid" io.github.biolend83.tubehaus -stress
-          for i in $(seq -w 1 16); do sleep 8; xcrun simctl io "$udid" screenshot shots/5-stress-$i.png; done
+          for i in $(seq -w 1 16); do sleep 8; xcrun simctl io "$udid" screenshot shots/5-stress-$i.png || echo "screenshot $i failed"; done
           xcrun simctl terminate "$udid" io.github.biolend83.tubehaus || true
           xcrun simctl spawn "$udid" log show --last 8m --style compact --predicate 'process == "TubeHaus"' > shots/app.log 2>&1 || true
           tail -60 shots/app.log
