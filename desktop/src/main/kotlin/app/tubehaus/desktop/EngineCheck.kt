@@ -26,6 +26,29 @@ fun main() = runBlocking {
             println("FAIL %-14s %s".format(name, e))
         }
     }
+    // TH_SERVER=https://tube.example.com (TH_SERVER_USER, TH_SERVER_PASS): videos through that TubeHaus server instead
+    System.getenv("TH_SERVER")?.let { server ->
+        app.tubehaus.engine.ServerVideo.set(server, System.getenv("TH_SERVER_USER") ?: "", System.getenv("TH_SERVER_PASS") ?: "")
+        fun first(url: String): String = Net.client.newCall(Request.Builder().url(url).header("Range", "bytes=0-999").build()).execute()
+            .use { r -> require(r.code == 206) { "HTTP ${r.code} $url" }; "${r.body!!.bytes().size} B ${r.header("Content-Type")}" }
+        check("server stream") {
+            val s = YouTube.stream("jNQXAC9IVRw")
+            require(s.client == "server") { "came from ${s.client}" }
+            val v = s.video.maxBy { it.height }
+            val a = s.audio.maxBy { it.bitrate }
+            "${s.title} | ${s.author} ${s.lengthSec}s, ${s.video.size}v/${s.audio.size}a, top ${v.height}p ${v.codecs} (init ${v.initRange}); video ${first(v.url)}; audio ${first(a.url)}"
+        }
+        check("server captions") {
+            val c = YouTube.stream("jNQXAC9IVRw").captions.first()
+            val text = Net.client.newCall(Request.Builder().url(YouTube.captionUrl(c)).build()).execute().use { r -> require(r.isSuccessful) { "HTTP ${r.code}" }; r.body!!.string() }
+            val ko = Net.client.newCall(Request.Builder().url(YouTube.captionUrl(c, "ko")).build()).execute().use { r -> require(r.isSuccessful) { "HTTP ${r.code}" }; r.body!!.string() }
+            "${c.lang} ${c.name}: ${text.lines().filter { it.isNotBlank() }.take(4).joinToString(" / ")} | ko: ${ko.lines().filter { it.isNotBlank() }.drop(1).take(2).joinToString(" / ")}"
+        }
+        check("server dash") { Dash.manifest(YouTube.stream("dQw4w9WgXcQ"), listOf("vp9", "avc1")).length.toString() + " chars" }
+        println(if (fails == 0) "\nall good" else "\n$fails failed")
+        Net.client.dispatcher.executorService.shutdown()
+        return@runBlocking
+    }
     check("search") {
         val p = YouTube.search("lofi hip hop")
         val v = p.items.filterIsInstance<Video>()

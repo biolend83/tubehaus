@@ -77,6 +77,18 @@ class DesktopPlatform : Platform {
         WinFrame.titleBar(f, (background.red * 255).toInt(), (background.green * 255).toInt(), (background.blue * 255).toInt())
     }
 
+    // the window's drawing surface, which has the keyboard focus, takes keys with or without the input method
+    // (the one turned off is remembered: by the time it is turned back on the focus may be elsewhere)
+    private var plain: java.awt.Component? = null
+    override fun plainKeys(on: Boolean) {
+        if (on) {
+            plain = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner?.apply { enableInputMethods(false) }
+        } else {
+            plain?.enableInputMethods(true)
+            plain = null
+        }
+    }
+
     // an invisible pointer while the video plays with its controls hidden
     override val blankPointer = PointerIcon(
         Toolkit.getDefaultToolkit().createCustomCursor(BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB), Point(0, 0), "none"),
