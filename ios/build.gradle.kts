@@ -8,6 +8,11 @@ plugins {
     id("org.jetbrains.compose")
 }
 
+dependencies {
+    // TubePatch: @Patchable functions get the check that lets patch.js replace them
+    add("kotlinNativeCompilerPluginClasspath", project(":tubepatch-plugin"))
+}
+
 kotlin {
     // iosArm64: iPads and iPhones; iosX64: the simulator on an Intel Mac (the CI check)
     listOf(iosArm64(), iosX64()).forEach {

@@ -15,6 +15,9 @@ targets:
       # the YouTube engine, built in (a newer one may sit in Files → On My iPad → TubeHaus)
       - path: ../engine/engine.js
         buildPhase: resources
+      # TubePatch replacements, built in (a newer patch.js may sit in the same folder)
+      - path: ../patch/patch.js
+        buildPhase: resources
     dependencies:
       - framework: ../build/kit/TubeHausKit.framework
         embed: false

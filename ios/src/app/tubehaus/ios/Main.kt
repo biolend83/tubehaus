@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.ComposeUIViewController
 import app.tubehaus.data.Store
 import app.tubehaus.engine.Engine
+import app.tubehaus.patch.TubePatch
 import app.tubehaus.engine.Video
 import kotlinx.coroutines.launch
 import app.tubehaus.ui.App
@@ -34,11 +35,12 @@ fun MainViewController(): UIViewController {
     center.addObserverForName(UIApplicationDidEnterBackgroundNotification, null, NSOperationQueue.mainQueue) { _ -> state.store.flush() }
     center.addObserverForName(UIApplicationWillEnterForegroundNotification, null, NSOperationQueue.mainQueue) { _ ->
         state.sync.refreshSoon()
-        state.scope.launch { Engine.update() }
+        state.scope.launch { Engine.update(); TubePatch.update() }
     }
     // the YouTube engine (engine.js): a note in its folder, and a newer one from GitHub if there is one
     writeFolderNote()
-    state.scope.launch { Engine.update() }
+    TubePatch.load()
+    state.scope.launch { Engine.update(); TubePatch.update() }
     // for the simulator check in CI: `-open <video id>` starts on that video
     val args = NSProcessInfo.processInfo.arguments.map { it.toString() }
     args.indexOf("-open").takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }?.let { id -> state.watch(Video(id, "", "", "", 0)) }
@@ -62,6 +64,7 @@ private fun writeFolderNote() {
         "The app checks GitHub every few hours and puts a newer engine.js here by itself, so a fix for YouTube\n" +
         "reaches the iPad without reinstalling the app. You can also put an engine.js here yourself: the one\n" +
         "with the higher ENGINE_VERSION (this one or the app's built-in one) is used. Delete it to go back to\n" +
-        "the built-in engine.\n"
+        "the built-in engine.\n\n" +
+        "patch.js works the same way: replacements for some of the app's own functions (TubePatch).\n"
     runCatching { okio.FileSystem.SYSTEM.write(path) { writeUtf8(note) } }
 }

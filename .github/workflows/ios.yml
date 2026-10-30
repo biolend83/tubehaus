@@ -91,9 +91,16 @@ jobs:
           xcrun simctl launch "$udid" io.github.biolend83.tubehaus; sleep 40
           xcrun simctl io "$udid" screenshot shots/2-home.png
           xcrun simctl terminate "$udid" io.github.biolend83.tubehaus || true
-          # straight to a video
+          # straight to a video (its related list comes from engine.js)
           xcrun simctl launch "$udid" io.github.biolend83.tubehaus -open jNQXAC9IVRw; sleep 45
           xcrun simctl io "$udid" screenshot shots/3-video.png
+          xcrun simctl terminate "$udid" io.github.biolend83.tubehaus || true
+          # TubePatch: a patch.js in the app's folder replaces the Kotlin duration() → "PATCHED <sec>" on the thumbnails
+          mkdir -p "$data/Documents"
+          echo 'var PATCH_VERSION = 99; var PATCHES = { "app.tubehaus.ui.duration": function (sec) { return "PATCHED " + sec; } };' > "$data/Documents/patch.js"
+          xcrun simctl launch "$udid" io.github.biolend83.tubehaus -open jNQXAC9IVRw; sleep 45
+          xcrun simctl io "$udid" screenshot shots/4-patched.png
+          ls "$data/Documents"
           xcrun simctl spawn "$udid" log show --last 5m --style compact --predicate 'process == "TubeHaus"' > shots/app.log 2>&1 || true
           tail -60 shots/app.log
           ls ~/Library/Logs/DiagnosticReports/ | grep -i tubehaus && cp ~/Library/Logs/DiagnosticReports/*TubeHaus* shots/ || echo "no crash report"
