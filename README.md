@@ -15,6 +15,8 @@ devices and the web version (optional).
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · **Windows** · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · [iPad / iPhone](https://github.com/biolend83/tubehaus/tree/ios-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
+<img src="docs/home.jpg" alt="TubeHaus home screen on Windows" width="800">
+
 </div>
 
 ## Disclaimer
