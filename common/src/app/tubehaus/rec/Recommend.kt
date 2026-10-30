@@ -1,5 +1,6 @@
 package app.tubehaus.rec
 
+import app.tubehaus.patch.Patchable
 import app.tubehaus.data.Meta
 import app.tubehaus.data.Store
 import app.tubehaus.data.Taste
@@ -41,6 +42,7 @@ object Learn {
     private val STOP = setOf("shorts", "short", "youtubeshorts", "viral", "fyp", "trending", "video", "youtube", "new", "official")
 
     /** Words that describe a video: its tags and the #hashtags in its title. */
+    @Patchable
     fun tokens(title: String, keywords: List<String> = emptyList()): List<String> {
         val tags = Regex("#([^\\s#]{2,40})").findAll(title).map { it.groupValues[1] }.toList()
         return (keywords.take(15) + tags).map { it.trim().lowercase().removePrefix("#") }
@@ -48,6 +50,7 @@ object Learn {
     }
 
     /** How much one viewing says you liked it: skipped < 0 < watched < finished < replayed < liked. */
+    @Patchable
     fun engagement(watched: Double, length: Double, liked: Boolean = false, disliked: Boolean = false): Double {
         val len = length.coerceAtLeast(1.0)
         val ratio = watched.coerceAtLeast(0.0) / len

@@ -18,7 +18,7 @@ interface Platform {
     val touch: Boolean
     /** a TV (Android TV, Google TV): the remote moves a visible focus, and videos fill the screen */
     val tv: Boolean get() = false
-    /** videos can be saved to watch without internet (not on iOS, whose player takes only HLS) */
+    /** videos can be saved to watch without internet (every app does; a platform without it can say so) */
     val canDownload: Boolean get() = true
     val player: VideoPlayer
 
