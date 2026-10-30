@@ -42,7 +42,18 @@ object YouTube {
     suspend fun search(query: String, filter: Filter = Filter.ALL): Page<Item> = itemPage(run("search", query, filter.params))
     suspend fun searchMore(token: String): Page<Item> = itemPage(run("searchMore", token))
     suspend fun suggestions(q: String): List<String> = if (q.isBlank()) emptyList() else run("suggestions", q).arr.mapNotNull { it.str }
-    suspend fun stream(id: String): Stream = stream(run("stream", id))
+    /**
+     * Through the connected TubeHaus server when there is one (its HLS list, see
+     * [ServerVideo.streamHls]), from this device when there isn't or the server can't.
+     */
+    suspend fun stream(id: String): Stream {
+        if (!ServerVideo.on) return stream(run("stream", id))
+        return try {
+            ServerVideo.streamHls(id)
+        } catch (e: YtError) {
+            try { stream(run("stream", id)) } catch (x: Exception) { if (x is kotlinx.coroutines.CancellationException) throw x; throw e }
+        }
+    }
     suspend fun details(id: String): Details = details(run("details", id))
     suspend fun relatedMore(token: String): Page<Item> = itemPage(run("relatedMore", token))
     suspend fun browseMore(token: String): Page<Item> = itemPage(run("browseMore", token))
@@ -96,7 +107,7 @@ object YouTube {
 
     /** WebVTT text of a caption track, optionally machine-translated to [to]. */
     fun captionUrl(c: Caption, to: String? = null): String =
-        c.url + "&fmt=vtt" + (to?.takeIf { it != c.lang.substringBefore('-') }?.let { "&tlang=$it" } ?: "")
+        ServerVideo.captionUrl(c, to) ?: c.url + "&fmt=vtt" + (to?.takeIf { it != c.lang.substringBefore('-') }?.let { "&tlang=$it" } ?: "")
 
     // ------------------------------------------------------------------ JSON → the app's types
     private fun itemPage(e: JsonElement?) = Page(e.at("items").arr.mapNotNull(::item), e.at("next").str)

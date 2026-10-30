@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.tubehaus.data.JsonFile
 import app.tubehaus.engine.Net
+import app.tubehaus.engine.ServerVideo
 import app.tubehaus.engine.Stream
 import app.tubehaus.engine.Sys
 import app.tubehaus.engine.Video
@@ -101,7 +102,7 @@ class Offline(private val app: AppState) {
                 val variants = Regex("BANDWIDTH=(\\d+)[^\\n]*RESOLUTION=\\d+x(\\d+)").findAll(Net.get(hls))
                     .map { it.groupValues[2].toInt() to it.groupValues[1].toLong() }.toList()
                 val pick = variants.filter { it.first <= maxHeight }.maxByOrNull { it.first } ?: variants.minByOrNull { it.first }
-                val asset = AVURLAsset(uRL = NSURL(string = hls), options = null)
+                val asset = AVURLAsset(uRL = NSURL(string = hls), options = ServerVideo.headersFor(hls)?.let { mapOf<Any?, Any>("AVURLAssetHTTPHeaderFieldsKey" to it) })
                 val options = pick?.let { mapOf<Any?, Any>(AVAssetDownloadTaskMinimumRequiredMediaBitrateKey to NSNumber(longLong = it.second)) }
                 val task = session.assetDownloadTaskWithURLAsset(asset, assetTitle = s.title.ifEmpty { v.title }, assetArtworkData = null, options = options)
                     ?: error(tr("This video can't be downloaded"))

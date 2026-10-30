@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.IntSize
 import app.tubehaus.engine.Caption
 import app.tubehaus.engine.Format
 import app.tubehaus.engine.Net
+import app.tubehaus.engine.ServerVideo
 import app.tubehaus.engine.Stream
 import app.tubehaus.engine.YouTube
 import app.tubehaus.ui.PlayOptions
@@ -302,6 +303,8 @@ class MpvPlayer : VideoPlayer {
         set("speed", opts.speed.toString())
         set("pause", if (opts.autoplay) "no" else "yes")
         set("force-media-title", opts.title.ifEmpty { s.title })
+        // a live stream from the connected server is opened by mpv itself and needs the server's login
+        set("http-header-fields", ServerVideo.authFor(url)?.let { "Authorization: $it" } ?: "")
         cmd("loadfile", url, "replace")
     }
 

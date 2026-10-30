@@ -15,7 +15,7 @@ import kotlinx.coroutines.CancellationException
 
 /**
  * The one HTTP client of the app on iOS (Apple's URLSession, through Ktor). The same two calls as
- * the OkHttp one in common/jvm; everything goes straight from this device to YouTube.
+ * the OkHttp one in common/jvm: to YouTube from this device, or to the connected TubeHaus server.
  */
 object Net {
     val client = HttpClient(Darwin) {
@@ -62,7 +62,8 @@ object Net {
         val r: HttpResponse = try {
             client.request(url) {
                 this.method = method
-                headers.forEach { (k, v) -> header(k, v) }
+                ServerVideo.authFor(url)?.takeIf { headers.keys.none { it.equals("Authorization", true) } }?.let { header("Authorization", it) }
+                headers.filterValues { it.isNotEmpty() }.forEach { (k, v) -> header(k, v) }
                 if (body != null) { contentType(ContentType.Application.Json); setBody(body) }
             }
         } catch (e: CancellationException) {

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.UIKitView
 import app.tubehaus.engine.Caption
 import app.tubehaus.engine.Net
+import app.tubehaus.engine.ServerVideo
 import app.tubehaus.engine.Stream
 import app.tubehaus.engine.YouTube
 import app.tubehaus.ui.PlayOptions
@@ -39,6 +40,7 @@ import platform.AVFoundation.AVLayerVideoGravityResizeAspect
 import platform.AVKit.AVPictureInPictureController
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
+import platform.AVFoundation.AVURLAsset
 import platform.AVFoundation.AVPlayerItemStatusFailed
 import platform.AVFoundation.AVPlayerItemStatusReadyToPlay
 import platform.AVFoundation.AVPlayerLayer
@@ -134,7 +136,10 @@ class IosPlayer : VideoPlayer {
             st.value = PlayerState(videoId = s.id, error = "This video has no stream the iPad can play")
             return
         }
-        val item = AVPlayerItem(uRL = NSURL(string = hls))
+        // from the connected server, the list and every piece need its login
+        val headers = ServerVideo.headersFor(hls)
+        val item = if (headers == null) AVPlayerItem(uRL = NSURL(string = hls))
+            else AVPlayerItem(asset = AVURLAsset(uRL = NSURL(string = hls), options = mapOf<Any?, Any>("AVURLAssetHTTPHeaderFieldsKey" to headers)))
         limit(item, o.maxHeight)
         av.replaceCurrentItemWithPlayerItem(item)
         startAt = o.startMs

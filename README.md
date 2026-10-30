@@ -7,7 +7,7 @@
 The same TubeHaus app as on Android and the desktop, built for iOS. It talks to YouTube directly,
 keeps your subscriptions, history and playlists on the iPad, and works out recommendations there too.
 
-**[⬇ TubeHaus-0.5.7-ipad.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-ipad.ipa)** (iOS 16+, beta) · install it with **[Sideloadly](https://sideloadly.io/)**
+**[⬇ TubeHaus-0.5.8-ipad.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-ipad.ipa)** (iOS 16+, beta) · install it with **[Sideloadly](https://sideloadly.io/)**
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · **iPad / iPhone** · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
@@ -35,7 +35,7 @@ There is no jailbreak and no paid developer account, and your Apple ID only goes
 
 ## Install
 
-1. Download **[TubeHaus-0.5.7-ipad.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-ipad.ipa)** and install **[Sideloadly](https://sideloadly.io/)** on your PC or Mac.
+1. Download **[TubeHaus-0.5.8-ipad.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-ipad.ipa)** and install **[Sideloadly](https://sideloadly.io/)** on your PC or Mac.
 2. Connect the iPad with a cable (tap *Trust This Computer* on the iPad if it asks).
 3. Drop the .ipa into Sideloadly, enter your Apple ID and press **Start**.
 4. On the iPad: Settings → General → **VPN & Device Management** → tap your Apple ID → *Trust*.
