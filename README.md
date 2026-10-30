@@ -1,6 +1,6 @@
 <div align="center">
 
-# TubeHaus for Android, Windows, macOS and Linux
+# TubeHaus for Android, Windows, macOS, Linux and iPad
 
 **YouTube on your own terms — and everything runs on your device.**
 
@@ -11,11 +11,11 @@ there too.
 Have a TubeHaus server at home? Connect it in Settings and your library is shared with your other
 devices and the web version (optional).
 
-**[⬇ Android APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7.apk)** · **[⬇ Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7.msi)** · **[⬇ macOS](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-mac-arm64.dmg)** · **[⬇ Linux .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-amd64.deb)** (0.5.4, beta)
+**[⬇ Android APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7.apk)** · **[⬇ Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7.msi)** · **[⬇ macOS](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-mac-arm64.dmg)** · **[⬇ Linux .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-amd64.deb)** · **[⬇ iPad / iPhone](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-ipad.ipa)** (0.5.7, beta)
 
 [<img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="54">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%20%22io.github.biolend83.tubehaus%22%2C%20%22url%22%3A%20%22https%3A%2F%2Fgithub.com%2Fbiolend83%2Ftubehaus%22%2C%20%22author%22%3A%20%22biolend83%22%2C%20%22name%22%3A%20%22TubeHaus%22%2C%20%22additionalSettings%22%3A%20%22%7B%5C%22filterReleaseTitlesByRegEx%5C%22%3A%20%5C%22%5ETubeHaus%20%5C%22%2C%20%5C%22fallbackToOlderReleases%5C%22%3A%20true%2C%20%5C%22includePrereleases%5C%22%3A%20false%2C%20%5C%22apkFilterRegEx%5C%22%3A%20%5C%22TubeHaus-%5C%5C%5C%5Cd%5C%22%7D%22%7D)
 
-**Android** · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
+**Android** · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · [iPad / iPhone](https://github.com/biolend83/tubehaus/tree/ios-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
 </div>
 
@@ -52,6 +52,8 @@ devices and the web version (optional).
   decodes), captions with auto-translate, speed, resume where you stopped.
   - Android: background play with notification controls, picture-in-picture, opens YouTube links,
     swipe on the left/right in full screen for brightness/volume, and a wide layout on tablets.
+  - iPad / iPhone: Apple's own player (AVPlayer, up to 4K), background play, picture-in-picture,
+    offline downloads, and a YouTube engine that updates itself without reinstalling the app.
   - Windows, macOS, Linux: mpv with GPU decoding, the same controls as on the phone plus a volume bar,
     keyboard shortcuts (space/K, arrows, J/L, F, M) and the mouse wheel for Shorts.
 - **Comments beside the video** — on tablets and desktops in a side panel, on phones under the
@@ -75,8 +77,10 @@ through a TubeHaus server. If you connect your own (Settings → *TubeHaus serve
 (subscriptions, history, playlists) is synced with it.
 
 One set of Kotlin sources (`common/src`) is compiled twice: by the Android app with Jetpack
-Compose and by the desktop app with Compose for Desktop. Only the player differs —
-ExoPlayer (Media3) on Android, libmpv on Windows, macOS and Linux.
+Compose and by the desktop app with Compose for Desktop, and a third time by Kotlin/Native with
+Compose Multiplatform for iPad and iPhone. Only the player differs — ExoPlayer (Media3) on Android,
+libmpv on Windows, macOS and Linux, AVPlayer on iOS. Details for iOS are on the
+[`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app) branch.
 
 ## Install
 
@@ -104,15 +108,16 @@ ExoPlayer (Media3) on Android, libmpv on Windows, macOS and Linux.
   iPad: Settings → General → *VPN & Device Management* → trust your Apple ID, and turn on
   Settings → Privacy & Security → *Developer Mode* if it asks. With a free Apple ID the app has to be
   re-signed every 7 days (Sideloadly can do that by itself over Wi-Fi). It's the same app, built for
-  iOS (videos play through Apple's player, with picture-in-picture); only offline downloads are missing.
+  iOS: Apple's player with picture-in-picture, background play and offline downloads. More on the
+  [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app) branch.
 - **Linux (x86-64 and ARM64)** — [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-amd64.deb) for Debian/Ubuntu, [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-x86_64.rpm)
   for Fedora/openSUSE, or [a tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-x64.tar.gz) to unpack anywhere and run `TubeHaus/bin/TubeHaus`.
   ARM64 (Raspberry Pi 4/5 and others): [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-arm64.deb), [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-aarch64.rpm),
   [tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.7/TubeHaus-0.5.7-linux-arm64.tar.gz).
   It uses your system's mpv: `sudo apt install libmpv2` (Fedora: `sudo dnf install mpv-libs`, Arch: `mpv`). New and not yet tested much: reports welcome.
 
-There is no iOS version: apps outside the App Store can't be installed on an iPhone without
-re-signing them every week. On iPhone and iPad, use the TubeHaus web app.
+Don't want to re-sign every week? On iPhone and iPad the TubeHaus web app (the server version) needs no
+installing at all: add it to the home screen.
 
 ## Build
 
@@ -123,6 +128,9 @@ JDK 21+ and the Android SDK.
 ./gradlew :desktop:run                 # needs libmpv-2.dll in desktop/resources/windows
 ./gradlew :desktop:packageMsi          # needs a JDK with jpackage
 ```
+
+The iPad / iPhone app needs a Mac with Xcode; see the
+[`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app) branch (CI builds it on GitHub's macOS runners).
 
 libmpv for Windows comes from [shinchiro's mpv builds](https://github.com/shinchiro/mpv-winbuild-cmake/releases)
 (`mpv-dev-x86_64-*.7z`, the file `libmpv-2.dll`). The release workflow downloads it.
