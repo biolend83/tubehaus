@@ -14,8 +14,12 @@
 //   app.tubehaus.ui.compact(n)                 "1.2M" from a count
 //   app.tubehaus.rec.Learn.tokens(title, keywords)              the words that describe a video
 //   app.tubehaus.rec.Learn.engagement(watched, length, liked, disliked)  how much a view says you liked it
+//   app.tubehaus.ui.textOverride(key, lang)    any text on screen: return a text for [key] (the English
+//                                              wording) in language [lang] ("en", "ko"), or "" to keep it
 //
-// Example (not active): show view counts in full with commas.
+// Examples (not active):
+//   "app.tubehaus.ui.textOverride": function (key, lang) { return key === "Subscribe" && lang === "ko" ? "구독하기" : ""; },
+// Show view counts in full with commas:
 //   "app.tubehaus.ui.compact": function (n) { return n.toLocaleString("en-US"); },
 
 var PATCH_VERSION = 0;

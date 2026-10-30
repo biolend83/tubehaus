@@ -97,7 +97,7 @@ jobs:
           xcrun simctl terminate "$udid" io.github.biolend83.tubehaus || true
           # TubePatch: a patch.js in the app's folder replaces the Kotlin duration() → "PATCHED <sec>" on the thumbnails
           mkdir -p "$data/Documents"
-          echo 'var PATCH_VERSION = 99; var PATCHES = { "app.tubehaus.ui.duration": function (sec) { return "PATCHED " + sec; } };' > "$data/Documents/patch.js"
+          echo 'var PATCH_VERSION = 99; var PATCHES = { "app.tubehaus.ui.duration": function (sec) { return "PATCHED " + sec; }, "app.tubehaus.ui.textOverride": function (key, lang) { return key === "Watch later" ? "LATER (patched)" : ""; } };' > "$data/Documents/patch.js"
           xcrun simctl launch "$udid" io.github.biolend83.tubehaus -open jNQXAC9IVRw; sleep 45
           xcrun simctl io "$udid" screenshot shots/4-patched.png
           ls "$data/Documents"

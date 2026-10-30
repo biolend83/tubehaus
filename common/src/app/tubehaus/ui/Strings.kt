@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.patch.Patchable
 import kotlin.concurrent.Volatile
 
 // Interface text. English is the key; other languages map it. A missing translation shows English.
@@ -13,10 +14,20 @@ const val BOT_CHECK = "YouTube wants this network to sign in, which it often doe
 
 val LANGS = listOf("en" to "English", "ko" to "한국어")
 
-fun tr(s: String): String = when (L.lang) {
-    "ko" -> KO[s] ?: s
-    else -> s
+fun tr(s: String): String {
+    textOverride(s, L.lang).let { if (it.isNotEmpty()) return it }
+    return when (L.lang) {
+        "ko" -> KO[s] ?: s
+        else -> s
+    }
 }
+
+/**
+ * A text of the app's own, in place of [key]'s translation; "" keeps the translation. Always ""
+ * here: on the iPad, patch.js can answer instead (TubePatch) and change any text without a new build.
+ */
+@Patchable
+fun textOverride(key: String, lang: String): String = ""
 
 private val KO = mapOf(
     "1 minute ago" to "1분 전", "{n} minutes ago" to "{n}분 전",
