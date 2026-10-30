@@ -106,10 +106,11 @@ jobs:
           xcrun simctl io "$udid" screenshot shots/4-patched.png
           ls "$data/Documents"
           # over and over: three videos, full screen on and off, twice (the app does it by itself with -stress)
+          xcrun simctl terminate "$udid" io.github.biolend83.tubehaus || true; sleep 2
           rm -f "$data/Documents/patch.js"
           # 360p: this checks the picture moving between places, not how fast the simulator decodes
           echo '{"lang":"en","welcomed":true,"maxHeight":360}' > "$data/Library/Application Support/tubehaus/settings.json"
-          xcrun simctl launch "$udid" io.github.biolend83.tubehaus -stress
+          xcrun simctl launch --terminate-running-process "$udid" io.github.biolend83.tubehaus -stress
           for i in $(seq -w 1 16); do sleep 8; xcrun simctl io "$udid" screenshot shots/5-stress-$i.png || echo "screenshot $i failed"; done
           xcrun simctl terminate "$udid" io.github.biolend83.tubehaus || true
           xcrun simctl spawn "$udid" log show --last 8m --style compact --predicate 'process == "TubeHaus"' > shots/app.log 2>&1 || true
