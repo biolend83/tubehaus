@@ -17,6 +17,8 @@ For Apple Silicon (M1 and later) and Intel Macs.
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · **macOS** · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · [iPad / iPhone](https://github.com/biolend83/tubehaus/tree/ios-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
+<img src="docs/home.jpg" alt="TubeHaus home screen on macOS" width="800">
+
 </div>
 
 ## Disclaimer
