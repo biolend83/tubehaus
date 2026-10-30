@@ -16,6 +16,10 @@ private val ITEM_KEYS = setOf(
 
 private val ID = Regex("[\\w-]{11}")
 private val UC = Regex("UC[\\w-]{22}")
+/** "1.2M views", "조회수 79만회", "12K watching" */
+private val VIEWS = Regex("(?i)\\bviews?\\b|\\bwatching\\b|조회수|시청 ?중")
+/** "3 days ago", "3일 전", "Streamed 2 weeks ago" */
+private val AGO = Regex("(?i)\\bago\\b|전$|^streamed|스트리밍")
 
 /** Every item below [root], in order, without duplicates. */
 fun parseItems(root: JsonElement?): List<Item> {
@@ -116,11 +120,16 @@ private fun lockup(v: JsonElement): Item? {
             rows.size == 1 -> "" to rows[0]
             else -> rows[0].first() to rows[1]
         }
+        // where the views and the date sit differs by page and by YouTube's experiments: look for them by
+        // what they say first, by position second
+        val parts = rows?.flatten().orEmpty()
+        val viewsText = parts.firstOrNull { VIEWS.containsMatchIn(it) } ?: stats.getOrNull(0) ?: ""
+        val dateText = parts.firstOrNull { it != viewsText && AGO.containsMatchIn(it) } ?: stats.getOrNull(1)?.takeIf { it != viewsText } ?: ""
         return Video(
             id = id, title = title, author = author, channelId = channelId,
             lengthSec = secondsOf(badgeText.takeIf { it.contains(':') }),
-            viewsText = stats.getOrNull(0) ?: "", views = countOf(stats.getOrNull(0)),
-            publishedText = stats.getOrNull(1) ?: "",
+            viewsText = viewsText, views = countOf(viewsText),
+            publishedText = dateText,
             live = live,
             avatar = bestImage(meta?.at("image")),
         )

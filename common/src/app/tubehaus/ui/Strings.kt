@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.patch.Patchable
 import kotlin.concurrent.Volatile
 
 // Interface text. English is the key; other languages map it. A missing translation shows English.
@@ -13,10 +14,20 @@ const val BOT_CHECK = "YouTube wants this network to sign in, which it often doe
 
 val LANGS = listOf("en" to "English", "ko" to "한국어")
 
-fun tr(s: String): String = when (L.lang) {
-    "ko" -> KO[s] ?: s
-    else -> s
+fun tr(s: String): String {
+    textOverride(s, L.lang).let { if (it.isNotEmpty()) return it }
+    return when (L.lang) {
+        "ko" -> KO[s] ?: s
+        else -> s
+    }
 }
+
+/**
+ * A text of the app's own, in place of [key]'s translation; "" keeps the translation. Always ""
+ * here: on the iPad, patch.js can answer instead (TubePatch) and change any text without a new build.
+ */
+@Patchable
+fun textOverride(key: String, lang: String): String = ""
 
 private val KO = mapOf(
     "1 minute ago" to "1분 전", "{n} minutes ago" to "{n}분 전",
@@ -96,6 +107,10 @@ private val KO = mapOf(
     "Resume" to "이어보기",
     "Downloads" to "오프라인 저장",
     "Groups" to "그룹",
+    "Recent searches" to "최근 검색",
+    "Remove" to "삭제",
+    "Unwatched, from the last 7 days: each channel's newest first, up to {n}" to "최근 7일 안 본 영상: 채널마다 최신 영상부터, 최대 {n}개",
+    "Search this feed" to "이 피드에서 찾기",
     "New group" to "새 그룹",
     "Add" to "추가",
     "Delete the group \"{g}\"?" to "\"{g}\" 그룹을 지울까요?",
@@ -103,7 +118,6 @@ private val KO = mapOf(
     "Sort channels into groups and Subscriptions gets a tab for each. A PocketTube backup brings its groups along (Library → Import)." to "채널을 그룹으로 나누면 구독 화면에 그룹마다 탭이 생겨요. PocketTube 백업 파일을 가져오면 그룹도 함께 들어와요 (보관함 → 가져오기).",
     "Only my groups in Subscriptions" to "구독에 내 그룹만 보기",
     "With subscription groups: no \"All\" tab, just the groups" to "구독 그룹이 있을 때 \"전체\" 탭 없이 그룹만 보여줘요",
-    "Downloads aren't available on iPad" to "iPad에서는 오프라인 저장을 할 수 없어요",
     "Downloaded" to "저장됨",
     "Remove download" to "저장한 영상 삭제",
     "Cancel download" to "저장 취소",
