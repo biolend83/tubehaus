@@ -59,6 +59,11 @@ interface Platform {
     fun externalDownload(url: String): Boolean = false
     /** desktop: the window's own title bar in the app's background colour (light, dark or black) */
     fun titleBar(background: androidx.compose.ui.graphics.Color) {}
+    /**
+     * desktop: typing goes past the input method (Korean, Japanese...) while [on], as in the
+     * system's own password boxes; a password typed through one waits on its composition
+     */
+    fun plainKeys(on: Boolean) {}
 }
 
 data class PlayerState(

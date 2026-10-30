@@ -43,8 +43,23 @@ object YouTube {
     }
 
     // ------------------------------------------------------------------ player
-    /** The streams of one video. Tries each player client until one gives playable URLs. */
+    /**
+     * The streams of one video: through the connected TubeHaus server when there is one
+     * (see [ServerVideo]), and from this device when there isn't or the server can't.
+     */
     suspend fun stream(id: String): Stream {
+        if (!ServerVideo.on) return device(id)
+        return try {
+            ServerVideo.stream(id)
+        } catch (e: YtError) {
+            // the server is down or YouTube refused it: this device may still get through,
+            // and when it can't either, the server's reason is the one worth showing
+            try { device(id) } catch (x: Exception) { if (x is kotlinx.coroutines.CancellationException) throw x; throw e }
+        }
+    }
+
+    /** From this device. Tries each player client until one gives playable URLs. */
+    private suspend fun device(id: String): Stream {
         var first: YtError? = null
         for (attempt in 0..1) {
             var walled = true
@@ -335,5 +350,5 @@ object YouTube {
 
     /** WebVTT text of a caption track, optionally machine-translated to [to]. */
     fun captionUrl(c: Caption, to: String? = null): String =
-        c.url + "&fmt=vtt" + (to?.takeIf { it != c.lang.substringBefore('-') }?.let { "&tlang=$it" } ?: "")
+        ServerVideo.captionUrl(c, to) ?: c.url + "&fmt=vtt" + (to?.takeIf { it != c.lang.substringBefore('-') }?.let { "&tlang=$it" } ?: "")
 }

@@ -11,12 +11,18 @@ import java.util.concurrent.TimeUnit
 
 
 
-/** The one HTTP client of the app. Everything goes straight from this device to YouTube. */
+/** The one HTTP client of the app: to YouTube from this device, or to the connected TubeHaus server. */
 object Net {
     val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
+        // the connected TubeHaus server's login, on requests to the server only (its streams, captions)
+        .addInterceptor { chain ->
+            val req = chain.request()
+            val auth = ServerVideo.authFor(req.url.toString())
+            chain.proceed(if (auth != null && req.header("Authorization") == null) req.newBuilder().header("Authorization", auth).build() else req)
+        }
         // subtitles arrive cleaned (Vtt): the player never sees YouTube's repeated lines
         .addInterceptor { chain ->
             val r = chain.proceed(chain.request())
