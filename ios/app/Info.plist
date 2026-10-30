@@ -23,6 +23,11 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!-- without a launch screen iOS shows the app letterboxed in an old phone size -->
+	<!-- the Documents folder shows in Files as "TubeHaus": the YouTube engine (engine.js) lives there -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<!-- the sound goes on with the screen locked -->

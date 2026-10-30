@@ -36,6 +36,28 @@ object Net {
     suspend fun post(url: String, body: String, headers: Map<String, String> = emptyMap()): String =
         call(HttpMethod.Post, url, body, headers)
 
+    /**
+     * For the JavaScript engine (Engine): any status comes back with its body, only a failed
+     * connection throws. Its Content-Type header sets the body's type.
+     */
+    suspend fun raw(method: String, url: String, headers: Map<String, String>, body: String?): Pair<Int, String> {
+        val r: HttpResponse = try {
+            client.request(url) {
+                this.method = HttpMethod.parse(method.uppercase())
+                headers.filterKeys { !it.equals("Content-Type", true) }.forEach { (k, v) -> header(k, v) }
+                if (body != null) {
+                    val type = headers.entries.firstOrNull { it.key.equals("Content-Type", true) }?.value ?: "application/json"
+                    contentType(ContentType.parse(type)); setBody(body)
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw okio.IOException(e.message ?: "network error")
+        }
+        return r.status.value to r.bodyAsText()
+    }
+
     private suspend fun call(method: HttpMethod, url: String, body: String?, headers: Map<String, String>): String {
         val r: HttpResponse = try {
             client.request(url) {
