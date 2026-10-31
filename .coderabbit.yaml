@@ -33,10 +33,11 @@ reviews:
         Plain ES modules with no build step and no new dependencies. User-visible text goes
         through $t() with the Korean original as the key. Text inserted with innerHTML must
         be escaped with esc().
-    - path: "docker-compose.yml"
+    - path: "services/**/service.json"
       instructions: >-
-        Must keep working on both amd64 and arm64 and with only `cp .env.example .env` plus
-        the documented variables.
+        Flisk service definitions (one per container). Must keep working on both amd64 and arm64
+        and with only `cp .env.example .env` plus the documented variables. Plain settings
+        belong in `env`; credentials in `secrets` (read from the git-ignored .env).
 
 chat:
   auto_reply: true

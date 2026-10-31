@@ -9,7 +9,7 @@ web:
       - any-glob-to-any-file: ["web/**", "!web/y/lang/**"]
 docker:
   - changed-files:
-      - any-glob-to-any-file: ["Dockerfile", "docker-compose.yml", "deploy/**", ".env.example"]
+      - any-glob-to-any-file: ["Dockerfile", "services/**", ".flisk/project.json", "deploy/**", ".env.example"]
 documentation:
   - changed-files:
       - any-glob-to-any-file: ["**/*.md", "docs/**"]

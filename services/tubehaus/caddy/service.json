@@ -1,0 +1,47 @@
+{
+  "$schema": "https://flisk.sh/schema.service.json",
+  "schemaVersion": 1,
+  "appName": "caddy",
+  "appType": "bring-your-own",
+  "stack": "tubehaus",
+  "port": 80,
+  "image": "caddy:2",
+  "exposeViaProxy": false,
+  "dependsOn": [
+    "invidious",
+    "tubehaus"
+  ],
+  "env": {
+    "TUBEHAUS_SITE": "${TUBEHAUS_SITE}",
+    "TUBEHAUS_AUTH": "${TUBEHAUS_AUTH:-none}",
+    "TUBEHAUS_USER": "${TUBEHAUS_USER:-}",
+    "TUBEHAUS_PASSWORD_HASH": "${TUBEHAUS_PASSWORD_HASH:-}"
+  },
+  "restart": "unless-stopped",
+  "extraPorts": [
+    {
+      "port": 80,
+      "bind": "0.0.0.0"
+    },
+    {
+      "port": 443,
+      "bind": "0.0.0.0"
+    }
+  ],
+  "volumes": [
+    {
+      "source": "../../../deploy/Caddyfile.docker",
+      "target": "/etc/caddy/Caddyfile",
+      "readOnly": true
+    },
+    {
+      "source": "../../../web",
+      "target": "/srv/web",
+      "readOnly": true
+    },
+    {
+      "source": "caddy-data",
+      "target": "/data"
+    }
+  ]
+}

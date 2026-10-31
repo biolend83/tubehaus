@@ -45,8 +45,8 @@ jobs:
           cat /tmp/server.log
           exit 1
 
-      - name: docker compose config
-        run: cp .env.example .env && docker compose config --quiet
+      - name: flisk up --dry-run
+        run: cp .env.example .env && npx --yes @flisk-sh/flisk@1.4.25 up --dry-run
 
       - name: Shell scripts
         run: bash -n deploy/entrypoint.sh

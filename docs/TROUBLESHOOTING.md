@@ -3,7 +3,7 @@
 Start with the self-check. It tests every piece TubeHaus depends on and prints one line each:
 
 ```sh
-docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
+flisk run tubehaus -- python3 /app/server/tubehaus_server.py --doctor
 ```
 
 ```
@@ -18,19 +18,19 @@ docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
 ```
 
 For a manual install, run `python3 server/tubehaus_server.py --doctor` with the same environment as the service.
-When you open an issue, please paste this output together with `docker compose logs tubehaus --tail 100`.
+When you open an issue, please paste this output together with `flisk logs --service tubehaus`.
 
 ## Videos don't play / "Sign in to confirm you're not a bot"
 
 - **WARP proxy fails:** the container could not register or connect WARP. Check
-  `docker compose logs tubehaus | grep -i warp`. Restarting the container usually fixes a first-start race:
-  `docker compose restart tubehaus`.
+  `flisk logs --service tubehaus | grep -i warp`. Restarting the container usually fixes a first-start race:
+  `flisk restart tubehaus`.
 - **WARP is on but videos still fail:** YouTube sometimes flags WARP addresses too. TubeHaus reconnects WARP for
   a fresh address automatically (at most every 45 s and 6 times per 30 min). Look for `[warp] rotated` in the logs.
   If it keeps rotating without success, wait a while; the limit protects you from hammering YouTube.
 - **Video lookup fails but WARP and Invidious are fine:** this usually means invidious-companion can't reach
-  YouTube or is out of date. Check `docker compose logs companion --tail 50` and pull the latest images:
-  `docker compose pull && docker compose up -d`.
+  YouTube or is out of date. Check `flisk logs --service companion` and pull the latest images
+  (see [Updating](UPGRADING.md)).
 
 ## The page loads but nothing plays (black player, spinner forever)
 
@@ -44,8 +44,8 @@ When you open an issue, please paste this output together with `docker compose l
 Live streams need yt-dlp and PO tokens from the `bgutil` container:
 
 ```sh
-docker compose ps bgutil                 # must be running
-docker compose logs tubehaus | grep live
+flisk status                             # bgutil must be ready
+flisk logs --service tubehaus | grep live
 ```
 
 A brand-new install can take a minute before the first PO token is ready.
@@ -53,7 +53,7 @@ A brand-new install can take a minute before the first PO token is ready.
 ## Live captions say "off"
 
 The image was built without whisper.cpp (`WITH_WHISPER=0`), or the model download failed during the build.
-Pull the prebuilt image (`docker compose pull tubehaus && docker compose up -d`), or rebuild with `docker compose build --no-cache tubehaus`.
+Pull the prebuilt image (`docker pull ghcr.io/biolend83/tubehaus:latest`, then `flisk down && flisk up`), or build it from the Dockerfile (see the README, "Quick start").
 
 ## HTTPS certificate errors
 
@@ -69,5 +69,5 @@ in the README.
 
 ## Health status
 
-`docker compose ps` shows whether each container is healthy. TubeHaus also answers `GET /api/p/health` with a
+`flisk status` shows whether each service is healthy. TubeHaus also answers `GET /api/p/health` with a
 small JSON status (WARP proxy on/off, rotations in the last 30 minutes, live captions available).
