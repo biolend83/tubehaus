@@ -90,27 +90,33 @@ fun WatchScreen(app: AppState) {
         val sideWidth = if (tablet || app.platform.tv) minOf(380.dp, maxWidth * 0.32f) else minOf(420.dp, maxWidth * 0.4f)
         if (wide) {
             // tablets and the desktop: the video and its details on the left; up next or the comments on the right
+            // the iPad lays it out like YouTube on a computer: the details and the comments scroll under
+            // the video, and the panel beside it has only what's next
+            val pc = app.platform.name == "ios"
             Row(Modifier.fillMaxSize()) {
-                if (tablet) {
+                if (tablet && !pc) {
                     // tablets: the video as large as the screen allows, with only its title under it;
-                    // the description, buttons and channel move into the panel (Details).
-                    // The iPad keeps it at the top, under the status bar, rather than floating in the middle
-                    val top = app.platform.name == "ios"
-                    Column(Modifier.weight(1f).fillMaxHeight().padding(12.dp), verticalArrangement = if (top) Arrangement.Top else Arrangement.Center) {
+                    // the description, buttons and channel move into the panel (Details)
+                    Column(Modifier.weight(1f).fillMaxHeight().padding(12.dp), verticalArrangement = Arrangement.Center) {
                         PlayerBox(app, sideGestures = true)
                         if (set.underVideo != 2) Text(v.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 10.dp))
                     }
                 } else {
-                    LazyColumn(Modifier.weight(1f).padding(16.dp)) {
-                        item { PlayerBox(app) }
+                    val pager = if (pc && token != null) rememberPager(token, { YouTube.comments(token) }, { YouTube.comments(it) }) else null
+                    LazyColumn(Modifier.weight(1f).padding(if (pc) 12.dp else 16.dp)) {
+                        item { PlayerBox(app, sideGestures = pc) }
                         under(app, v)
+                        if (pager != null) {
+                            item { SectionTitle(tr("Comments")) }
+                            comments(app, pager)
+                        }
                     }
                 }
                 val tabs = buildList {
                     if (hasRelated) add("next" to tr("Up next"))
-                    if (token != null) add("comments" to tr("Comments"))
-                    if (tablet && set.underVideo != 2) add("details" to tr("Details"))
+                    if (token != null && !pc) add("comments" to tr("Comments"))
+                    if (tablet && !pc && set.underVideo != 2) add("details" to tr("Details"))
                 }
                 if (tabs.isNotEmpty()) {
                     val shown = side.takeIf { s -> tabs.any { it.first == s } } ?: tabs.first().first
@@ -370,15 +376,18 @@ fun CommentsPanel(app: AppState, token: String, onClose: () -> Unit) {
 @Composable
 private fun Comments(app: AppState, token: String) {
     val pager = rememberPager(token, { YouTube.comments(token) }, { YouTube.comments(it) })
-    LazyColumn(Modifier.fillMaxSize()) {
-        if (pager.items.isEmpty() && pager.loading) item { Busy() }
-        if (pager.items.isEmpty() && pager.started && !pager.loading) item { Empty(tr("No comments")) }
-        items(pager.items, key = { "c" + it.id }) { CommentView(app, it) }
-        if (pager.next != null) item("more") {
-            // reaching the end asks for the next page
-            LaunchedEffect(pager.items.size) { pager.loadMore() }
-            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp)) }
-        }
+    LazyColumn(Modifier.fillMaxSize()) { comments(app, pager) }
+}
+
+/** the comments as items of a list, loading the next page when the end comes into view */
+private fun LazyListScope.comments(app: AppState, pager: Pager<Comment>) {
+    if (pager.items.isEmpty() && pager.loading) item { Busy() }
+    if (pager.items.isEmpty() && pager.started && !pager.loading) item { Empty(tr("No comments")) }
+    items(pager.items, key = { "c" + it.id }) { CommentView(app, it) }
+    if (pager.next != null) item("more") {
+        // reaching the end asks for the next page
+        LaunchedEffect(pager.items.size) { pager.loadMore() }
+        Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp)) }
     }
 }
 
