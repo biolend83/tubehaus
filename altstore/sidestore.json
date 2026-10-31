@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "0.5.9",
+          "buildVersion": "26",
+          "date": "2026-10-31",
+          "localizedDescription": "The channel picture on the watch page shows again when YouTube leaves it out.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.9/TubeHaus-0.5.9-ipad.ipa",
+          "size": 15700689,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "0.5.8",
           "buildVersion": "25",
           "date": "2026-10-31",
