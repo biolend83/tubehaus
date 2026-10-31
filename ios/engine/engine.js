@@ -533,7 +533,7 @@ async function details(id) {
   return {
     likesText: str(at(like, "likeButtonViewModel.likeButtonViewModel.toggleButtonViewModel.toggleButtonViewModel.defaultButtonViewModel.buttonViewModel.title")) || "",
     subsText: text(at(owner, "subscriberCountText")) || "",
-    avatar: bestImage(at(owner, "thumbnail")),
+    avatar: bestImage(at(owner, "thumbnail")) || bestImage(watch ? findFirst(watch, "decoratedAvatarViewModel") : null),
     publishedText: text(at(primary, "relativeDateText")) || text(at(primary, "dateText")) || "",
     viewsText: text(at(primary, "viewCount.videoViewCountRenderer.viewCount")) || "",
     related: parseItems(related), relatedNext: continuationOf(related), commentsToken: token,

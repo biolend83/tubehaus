@@ -225,7 +225,7 @@ private fun Info(app: AppState, v: Video) {
         if (has("channel") || showSub) Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             if (has("channel")) {
                 val open = { if (v.channelId.isNotEmpty()) app.go(Screen.Channel(v.channelId, v.author)) }
-                Avatar(d?.avatar ?: lib.subs[v.channelId]?.thumb ?: "", 36, Modifier.clickable { open() })
+                Avatar(d?.avatar?.ifEmpty { null } ?: v.avatar.ifEmpty { null } ?: lib.subs[v.channelId]?.thumb ?: "", 36, Modifier.clickable { open() })
                 Column(Modifier.weight(1f, fill = false).padding(start = 10.dp).clickable { open() }) {
                     Text(v.author, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (!calm && has("subscribers") && !d?.subsText.isNullOrEmpty())
@@ -233,7 +233,7 @@ private fun Info(app: AppState, v: Video) {
                 }
                 Spacer(Modifier.width(12.dp))
             }
-            if (showSub) SubscribeButton(v.channelId, v.author, d?.avatar ?: "", app)
+            if (showSub) SubscribeButton(v.channelId, v.author, d?.avatar?.ifEmpty { null } ?: v.avatar, app)
         }
         Actions(app, v, ::has)
     }
@@ -255,7 +255,7 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
                         .clickable { onClose(); if (v.channelId.isNotEmpty()) app.go(Screen.Channel(v.channelId, v.author)) },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Avatar(d?.avatar ?: app.store.lib.value.subs[v.channelId]?.thumb ?: "", 28)
+                    Avatar(d?.avatar?.ifEmpty { null } ?: v.avatar.ifEmpty { null } ?: app.store.lib.value.subs[v.channelId]?.thumb ?: "", 28)
                     Text(v.author, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 10.dp))
                 }
                 // likes, views and the date side by side, the numbers large
