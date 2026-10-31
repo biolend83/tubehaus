@@ -1,0 +1,1 @@
+- Channel pictures on the watch page show again when YouTube leaves them out
