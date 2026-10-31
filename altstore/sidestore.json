@@ -39,7 +39,7 @@
         {
           "version": "0.5.9",
           "buildVersion": "26",
-          "date": "2026-10-31",
+          "date": "2026-10-31T13:00:00+00:00",
           "localizedDescription": "The channel picture on the watch page shows again when YouTube leaves it out.",
           "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.9/TubeHaus-0.5.9-ipad.ipa",
           "size": 15700689,
@@ -48,7 +48,7 @@
         {
           "version": "0.5.8",
           "buildVersion": "25",
-          "date": "2026-10-31",
+          "date": "2026-10-31T03:00:00+00:00",
           "localizedDescription": "iPad: details and comments under the video like YouTube on a computer, up next beside it. Videos play through the connected TubeHaus server when one is connected.",
           "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-ipad.ipa",
           "size": 15700112,
@@ -58,8 +58,14 @@
       "appPermissions": {
         "entitlements": [],
         "privacy": {}
-      }
+      },
+      "version": "0.5.9",
+      "versionDate": "2026-10-31T13:00:00+00:00",
+      "versionDescription": "The channel picture on the watch page shows again when YouTube leaves it out.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.9/TubeHaus-0.5.9-ipad.ipa",
+      "size": 15700689
     }
   ],
-  "news": []
+  "news": [],
+  "sourceURL": "https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/altstore/sidestore.json"
 }
