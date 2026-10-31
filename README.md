@@ -9,7 +9,7 @@ keeps your subscriptions, history and playlists on the iPad, and works out recom
 
 **[⬇ TubeHaus-0.5.8-ipad.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-ipad.ipa)** (iOS 16+, beta) · install it with **[Sideloadly](https://sideloadly.io/)**
 
-Using **AltStore** or **SideStore**? Add the source `https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/altstore/source.json` and install and update TubeHaus from there.
+Install and update TubeHaus from a source: **AltStore** `https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/altstore/altstore.json` · **SideStore** `https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/altstore/sidestore.json`
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · **iPad / iPhone** · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
