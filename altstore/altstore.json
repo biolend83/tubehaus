@@ -18,6 +18,7 @@
       "category": "entertainment",
       "screenshots": {
         "ipad": [
+          "https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/altstore/ipad-landscape.png",
           "https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/altstore/ipad-watch.png",
           "https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/altstore/ipad-start.png"
         ]
