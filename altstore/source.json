@@ -1,0 +1,43 @@
+{
+  "name": "TubeHaus",
+  "identifier": "io.github.biolend83.tubehaus.source",
+  "subtitle": "A private YouTube client",
+  "description": "TubeHaus for iPad and iPhone: no Google account, recommendations kept on the device. Open source (AGPL-3.0).",
+  "iconURL": "https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/ios/app/Assets.xcassets/AppIcon.appiconset/icon-1024.png",
+  "website": "https://github.com/biolend83/tubehaus",
+  "tintColor": "#2DD4BF",
+  "apps": [
+    {
+      "name": "TubeHaus",
+      "bundleIdentifier": "io.github.biolend83.tubehaus",
+      "developerName": "biolend83",
+      "subtitle": "A private YouTube client",
+      "localizedDescription": "TubeHaus is a YouTube client that needs no Google account and keeps what you watch on your device.\n\n- Apple's player, background play and picture-in-picture\n- Subscriptions without an account\n- Recommendations worked out on the device; tell it to forget a video or a channel\n- Import subscriptions from Google Takeout (CSV), NewPipe, FreeTube or Invidious\n- Calm mode and Focus: hide Shorts, comments, related videos or thumbnails\n- Optional: connect to your own self-hosted TubeHaus server\n\nBeta. Not affiliated with YouTube or Google.",
+      "iconURL": "https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/ios/app/Assets.xcassets/AppIcon.appiconset/icon-1024.png",
+      "tintColor": "#2DD4BF",
+      "category": "entertainment",
+      "screenshots": {
+        "ipad": [
+          "https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/altstore/ipad-watch.png",
+          "https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/altstore/ipad-start.png"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.5.8",
+          "buildVersion": "25",
+          "date": "2026-10-31",
+          "localizedDescription": "iPad: details and comments under the video like YouTube on a computer, up next beside it. Videos play through the connected TubeHaus server when one is connected.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.8/TubeHaus-0.5.8-ipad.ipa",
+          "size": 15700112,
+          "minOSVersion": "16.0"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {}
+      }
+    }
+  ],
+  "news": []
+}
