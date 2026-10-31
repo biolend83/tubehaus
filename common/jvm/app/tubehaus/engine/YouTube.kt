@@ -169,7 +169,7 @@ object YouTube {
         return Details(
             likesText = like.at("likeButtonViewModel.likeButtonViewModel.toggleButtonViewModel.toggleButtonViewModel.defaultButtonViewModel.buttonViewModel.title").str ?: "",
             subsText = owner.at("subscriberCountText").text ?: "",
-            avatar = bestImage(owner.at("thumbnail")),
+            avatar = bestImage(owner.at("thumbnail")).ifEmpty { bestImage(watch?.findFirst("decoratedAvatarViewModel")) },
             publishedText = primary.at("relativeDateText").text ?: primary.at("dateText").text ?: "",
             viewsText = primary.at("viewCount.videoViewCountRenderer.viewCount").text ?: "",
             related = parseItems(related),
