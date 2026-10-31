@@ -1,0 +1,14 @@
+{
+  "$schema": "https://flisk.sh/schema.service.json",
+  "schemaVersion": 1,
+  "appName": "tubehaus",
+  "appType": "backend",
+  "command": "HT_PORT=${PORT:-3010} python3 tubehaus_server.py",
+  "port": 3010,
+  "healthCheckPath": "/api/p/health",
+  "env": {
+    "HT_STATE": "./state",
+    "HT_YT_PROXY": "",
+    "HT_WARP_ROTATE": "0"
+  }
+}
