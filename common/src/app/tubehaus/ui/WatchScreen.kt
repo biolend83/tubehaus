@@ -93,8 +93,10 @@ fun WatchScreen(app: AppState) {
             Row(Modifier.fillMaxSize()) {
                 if (tablet) {
                     // tablets: the video as large as the screen allows, with only its title under it;
-                    // the description, buttons and channel move into the panel (Details)
-                    Column(Modifier.weight(1f).fillMaxHeight().padding(12.dp), verticalArrangement = Arrangement.Center) {
+                    // the description, buttons and channel move into the panel (Details).
+                    // The iPad keeps it at the top, under the status bar, rather than floating in the middle
+                    val top = app.platform.name == "ios"
+                    Column(Modifier.weight(1f).fillMaxHeight().padding(12.dp), verticalArrangement = if (top) Arrangement.Top else Arrangement.Center) {
                         PlayerBox(app, sideGestures = true)
                         if (set.underVideo != 2) Text(v.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 10.dp))
