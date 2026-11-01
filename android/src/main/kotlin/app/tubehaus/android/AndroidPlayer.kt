@@ -1,7 +1,9 @@
 package app.tubehaus.android
 
 import android.content.Context
+import android.media.MediaCodecInfo
 import android.media.MediaCodecList
+import android.os.Build
 import android.net.Uri
 import android.util.Base64
 import android.view.ViewGroup
@@ -94,7 +96,7 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
     /** codec families this phone decodes in hardware, best first */
     private val codecs: List<String> by lazy {
         val hw = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
-            .filter { !it.isEncoder && it.isHardwareAccelerated }
+            .filter { !it.isEncoder && isHardware(it) }
             .flatMap { it.supportedTypes.toList() }.map { it.lowercase() }.toSet()
         buildList {
             if ("video/av01" in hw) add("av1")
@@ -103,6 +105,11 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             add("vp9"); add("av1")
         }.distinct()
     }
+
+    /** isHardwareAccelerated is Android 10+; before that, the software decoders are the ones named OMX.google.* / c2.android.* */
+    private fun isHardware(c: MediaCodecInfo): Boolean =
+        if (Build.VERSION.SDK_INT >= 29) c.isHardwareAccelerated
+        else c.name.lowercase().let { !it.startsWith("omx.google.") && !it.startsWith("c2.android.") && !it.contains(".sw.") }
 
     init {
         exo.addListener(object : Player.Listener {
