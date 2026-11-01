@@ -47,6 +47,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -344,8 +347,9 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
         }
     }
     if (touch && settings) {
-        ModalBottomSheet(onDismissRequest = { settings = false }) {
-            Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) { SettingsPages(app) { settings = false } }
+        // opened all the way and scrolling: a phone held sideways has room for only a few rows
+        ModalBottomSheet(onDismissRequest = { settings = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) { SettingsPages(app) { settings = false } }
         }
     }
 }
@@ -630,7 +634,7 @@ internal fun Track(
     }
 }
 
-/** Quality, speed and captions: a sheet on phones, a menu on the desktop. */
+/** Quality, speed, audio track, ambient mode and captions: a sheet on phones, a menu on the desktop. */
 @Composable
 private fun ColumnScope.SettingsPages(app: AppState, dismiss: () -> Unit) {
     val player = app.platform.player
@@ -640,13 +644,25 @@ private fun ColumnScope.SettingsPages(app: AppState, dismiss: () -> Unit) {
         "" -> {
             SheetRow(Sym.HighQuality.outline, tr("Quality"), if (st.height > 0) "${st.height}p" else tr("Auto")) { page = "q" }
             SheetRow(Sym.Speed.outline, tr("Speed"), if (st.speed == 1f) tr("Normal") else "${st.speed}x") { page = "s" }
+            if (st.audioTracks.size > 1) {
+                SheetRow(Sym.VolumeUp.outline, tr("Audio track"), st.audioTracks.firstOrNull { it.first == st.audioTrack }?.second ?: "") { page = "a" }
+            }
+            if (app.platform.name == "android") {
+                val ambient = app.store.settings.state.collectAsState().value.ambient
+                SheetRow(Sym.BrightnessMedium.outline, tr("Ambient mode"), tr(if (ambient) "On" else "Off")) {
+                    app.store.settings.update { it.copy(ambient = !ambient) }
+                }
+            }
             if (!app.playback.stream?.captions.isNullOrEmpty()) {
-                SheetRow(Sym.ClosedCaption.fill, tr("Captions"), st.captions?.name ?: tr("Off")) { page = "c" }
+                SheetRow(Sym.ClosedCaption.fill, tr("Captions"), st.captions?.let { c -> st.captionsTranslated?.let { l -> tr("Auto-translate") + " (" + (LANGS.firstOrNull { it.first == l }?.second ?: l) + ")" } ?: c.name } ?: tr("Off")) { page = "c" }
             }
         }
         "q" -> {
             Pick(tr("Auto"), st.height == 0) { player.setHeight(0); dismiss() }
             for (h in st.heights.sortedDescending()) Pick("${h}p", st.height == h) { player.setHeight(h); dismiss() }
+        }
+        "a" -> for ((lang, name) in st.audioTracks) {
+            Pick(name, st.audioTrack == lang) { player.setAudioTrack(lang); dismiss() }
         }
         "s" -> for (x in listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)) {
             Pick(if (x == 1f) tr("Normal") else "${x}x", st.speed == x) {
@@ -659,11 +675,11 @@ private fun ColumnScope.SettingsPages(app: AppState, dismiss: () -> Unit) {
             Pick(tr("Off"), st.captions == null) {
                 player.setCaptions(null, null); app.store.settings.update { it.copy(captions = false) }; dismiss()
             }
-            for (c in caps) Pick(c.name, st.captions == c) {
+            for (c in caps) Pick(c.name, st.captions == c && st.captionsTranslated == null) {
                 player.setCaptions(c, null); app.store.settings.update { it.copy(captions = true) }; dismiss()
             }
             if (caps.none { it.lang.substringBefore('-') == lang }) caps.firstOrNull()?.let { c ->
-                Pick(tr("Auto-translate") + " (" + (LANGS.firstOrNull { it.first == lang }?.second ?: lang) + ")", false) {
+                Pick(tr("Auto-translate") + " (" + (LANGS.firstOrNull { it.first == lang }?.second ?: lang) + ")", st.captions != null && st.captionsTranslated == lang) {
                     player.setCaptions(c, lang); app.store.settings.update { it.copy(captions = true) }; dismiss()
                 }
             }

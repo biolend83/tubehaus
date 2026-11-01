@@ -54,7 +54,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "0.5.10"
+const val VERSION = "0.5.11"
 
 @Composable
 fun SettingsScreen(app: AppState) {
@@ -140,6 +140,9 @@ fun SettingsScreen(app: AppState) {
             item {
                 Choice(tr("Beside the video"), tr(if (s.sideTab == "comments") "Comments" else "Up next"),
                     listOf("next" to tr("Up next"), "comments" to tr("Comments"))) { c -> set { it.copy(sideTab = c) } }
+            }
+            if (app.platform.name == "android") item {
+                Toggle(tr("Ambient mode"), tr("In the dark theme, the video's colours glow softly around it"), s.ambient) { b -> set { it.copy(ambient = b) } }
             }
             item { Toggle(tr("Captions"), tr("Turn captions on when a video has them"), s.captions) { b -> set { it.copy(captions = b) } } }
             if (app.platform.name == "android") item {
