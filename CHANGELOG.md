@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.17 — 2026-11-01
+
+### Added
+- iPhone: videos play with Safari's own player, through the server's HLS (`/api/p/hls`), so they no longer start on a black picture, and Picture-in-Picture over other apps and AirPlay work (#41, thanks @Neatly9509). A video without HLS falls back to the usual player. Settings has a toggle (iPhone only, on by default). Other devices, iPad included, are unchanged
+
+### Fixed
+- iPhone home-screen app: the top bar, the side menu and the full-screen player clear the status bar (#41)
+
 ## v0.7.16 — 2026-10-30
 
 ### Added
