@@ -59,7 +59,7 @@ Pull the prebuilt image (`docker pull ghcr.io/biolend83/tubehaus:latest`, then `
 
 Caddy gets a certificate automatically only if `TUBEHAUS_SITE` is a real hostname that points at your server and
 ports 80 and 443 are reachable from the internet. On a LAN without a domain, or behind your own reverse proxy,
-use `TUBEHAUS_SITE=:80` with `TUBEHAUS_HTTP_BIND` for the host port: see "No domain, or your own reverse proxy?"
+use `TUBEHAUS_SITE=:80` (and the ports in `services/tubehaus/caddy/service.json` for a proxy): see "No domain, or your own reverse proxy?"
 in the README.
 
 ## `COMPANION_KEY` errors in the Invidious logs

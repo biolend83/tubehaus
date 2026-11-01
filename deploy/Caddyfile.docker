@@ -4,7 +4,7 @@
 # TubeHaus has no accounts of its own. For a simple password, set in .env:
 #   TUBEHAUS_AUTH=basic
 #   TUBEHAUS_USER=me
-#   TUBEHAUS_PASSWORD_HASH=<from: flisk run caddy -- caddy hash-password>  (write every $ as $$)
+#   TUBEHAUS_PASSWORD_HASH=<from: docker run --rm -it caddy:2 caddy hash-password>  (write every $ as $$)
 # or put Authelia / Authentik / a passkey gate in front with forward_auth instead.
 
 (auth-none) {

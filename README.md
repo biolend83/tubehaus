@@ -165,13 +165,14 @@ TUBEHAUS_EXTERNAL_PORT=443
 ```
 
 For the second setup also change the two ports in `services/tubehaus/caddy/service.json` so only your proxy reaches Caddy:
-`"extraPorts": [{ "port": 80, "hostPort": 8080 }, { "port": 443, "hostPort": 8443 }]` (without `"bind"`, a port is published on
-this machine only). Then point your proxy at `http://127.0.0.1:8080` for everything, unbuffered (video and live streams), e.g. in nginx:
-`proxy_pass http://127.0.0.1:8080; proxy_buffering off; proxy_read_timeout 1h; proxy_set_header Host $host;`
+`"extraPorts": [{ "port": 80, "hostPort": 9080 }, { "port": 443, "hostPort": 9443 }]` (without `"bind"`, a port is published on
+this machine only; 9080 and 9443 stay clear of Flisk's own router, which uses 8080 and 8443). Then point your proxy at
+`http://127.0.0.1:9080` for everything, unbuffered (video and live streams), e.g. in nginx:
+`proxy_pass http://127.0.0.1:9080; proxy_buffering off; proxy_read_timeout 1h; proxy_set_header Host $host;`
 
 **Add a login before you expose it.** TubeHaus has no accounts of its own. The simplest option is the built-in
 password: set `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER` and `TUBEHAUS_PASSWORD_HASH` in `.env` (the hash comes from
-`flisk run caddy -- caddy hash-password`; write every `$` as `$$`). Or put Authelia, Authentik or a
+`docker run --rm -it caddy:2 caddy hash-password`, which needs no running stack; write every `$` as `$$`). Or put Authelia, Authentik or a
 passkey gate in front with `forward_auth`.
 
 **Check that everything works:**

@@ -106,7 +106,7 @@ Caddy, WARP가 들어 있는 TubeHaus 서버, 라이브용 PO 토큰 제공기, 
 
 **외부에 열기 전에 로그인을 붙이세요.** TubeHaus에는 계정 기능이 없어서, 주소를 아는 사람은 누구나 같은 라이브러리를 봐요.
 가장 쉬운 방법은 내장 비밀번호예요. `.env`에 `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER`, `TUBEHAUS_PASSWORD_HASH`를 넣으세요.
-해시는 `flisk run caddy -- caddy hash-password`로 만들고, `.env`에서는 `$`를 모두 `$$`로 써야 해요.
+해시는 `docker run --rm -it caddy:2 caddy hash-password`로 만들고, `.env`에서는 `$`를 모두 `$$`로 써야 해요.
 Authelia, Authentik, 패스키 게이트 같은 것을 `forward_auth`로 앞에 둬도 돼요.
 
 **잘 돌아가는지 점검:**
