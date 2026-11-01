@@ -82,6 +82,12 @@ data class PlayerState(
     val height: Int = 0,
     val speed: Float = 1f,
     val captions: Caption? = null,
+    /** the language YouTube is machine-translating [captions] into; null: the track as it is */
+    val captionsTranslated: String? = null,
+    /** the video's audio languages (YouTube's dubs) as language to name; empty or one when there is no choice */
+    val audioTracks: List<Pair<String, String>> = emptyList(),
+    /** the language playing now */
+    val audioTrack: String? = null,
     /** 0..1, only where the app has its own volume (the desktop) */
     val volume: Float = 1f,
     val muted: Boolean = false,
@@ -115,9 +121,16 @@ interface VideoPlayer {
     /** 0 = automatic */
     fun setHeight(h: Int)
     fun setCaptions(c: Caption?, translateTo: String?)
+    /** one of [PlayerState.audioTracks] for this video; every video starts in its original language */
+    fun setAudioTrack(lang: String) {}
     fun setLoop(on: Boolean)
     /** read about 20 minutes ahead instead of 5 */
     fun setReadAhead(long: Boolean) {}
+    /**
+     * A small, already softened picture of the frame showing now, for the glow around the video
+     * in the dark theme (Ambient mode); null where the platform can't take one
+     */
+    suspend fun frame(): androidx.compose.ui.graphics.ImageBitmap? = null
     fun stop()
 
     /** phones use the system volume; the desktop has a slider of its own */

@@ -70,7 +70,7 @@ object ServerVideo {
             live = live,
             hls = hls,
             video = formats.filter { it.isVideo },
-            audio = formats.filter { !it.isVideo },
+            audio = originalFirst(formats.filter { !it.isVideo }),
             captions = d.at("captions").arr.mapNotNull { c ->
                 val url = c.at("url").str ?: return@mapNotNull null
                 val label = c.at("label").str ?: ""
