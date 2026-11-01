@@ -280,6 +280,7 @@ export class Player {
     if (this.info !== info) return false;
     v.disableRemotePlayback = false;
     this.nativeSrc = true;
+    this.nativeOk = false;
     v.src = this.live ? info.hlsUrl.replace(/^https?:\/\/[^/]+/, "") : `/api/p/hls/${info.videoId}.m3u8`;
     try {
       await new Promise((ok, no) => {
@@ -291,12 +292,14 @@ export class Player {
       return false;
     }
     if (this.info !== info) return false;
+    this.nativeOk = true;
     if (start && !this.live) v.currentTime = start;
     return true;
   }
   releaseNative() {
     if (!this.nativeSrc) return;
     this.nativeSrc = false;
+    this.nativeOk = false;
     this.video.removeAttribute("src");
     this.video.load();
   }
@@ -336,8 +339,9 @@ export class Player {
     this.showCtl();
   }
   range() {
-    if (this.live && this.sp) { const s = this.sp.seekRange(); return [s.start, s.end]; }
+    // native first: after a Shaka fallback this.sp stays set (unloaded) and its range would be stale
     if (this.live && this.native) { const s = this.video.seekable; return s.length ? [s.start(0), s.end(s.length - 1)] : [0, 0]; }
+    if (this.live && this.sp) { const s = this.sp.seekRange(); return [s.start, s.end]; }
     return [0, this.video.duration || this.info?.lengthSeconds || 0];
   }
   stop() {
@@ -743,6 +747,8 @@ export class Player {
     });
     v.addEventListener("enterpictureinpicture", () => r.classList.add("pip"));
     v.addEventListener("leavepictureinpicture", () => r.classList.remove("pip"));
+    // native player failing mid-video (expired stream URL, dropped connection): same reopen-once path as Shaka's errors
+    v.addEventListener("error", () => { if (this.native && this.nativeOk && this.info) { this.nativeOk = false; this.onError({ code: 1002 }); } });
     v.addEventListener("webkitpresentationmodechanged", () => r.classList.toggle("pip", v.webkitPresentationMode === "picture-in-picture"));
   }
   setBuffering(on) {
