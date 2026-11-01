@@ -113,7 +113,7 @@ object YouTube {
             live = vd.at("isLive").bool,
             hls = hls,
             video = formats.filter { it.isVideo },
-            audio = formats.filter { !it.isVideo },
+            audio = originalFirst(formats.filter { !it.isVideo }),
             captions = caps,
             expiresAt = Sys.nowMs() / 1000 + (sd.at("expiresInSeconds").long ?: 18000),
             client = c.name,

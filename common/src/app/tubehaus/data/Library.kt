@@ -133,6 +133,8 @@ data class Settings(
     val offlineHeight: Int = 720,
     /** Android: the TV layout and remote keys; 0 when the device is a TV, 1 always, 2 never */
     val tvMode: Int = 0,
+    /** dark theme: the video's colours glow softly around it, as on YouTube */
+    val ambient: Boolean = true,
     val checkedAt: Long = 0,
     val skipVersion: String = "",
 )

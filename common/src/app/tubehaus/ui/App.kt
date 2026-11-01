@@ -36,6 +36,13 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.roundToInt
 import androidx.compose.ui.unit.Density
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -188,6 +195,15 @@ private fun Shell(app: AppState) {
     val showTop = cur !is Screen.Watch && cur !is Screen.Shorts && cur !is Screen.Search
     // the desktop: while you browse, the video keeps playing in a small window at the bottom right
     val floating = !app.platform.touch && !app.platform.tv
+    // dragged with the mouse: how far from that corner it was moved, kept inside the window
+    var floatAt by remember { mutableStateOf(Offset.Zero) }
+    var floatArea by remember { mutableStateOf(IntSize.Zero) }
+    val floatMargin = with(LocalDensity.current) { 32.dp.toPx() }
+    val moveFloat = { d: Offset, card: IntSize ->
+        val maxX = (floatArea.width - card.width - floatMargin).coerceAtLeast(0f)
+        val maxY = (floatArea.height - card.height - floatMargin).coerceAtLeast(0f)
+        floatAt = Offset((floatAt.x + d.x).coerceIn(-maxX, 0f), (floatAt.y + d.y).coerceIn(-maxY, 0f))
+    }
     // touch screens: the tabs (bottom on phones, the side rail on tablets) and the top bar slide away
     // while scrolling down and come back scrolling up
     val autoHide = app.platform.touch && app.store.settings.state.collectAsState().value.autoHideNav
@@ -270,7 +286,7 @@ private fun Shell(app: AppState) {
               if (railCollapsed && cur is Screen.Watch && !app.platform.touch) {
                   IconButton(onClick = unfold, modifier = Modifier.padding(start = 4.dp).size(36.dp)) { Icon(Sym.Menu.fill, tr("Menu")) }
               }
-              Box(Modifier.weight(1f).fillMaxWidth()) {
+              Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { floatArea = it }) {
                 key(cur) {
                   // a new page fades in: going forward it slides in from the right, going back from the
                   // left, a tab settles from a touch smaller (not the watch page or Shorts: a video
@@ -308,10 +324,10 @@ private fun Shell(app: AppState) {
                 // the plain one: inside a Box that sits in a Column, the Column version would be picked
                 androidx.compose.animation.AnimatedVisibility(
                     floating && app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).offset { IntOffset(floatAt.x.roundToInt(), floatAt.y.roundToInt()) },
                     enter = fadeIn(tween(Motion.MEDIUM)) + scaleIn(tween(Motion.MEDIUM, easing = Motion.emphasizedIn), initialScale = 0.9f),
                     exit = fadeOut(tween(Motion.SHORT)) + scaleOut(tween(Motion.SHORT), targetScale = 0.9f),
-                ) { FloatingPlayer(app) }
+                ) { FloatingPlayer(app, moveFloat) }
               }
             }
         }
@@ -440,11 +456,15 @@ private fun UpdateDialog(app: AppState, r: app.tubehaus.engine.Remote.Release) {
 /** The bar above the tabs while a video plays and you look at something else. */
 /** The desktop's mini player: the playing video, small, over the page; a click goes back to it. */
 @Composable
-private fun FloatingPlayer(app: AppState) {
+private fun FloatingPlayer(app: AppState, move: (Offset, IntSize) -> Unit) {
     val v = app.playback.video ?: return
     val st by app.platform.player.state.collectAsState()
+    var size by remember { mutableStateOf(IntSize.Zero) }
     Surface(
-        Modifier.width(360.dp), shape = RoundedCornerShape(12.dp),
+        // drag it anywhere by the picture or the title; a click (no drag) still opens the video
+        Modifier.width(360.dp).onSizeChanged { size = it }
+            .pointerInput(Unit) { detectDragGestures { change, d -> change.consume(); move(d, size) } },
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainer, shadowElevation = 8.dp,
     ) {
         Column {

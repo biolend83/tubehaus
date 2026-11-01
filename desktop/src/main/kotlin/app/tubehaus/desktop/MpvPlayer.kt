@@ -66,6 +66,8 @@ class MpvPlayer : VideoPlayer {
     private var stream: Stream? = null
     private var opts = PlayOptions()
     private var pinned = 0
+    /** the audio language picked for this video; null = the original */
+    private var audioLang: String? = null
     private var caption: Caption? = null
     private var translateTo: String? = null
     /** the subtitle track added to the file (shown or not): the captions button only flips its visibility */
@@ -123,7 +125,10 @@ class MpvPlayer : VideoPlayer {
             // read far ahead (5 minutes, up to 500 MB) and keep the last part for seeking back
             o("cache", "yes"); o("cache-secs", "300"); o("demuxer-readahead-secs", "300")
             o("demuxer-max-bytes", "500MiB"); o("demuxer-max-back-bytes", "100MiB")
-            o("sub-auto", "no"); o("sub-font-size", "42"); o("sub-border-size", "2.5"); o("sub-margin-y", "40")
+            o("sub-auto", "no"); o("sub-font-size", "42"); o("sub-margin-y", "40")
+            // captions as on YouTube: white on a see-through black box behind each line (mpv 0.38+; before that, an outline)
+            if (o("sub-border-style", "opaque-box") >= 0) { o("sub-border-color", "#BF080808"); o("sub-border-size", "6"); o("sub-shadow-offset", "0") }
+            else o("sub-border-size", "2.5")
             o("audio-display", "no"); o("audio-client-name", "TubeHaus")
             o("terminal", "no"); o("msg-level", "all=warn")
             if (l.mpv_initialize(p) < 0) { l.mpv_terminate_destroy(p); return null }
@@ -220,7 +225,7 @@ class MpvPlayer : VideoPlayer {
                 LibMpv.EVENT_FILE_LOADED -> {
                     st.update { it.copy(ended = false, error = null) }
                     // mpv downloads the track here, on this thread, never on the UI's
-                    loadedCaption?.let { c -> YouTube.captionUrl(c, loadedTranslate).let { u -> cmd("sub-add", Net.captionFile(u) ?: u, "select", c.name) } }
+                    loadedCaption?.let { c -> addSubs(c, loadedTranslate) }
                 }
             }
         }
@@ -271,8 +276,10 @@ class MpvPlayer : VideoPlayer {
         return at.firstOrNull { it.codecFamily == "vp9" } ?: at.firstOrNull { it.codecFamily == "h264" } ?: at.first()
     }
 
+    /** the language you picked for this video, else the original track */
     private fun pickAudio(s: Stream): Format? {
-        val main = s.audio.filter { it.audioDefault }.ifEmpty { s.audio }
+        val main = audioLang?.let { l -> s.audio.filter { it.audioLang == l } }?.ifEmpty { null }
+            ?: s.audio.filter { it.audioDefault }.ifEmpty { s.audio }
         return main.filter { it.codecFamily == "opus" }.maxByOrNull { it.bitrate } ?: main.maxByOrNull { it.bitrate }
     }
 
@@ -285,7 +292,9 @@ class MpvPlayer : VideoPlayer {
             return
         }
         val heights = s.video.map { it.height }.distinct().sorted()
-        st.update { it.copy(heights = heights, height = pinned, buffering = true) }
+        val languages = s.audio.mapNotNull { f -> f.audioLang?.let { it to (f.audioTrackName ?: it) } }.distinctBy { it.first }
+        val audioNow = if (s.live || s.video.isEmpty()) null else pickAudio(s)?.audioLang
+        st.update { it.copy(heights = heights, height = pinned, buffering = true, audioTracks = languages, audioTrack = audioNow) }
         val url: String
         cmd("change-list", "audio-files", "clr", "")
         if (s.live || s.video.isEmpty()) {
@@ -310,6 +319,7 @@ class MpvPlayer : VideoPlayer {
 
     // ------------------------------------------------------------------ VideoPlayer
     override fun load(s: Stream, o: PlayOptions) {
+        if (stream?.id != s.id) audioLang = null
         stream = s
         opts = o
         pinned = 0
@@ -319,7 +329,7 @@ class MpvPlayer : VideoPlayer {
         loadedTranslate = if (caption != null) translateTo else o.standbyTranslate
         set("sub-visibility", if (caption != null) "yes" else "no")
         val muted = st.value.muted
-        st.value = PlayerState(videoId = s.id, buffering = true, speed = o.speed, captions = caption, volume = o.volume, muted = muted)
+        st.value = PlayerState(videoId = s.id, buffering = true, speed = o.speed, captions = caption, captionsTranslated = translateTo, volume = o.volume, muted = muted)
         clearPicture()
         set("volume", (o.volume * 100).roundToInt().toString())
         open(o.startMs)
@@ -343,10 +353,15 @@ class MpvPlayer : VideoPlayer {
         open(st.value.positionMs)
     }
 
+    override fun setAudioTrack(lang: String) {
+        audioLang = lang
+        open(st.value.positionMs)
+    }
+
     override fun setCaptions(c: Caption?, translateTo: String?) {
         caption = c
         this.translateTo = translateTo
-        st.update { it.copy(captions = c) }
+        st.update { it.copy(captions = c, captionsTranslated = translateTo.takeIf { c != null }) }
         if (c == null || (c == loadedCaption && translateTo == loadedTranslate)) {
             set("sub-visibility", if (c != null) "yes" else "no")
             return
@@ -356,9 +371,21 @@ class MpvPlayer : VideoPlayer {
         // another track: mpv downloads it, so not on the UI thread
         thread(isDaemon = true, name = "mpv-subs") {
             cmd("sub-remove")
-            YouTube.captionUrl(c, translateTo).let { u -> cmd("sub-add", Net.captionFile(u) ?: u, "select", c.name) }
+            addSubs(c, translateTo)
             set("sub-visibility", "yes")
         }
+    }
+
+    /** a caption track into mpv; YouTube often turns down its machine translations (HTTP 429), then the track as it is */
+    private fun addSubs(c: Caption, to: String?) {
+        val u = YouTube.captionUrl(c, to)
+        val f = Net.captionFile(u)
+        if (f == null && to != null) {
+            loadedTranslate = null
+            if (caption == c) { translateTo = null; st.update { it.copy(captionsTranslated = null) } }
+            return addSubs(c, null)
+        }
+        cmd("sub-add", f ?: u, "select", c.name)
     }
 
     override fun setLoop(on: Boolean) { opts = opts.copy(loop = on); set("loop-file", if (on) "inf" else "no") }
