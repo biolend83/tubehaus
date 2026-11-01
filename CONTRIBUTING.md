@@ -14,7 +14,7 @@ First pull requests get a reply within a day or two, usually sooner.
 ## Reporting a bug
 
 Open an [issue](https://github.com/biolend83/tubehaus/issues/new/choose) and include your setup
-(Flisk or manual), device and browser, and the logs (`flisk logs --service tubehaus`).
+(docker compose or manual), device and browser, and the logs (`docker compose logs tubehaus --tail 100`).
 If plain Invidious fails the same way, the problem is probably upstream in Invidious or its companion.
 
 ## Pull requests

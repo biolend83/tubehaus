@@ -3,7 +3,7 @@
 Start with the self-check. It tests every piece TubeHaus depends on and prints one line each:
 
 ```sh
-flisk run tubehaus -- python3 /app/server/tubehaus_server.py --doctor
+docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
 ```
 
 ```
@@ -18,19 +18,19 @@ flisk run tubehaus -- python3 /app/server/tubehaus_server.py --doctor
 ```
 
 For a manual install, run `python3 server/tubehaus_server.py --doctor` with the same environment as the service.
-When you open an issue, please paste this output together with `flisk logs --service tubehaus`.
+When you open an issue, please paste this output together with `docker compose logs tubehaus --tail 100`.
 
 ## Videos don't play / "Sign in to confirm you're not a bot"
 
 - **WARP proxy fails:** the container could not register or connect WARP. Check
-  `flisk logs --service tubehaus | grep -i warp`. Restarting the container usually fixes a first-start race:
-  `flisk restart tubehaus`.
+  `docker compose logs tubehaus | grep -i warp`. Restarting the container usually fixes a first-start race:
+  `docker compose restart tubehaus`.
 - **WARP is on but videos still fail:** YouTube sometimes flags WARP addresses too. TubeHaus reconnects WARP for
   a fresh address automatically (at most every 45 s and 6 times per 30 min). Look for `[warp] rotated` in the logs.
   If it keeps rotating without success, wait a while; the limit protects you from hammering YouTube.
 - **Video lookup fails but WARP and Invidious are fine:** this usually means invidious-companion can't reach
-  YouTube or is out of date. Check `flisk logs --service companion` and pull the latest images
-  (see [Updating](UPGRADING.md)).
+  YouTube or is out of date. Check `docker compose logs companion --tail 50` and pull the latest images:
+  `docker compose pull && docker compose up -d`.
 
 ## The page loads but nothing plays (black player, spinner forever)
 
@@ -44,8 +44,8 @@ When you open an issue, please paste this output together with `flisk logs --ser
 Live streams need yt-dlp and PO tokens from the `bgutil` container:
 
 ```sh
-flisk status                             # bgutil must be ready
-flisk logs --service tubehaus | grep live
+docker compose ps bgutil                 # must be running
+docker compose logs tubehaus | grep live
 ```
 
 A brand-new install can take a minute before the first PO token is ready.
@@ -53,13 +53,13 @@ A brand-new install can take a minute before the first PO token is ready.
 ## Live captions say "off"
 
 The image was built without whisper.cpp (`WITH_WHISPER=0`), or the model download failed during the build.
-Pull the prebuilt image (`docker pull ghcr.io/biolend83/tubehaus:latest`, then `flisk down && flisk up`), or build it from the Dockerfile (see the README, "Quick start").
+Pull the prebuilt image (`docker compose pull tubehaus && docker compose up -d`), or rebuild with `docker compose build --no-cache tubehaus`.
 
 ## HTTPS certificate errors
 
 Caddy gets a certificate automatically only if `TUBEHAUS_SITE` is a real hostname that points at your server and
 ports 80 and 443 are reachable from the internet. On a LAN without a domain, or behind your own reverse proxy,
-use `TUBEHAUS_SITE=:80` (and the ports in `services/tubehaus/caddy/service.json` for a proxy): see "No domain, or your own reverse proxy?"
+use `TUBEHAUS_SITE=:80` with `TUBEHAUS_HTTP_BIND` for the host port: see "No domain, or your own reverse proxy?"
 in the README.
 
 ## `COMPANION_KEY` errors in the Invidious logs
@@ -69,5 +69,5 @@ in the README.
 
 ## Health status
 
-`flisk status` shows whether each service is healthy. TubeHaus also answers `GET /api/p/health` with a
+`docker compose ps` shows whether each container is healthy. TubeHaus also answers `GET /api/p/health` with a
 small JSON status (WARP proxy on/off, rotations in the last 30 minutes, live captions available).

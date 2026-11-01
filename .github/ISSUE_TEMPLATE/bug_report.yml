@@ -14,7 +14,7 @@ body:
     attributes:
       label: How do you run TubeHaus?
       options:
-        - Flisk (this repo)
+        - docker compose (this repo)
         - Manual setup
         - Manual setup with an existing Invidious instance
     validations:
@@ -33,5 +33,5 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: "`flisk logs --service tubehaus` (and `companion` / `invidious` if relevant). Remove anything private."
+      description: "`docker compose logs tubehaus --tail 100` (and `companion` / `invidious` if relevant). Remove anything private."
       render: text

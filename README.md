@@ -29,7 +29,7 @@ TubeHaus comes in two separate forms. They share the look and the name, but they
 
 | | 🖥️ **Server version** (this branch, `main`) | 📱 **App** (branches `android-app`, `windows-app`, `mac-app`, `linux-app`, `ios-app`) |
 |---|---|---|
-| **What you install** | A server: Flisk (Docker) on a VPS, a home PC or a Raspberry Pi | An app on each device: Android (phones, tablets, Android TV / Google TV), Windows, macOS, Linux, or iPad/iPhone (installed with Sideloadly) |
+| **What you install** | A server: docker compose on a VPS, a home PC or a Raspberry Pi | An app on each device: Android (phones, tablets, Android TV / Google TV), Windows, macOS, Linux, or iPad/iPhone (installed with Sideloadly) |
 | **How you watch** | In any browser: phones, iPhone/iPad, PCs, TVs. Add it to the home screen to use it like an app | In the app on that device |
 | **Who talks to YouTube** | Your server, through Invidious and Cloudflare WARP. Your devices only ever talk to your server | The device itself, with the app's own YouTube engine. No Invidious and no TubeHaus server in between |
 | **What YouTube sees** | A Cloudflare WARP address, not your home or your device | Your device's own internet address, like any YouTube app |
@@ -117,7 +117,7 @@ videos lack, WARP rotation when YouTube blocks).
 
 ## Requirements
 
-- **Server:** Linux with Docker and [Flisk](https://flisk.sh) 1.4.25 or later (`npm install -g @flisk-sh/flisk`, then `flisk doctor` checks the rest), x86-64 or ARM64 (a free Oracle Cloud ARM VM works fine)
+- **Server:** Linux with Docker and docker compose, x86-64 or ARM64 (a free Oracle Cloud ARM VM works fine)
 - **CPU / RAM:** 2+ cores and about 4 GB RAM for the whole stack. Live captions use about one more core, only while someone watches a live stream with captions on
 - **Disk:** about 10-20 GB, mostly Docker images. Videos are streamed, not stored, so this doesn't grow with use
 - **A hostname** for HTTPS (a domain, or a free wildcard DNS name such as sslip.io), or plain HTTP on a LAN
@@ -131,20 +131,14 @@ Invidious + companion + PostgreSQL images. Works on x86-64 and ARM64.
 ```sh
 git clone https://github.com/biolend83/tubehaus && cd tubehaus
 cp .env.example .env        # set your domain and three secrets
-flisk up                    # pulls the prebuilt images (amd64, arm64) and starts everything
+docker compose pull         # prebuilt images, amd64 and arm64
+docker compose up -d
 ```
 
-The six services (Caddy, TubeHaus, bgutil, Invidious, its companion and PostgreSQL) are one small `service.json` each under
-[`services/tubehaus/`](services/tubehaus). `flisk status` shows their health, `flisk logs --service <name>` their logs and
-`flisk down` stops them; your data stays in Docker volumes.
+Already using [Flisk](https://flisk.sh)? The same stack runs with `flisk up` too: see [docs/FLISK.md](docs/FLISK.md) (optional; docker compose stays the main way).
 
-Caddy is published on ports 80 and 443 of every network interface (`"bind": "0.0.0.0"` in
-`services/tubehaus/caddy/service.json`), so phones and TVs on your network can open it. Flisk's own router uses 8080 and 8443
-on this machine only.
-
-To build the TubeHaus image yourself instead (for example after changing the code), edit
-`services/tubehaus/tubehaus/service.json`: replace `"image": "ghcr.io/biolend83/tubehaus:latest"` with
-`"buildContext": "../../.."` and `"dockerfile": "Dockerfile"`. The first build takes a few minutes because of whisper.cpp.
+To build the TubeHaus image yourself instead (for example after changing the code), use
+`docker compose up -d --build`. The first build takes a few minutes because of whisper.cpp.
 
 Then open your domain. WARP registers itself on first start and keeps its registration in a
 volume; the companion reaches YouTube through it as well.
@@ -152,36 +146,36 @@ volume; the companion reaches YouTube through it as well.
 **No domain, or your own reverse proxy?** Caddy can serve plain HTTP on any port. In `.env`:
 
 ```sh
-# plain HTTP on a LAN, at http://192.168.1.10
+# plain HTTP on a LAN, at http://192.168.1.10:8080
 TUBEHAUS_SITE=:80
-TUBEHAUS_URL=http://192.168.1.10
+TUBEHAUS_HTTP_BIND=8080
+TUBEHAUS_URL=http://192.168.1.10:8080
 TUBEHAUS_DOMAIN=192.168.1.10
 TUBEHAUS_HTTPS=false
-TUBEHAUS_EXTERNAL_PORT=80
+TUBEHAUS_EXTERNAL_PORT=8080
 
 # behind your own nginx, Traefik or Caddy, which handles HTTPS for tube.example.com
 TUBEHAUS_SITE=:80
+TUBEHAUS_HTTP_BIND=127.0.0.1:8080       # only your proxy reaches it
+TUBEHAUS_HTTPS_BIND=127.0.0.1:8443      # unused, kept off the public 443
 TUBEHAUS_URL=https://tube.example.com
 TUBEHAUS_DOMAIN=tube.example.com
 TUBEHAUS_HTTPS=true
 TUBEHAUS_EXTERNAL_PORT=443
 ```
 
-For the second setup also change the two ports in `services/tubehaus/caddy/service.json` so only your proxy reaches Caddy:
-`"extraPorts": [{ "port": 80, "hostPort": 9080 }, { "port": 443, "hostPort": 9443 }]` (without `"bind"`, a port is published on
-this machine only; 9080 and 9443 stay clear of Flisk's own router, which uses 8080 and 8443). Then point your proxy at
-`http://127.0.0.1:9080` for everything, unbuffered (video and live streams), e.g. in nginx:
-`proxy_pass http://127.0.0.1:9080; proxy_buffering off; proxy_read_timeout 1h; proxy_set_header Host $host;`
+Then point your proxy at `http://127.0.0.1:8080` for everything, unbuffered (video and live streams), e.g. in nginx:
+`proxy_pass http://127.0.0.1:8080; proxy_buffering off; proxy_read_timeout 1h; proxy_set_header Host $host;`
 
 **Add a login before you expose it.** TubeHaus has no accounts of its own. The simplest option is the built-in
 password: set `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER` and `TUBEHAUS_PASSWORD_HASH` in `.env` (the hash comes from
-`docker run --rm -it caddy:2 caddy hash-password`, which needs no running stack; write every `$` as `$$`). Or put Authelia, Authentik or a
+`docker compose run --rm caddy caddy hash-password`; write every `$` as `$$`). Or put Authelia, Authentik or a
 passkey gate in front with `forward_auth`.
 
 **Check that everything works:**
 
 ```sh
-flisk run tubehaus -- python3 /app/server/tubehaus_server.py --doctor
+docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
 ```
 
 It tests WARP, YouTube, Invidious, a real video lookup and the optional tools, one line each.
@@ -250,7 +244,7 @@ be sent to your login page.
 **Is this a replacement for Invidious?**
 No, it runs alongside it. Invidious and its companion fetch everything from YouTube; TubeHaus is a
 YouTube-style front end plus a server that adds live streams, live captions, a shared library, send to TV,
-downloads and WARP egress. The Flisk services run the official Invidious images for you.
+downloads and WARP egress. The docker compose file runs the official Invidious images for you.
 
 **Can I use my existing Invidious instance (or keep using Yattee, FreeTube, ...)?**
 Yes, follow *Manual setup* and point TubeHaus at it. Apps that talk to Invidious keep working, and if the

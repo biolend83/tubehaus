@@ -1,0 +1,129 @@
+# Everything in one go:  cp .env.example .env  (edit the top part)  &&  docker compose up -d
+#   caddy      - serves the app and routes everything (ports 80/443)
+#   tubehaus   - TubeHaus server + Cloudflare WARP
+#   bgutil     - PO tokens for yt-dlp (live streams), shares tubehaus's network
+#   invidious, companion, invidious-db - official Invidious images
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    # host ports from .env: e.g. TUBEHAUS_HTTP_BIND=127.0.0.1:8080 behind your own nginx (see README)
+    ports:
+      - "${TUBEHAUS_HTTP_BIND:-80}:80"
+      - "${TUBEHAUS_HTTPS_BIND:-443}:443"
+    environment:
+      TUBEHAUS_SITE: ${TUBEHAUS_SITE}
+      TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-none}
+      TUBEHAUS_USER: ${TUBEHAUS_USER:-}
+      TUBEHAUS_PASSWORD_HASH: ${TUBEHAUS_PASSWORD_HASH:-}
+    volumes:
+      - ./deploy/Caddyfile.docker:/etc/caddy/Caddyfile:ro
+      - ./web:/srv/web:ro
+      - caddy-data:/data
+    depends_on:
+      - tubehaus
+      - invidious
+
+  tubehaus:
+    # prebuilt for amd64 and arm64; `docker compose up -d --build` builds it from this checkout instead
+    image: ghcr.io/biolend83/tubehaus:latest
+    cap_add: [NET_ADMIN]       # WARP sets up its own routing (inside this container only); without it WARP never connects
+    init: true                 # reaps finished helper processes (socat, yt-dlp, ffmpeg)
+    build: .
+    restart: unless-stopped
+    environment:
+      HT_INVIDIOUS: http://invidious:3000
+      HT_COMPANION: http://companion:8282
+      HT_PUBLIC_URL: ${TUBEHAUS_URL}
+      HT_SUB_LANG: ${TUBEHAUS_SUB_LANG:-en}
+      HT_WHISPER_LANG: ${TUBEHAUS_CAPTION_LANG:-auto}
+      HT_PUBLIC_MODE: ${TUBEHAUS_PUBLIC:-0}
+      HT_MAX_VIEWERS: ${TUBEHAUS_MAX_VIEWERS:-0}
+      HT_MAX_HEIGHT: ${TUBEHAUS_MAX_HEIGHT:-0}
+      HT_RATE_PER_MIN: ${TUBEHAUS_RATE_PER_MIN:-}
+    volumes:
+      - tubehaus-data:/data
+      - warp-data:/var/lib/cloudflare-warp
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3010/api/p/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  bgutil:
+    image: brainicism/bgutil-ytdlp-pot-provider
+    restart: unless-stopped
+    network_mode: "service:tubehaus"     # yt-dlp finds it on 127.0.0.1:4416
+
+  invidious:
+    image: quay.io/invidious/invidious:latest
+    restart: unless-stopped
+    environment:
+      INVIDIOUS_CONFIG: |
+        db:
+          dbname: invidious
+          user: kemal
+          password: ${POSTGRES_PASSWORD}
+          host: invidious-db
+          port: 5432
+        check_tables: true
+        domain: ${TUBEHAUS_DOMAIN}
+        https_only: ${TUBEHAUS_HTTPS:-true}
+        external_port: ${TUBEHAUS_EXTERNAL_PORT:-443}
+        use_innertube_for_captions: true
+        invidious_companion:
+        - private_url: "http://tubehaus:3010/companion"
+          public_url: "${TUBEHAUS_URL}/companion"
+        invidious_companion_key: ${COMPANION_KEY}
+        hmac_key: ${INVIDIOUS_HMAC_KEY}
+    healthcheck:
+      test: wget -nv --tries=1 --spider http://127.0.0.1:3000/api/v1/stats || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 2
+    depends_on:
+      - invidious-db
+
+  companion:
+    image: quay.io/invidious/invidious-companion:latest
+    restart: unless-stopped
+    environment:
+      - SERVER_SECRET_KEY=${COMPANION_KEY}
+      - PROXY=socks5://tubehaus:1080          # YouTube through WARP
+      - NETWORKING_FETCH_TIMEOUT_MS=15000
+      - NETWORKING_FETCH_RETRY_ENABLED=true
+      - NETWORKING_FETCH_RETRY_TIMES=3
+      - NETWORKING_FETCH_RETRY_INITIAL_DEBOUNCE=200
+      - NETWORKING_FETCH_RETRY_DEBOUNCE_MULTIPLIER=2   # without these two the PO-token job never succeeds
+      # refresh the PO token hourly instead of every few minutes (each refresh starts a browser)
+      - "JOBS_YOUTUBE_SESSION_FREQUENCY=0 * * * *"
+    shm_size: 256mb
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    read_only: true
+    volumes:
+      - companion-cache:/var/tmp/youtubei.js:rw
+    security_opt:
+      - no-new-privileges:true
+
+  invidious-db:
+    image: docker.io/library/postgres:14
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: invidious
+      POSTGRES_USER: kemal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+
+volumes:
+  caddy-data:
+  tubehaus-data:
+  warp-data:
+  companion-cache:
+  postgres-data:

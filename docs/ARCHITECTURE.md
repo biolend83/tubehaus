@@ -83,4 +83,4 @@ path, one after another. Settings come from environment variables at the top (`H
 
 `Dockerfile` builds one image with the server, the official Cloudflare WARP client, yt-dlp (+ the PO token
 plugin) and whisper.cpp. `deploy/entrypoint.sh` starts WARP in proxy mode, re-exposes it on port 1080 for the
-companion, then starts the server. The Flisk services under `services/tubehaus/` add Caddy, Invidious, the companion and PostgreSQL.
+companion, then starts the server. `docker-compose.yml` adds Caddy, Invidious, the companion and PostgreSQL.

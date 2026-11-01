@@ -23,7 +23,7 @@ TubeHaus는 따로 동작하는 두 가지가 있어요. 이름과 생김새는 
 
 | | 🖥️ **서버판** (이 브랜치, `main`) | 📱 **앱** (`android-app`, `windows-app`, `mac-app`, `linux-app`, `ios-app` 브랜치) |
 |---|---|---|
-| **설치하는 것** | 서버 한 대: 클라우드 서버, 집 PC, 라즈베리파이에 Flisk(Docker) | 기기마다 앱: 안드로이드(폰, 태블릿, 안드로이드 TV / 구글 TV), Windows, macOS, 리눅스, 아이패드/아이폰(Sideloadly로 설치) |
+| **설치하는 것** | 서버 한 대: 클라우드 서버, 집 PC, 라즈베리파이에 docker compose | 기기마다 앱: 안드로이드(폰, 태블릿, 안드로이드 TV / 구글 TV), Windows, macOS, 리눅스, 아이패드/아이폰(Sideloadly로 설치) |
 | **보는 방법** | 아무 브라우저: 폰, 아이폰/아이패드, PC, TV. 홈 화면에 추가하면 앱처럼 써요 | 그 기기의 앱에서 |
 | **유튜브와 통신하는 쪽** | 내 서버가 Invidious와 Cloudflare WARP를 거쳐서. 기기는 내 서버하고만 통신해요 | 기기가 직접, 앱 안의 자체 유튜브 엔진으로. 중간에 Invidious도 TubeHaus 서버도 없어요 |
 | **유튜브가 보는 주소** | Cloudflare WARP 주소. 집이나 기기 주소가 아니에요 | 내 기기의 인터넷 주소. 다른 유튜브 앱과 같아요 |
@@ -91,7 +91,7 @@ Invidious 팀에 감사드려요.
 
 ## 필요한 것
 
-- **서버:** Docker와 Flisk 1.4.25 이상(`npm install -g @flisk-sh/flisk`)이 있는 리눅스, x86-64 또는 ARM64(오라클 클라우드 무료 ARM 서버로 충분해요)
+- **서버:** Docker와 docker compose가 있는 리눅스, x86-64 또는 ARM64(오라클 클라우드 무료 ARM 서버로 충분해요)
 - **CPU / 메모리:** 2코어 이상, 전체 합쳐 메모리 약 4GB. 라이브 자막을 켜고 라이브를 볼 때만 코어 하나를 더 써요
 - **디스크:** 약 10~20GB, 대부분 Docker 이미지예요. 영상은 저장하지 않고 흘려보내서 써도 늘지 않아요
 - **HTTPS용 주소:** 도메인, 또는 sslip.io 같은 무료 와일드카드 DNS 이름. 집 안 네트워크에서만 쓰면 HTTP도 돼요
@@ -101,21 +101,24 @@ Invidious 팀에 감사드려요.
 ```sh
 git clone https://github.com/biolend83/tubehaus && cd tubehaus
 cp .env.example .env        # 도메인과 비밀값 세 개를 넣어요
-flisk up                    # 미리 빌드된 이미지(amd64, arm64)를 받아서 모두 시작해요
+docker compose pull         # 미리 빌드된 이미지 (amd64, arm64)
+docker compose up -d
 ```
 
 Caddy, WARP가 들어 있는 TubeHaus 서버, 라이브용 PO 토큰 제공기, 라이브 자막용 whisper.cpp,
 공식 Invidious + companion + PostgreSQL 이미지가 한 번에 올라와요. 끝나면 도메인을 열면 돼요.
 
+[Flisk](https://flisk.sh)를 이미 쓰고 있다면 `flisk up`으로도 같은 구성을 띄울 수 있어요: [docs/FLISK.md](docs/FLISK.md) (선택 사항이고, 기본은 계속 docker compose예요).
+
 **외부에 열기 전에 로그인을 붙이세요.** TubeHaus에는 계정 기능이 없어서, 주소를 아는 사람은 누구나 같은 라이브러리를 봐요.
 가장 쉬운 방법은 내장 비밀번호예요. `.env`에 `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER`, `TUBEHAUS_PASSWORD_HASH`를 넣으세요.
-해시는 `docker run --rm -it caddy:2 caddy hash-password`로 만들고, `.env`에서는 `$`를 모두 `$$`로 써야 해요.
+해시는 `docker compose run --rm caddy caddy hash-password`로 만들고, `.env`에서는 `$`를 모두 `$$`로 써야 해요.
 Authelia, Authentik, 패스키 게이트 같은 것을 `forward_auth`로 앞에 둬도 돼요.
 
 **잘 돌아가는지 점검:**
 
 ```sh
-flisk run tubehaus -- python3 /app/server/tubehaus_server.py --doctor
+docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
 ```
 
 WARP, 유튜브 연결, Invidious, 실제 영상 조회, 선택 기능(yt-dlp, ffmpeg, whisper)을 한 줄씩 점검해요.
@@ -137,7 +140,7 @@ WARP, 유튜브 연결, Invidious, 실제 영상 조회, 선택 기능(yt-dlp, f
 
 **Invidious를 대체하나요?**
 아니요, 같이 돌아가요. 유튜브에서 가져오는 일은 Invidious와 companion이 하고, TubeHaus는 유튜브 같은 화면과,
-라이브, 라이브 자막, 공유 라이브러리, TV로 보내기, 저장, WARP를 더하는 서버예요. Flisk가 공식 Invidious 이미지를 같이 띄워 줘요.
+라이브, 라이브 자막, 공유 라이브러리, TV로 보내기, 저장, WARP를 더하는 서버예요. docker compose가 공식 Invidious 이미지를 같이 띄워 줘요.
 
 **이미 쓰는 Invidious(또는 Yattee, FreeTube)와 같이 쓸 수 있나요?**
 네. 직접 설치 방법대로 기존 Invidious를 가리키게 하면 돼요. 같은 Invidious를 쓰는 앱들은 그대로 동작해요.
