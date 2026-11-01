@@ -17,10 +17,11 @@ struct WatchView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 50) {
                 HStack(alignment: .top, spacing: 60) {
-                    AsyncImage(url: URL(string: "https://i.ytimg.com/vi/\(video.id)/maxresdefault.jpg")) { img in
+                    // hqdefault exists for every video (maxresdefault doesn't, and then YouTube sends a grey placeholder)
+                    AsyncImage(url: video.thumb) { img in
                         img.resizable().aspectRatio(16 / 9, contentMode: .fill)
                     } placeholder: {
-                        AsyncImage(url: video.thumb) { $0.resizable().aspectRatio(16 / 9, contentMode: .fill) } placeholder: { Rectangle().fill(.quaternary) }
+                        Rectangle().fill(.quaternary)
                     }
                     .frame(width: 880, height: 495)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
