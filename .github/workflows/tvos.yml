@@ -1,0 +1,84 @@
+name: Apple TV
+
+# TubeHaus for Apple TV (tvos/): an unsigned .ipa as a build artifact, and a run in an Apple TV
+# simulator with screenshots, as a check that it starts, draws and plays. Apple TV apps can't be
+# sideloaded like the iPad one: installing needs Xcode on a Mac (free Apple ID) or TestFlight.
+on:
+  push:
+    branches: [ios-app]
+    paths: ["tvos/**", "ios/engine/**", ".github/workflows/tvos.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode project
+        run: |
+          brew install xcodegen
+          cd tvos && xcodegen generate
+      - name: Build the app (unsigned)
+        run: >-
+          xcodebuild -project tvos/TubeHausTV.xcodeproj -scheme TubeHausTV -sdk appletvos -configuration Release
+          -derivedDataPath build/xcode CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Package TubeHaus-AppleTV.ipa
+        run: |
+          set -e
+          app=build/xcode/Build/Products/Release-appletvos/TubeHaus.app
+          test -x "$app/TubeHaus"
+          mkdir -p out/Payload && cp -R "$app" out/Payload/
+          cd out && zip -qr TubeHaus-AppleTV.ipa Payload && unzip -l TubeHaus-AppleTV.ipa | tail -3
+          du -h TubeHaus-AppleTV.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TubeHaus-AppleTV
+          path: out/TubeHaus-AppleTV.ipa
+          if-no-files-found: error
+
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build for the simulator
+        run: |
+          brew install xcodegen
+          (cd tvos && xcodegen generate)
+          xcodebuild -project tvos/TubeHausTV.xcodeproj -scheme TubeHausTV -sdk appletvsimulator -configuration Debug             -derivedDataPath build/xcode CODE_SIGNING_ALLOWED=NO build
+      - name: Run it on an Apple TV
+        timeout-minutes: 15
+        run: |
+          set -x
+          app=build/xcode/Build/Products/Debug-appletvsimulator/TubeHaus.app
+          id=io.github.biolend83.tubehaus.tv
+          udid=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k,v in sorted(d.items(), reverse=True) if 'tvOS' in k for x in v if 'Apple TV' in x['name']))")
+          xcrun simctl boot "$udid"; xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" "$app"
+          mkdir -p shots
+          # Home with no subscriptions: topic rows from search
+          xcrun simctl launch "$udid" $id; sleep 30
+          xcrun simctl io "$udid" screenshot shots/1-home.png
+          xcrun simctl terminate "$udid" $id || true
+          # one video page (streams, details and the related row all come from engine.js)
+          xcrun simctl launch "$udid" $id -open jNQXAC9IVRw; sleep 30
+          xcrun simctl io "$udid" screenshot shots/2-video.png
+          xcrun simctl terminate "$udid" $id || true
+          # and playing it
+          xcrun simctl launch "$udid" $id -open aqz-KE-bpKQ -autoplay YES; sleep 40
+          xcrun simctl io "$udid" screenshot shots/3-playing.png
+          sleep 20
+          xcrun simctl io "$udid" screenshot shots/4-still-playing.png
+          xcrun simctl terminate "$udid" $id || true
+          xcrun simctl spawn "$udid" log show --last 5m --style compact --predicate 'process == "TubeHaus"' > shots/app.log 2>&1 || true
+          tail -60 shots/app.log
+          ls ~/Library/Logs/DiagnosticReports/ | grep -i tubehaus && cp ~/Library/Logs/DiagnosticReports/*TubeHaus* shots/ || echo "no crash report"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AppleTV-simulator-check
+          path: shots/

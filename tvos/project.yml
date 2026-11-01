@@ -1,0 +1,26 @@
+# TubeHaus for Apple TV. XcodeGen: `xcodegen generate` here makes TubeHausTV.xcodeproj (not kept in git).
+# Plain SwiftUI, no Kotlin: it runs the same YouTube engine as the iPad app (../ios/engine/engine.js).
+name: TubeHausTV
+options:
+  deploymentTarget:
+    tvOS: "17.0"
+targets:
+  TubeHausTV:
+    type: application
+    platform: tvOS
+    sources:
+      - Sources
+      - Assets.xcassets
+      - path: ../ios/engine/engine.js
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.biolend83.tubehaus.tv
+        PRODUCT_NAME: TubeHaus
+        INFOPLIST_FILE: Info.plist
+        TARGETED_DEVICE_FAMILY: "3"
+        SWIFT_VERSION: "5.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"
+        # set DEVELOPMENT_TEAM (and turn signing on) in Xcode to install on your own Apple TV
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""

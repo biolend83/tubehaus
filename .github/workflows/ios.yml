@@ -6,6 +6,8 @@ name: iPad
 on:
   push:
     branches: [ios-app]
+    # the Apple TV app (tvos/) has its own workflow
+    paths-ignore: ["tvos/**", ".github/workflows/tvos.yml"]
   workflow_dispatch:
 
 permissions:
