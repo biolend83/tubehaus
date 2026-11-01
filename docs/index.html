@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TubeHaus</title>
+<meta name="description" content="A private YouTube client with no Google account and no tracking. Apps for Android, Android TV, Windows, macOS, Linux and iPad, or self-host it with Docker. Free and open source.">
+<meta property="og:title" content="TubeHaus">
+<meta property="og:description" content="A private YouTube client with no Google account and no tracking. Free and open source.">
+<meta property="og:image" content="https://biolend83.github.io/tubehaus/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  :root { --bg: #f6f8fb; --fg: #14283f; --muted: #52637a; --card: #fff; --line: #dfe5ee; --teal: #14a394; --teal-bg: #2dd4bf; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1c2d; --fg: #eaf0f7; --muted: #9fb0c5; --card: #16263b; --line: #24364e; --teal: #2dd4bf; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--teal); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+  header { display: flex; align-items: center; gap: 12px; padding: 20px 0; }
+  header img { width: 40px; height: 40px; }
+  header b { font-size: 20px; }
+  header nav { margin-left: auto; display: flex; gap: 18px; font-size: 15px; }
+  header nav a { color: var(--muted); text-decoration: none; }
+  .hero { text-align: center; padding: 40px 0 24px; }
+  .hero h1 { font-size: clamp(30px, 6vw, 48px); line-height: 1.15; margin: 0 0 14px; letter-spacing: -0.02em; }
+  .hero p { color: var(--muted); font-size: 19px; max-width: 640px; margin: 0 auto 26px; }
+  .btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1px solid var(--line); color: var(--fg); background: var(--card); }
+  .btn.primary { background: var(--teal-bg); border-color: var(--teal-bg); color: #0b2230; }
+  .shot { display: block; width: 100%; height: auto; border-radius: 14px; margin: 34px 0 10px; border: 1px solid var(--line); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 40px 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; }
+  .card h3 { margin: 0 0 6px; font-size: 18px; }
+  .card p { margin: 0; color: var(--muted); font-size: 16px; }
+  h2 { font-size: 26px; margin: 50px 0 14px; }
+  ul.dl { padding-left: 20px; }
+  ul.dl li { margin: 4px 0; }
+  .note { color: var(--muted); font-size: 15px; }
+  footer { border-top: 1px solid var(--line); margin-top: 56px; padding: 26px 0 40px; color: var(--muted); font-size: 14px; }
+  footer .badges { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  @media (max-width: 560px) { header nav { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="icon.svg" alt="">
+    <b>TubeHaus</b>
+    <nav>
+      <a href="#apps">Apps</a>
+      <a href="#server">Server</a>
+      <a href="https://github.com/biolend83/tubehaus">GitHub</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>YouTube, without the Google account.</h1>
+    <p>TubeHaus is a free, open-source YouTube client with no tracking and no ads. Install the app on your TV, phone, computer or iPad, or run it on your own server for the whole household.</p>
+    <div class="btns">
+      <a class="btn primary" href="https://github.com/biolend83/tubehaus/releases/latest">Get the app</a>
+      <a class="btn" href="https://github.com/biolend83/tubehaus#quick-start-docker">Run the server</a>
+    </div>
+    <img class="shot" src="devices.jpg" alt="TubeHaus on Android TV, iPad and an Android phone" width="2400" height="666">
+  </section>
+
+  <div class="grid">
+    <div class="card"><h3>No account, no tracking</h3><p>Subscriptions, history and playlists stay on your device or your own server, not in a Google account.</p></div>
+    <div class="card"><h3>Looks like YouTube</h3><p>Same layout and keyboard shortcuts, so there is nothing new to learn.</p></div>
+    <div class="card"><h3>Made for the TV too</h3><p>A TV mode that works with a remote, on Android TV and Google TV.</p></div>
+    <div class="card"><h3>SponsorBlock built in</h3><p>Skip sponsor segments and intros automatically.</p></div>
+    <div class="card"><h3>Downloads and background play</h3><p>Save videos for offline, keep audio playing with the screen off, picture-in-picture.</p></div>
+    <div class="card"><h3>Free and open source</h3><p>AGPL-3.0. Read the code, build it yourself, or send a fix.</p></div>
+  </div>
+
+  <h2 id="apps">The app</h2>
+  <p>Each app has its own YouTube engine and talks to YouTube directly. Nothing else to set up.</p>
+  <ul class="dl">
+    <li><b>Android</b> phones, tablets and Android TV / Google TV (on TV: Downloader code <b>3155410</b>)</li>
+    <li><b>Windows</b>, <b>macOS</b> (Apple Silicon and Intel) and <b>Linux</b> (.deb, .rpm)</li>
+    <li><b>iPad / iPhone</b> (beta, installed with <a href="https://sideloadly.io/">Sideloadly</a>)</li>
+  </ul>
+  <p><a class="btn primary" href="https://github.com/biolend83/tubehaus/releases/latest">Download from GitHub Releases</a></p>
+
+  <h2 id="server">The server</h2>
+  <p>One <code>docker compose</code> on a home PC, a Raspberry Pi or a cheap cloud VM. Every device in the house watches in the browser and shares one library, and YouTube never sees your home address. Extras only on the server: live captions for live streams, send to TV, calm mode.</p>
+  <img class="shot" src="screenshot-home.jpg" alt="TubeHaus home screen in the browser" loading="lazy">
+  <p><a class="btn" href="https://github.com/biolend83/tubehaus#quick-start-docker">Quick start</a></p>
+
+  <h2>Who made this</h2>
+  <p>I'm not a programmer. I wanted YouTube on my TV and phone without a Google account, so I built TubeHaus. Most of the code is written with Claude Code, and I test every release on my own devices. Bug reports and ideas are welcome on <a href="https://github.com/biolend83/tubehaus/issues">GitHub</a>.</p>
+
+  <footer>
+    <div class="badges">
+      <a href="https://fazier.com" target="_blank"><img src="https://fazier.com/api/v1//public/badges/launch_badges.svg?badge_type=launched&theme=light" width=120 alt="Fazier badge" /></a>
+      <a href="https://www.producthunt.com/products/tubehaus?launch=tubehaus">TubeHaus on Product Hunt</a>
+    </div>
+    Independent open-source software, not affiliated with YouTube or Google. · <a href="https://github.com/biolend83/tubehaus">Source on GitHub</a>
+  </footer>
+</div>
+</body>
+</html>
