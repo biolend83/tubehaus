@@ -70,6 +70,13 @@ fun main() = runBlocking {
         val code = r.code; r.close()
         "${s.client}: ${s.title} | ${s.video.size} video ${s.audio.size} audio ${s.captions.size} captions | ${v.height}p ${v.codecs} -> HTTP $code | mpd ${Dash.manifest(s, listOf("vp9")).length}B"
     }
+    // a video with dubs: the original language must be the default track
+    check("stream dubs") {
+        val s = YouTube.stream("0e3GPea1Tyg")
+        val tracks = s.audio.distinctBy { it.audioTrack }
+        val main = tracks.filter { it.audioDefault }.map { "${it.audioLang}/${it.audioContent}" }
+        "${tracks.size} tracks, default $main, others ${tracks.filter { !it.audioDefault }.take(4).map { "${it.audioLang}/${it.audioContent}" }}"
+    }
     check("stream short") { YouTube.stream("SxEAxK_Eb3Q").let { "${it.client}: ${it.title} ${it.lengthSec}s ${it.keywords.take(3)}" } }
     check("stream zoo") {
         val s = YouTube.stream("jNQXAC9IVRw")

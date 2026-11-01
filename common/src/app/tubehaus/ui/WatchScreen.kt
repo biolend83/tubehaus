@@ -50,7 +50,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -100,7 +114,7 @@ fun WatchScreen(app: AppState) {
                             modifier = Modifier.padding(top = 10.dp))
                     }
                 } else {
-                    LazyColumn(Modifier.weight(1f).padding(16.dp)) {
+                    LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp)) {
                         item { PlayerBox(app) }
                         under(app, v)
                     }
@@ -150,8 +164,21 @@ private fun PlayerBox(app: AppState, sideGestures: Boolean = false) {
     val pb = app.playback
     val st by app.platform.player.state.collectAsState()
     val touch = app.platform.touch
+    // Ambient mode: in the dark theme the video's colours glow around it, a fresh frame each second
+    val showing = pb.error == null && !pb.loading && st.videoId == pb.video?.id
+    val ambient = app.store.settings.state.collectAsState().value.ambient && MaterialTheme.colorScheme.background.luminance() < 0.3f
+    var glow by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(ambient && showing, st.videoId) {
+        glow = null
+        if (!ambient || !showing) return@LaunchedEffect
+        while (true) {
+            app.platform.player.frame()?.let { glow = it }
+            // paused: the picture only changes when you seek
+            delay(if (app.platform.player.state.value.playing) 1000 else 2500)
+        }
+    }
     Box(
-        Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)
+        Modifier.fillMaxWidth().aspectRatio(16f / 9f).ambientGlow(glow).background(Color.Black)
             // touch screens: swipe the video down to keep it playing in the mini player and go back
             .pointerInput(touch) {
                 if (!touch) return@pointerInput
@@ -185,6 +212,60 @@ private fun PlayerBox(app: AppState, sideGestures: Boolean = false) {
         }
     }
     st.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp)) }
+}
+
+/**
+ * Draws [frame] (a small blurred picture of the video) stretched past the edges of what follows,
+ * fading out a little way above and to the sides and further below; each new frame fades in over
+ * the last one.
+ */
+@Composable
+private fun Modifier.ambientGlow(frame: ImageBitmap?): Modifier {
+    var last by remember { mutableStateOf<ImageBitmap?>(null) }
+    var now by remember { mutableStateOf<ImageBitmap?>(null) }
+    val fade = remember { Animatable(1f) }
+    LaunchedEffect(frame) {
+        if (frame === now) return@LaunchedEffect
+        last = now
+        now = frame
+        fade.snapTo(0f)
+        fade.animateTo(1f, tween(900))
+    }
+    if (last == null && now == null) return this
+    return drawBehind {
+        val w = size.width
+        val h = size.height
+        val area = Rect(-w * 0.12f, -h * 0.3f, w * 1.12f, h * 1.8f)
+        val p = fade.value
+        drawIntoCanvas { c ->
+            c.saveLayer(area, Paint())
+            fun img(b: ImageBitmap?, alpha: Float) {
+                if (b == null || alpha <= 0f) return
+                drawImage(b, IntOffset.Zero, IntSize(b.width, b.height), IntOffset(area.left.toInt(), area.top.toInt()),
+                    IntSize(area.width.toInt(), area.height.toInt()), alpha = alpha * 0.6f, filterQuality = FilterQuality.Low)
+            }
+            img(last, 1f - p)
+            img(now, p)
+            // fade toward the edges: down, then across
+            drawRect(
+                Brush.verticalGradient(
+                    0f to Color.Transparent, (-area.top / area.height) to Color.Black,
+                    ((h - area.top) / area.height) to Color.Black, 1f to Color.Transparent,
+                    startY = area.top, endY = area.bottom,
+                ),
+                area.topLeft, area.size, blendMode = BlendMode.DstIn,
+            )
+            drawRect(
+                Brush.horizontalGradient(
+                    0f to Color.Transparent, (-area.left / area.width) to Color.Black,
+                    ((w - area.left) / area.width) to Color.Black, 1f to Color.Transparent,
+                    startX = area.left, endX = area.right,
+                ),
+                area.topLeft, area.size, blendMode = BlendMode.DstIn,
+            )
+            c.restore()
+        }
+    }
 }
 
 @Composable

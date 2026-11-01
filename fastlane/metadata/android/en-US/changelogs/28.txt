@@ -1,0 +1,3 @@
+- Korean and other videos start in their original audio, not YouTube's English auto-dub; pick another track under Settings
+- Captions look like YouTube's: white text on a see-through dark box, a little above the bottom
+- Ambient mode: in the dark theme the video's colours glow softly around it
