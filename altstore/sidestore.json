@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "0.5.10",
+          "buildVersion": "27",
+          "date": "2026-11-01T04:00:00+00:00",
+          "localizedDescription": "Same version as the Android fix release; no changes on iPad and iPhone.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.10/TubeHaus-0.5.10-ipad.ipa",
+          "size": 15700438,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "0.5.9",
           "buildVersion": "26",
           "date": "2026-10-31T13:00:00+00:00",
@@ -59,11 +68,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "0.5.9",
-      "versionDate": "2026-10-31T13:00:00+00:00",
-      "versionDescription": "The channel picture on the watch page shows again when YouTube leaves it out.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.9/TubeHaus-0.5.9-ipad.ipa",
-      "size": 15700689
+      "version": "0.5.10",
+      "versionDate": "2026-11-01T04:00:00+00:00",
+      "versionDescription": "Same version as the Android fix release; no changes on iPad and iPhone.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.10/TubeHaus-0.5.10-ipad.ipa",
+      "size": 15700438
     }
   ],
   "news": [],
