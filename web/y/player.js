@@ -1,6 +1,6 @@
 // YouTube-style player: controls, captions, storyboards, chapters and SponsorBlock drawn on top of Shaka (DASH/HLS).
 // Built once and reused (moving between pages continues seamlessly in the mini player).
-import { $, $$, el, esc, icon, fmtTime, settings, toast, copy, localUrl, parseT, toGate, SERVER_MAX_H, PUBLIC } from "./util.js";
+import { $, $$, el, esc, icon, fmtTime, settings, toast, copy, localUrl, parseT, toGate, SERVER_MAX_H, PUBLIC, IPHONE } from "./util.js";
 import { $t, LANG, LANGS } from "./i18n.js";
 
 const isTouch = matchMedia("(pointer: coarse)").matches;
@@ -169,7 +169,8 @@ export class Player {
     v.muted = false;
     this.autoMuted = false;
     this.q = (s) => $(s, r);
-    if (!document.pictureInPictureEnabled) this.q(".b-pip").remove();
+    // iOS offers no Picture-in-Picture to an app installed on the home screen (webkitSupportsPresentationMode is false there)
+    if ((!document.pictureInPictureEnabled && !IPHONE) || (IPHONE && navigator.standalone)) this.q(".b-pip").remove();
     this.bindVideo();
     this.bindControls();
     this.bindProgress();
@@ -207,7 +208,10 @@ export class Player {
 
   // ------------------------------------------------------------ load
   async load(info, { start = 0, autoplay = true } = {}) {
-    await this.init();
+    // iPhone: Safari's own player (HLS) instead of Shaka. Shaka runs on ManagedMediaSource there, which starts with a
+    // black picture, has no Picture-in-Picture over other apps and no AirPlay
+    let native = this.native = IPHONE && settings.nativeIphone && !(info.liveNow && !info.hlsUrl);
+    if (!native) await this.init();
     this.info = info;
     this.live = !!(info.liveNow && info.hlsUrl);
     this.lockH = null;
@@ -222,6 +226,7 @@ export class Player {
     this.closeMenu();
     const r = this.root;
     r.classList.toggle("live", this.live);
+    r.classList.toggle("native", native);
     r.classList.remove("ended");
     this.q(".ytp-title").textContent = info.title;
     this.q(".ytp-poster").style.backgroundImage = `url(/vi/${info.videoId}/maxres.jpg), url(/vi/${info.videoId}/hqdefault.jpg)`;
@@ -229,28 +234,71 @@ export class Player {
     this.chapters = this.live ? [] : parseChapters(info.description, info.lengthSeconds);
     this.sb = this.pickStoryboard(info.storyboards);
     this.drawSegs();
-    this.sp.configure("streaming.bufferingGoal", TV_DEVICE ? 20 : settings.dataSaver ? 30 : this.live ? 30 : 120);
-    // the cap applies from the first segment (so a TV does not start with 4K/8K and switch late)
-    this.sp.configure("abr.restrictions.maxHeight", this.live ? Infinity : this.capHeight());
-    if (TV_DEVICE) this.sp.configure({ streaming: { segmentPrefetchLimit: 2, bufferBehind: 10 } });
-    const src = this.live ? info.hlsUrl.replace(/^https?:\/\/[^/]+/, "") : `/api/manifest/dash/id/${info.videoId}?local=true`;
     r.classList.add("buffering");
-    try {
-      await this.sp.load(src, this.live ? null : start || 0);
-    } catch (e) {
-      if (e && e.code === 7000) return;   // interrupted by switching to another video
-      this.onError(e);
-      return;
+    if (native && !(await this.loadNative(info, start))) {
+      if (this.info !== info) return;
+      // the server could not make HLS for this video: Shaka plays it
+      native = this.native = false;
+      r.classList.remove("native", "buffering");
+      this.hideErr();
+      await this.init();
+      r.classList.add("buffering");
+    }
+    if (!native) {
+      this.releaseNative();
+      this.sp.configure("streaming.bufferingGoal", TV_DEVICE ? 20 : settings.dataSaver ? 30 : this.live ? 30 : 120);
+      // the cap applies from the first segment (so a TV does not start with 4K/8K and switch late)
+      this.sp.configure("abr.restrictions.maxHeight", this.live ? Infinity : this.capHeight());
+      if (TV_DEVICE) this.sp.configure({ streaming: { segmentPrefetchLimit: 2, bufferBehind: 10 } });
+      const src = this.live ? info.hlsUrl.replace(/^https?:\/\/[^/]+/, "") : `/api/manifest/dash/id/${info.videoId}?local=true`;
+      try {
+        await this.sp.load(src, this.live ? null : start || 0);
+      } catch (e) {
+        if (e && e.code === 7000) return;   // interrupted by switching to another video
+        this.onError(e);
+        return;
+      }
     }
     this.video.playbackRate = settings.rememberSpeed ? (+settings.speed || 1) : (+sessionStorage.getItem("yt.speed") || 1);
-    await this.rateTracks();
-    this.applyDefaultQuality();
+    if (!native) {
+      await this.rateTracks();
+      this.applyDefaultQuality();
+    }
     this.dropWatch();
     this.setupCaptions();
     this.syncQualityLabel();
     this.mediaSession();
     sponsorSegments(info.videoId).then((s) => { if (this.info === info) { this.segments = s; this.drawSegs(); } });
     if (autoplay) this.play();
+  }
+
+  // native path (see load): the browser's own player. VOD comes as the HLS the server builds from the MP4 streams
+  // (/api/p/hls), live as the server's live HLS. Resolves false if superseded or if the stream would not start
+  async loadNative(info, start) {
+    const v = this.video;
+    if (this.sp) await this.sp.unload().catch(() => { });   // let go of Shaka's MediaSource
+    if (this.info !== info) return false;
+    v.disableRemotePlayback = false;
+    this.nativeSrc = true;
+    v.src = this.live ? info.hlsUrl.replace(/^https?:\/\/[^/]+/, "") : `/api/p/hls/${info.videoId}.m3u8`;
+    try {
+      await new Promise((ok, no) => {
+        const ac = new AbortController();
+        v.addEventListener("loadedmetadata", () => { ac.abort(); ok(); }, { signal: ac.signal });
+        v.addEventListener("error", () => { ac.abort(); no(v.error); }, { signal: ac.signal });
+      });
+    } catch {
+      return false;
+    }
+    if (this.info !== info) return false;
+    if (start && !this.live) v.currentTime = start;
+    return true;
+  }
+  releaseNative() {
+    if (!this.nativeSrc) return;
+    this.nativeSrc = false;
+    this.video.removeAttribute("src");
+    this.video.load();
   }
 
   play() {
@@ -289,11 +337,13 @@ export class Player {
   }
   range() {
     if (this.live && this.sp) { const s = this.sp.seekRange(); return [s.start, s.end]; }
+    if (this.live && this.native) { const s = this.video.seekable; return s.length ? [s.start(0), s.end(s.length - 1)] : [0, 0]; }
     return [0, this.video.duration || this.info?.lengthSeconds || 0];
   }
   stop() {
     this.video.pause();
     if (this.sp) this.sp.unload().catch(() => { });
+    this.releaseNative();
     this.info = null;
   }
 
@@ -428,7 +478,7 @@ export class Player {
   // ------------------------------------------------------------ captions
   captionList() {
     // YouTube gives no captions for live streams -> our server transcribes the audio (whisper)
-    if (this.live && this.info) return [{ label: $t("자동 받아쓰기 (실시간)"), lang: "auto", url: `live:${this.info.videoId}`, liveCc: true }];
+    if (this.live && this.info) return this.native ? [] : [{ label: $t("자동 받아쓰기 (실시간)"), lang: "auto", url: `live:${this.info.videoId}`, liveCc: true }];
     const list = (this.info?.captions || []).map((c) => ({ label: c.label, lang: c.language_code, url: c.url.replace(/^https?:\/\/[^/]+/, "") }));
     if (this.info && !this.live && !list.some((c) => c.lang.startsWith(LANG) && !/auto/i.test(c.label)) && list.length) {
       const name = (LANGS.find(([c]) => c === LANG) || [, LANG])[1];
@@ -693,6 +743,7 @@ export class Player {
     });
     v.addEventListener("enterpictureinpicture", () => r.classList.add("pip"));
     v.addEventListener("leavepictureinpicture", () => r.classList.remove("pip"));
+    v.addEventListener("webkitpresentationmodechanged", () => r.classList.toggle("pip", v.webkitPresentationMode === "picture-in-picture"));
   }
   setBuffering(on) {
     // a spinner shown for every tiny wait (segment boundaries etc.) looks like flicker -> only after 0.4 s
@@ -849,7 +900,13 @@ export class Player {
     else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();   // iPhone
   }
   async pip() {
+    const v = this.video;
     try {
+      // iPhone's native player: Safari's own Picture-in-Picture, the one that floats over other apps
+      if (this.native && v.webkitSupportsPresentationMode?.("picture-in-picture")) {
+        v.webkitSetPresentationMode(v.webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture");
+        return;
+      }
       if (document.pictureInPictureElement) await document.exitPictureInPicture();
       else await this.video.requestPictureInPicture();
     } catch { toast($t("PIP 를 열 수 없어요")); }
@@ -891,7 +948,7 @@ export class Player {
         tog("ambient", "ambient", $t("앰비언트 모드"), settings.ambient),
         caps.length ? row("go:cc", "cc", `${$t("자막 ({0})", caps.length)}`, this.capTrack ? esc(this.capTrack.label) : $t("사용 안함")) : "",
         row("go:speed", "speed", $t("재생 속도"), v.playbackRate === 1 ? $t("표준") : v.playbackRate + ""),
-        this.live && !this.tracks().length ? "" : row("go:quality", "tune", $t("화질"), this.qLabel(t)),
+        this.native || (this.live && !this.tracks().length) ? "" : row("go:quality", "tune", $t("화질"), this.qLabel(t)),
         auds.length > 1 ? row("go:audio", "audio", $t("오디오 트랙"), esc(this.curAudio() || "")) : "",
         row("go:sleep", "timer", $t("수면 타이머"), sleepTxt),
         tog("loop", "loop", $t("반복 재생"), v.loop),

@@ -6,7 +6,7 @@
   --line: #e5e5e5; --hover: #ebebeb; --chip: #f2f2f2; --chip-h: #e5e5e5; --chip-on: #030303; --chip-on-fg: #fff;
   --input: #fff; --input-line: #c0c0c0; --sbtn: #f8f8f8; --red: #ff0000; --blue: #065fd4; --pop: #fff;
   --shadow: 0 4px 32px rgba(0,0,0,.12), 0 0 0 1px rgba(0,0,0,.06);
-  --mast: 56px; --mg: 72px; --guide: 240px;
+  --sat: env(safe-area-inset-top, 0px); --mastc: 56px; --mast: calc(var(--mastc) + var(--sat)); --mg: 72px; --guide: 240px;
   --font: Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif;
   color-scheme: light;
 }
@@ -36,7 +36,7 @@ img { display: block; }
 
 /* ------------------------------------------------ header */
 #mast { position: fixed; z-index: 300; top: 0; left: 0; right: 0; height: var(--mast); display: flex; align-items: center; justify-content: space-between;
-  background: var(--bg2); border-bottom: 1px solid var(--line); padding: 0 16px; gap: 8px; }
+  background: var(--bg2); border-bottom: 1px solid var(--line); padding: var(--sat) max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); gap: 8px; }
 .m-start { display: flex; align-items: center; gap: 16px; flex: none; }
 .logo { display: flex; align-items: center; gap: 4px; height: 40px; padding: 0 2px; }
 .logo-ic { width: 29px; height: 20px; }
@@ -78,11 +78,11 @@ img { display: block; }
 #mguide a:hover { background: var(--hover); }
 #mguide a.act .ic { color: var(--red); }
 #guide { position: fixed; z-index: 400; top: 0; bottom: 0; left: 0; width: var(--guide); background: var(--bg2); overflow-y: auto; transform: translateX(-100%);
-  transition: transform .2s; padding-bottom: 24px; overscroll-behavior: contain; }
+  transition: transform .2s; padding-top: var(--sat); padding-bottom: 24px; overscroll-behavior: contain; }
 body.guide-open #guide { transform: none; }
 #scrim { position: fixed; inset: 0; z-index: 390; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .2s; }
 body.guide-open #scrim { opacity: 1; pointer-events: auto; }
-.g-head { height: var(--mast); display: flex; align-items: center; gap: 16px; padding: 0 16px; }
+.g-head { height: var(--mastc); display: flex; align-items: center; gap: 16px; padding: 0 16px; }
 .g-sec { padding: 12px 0; border-bottom: 1px solid var(--line); }
 .gi { display: flex; align-items: center; gap: 24px; height: 40px; padding: 0 24px; font-size: 14px; width: 100%; text-align: left; }
 .gi span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -571,7 +571,7 @@ body[data-route="shorts"] { overflow: hidden; }
 .ytp.mini .ytp-unmute { top: 6px; left: 6px; padding: 4px 10px 4px 6px; font-size: 12px; }
 .ytp-skipbtn .ic { width: 20px; height: 20px; }
 .ytp-top { position: absolute; left: 0; right: 0; top: 0; padding: 14px 20px 40px; background: linear-gradient(rgba(0,0,0,.6), transparent); z-index: 9; opacity: 0; transition: opacity .2s; pointer-events: none; display: none; }
-.ytp.fs .ytp-top { display: block; }
+.ytp.fs .ytp-top { display: block; padding-top: calc(14px + var(--sat)); }
 .ytp.ctl .ytp-top { opacity: 1; }
 .ytp-title { font-size: 18px; text-shadow: 0 0 2px rgba(0,0,0,.5); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ytp-center { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; gap: 15%; z-index: 9; pointer-events: none; opacity: 0; transition: opacity .2s; background: rgba(0,0,0,.35); }
@@ -650,6 +650,7 @@ body[data-route="shorts"] { overflow: hidden; }
 @container (max-width: 560px) {
   .ytp .b-theater, .ytp .b-mini, .ytp .b-pip, .ytp .ytp-chap { display: none !important; }
   .ytp-bar button { width: 40px; }
+  .ytp.native .b-pip { display: flex !important; }   /* iPhone's native player: the one PiP button, always */
   .ytp-bar .ic { width: 24px; height: 24px; }
   .ytp-bottom { padding: 0 6px; }
 }
@@ -705,6 +706,7 @@ body[data-route="shorts"] { overflow: hidden; }
 .ytp.mini .ytp-prog { margin: 0; padding: 0; height: 3px; pointer-events: none; }
 .ytp.mini .ytp-scrub { display: none; }
 .ytp.fs { position: fixed !important; inset: 0 !important; z-index: 1000; }
+.ytp.fs .ytp-stats, .ytp.fs .ytp-unmute { top: calc(10px + var(--sat)); }
 .ytp.fs .ytp-bar { height: 54px; }
 .ytp.fs .ytp-bar .ic { width: 34px; height: 34px; }
 
@@ -772,6 +774,7 @@ body[data-route="shorts"] { overflow: hidden; }
   .sv-nav { display: none; }
   body[data-route="shorts"] #mast { display: none; }
   body[data-route="shorts"] { padding-top: 0; }
+  body[data-route="shorts"] .ytp-unmute { top: calc(12px + var(--sat)); }
   .shorts-view { height: calc(100dvh - 48px); }
   .ytp-chap { max-width: 120px; }
   .ytp-menu { left: 8px; right: 8px; bottom: 8px; min-width: 0; border-radius: 12px; }
@@ -815,7 +818,7 @@ body[data-route="shorts"] { overflow: hidden; }
 }
 
 /* ================================================= TV mode (Android TV remote) */
-html.tv { --mast: 64px; }
+html.tv { --mastc: 64px; }
 html.tv body { font-size: 17px; }
 html.tv :focus { outline: none; }
 html.tv a:focus, html.tv button:focus, html.tv input:focus, html.tv select:focus, html.tv [data-tvfocus]:focus {
