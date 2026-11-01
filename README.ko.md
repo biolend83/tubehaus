@@ -2,6 +2,7 @@
 한국인이 만들었어요!
 [![Featured in selfh.st Weekly](https://img.shields.io/badge/featured%20in-selfh.st%20weekly-2ea44f)](https://selfh.st/weekly/2026-10-23/)
 [![TubeHaus on Product Hunt](https://img.shields.io/badge/Product%20Hunt-TubeHaus-DA552F?logo=producthunt&logoColor=white)](https://www.producthunt.com/products/tubehaus?launch=tubehaus)
+<a href="https://fazier.com" target="_blank"><img src="https://fazier.com/api/v1//public/badges/launch_badges.svg?badge_type=launched&theme=light" height="20" alt="Launched on Fazier"></a>
 
 [English](README.md) · **한국어**
 
