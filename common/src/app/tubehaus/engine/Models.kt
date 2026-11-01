@@ -63,6 +63,10 @@ data class Format(
     val drc: Boolean = false,
 ) {
     val isVideo get() = mime.startsWith("video")
+    /** the audio track's language ("ko", "en-US"), from its id ("ko.4"); null when the video has one track */
+    val audioLang: String? get() = audioTrack?.substringBefore('.')?.takeIf { it.isNotEmpty() }
+    /** what YouTube says the audio track is: "original", "dubbed-auto", "dubbed", "descriptive"... (xtags in the stream URL) */
+    val audioContent: String? get() = Regex("acont(?:=|%3D)([a-z-]+)", RegexOption.IGNORE_CASE).find(url)?.groupValues?.get(1)?.lowercase()
     val codecFamily: String
         get() = when {
             codecs.startsWith("av01") -> "av1"
@@ -73,6 +77,15 @@ data class Format(
             else -> codecs
         }
 }
+
+/**
+ * A video's audio tracks with the original language as the default. YouTube marks the dub in
+ * the request's language (English) as its default, so a Korean video started in an auto-dubbed
+ * English; the stream URLs say which track is the original.
+ */
+fun originalFirst(audio: List<Format>): List<Format> =
+    if (audio.none { it.audioContent == "original" }) audio
+    else audio.map { it.copy(audioDefault = it.audioContent == "original") }
 
 data class Caption(val lang: String, val name: String, val url: String, val auto: Boolean)
 
