@@ -1,0 +1,1 @@
+- Android 8 and 9: playing a video no longer closes the app
