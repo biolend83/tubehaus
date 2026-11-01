@@ -1,0 +1,38 @@
+{
+  "$schema": "https://flisk.sh/schema.service.json",
+  "schemaVersion": 1,
+  "appName": "tubehaus",
+  "appType": "bring-your-own",
+  "stack": "tubehaus",
+  "port": 3010,
+  "exposeViaProxy": false,
+  "env": {
+    "HT_INVIDIOUS": "http://invidious:3000",
+    "HT_COMPANION": "http://companion:8282",
+    "HT_PUBLIC_URL": "${TUBEHAUS_URL}",
+    "HT_SUB_LANG": "${TUBEHAUS_SUB_LANG:-en}",
+    "HT_WHISPER_LANG": "${TUBEHAUS_CAPTION_LANG:-auto}",
+    "HT_PUBLIC_MODE": "${TUBEHAUS_PUBLIC:-0}",
+    "HT_MAX_VIEWERS": "${TUBEHAUS_MAX_VIEWERS:-0}",
+    "HT_MAX_HEIGHT": "${TUBEHAUS_MAX_HEIGHT:-0}",
+    "HT_RATE_PER_MIN": "${TUBEHAUS_RATE_PER_MIN:-}"
+  },
+  "restart": "unless-stopped",
+  "container": {
+    "capAdd": [
+      "NET_ADMIN"
+    ],
+    "init": true
+  },
+  "volumes": [
+    {
+      "source": "tubehaus-data",
+      "target": "/data"
+    },
+    {
+      "source": "warp-data",
+      "target": "/var/lib/cloudflare-warp"
+    }
+  ],
+  "image": "ghcr.io/biolend83/tubehaus:latest"
+}

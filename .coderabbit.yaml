@@ -36,6 +36,12 @@ reviews:
     - path: "docker-compose.yml"
       instructions: >-
         Must keep working on both amd64 and arm64 and with only `cp .env.example .env` plus
+        the documented variables. The optional Flisk files (services/tubehaus/*/service.json)
+        must stay in step with it: same images, variables, volumes and ports.
+    - path: "services/**/service.json"
+      instructions: >-
+        Optional Flisk service definitions, one per container, mirroring docker-compose.yml.
+        Must keep working on both amd64 and arm64 and with only `cp .env.example .env` plus
         the documented variables.
 
 chat:

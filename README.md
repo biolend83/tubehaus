@@ -135,6 +135,8 @@ docker compose pull         # prebuilt images, amd64 and arm64
 docker compose up -d
 ```
 
+Already using [Flisk](https://flisk.sh)? The same stack runs with `flisk up` too: see [docs/FLISK.md](docs/FLISK.md) (optional; docker compose stays the main way).
+
 To build the TubeHaus image yourself instead (for example after changing the code), use
 `docker compose up -d --build`. The first build takes a few minutes because of whisper.cpp.
 

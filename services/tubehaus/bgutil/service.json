@@ -1,0 +1,12 @@
+{
+  "$schema": "https://flisk.sh/schema.service.json",
+  "schemaVersion": 1,
+  "appName": "bgutil",
+  "appType": "bring-your-own",
+  "stack": "tubehaus",
+  "port": 4416,
+  "image": "brainicism/bgutil-ytdlp-pot-provider",
+  "exposeViaProxy": false,
+  "restart": "unless-stopped",
+  "sidecarOf": "tubehaus"
+}
