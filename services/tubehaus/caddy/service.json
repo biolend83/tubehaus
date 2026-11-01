@@ -21,11 +21,11 @@
   "extraPorts": [
     {
       "port": 80,
-      "bind": "0.0.0.0"
+      "publish": "${TUBEHAUS_HTTP_BIND:-80}"
     },
     {
       "port": 443,
-      "bind": "0.0.0.0"
+      "publish": "${TUBEHAUS_HTTPS_BIND:-443}"
     }
   ],
   "volumes": [

@@ -51,7 +51,7 @@ jobs:
       # the optional Flisk setup (services/tubehaus); a Flisk-side problem doesn't block a release
       - name: flisk up --dry-run
         continue-on-error: true
-        run: cp .env.example .env && npx --yes @flisk-sh/flisk@1.4.25 up --dry-run
+        run: cp .env.example .env && npx --yes @flisk-sh/flisk@1.4.26 up --dry-run
 
       - name: Shell scripts
         run: bash -n deploy/entrypoint.sh
