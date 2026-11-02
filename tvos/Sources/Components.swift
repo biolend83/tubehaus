@@ -221,9 +221,9 @@ extension View {
 /// what the remote is on grows a little and gets a teal ring (for round pictures and chips,
 /// where the square .card look doesn't fit)
 struct Lift: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View { Body(configuration: configuration) }
+    func makeBody(configuration: Configuration) -> some View { Focused(configuration: configuration) }
 
-    private struct Body: View {
+    private struct Focused: View {
         let configuration: ButtonStyleConfiguration
         @Environment(\.isFocused) private var focused
 
