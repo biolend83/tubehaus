@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.2.0</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>
@@ -33,6 +33,9 @@
 		<true/>
 	</dict>
 	<key>UIUserInterfaceStyle</key>
-	<string>Automatic</string>
+	<string>Dark</string>
+	<!-- the import screen: a phone on the same network sends its subscriptions file to this TV -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>To receive your subscriptions from a phone on the same network.</string>
 </dict>
 </plist>

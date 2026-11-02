@@ -60,21 +60,27 @@ jobs:
           xcrun simctl boot "$udid"; xcrun simctl bootstatus "$udid" -b
           xcrun simctl install "$udid" "$app"
           mkdir -p shots
-          # Home with no subscriptions: topic rows from search
-          xcrun simctl launch "$udid" $id; sleep 30
-          xcrun simctl io "$udid" screenshot shots/1-home.png
-          xcrun simctl terminate "$udid" $id || true
-          # one video page (streams, details and the related row all come from engine.js)
-          xcrun simctl launch "$udid" $id -open jNQXAC9IVRw; sleep 30
-          xcrun simctl io "$udid" screenshot shots/2-video.png
-          xcrun simctl terminate "$udid" $id || true
+          shot() { xcrun simctl io "$udid" screenshot "shots/$1.png"; }
+          run() { xcrun simctl terminate "$udid" $id 2>/dev/null || true; xcrun simctl launch "$udid" $id "$@"; }
+          # first start: topics to pick
+          run; sleep 25; shot 01-topics
+          # Home from picked topics
+          run -pick Music,Science; sleep 45; shot 02-home
+          # the import screen, then a YouTube Takeout file sent to it as a phone would
+          run -tab subscriptions -import YES; sleep 15; shot 03-import
+          curl -sS --max-time 60 -X POST -H "Content-Type: text/plain" --data-binary @tvos/ci/subscriptions.csv http://127.0.0.1:8080/import || echo "import failed"
+          echo; sleep 10; shot 04-imported
+          run -tab subscriptions; sleep 40; shot 05-subscriptions
+          run -tab search -q "lofi hip hop"; sleep 30; shot 06-search
+          run -tab library; sleep 8; shot 07-library
+          run -tab settings; sleep 8; shot 08-settings
+          # one video page (streams, details, related videos and comments all come from engine.js)
+          run -open jNQXAC9IVRw; sleep 35; shot 09-video
           # and playing it
-          xcrun simctl launch "$udid" $id -open aqz-KE-bpKQ -autoplay YES; sleep 40
-          xcrun simctl io "$udid" screenshot shots/3-playing.png
-          sleep 20
-          xcrun simctl io "$udid" screenshot shots/4-still-playing.png
+          run -open aqz-KE-bpKQ -autoplay YES; sleep 40; shot 10-playing
+          sleep 20; shot 11-still-playing
           xcrun simctl terminate "$udid" $id || true
-          xcrun simctl spawn "$udid" log show --last 5m --style compact --predicate 'process == "TubeHaus"' > shots/app.log 2>&1 || true
+          xcrun simctl spawn "$udid" log show --last 15m --style compact --predicate 'process == "TubeHaus"' > shots/app.log 2>&1 || true
           tail -60 shots/app.log
           ls ~/Library/Logs/DiagnosticReports/ | grep -i tubehaus && cp ~/Library/Logs/DiagnosticReports/*TubeHaus* shots/ || echo "no crash report"
       - uses: actions/upload-artifact@v4

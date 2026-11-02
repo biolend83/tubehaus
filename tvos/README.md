@@ -4,9 +4,14 @@ A SwiftUI app for tvOS 17+. It runs the same YouTube engine as the iPad app
 ([`ios/engine/engine.js`](../ios/engine/engine.js)) in JavaScriptCore and plays videos with
 Apple's own player (HLS), so the Siri Remote, subtitles and AirPlay work as in any Apple TV app.
 
-- Home: continue watching, then the newest videos from your subscriptions
-- Search with suggestions, channels, playlists, "Up next" on every video
-- Subscriptions, Watch later and history, kept on the Apple TV only (no account, no server)
+- Home: continue watching, new uploads from your subscriptions, and recommendations worked out on the
+  TV from what you watch and like (the same recommender as the Android app; nothing leaves the TV)
+- Import your subscriptions with your phone: scan the QR code and send a YouTube Takeout, NewPipe,
+  FreeTube, Invidious, TubeHaus or OPML file (or paste channel links) over your home network
+- Subtitles (YouTube's own tracks, or auto-translated into the TV's language) and playback speed in
+  the player's top bar; the next video in "Up next" plays on its own (Settings)
+- Search with suggestions and recent searches, channels, playlists, comments, likes, Watch later
+  and history, kept on the Apple TV only (no account, no server)
 - The engine updates itself from GitHub, so a YouTube change doesn't need a new install
 
 ## Installing
