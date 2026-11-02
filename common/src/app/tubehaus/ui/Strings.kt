@@ -40,6 +40,7 @@ private val KO = mapOf(
     "About" to "정보",
     "Auto" to "자동",
     "Audio track" to "오디오 트랙",
+    "(original)" to "(원본)",
     "Ambient mode" to "영화 조명 효과",
     "In the dark theme, the video's colours glow softly around it" to "어두운 테마에서 영상의 색이 주변으로 은은하게 번져요",
     "Auto-translate" to "자동 번역",
