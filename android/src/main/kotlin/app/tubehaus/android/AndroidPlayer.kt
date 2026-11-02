@@ -1,6 +1,9 @@
 package app.tubehaus.android
 
+import android.app.UiModeManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
@@ -35,6 +38,7 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.text.Cue
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.util.Util
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -49,6 +53,7 @@ import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import app.tubehaus.engine.Caption
 import app.tubehaus.engine.Dash
+import app.tubehaus.engine.Format
 import app.tubehaus.engine.Net
 import app.tubehaus.engine.Stream
 import app.tubehaus.engine.YouTube
@@ -86,6 +91,12 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
     override val state: StateFlow<PlayerState> = st
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    /** a TV (the same test as TubeApp's): only there is the video fitted to the set, see [decodes] and the read-ahead below */
+    private val tv: Boolean by lazy {
+        (ctx.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager).currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+            ctx.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    }
+
     private val dataSource = DefaultDataSource.Factory(ctx, OkHttpDataSource.Factory(Net.client))
 
     val exo: ExoPlayer = ExoPlayer.Builder(ctx)
@@ -95,12 +106,12 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         .setSeekBackIncrementMs(10_000)
         .setSeekForwardIncrementMs(10_000)
         // read far ahead (up to 5 minutes, within ExoPlayer's memory budget) so a slow patch of network doesn't stop the video;
-        // Settings → Read further ahead: up to 20 minutes, with up to 400 MB for it
+        // Settings → Read further ahead: up to 20 minutes, with up to 400 MB for it (150 MB on a TV: many have little memory)
         .setLoadControl(
             DefaultLoadControl.Builder()
                 .setBufferDurationsMs(60_000, if (longBuffer) 1_200_000 else 300_000, 1_500, 3_000)
                 .setBackBuffer(30_000, true)
-                .apply { if (longBuffer) setTargetBufferBytes(400 * 1024 * 1024).setPrioritizeTimeOverSizeThresholds(true) }
+                .apply { if (longBuffer) setTargetBufferBytes((if (tv) 150 else 400) * 1024 * 1024).setPrioritizeTimeOverSizeThresholds(true) }
                 .build(),
         )
         .build()
@@ -128,6 +139,29 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             add("h264")
             add("vp9"); add("av1")
         }.distinct()
+    }
+
+    private val decoders by lazy { MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { !it.isEncoder } }
+
+    /** the screen in pixels (a TV's panel, not its smaller menu resolution) */
+    private val screen by lazy { Util.getCurrentDisplayModeSize(ctx) }
+
+    /**
+     * For a TV: whether the screen shows more than the size below and a hardware decoder takes this size at this
+     * frame rate. Some TVs freeze outright on 8K (or 8K at 60) rather than fail, and software decoding 4K stutters on them.
+     */
+    private fun decodes(f: Format): Boolean {
+        val type = when (f.codecFamily) { "av1" -> "video/av01"; "vp9" -> "video/x-vnd.on2.vp9"; "h264" -> "video/avc"; else -> return true }
+        if (f.width <= 0 || f.height <= 0) return true
+        // the short sides: a 4096x2160 film still counts as 4K, a vertical video by its width
+        if (screen.x > 0 && screen.y > 0 && minOf(f.width, f.height) > minOf(screen.x, screen.y)) return false
+        return decoders.any { c ->
+            isHardware(c) && type in c.supportedTypes.map { it.lowercase() } &&
+                runCatching {
+                    val v = c.getCapabilitiesForType(type).videoCapabilities ?: return@runCatching true
+                    if (f.fps > 0) v.areSizeAndRateSupported(f.width, f.height, f.fps.toDouble()) else v.isSizeSupported(f.width, f.height)
+                }.getOrDefault(true)
+        }
     }
 
     /** isHardwareAccelerated is Android 10+; before that, the software decoders are the ones named OMX.google.* / c2.android.* */
@@ -232,7 +266,11 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         if (s.live || s.video.isEmpty()) {
             b.setUri(s.hls).setMimeType(MimeTypes.APPLICATION_M3U8)
         } else {
-            val mpd = Dash.manifest(s, codecs)
+            val mpd = if (!tv) Dash.manifest(s, codecs) else {
+                // on a TV the codec that reaches the highest quality there first (say VP9 at 4K over AV1 that stops at 1080p)
+                val best = codecs.sortedByDescending { c -> s.video.filter { it.codecFamily == c && it.indexRange != null && decodes(it) }.maxOfOrNull { it.height } ?: 0 }
+                Dash.manifest(s, best, plays = ::decodes)
+            }
             b.setUri("data:application/dash+xml;base64," + Base64.encodeToString(mpd.toByteArray(), Base64.NO_WRAP))
                 .setMimeType(MimeTypes.APPLICATION_MPD)
         }
