@@ -1,5 +1,18 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.layout
+import app.tubehaus.engine.Sys
+import androidx.compose.foundation.text.selection.SelectionContainer
 import kotlin.math.pow
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.focus.FocusRequester
@@ -406,7 +419,7 @@ private fun TouchOverlay(
                 if (st.speed != 1f) Text("${st.speed}x", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(end = 4.dp))
                 FullscreenButton(app, fullscreen)
             }
-            SeekBar(st, dragging, onDrag) { f -> player.seekTo((f * st.durationMs).toLong()); onDragEnd() }
+            SeekBar(app, st, dragging, onDrag) { f -> player.seekTo((f * st.durationMs).toLong()); onDragEnd() }
             if (fullscreen) FullscreenActions(app) { poke() }
         }
     }
@@ -484,7 +497,7 @@ private fun MouseOverlay(
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xAA000000))))
                 .padding(horizontal = 12.dp).padding(top = 24.dp, bottom = 4.dp),
         ) {
-            SeekBar(st, dragging, onDrag) { f -> player.seekTo((f * st.durationMs).toLong()); onDragEnd() }
+            SeekBar(app, st, dragging, onDrag) { f -> player.seekTo((f * st.durationMs).toLong()); onDragEnd() }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Bar(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"),
                     playFocus?.let { Modifier.focusRequester(it) } ?: Modifier) {
@@ -530,13 +543,52 @@ private fun Volume(app: AppState, st: PlayerState) {
 
 // ---------------------------------------------------------------------- shared pieces
 
+/** the time, and the chapter playing (which opens the list of chapters), as on YouTube */
 @Composable
 private fun TimeText(app: AppState, st: PlayerState, dragging: Float?) {
     val pos = dragging?.let { (it * st.durationMs).toLong() } ?: st.positionMs
-    Text(
-        if (app.playback.video?.live == true) "● " + tr("LIVE") else "${durationMs(pos)} / ${durationMs(st.durationMs)}",
-        color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium,
-    )
+    var list by remember { mutableStateOf(false) }
+    val chapter = app.playback.chapters.lastOrNull { it.startMs <= pos }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            if (app.playback.video?.live == true) "● " + tr("LIVE") else "${durationMs(pos)} / ${durationMs(st.durationMs)}",
+            color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+        )
+        if (chapter != null && chapter.title.isNotEmpty()) Text(
+            " • " + chapter.title + " ›", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1,
+            overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp).clip(RoundedCornerShape(4.dp)).clickable { list = true },
+        )
+    }
+    if (list) ChaptersSheet(app) { list = false }
+}
+
+/** every chapter with its picture and time; the one playing is marked, a press jumps there */
+@Composable
+internal fun ChaptersSheet(app: AppState, onClose: () -> Unit) {
+    val player = app.platform.player
+    val pos = player.state.collectAsState().value.positionMs
+    val chapters = app.playback.chapters
+    val now = chapters.lastOrNull { it.startMs <= pos }
+    ModalBottomSheet(onDismissRequest = onClose) {
+        Text(tr("Chapters"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        LazyColumn(Modifier.fillMaxWidth()) {
+            items(chapters) { c ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { player.seekTo(c.startMs); onClose() }
+                        .background(if (c == now) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (c.thumb.isNotEmpty()) Img(c.thumb, Modifier.width(112.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(6.dp)))
+                    Column(Modifier.padding(start = 12.dp)) {
+                        Text(c.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(durationMs(c.startMs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
 }
 
 @Composable
@@ -566,14 +618,40 @@ private fun CaptionsButton(app: AppState, st: PlayerState, onPress: () -> Unit) 
     }
 }
 
+/** the seek bar: gaps between chapters, and while dragging the picture, chapter and time at that point */
 @Composable
-private fun SeekBar(st: PlayerState, dragging: Float?, onDrag: (Float) -> Unit, onDone: (Float) -> Unit) {
+private fun SeekBar(app: AppState, st: PlayerState, dragging: Float?, onDrag: (Float) -> Unit, onDone: (Float) -> Unit) {
     if (st.durationMs <= 0) { Spacer(Modifier.height(24.dp)); return }
+    val chapters = app.playback.chapters
+    val board = app.playback.storyboard
     Track(
         value = dragging ?: (st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f),
         buffered = (st.bufferedMs.toFloat() / st.durationMs).coerceIn(0f, 1f),
         color = Red, onDrag = onDrag, onDone = onDone,
         modifier = Modifier.fillMaxWidth(),
+        marks = chapters.drop(1).map { it.startMs.toFloat() / st.durationMs },
+        above = if (app.playback.video?.live == true) null else { f ->
+            val ms = (f * st.durationMs).toLong()
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (board != null && !app.store.settings.value.hideThumbs) {
+                    val fr = board.frame(ms, st.durationMs)
+                    val w = 160.dp
+                    val h = w * board.height / maxOf(1, board.width)
+                    Box(Modifier.size(w, h).clip(RoundedCornerShape(6.dp)).border(2.dp, Color.White, RoundedCornerShape(6.dp))) {
+                        AsyncImage(
+                            fr.url, null, contentScale = ContentScale.FillBounds,
+                            modifier = Modifier.wrapContentSize(Alignment.TopStart, unbounded = true)
+                                .requiredSize(w * board.cols, h * board.rows).offset(-w * fr.col, -h * fr.row),
+                        )
+                    }
+                }
+                val title = chapters.lastOrNull { it.startMs <= ms }?.title ?: ""
+                if (title.isNotEmpty()) Text(title, color = Color.White, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 220.dp).padding(top = 4.dp).background(Color(0x99000000), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp))
+                Text(durationMs(ms), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 2.dp).background(Color(0x99000000), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp))
+            }
+        },
     )
 }
 
@@ -585,6 +663,10 @@ private fun SeekBar(st: PlayerState, dragging: Float?, onDrag: (Float) -> Unit, 
 internal fun Track(
     value: Float, color: Color, onDrag: (Float) -> Unit, onDone: (Float) -> Unit,
     modifier: Modifier = Modifier, buffered: Float = 0f,
+    /** where chapters begin (0..1): small gaps in the bar */
+    marks: List<Float> = emptyList(),
+    /** drawn above the handle while it is held (the seek bar's preview) */
+    above: (@Composable (Float) -> Unit)? = null,
 ) {
     var hover by remember { mutableStateOf(false) }
     var held by remember { mutableStateOf<Float?>(null) }
@@ -624,17 +706,28 @@ internal fun Track(
         contentAlignment = Alignment.CenterStart,
     ) {
         val thick = if (active) 5.dp else 3.dp
+        val wide = maxWidth
         Box(Modifier.fillMaxWidth().height(thick).background(Color(0x44FFFFFF))) {
             if (buffered > 0f) Box(Modifier.fillMaxWidth(buffered).height(thick).background(Color(0x77FFFFFF)))
             Box(Modifier.fillMaxWidth(shown).height(thick).background(color))
+            for (m in marks) if (m in 0.01f..0.99f) Box(Modifier.offset(x = wide * m - 1.dp).width(2.dp).height(thick).background(Color(0xCC000000)))
         }
+        val full = constraints.maxWidth
+        val h = held
+        if (above != null && h != null) Box(Modifier.layout { m, _ ->
+            val p = m.measure(Constraints())
+            layout(0, 0) { p.place((full * h - p.width / 2f).toInt().coerceIn(0, maxOf(0, full - p.width)), -p.height - 16.dp.roundToPx()) }
+        }) { above(h) }
         // the handle: 12dp, 20dp while dragging (YouTube's sizes)
         val knob = if (held != null) 20.dp else if (active) 14.dp else 12.dp
         Box(Modifier.offset(x = maxWidth * shown - knob / 2).size(knob).background(color, CircleShape))
     }
 }
 
-/** Quality, speed, audio track, ambient mode and captions: a sheet on phones, a menu on the desktop. */
+/**
+ * Quality, speed, audio track, captions, loop, sleep timer, ambient mode and stats for nerds:
+ * a sheet on phones, a menu on the desktop.
+ */
 @Composable
 private fun ColumnScope.SettingsPages(app: AppState, dismiss: () -> Unit) {
     val player = app.platform.player
@@ -655,6 +748,43 @@ private fun ColumnScope.SettingsPages(app: AppState, dismiss: () -> Unit) {
             }
             if (!app.playback.stream?.captions.isNullOrEmpty()) {
                 SheetRow(Sym.ClosedCaption.fill, tr("Captions"), st.captions?.let { c -> st.captionsTranslated?.let { l -> tr("Auto-translate") + " (" + (LANGS.firstOrNull { it.first == l }?.second ?: l) + ")" } ?: c.name } ?: tr("Off")) { page = "c" }
+            }
+            val pb = app.playback
+            SheetRow(Sym.Replay.outline, tr("Loop video"), tr(if (pb.loop) "On" else "Off")) { pb.loopVideo(!pb.loop); dismiss() }
+            SheetRow(Sym.WatchLater.outline, tr("Sleep timer"), when {
+                pb.sleepAt == Playback.END -> tr("End of video")
+                pb.sleepAt > 0 -> tr("{n} min left").replace("{n}", "${((pb.sleepAt - Sys.nowMs()) / 60_000 + 1)}")
+                else -> tr("Off")
+            }) { page = "t" }
+            SheetRow(Sym.Bolt.outline, tr("Stats for nerds"), "") { page = "n" }
+        }
+        "t" -> {
+            val pb = app.playback
+            Pick(tr("Off"), pb.sleepAt == 0L) { pb.sleep(0); dismiss() }
+            for (m in listOf(10, 15, 20, 30, 45, 60, 90)) Pick(tr("{n} minutes").replace("{n}", "$m"), false) { pb.sleep(m); dismiss() }
+            Pick(tr("End of video"), pb.sleepAt == Playback.END) { pb.sleep(-1); dismiss() }
+        }
+        "n" -> {
+            val s = app.playback.stream
+            val v = s?.video?.filter { st.height == 0 || it.height == st.height }?.maxByOrNull { it.height * 1000 + it.bitrate / 1000 }
+            val a = s?.audio?.firstOrNull { st.audioTrack == null || it.audioTrack == null || it.audioTrack.startsWith(st.audioTrack!!) }
+            val lines = listOfNotNull(
+                tr("Video ID") to (s?.id ?: st.videoId ?: ""),
+                tr("Through") to (s?.client ?: ""),
+                tr("Resolution") to (v?.let { "${it.width}x${it.height}@${it.fps}" + if (st.height == 0) " (" + tr("Auto") + ")" else "" } ?: ""),
+                tr("Video codec") to (v?.let { "${it.codecs} (itag ${it.itag}, ${it.bitrate / 1000} kbps)" } ?: ""),
+                tr("Audio codec") to (a?.let { "${it.codecs} (itag ${it.itag}, ${it.bitrate / 1000} kbps, ${it.sampleRate} Hz)" } ?: ""),
+                tr("Buffer health") to "${(st.bufferedMs - st.positionMs).coerceAtLeast(0) / 100 / 10.0} s",
+                tr("Speed") to "${st.speed}x",
+                s?.live?.takeIf { it }?.let { tr("LIVE") to (s.hls?.let { "HLS" } ?: "") },
+            ).filter { it.second.isNotEmpty() }
+            SelectionContainer {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
+                    for ((k, x) in lines) Row(Modifier.padding(vertical = 3.dp)) {
+                        Text(k, Modifier.width(120.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(x, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
             }
         }
         "q" -> {
