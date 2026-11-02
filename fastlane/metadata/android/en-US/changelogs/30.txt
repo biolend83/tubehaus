@@ -1,1 +1,2 @@
 - Videos through a connected server: dubbed videos start in their original language, and Settings → Audio track lists every language (the server's streams didn't say which language they were, so a dub could play)
+- Channels: the first line of the description and "...more", which shows the whole description, the channel's links, its country, joined date, views and number of videos
