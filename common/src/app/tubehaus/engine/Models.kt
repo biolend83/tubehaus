@@ -145,7 +145,26 @@ data class ChannelPage(
     val subsText: String,
     val videoCountText: String,
     val items: Page<Item>,
+    /** the start of the channel's description, as under its name on YouTube */
+    val description: String = "",
+    /** for [YouTube.channelAbout]: what "...more" opens */
+    val aboutToken: String? = null,
 )
+
+/** A channel's "more about this channel": the whole description, its links and the numbers. */
+data class ChannelAbout(
+    val description: String,
+    val links: List<ChannelLink>,
+    val url: String,
+    val country: String,
+    val joinedText: String,
+    val viewsText: String,
+    val subsText: String,
+    val videoCountText: String,
+)
+
+/** a link the channel lists: its title, the address as shown, where it goes, and the site's icon */
+data class ChannelLink(val title: String, val text: String, val url: String, val icon: String)
 
 data class PlaylistPage(
     val id: String,
