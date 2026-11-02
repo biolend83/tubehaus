@@ -6,13 +6,15 @@ package app.tubehaus.engine
  * (SegmentBase: the init segment and the sidx/cues byte ranges), which is exactly what the
  * on-demand DASH profile describes.
  *
- * [codecs] limits the video to the codec families this device decodes well, best first.
+ * [codecs] limits the video to the codec families this device decodes well, best first;
+ * [plays] leaves out sizes its decoder can't take (some TVs freeze on 8K rather than fail).
  */
 object Dash {
-    fun manifest(s: Stream, codecs: List<String>, maxHeight: Int = Int.MAX_VALUE): String {
-        val family = codecs.firstOrNull { c -> s.video.any { it.codecFamily == c && it.indexRange != null } }
-        val video = s.video.filter { it.codecFamily == family && it.height <= maxHeight && it.indexRange != null }
-            .ifEmpty { s.video.filter { it.codecFamily == family && it.indexRange != null }.sortedBy { it.height }.take(1) }
+    fun manifest(s: Stream, codecs: List<String>, maxHeight: Int = Int.MAX_VALUE, plays: (Format) -> Boolean = { true }): String {
+        val usable = s.video.filter { it.indexRange != null && plays(it) }.ifEmpty { s.video.filter { it.indexRange != null }.sortedBy { it.height }.take(1) }
+        val family = codecs.firstOrNull { c -> usable.any { it.codecFamily == c } }
+        val video = usable.filter { it.codecFamily == family && it.height <= maxHeight }
+            .ifEmpty { usable.filter { it.codecFamily == family }.sortedBy { it.height }.take(1) }
         val audio = s.audio.filter { it.indexRange != null }
         val dur = s.lengthSec.coerceAtLeast(1)
         val sb = StringBuilder()

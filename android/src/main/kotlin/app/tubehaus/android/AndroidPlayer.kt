@@ -1,6 +1,9 @@
 package app.tubehaus.android
 
+import android.app.UiModeManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
@@ -49,6 +52,7 @@ import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import app.tubehaus.engine.Caption
 import app.tubehaus.engine.Dash
+import app.tubehaus.engine.Format
 import app.tubehaus.engine.Net
 import app.tubehaus.engine.Stream
 import app.tubehaus.engine.YouTube
@@ -128,6 +132,24 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             add("h264")
             add("vp9"); add("av1")
         }.distinct()
+    }
+
+    /** a TV (the same test as TubeApp's): only there is a size the decoder can't take left out, see [decodes] */
+    private val tv: Boolean by lazy {
+        (ctx.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager).currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+            ctx.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    }
+
+    private val decoders by lazy { MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { !it.isEncoder } }
+
+    /** whether some decoder here says it takes this size: some TVs freeze outright on 8K rather than fail */
+    private fun decodes(f: Format): Boolean {
+        val type = when (f.codecFamily) { "av1" -> "video/av01"; "vp9" -> "video/x-vnd.on2.vp9"; "h264" -> "video/avc"; else -> return true }
+        if (f.width <= 0 || f.height <= 0) return true
+        return decoders.any { c ->
+            type in c.supportedTypes.map { it.lowercase() } &&
+                runCatching { c.getCapabilitiesForType(type).videoCapabilities?.isSizeSupported(f.width, f.height) ?: true }.getOrDefault(true)
+        }
     }
 
     /** isHardwareAccelerated is Android 10+; before that, the software decoders are the ones named OMX.google.* / c2.android.* */
@@ -232,7 +254,7 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         if (s.live || s.video.isEmpty()) {
             b.setUri(s.hls).setMimeType(MimeTypes.APPLICATION_M3U8)
         } else {
-            val mpd = Dash.manifest(s, codecs)
+            val mpd = if (tv) Dash.manifest(s, codecs, plays = ::decodes) else Dash.manifest(s, codecs)
             b.setUri("data:application/dash+xml;base64," + Base64.encodeToString(mpd.toByteArray(), Base64.NO_WRAP))
                 .setMimeType(MimeTypes.APPLICATION_MPD)
         }
