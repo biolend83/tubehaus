@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import androidx.compose.material3.ModalBottomSheet
+import app.tubehaus.engine.Details
 import app.tubehaus.engine.Sys
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeOut
@@ -217,6 +219,10 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
     var heart by remember { mutableStateOf(false) }
     LaunchedEffect(hearts) { if (hearts > 0) { heart = true; delay(650); heart = false } }
     val mine = active && st.videoId == v.id
+    // the comments come with the watch page's details, asked for when the button is pressed
+    var comments by remember { mutableStateOf(false) }
+    var info by remember(v.id) { mutableStateOf<Details?>(null) }
+    LaunchedEffect(comments) { if (comments && info == null) info = runCatching { YouTube.details(v.id) }.getOrNull() ?: Details() }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Box(
@@ -263,7 +269,19 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
             Column(Modifier.align(Alignment.CenterEnd).padding(end = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 RoundAction(if (liked) Sym.ThumbUp.fill else Sym.ThumbUp.outline, tr("Like")) { app.store.setInList("likes", full, !liked) }
                 RoundAction(if (disliked) Sym.ThumbDown.fill else Sym.ThumbDown.outline, tr("Dislike")) { app.store.setInList("dislikes", full, !disliked) }
+                if (!app.store.settings.value.hideComments) RoundAction(Sym.Comment.outline, tr("Comments")) { comments = true }
                 RoundAction(Sym.Share.outline, tr("Share")) { app.share(v.title, "https://youtube.com/shorts/${v.id}") }
+            }
+        }
+    }
+    if (comments) ModalBottomSheet(onDismissRequest = { comments = false }) {
+        val d = info
+        val token = d?.commentsToken
+        Box(Modifier.fillMaxWidth().fillMaxHeight(0.7f)) {
+            when {
+                d == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                token == null -> Text(tr("No comments"), Modifier.align(Alignment.Center))
+                else -> CommentsPanel(app, token, d) { comments = false }
             }
         }
     }

@@ -106,6 +106,8 @@ data class Stream(
     val captions: List<Caption>,
     val expiresAt: Long,
     val client: String,
+    /** YouTube's storyboard spec: the small pictures shown over the seek bar while you drag it */
+    val storyboard: String? = null,
 ) {
     fun asVideo() = Video(id, title, author, channelId, lengthSec, views = views, live = live)
 }
@@ -120,7 +122,14 @@ data class Details(
     val related: List<Item> = emptyList(),
     val relatedNext: String? = null,
     val commentsToken: String? = null,
+    /** "Top" and "Newest", each with the token that loads the comments in that order */
+    val commentSorts: List<Pair<String, String>> = emptyList(),
+    val commentsCount: String = "",
+    val chapters: List<Chapter> = emptyList(),
 )
+
+/** A chapter of a video: its title, where it starts and its picture. */
+data class Chapter(val title: String, val startMs: Long, val thumb: String = "")
 
 data class Comment(
     val id: String,
@@ -149,7 +158,48 @@ data class ChannelPage(
     val description: String = "",
     /** for [YouTube.channelAbout]: what "...more" opens */
     val aboutToken: String? = null,
+    /** the tabs this channel has, in YouTube's order (Home, Videos, Shorts, Live, Courses, Playlists, Posts...) */
+    val tabs: List<ChannelTab> = emptyList(),
+    /** whether YouTube offers a search inside this channel */
+    val searchable: Boolean = false,
+    /** the link line under the description: its first link and "and 4 more links" */
+    val linkText: String = "",
+    val linkMore: String = "",
+    /** the Home tab: the featured video (with the start of its description) and the shelves under it */
+    val featured: Video? = null,
+    val featuredText: String = "",
+    val shelves: Page<Shelf> = Page(emptyList()),
+    /** the Posts tab */
+    val posts: Page<Post> = Page(emptyList()),
 )
+
+/** One tab of a channel: its name as YouTube shows it, what to ask for it, and what it is ("videos", "posts"...). */
+data class ChannelTab(val title: String, val params: String, val kind: String)
+
+/** A row on a channel's Home tab: a title and its videos, shorts or playlists, and where "Play all" goes. */
+data class Shelf(val title: String, val items: List<Item>, val playlistId: String? = null, val tabParams: String? = null) {
+    val id: String get() = title + (items.firstOrNull()?.id ?: "")
+}
+
+/** A post on a channel's Posts tab. [links] mark the parts of [text] that are links. */
+data class Post(
+    val id: String,
+    val author: String,
+    val avatar: String,
+    val published: String,
+    val text: String,
+    val links: List<TextLink> = emptyList(),
+    val likes: String = "",
+    val replies: String = "",
+    val images: List<String> = emptyList(),
+    val video: Video? = null,
+    val playlist: Playlist? = null,
+    val poll: List<String> = emptyList(),
+    val pollVotes: String = "",
+)
+
+/** characters [start] until [end] of a text are a link to [url] */
+data class TextLink(val start: Int, val end: Int, val url: String)
 
 /** A channel's "more about this channel": the whole description, its links and the numbers. */
 data class ChannelAbout(

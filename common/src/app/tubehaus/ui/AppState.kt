@@ -12,6 +12,7 @@ import app.tubehaus.data.Store
 import app.tubehaus.engine.InnerTube
 import app.tubehaus.engine.Remote
 import app.tubehaus.engine.Video
+import app.tubehaus.engine.urlDecode
 import app.tubehaus.rec.Feed
 import app.tubehaus.rec.Recommender
 import kotlinx.coroutines.CoroutineScope
@@ -165,6 +166,24 @@ class AppState(val platform: Platform, val store: Store) {
     /** a downloader app (YTDLnis, Seal) takes the link; without one, say which to get */
     fun download(v: Video) {
         if (!platform.externalDownload("https://www.youtube.com/watch?v=${v.id}")) toast(tr("Install YTDLnis or Seal to download videos"))
+    }
+
+    /** A link in a description or a post: YouTube's own (videos, channels, playlists, #tags) open here, the rest in the browser. */
+    fun openLink(url: String) {
+        val u = if (url.startsWith("www.")) "https://$url" else url
+        if (!Regex("^https?://([\\w-]+\\.)?(youtube\\.com|youtu\\.be)/", RegexOption.IGNORE_CASE).containsMatchIn(u)) {
+            platform.openExternal(u); return
+        }
+        Regex("/hashtag/([^/?#]+)").find(u)?.let { go(Screen.Search("#" + urlDecode(it.groupValues[1]))); return }
+        scope.launch {
+            val r = runCatching { YouTube.resolve(u) }.getOrNull()
+            when (r?.first) {
+                "video" -> watch(Video(r.second, ""))
+                "playlist" -> go(Screen.Playlist(r.second))
+                "channel" -> go(Screen.Channel(r.second))
+                else -> platform.openExternal(u)
+            }
+        }
     }
 
     fun share(title: String, url: String) {
