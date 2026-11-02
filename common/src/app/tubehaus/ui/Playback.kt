@@ -5,6 +5,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.tubehaus.engine.Caption
+import app.tubehaus.engine.Chapter
+import app.tubehaus.engine.Storyboard
+import app.tubehaus.engine.chaptersIn
 import app.tubehaus.engine.Details
 import app.tubehaus.engine.Stream
 import app.tubehaus.engine.Video
@@ -22,6 +25,8 @@ import kotlinx.coroutines.launch
  * plays the next one (your queue, else the top related video).
  */
 class Playback(private val app: AppState) {
+    companion object { const val END = -1L }
+
     var video by mutableStateOf<Video?>(null)
         private set
     var stream by mutableStateOf<Stream?>(null)
@@ -40,6 +45,43 @@ class Playback(private val app: AppState) {
     /** "Up next" when there is no queue */
     val next: Video?
         get() = queue.firstOrNull() ?: details?.related?.filterIsInstance<Video>()?.firstOrNull { !it.live && !it.short }
+
+    /** "Loop video": this one plays again from the start; off again for the next video */
+    var loop by mutableStateOf(false)
+        private set
+    /** the sleep timer: when it pauses (epoch ms), [END] for the end of this video, 0 when off */
+    var sleepAt by mutableStateOf(0L)
+        private set
+    private var sleepJob: Job? = null
+
+    fun loopVideo(on: Boolean) { loop = on; player.setLoop(on) }
+
+    /** pause after [minutes]; [END] at the end of this video; 0 turns the timer off */
+    fun sleep(minutes: Int) {
+        sleepJob?.cancel()
+        sleepAt = when { minutes == 0 -> 0L; minutes < 0 -> END; else -> Sys.nowMs() + minutes * 60_000L }
+        if (minutes > 0) sleepJob = app.scope.launch {
+            delay(minutes * 60_000L)
+            player.pause(); sleepAt = 0L
+            app.toast(tr("Sleep timer: paused"))
+        }
+    }
+
+    /** the video's chapters: YouTube's, or the ones written in its description */
+    val chapters: List<Chapter>
+        get() = details?.chapters?.takeIf { it.isNotEmpty() } ?: stream?.let { s ->
+            if (chapterCache.first != s.id) chapterCache = s.id to chaptersIn(s.description)
+            chapterCache.second
+        } ?: emptyList()
+    private var chapterCache: Pair<String, List<Chapter>> = "" to emptyList()
+
+    /** the pictures the seek bar shows while dragging */
+    val storyboard: Storyboard?
+        get() = stream?.let { s ->
+            if (boardCache.first != s.id) boardCache = s.id to Storyboard.parse(s.storyboard)
+            boardCache.second
+        }
+    private var boardCache: Pair<String, Storyboard?> = "" to null
 
     private var job: Job? = null
     private var watchedMs = 0L          // the furthest point reached, for learning
@@ -77,6 +119,7 @@ class Playback(private val app: AppState) {
         watchedMs = 0
         learned = false
         endHandled = false
+        loop = false
         job?.cancel()
         job = app.scope.launch {
             launch {
@@ -158,6 +201,7 @@ class Playback(private val app: AppState) {
         val v = video ?: return
         learnNow()
         store.savePosition(v, v.lengthSec.toLong(), v.lengthSec.toLong())
+        if (sleepAt == END) { sleepAt = 0L; app.toast(tr("Sleep timer: paused")); return }
         if (app.store.settings.value.calm) return       // calm mode: nothing starts by itself
         if (!app.store.settings.value.autoplay && queue.isEmpty()) return
         val n = next ?: return
