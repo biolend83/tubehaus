@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "0.5.13",
+          "buildVersion": "30",
+          "date": "2026-11-02T14:36:28+00:00",
+          "localizedDescription": "Shared with the 0.5.13 release: when the player refuses a video's streams (for example after switching Wi-Fi, mobile data or a VPN), the app fetches fresh ones once and carries on where it stopped.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.13/TubeHaus-0.5.13-ipad.ipa",
+          "size": 15739315,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "0.5.11",
           "buildVersion": "28",
           "date": "2026-11-01T14:41:50+00:00",
@@ -77,11 +86,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "0.5.11",
-      "versionDate": "2026-11-01T14:41:50+00:00",
-      "versionDescription": "Shared with the 0.5.11 release: the original audio track is chosen first, plus caption and player sheet updates.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.11/TubeHaus-0.5.11-ipad.ipa",
-      "size": 15736209
+      "version": "0.5.13",
+      "versionDate": "2026-11-02T14:36:28+00:00",
+      "versionDescription": "Shared with the 0.5.13 release: when the player refuses a video's streams (for example after switching Wi-Fi, mobile data or a VPN), the app fetches fresh ones once and carries on where it stopped.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.13/TubeHaus-0.5.13-ipad.ipa",
+      "size": 15739315
     }
   ],
   "news": [],
