@@ -45,6 +45,7 @@ class Playback(private val app: AppState) {
     private var watchedMs = 0L          // the furthest point reached, for learning
     private var learned = false
     private var endHandled = false
+    private var refreshed = false       // the streams were asked for again once after the player failed
     private val player get() = app.platform.player
     private val store get() = app.store
 
@@ -55,6 +56,7 @@ class Playback(private val app: AppState) {
             player.state.collectLatest { s ->
                 val v = video ?: return@collectLatest
                 if (s.videoId != v.id) return@collectLatest
+                if (s.error != null && !refreshed) { refreshed = true; refresh(v, s.positionMs); return@collectLatest }
                 if (s.positionMs > watchedMs) watchedMs = s.positionMs
                 val now = Sys.nowMs()
                 if (s.playing && now - lastSave > 5000) {
@@ -77,6 +79,7 @@ class Playback(private val app: AppState) {
         watchedMs = 0
         learned = false
         endHandled = false
+        refreshed = false
         job?.cancel()
         job = app.scope.launch {
             launch {
@@ -153,6 +156,23 @@ class Playback(private val app: AppState) {
             ?: list.firstOrNull { !it.auto } ?: list.firstOrNull()
 
     fun retry() { video?.let { open(it, queue) } }
+
+    /**
+     * The player couldn't load the streams it was given: their addresses are tied to the network
+     * they were asked from, so a device that has since moved (Wi-Fi, mobile data, a VPN) or a
+     * server whose way out to YouTube changed gets them refused ("resource unavailable" on
+     * iPad). Ask for them afresh once and carry on from where it stopped; only if that fails too
+     * does the error stay on screen. A saved copy plays from the device and isn't asked again.
+     */
+    private fun refresh(v: Video, atMs: Long) {
+        if (app.offline.stream(v.id) != null) return
+        app.scope.launch {
+            val s = try { YouTube.stream(v.id) } catch (e: Exception) { return@launch }
+            if (video?.id != v.id) return@launch
+            stream = s
+            start(s, atMs / 1000)
+        }
+    }
 
     private fun onEnded() {
         val v = video ?: return
