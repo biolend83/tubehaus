@@ -38,6 +38,15 @@ fun main() = runBlocking {
             val a = s.audio.maxBy { it.bitrate }
             "${s.title} | ${s.author} ${s.lengthSec}s, ${s.video.size}v/${s.audio.size}a, top ${v.height}p ${v.codecs} (init ${v.initRange}); video ${first(v.url)}; audio ${first(a.url)}"
         }
+        // a video with dubs: one track per language, the original the default
+        check("server dubs") {
+            val s = YouTube.stream("0e3GPea1Tyg")
+            val tracks = s.audio.distinctBy { it.audioTrack }
+            require(tracks.size > 1) { "one audio track" }
+            val main = tracks.filter { it.audioDefault }.map { "${it.audioTrack} ${it.audioTrackName}" }
+            require(main.size == 1) { "default tracks: $main" }
+            "${tracks.size} tracks, default $main, others ${tracks.filter { !it.audioDefault }.take(3).map { it.audioTrackName }}"
+        }
         check("server captions") {
             val c = YouTube.stream("jNQXAC9IVRw").captions.first()
             val text = Net.client.newCall(Request.Builder().url(YouTube.captionUrl(c)).build()).execute().use { r -> require(r.isSuccessful) { "HTTP ${r.code}" }; r.body!!.string() }

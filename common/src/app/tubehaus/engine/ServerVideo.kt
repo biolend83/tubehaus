@@ -1,5 +1,7 @@
 package app.tubehaus.engine
 
+import app.tubehaus.ui.L
+import app.tubehaus.ui.tr
 import kotlinx.serialization.json.JsonElement
 import kotlin.concurrent.Volatile
 import kotlin.io.encoding.Base64
@@ -55,7 +57,7 @@ object ServerVideo {
         d.at("error").str?.let { throw YtError(it, YtError.Kind.UNAVAILABLE) }
         val live = d.at("liveNow").bool
         val hls = d.at("hlsUrl").str?.let { local(b, it) }
-        val formats = d.at("adaptiveFormats").arr.mapNotNull { format(b, it) }
+        val formats = d.at("adaptiveFormats").arr.mapNotNull { format(b, it) }.filter { !it.drc }
         if (formats.isEmpty() && hls == null) throw YtError("No playable streams", YtError.Kind.UNAVAILABLE)
         val expire = formats.firstNotNullOfOrNull { Regex("[?&]expire=(\\d+)").find(it.url)?.groupValues?.get(1)?.toLongOrNull() }
         return Stream(
@@ -151,11 +153,21 @@ object ServerVideo {
         return (a.toLongOrNull() ?: return null)..(z.toLongOrNull() ?: return null)
     }
 
+    /** the stream URL's xtags ("acont=original:lang=en-US", percent-encoded) as a map */
+    private fun xtags(url: String): Map<String, String> =
+        url.substringAfter("xtags=", "").substringBefore('&').replace("%3D", "=", true).replace("%3A", ":", true)
+            .split(':').mapNotNull { p -> p.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] } }.toMap()
+
     private fun format(b: String, f: JsonElement): Format? {
         val url = f.at("url").str ?: return null
         val type = f.at("type").str ?: return null
         val mime = type.substringBefore(';').trim()
         val size = f.at("size").str?.split('x')
+        // Invidious leaves out which language an audio stream is, so a dubbed video's 30-odd tracks
+        // came as one and the player picked any of them: the language is in the stream URL too
+        val tags = if (mime.startsWith("audio")) xtags(url) else emptyMap()
+        val lang = tags["lang"]
+        val original = tags["acont"] == "original"
         return Format(
             itag = f.at("itag").int ?: 0,
             url = proxied(b, url),
@@ -171,10 +183,11 @@ object ServerVideo {
             qualityLabel = f.at("qualityLabel").str ?: "",
             sampleRate = f.at("audioSampleRate").int ?: 0,
             channels = f.at("audioChannels").int ?: 2,
-            audioTrack = f.at("audioTrack.id").str,
-            audioTrackName = f.at("audioTrack.displayName").str,
+            audioTrack = f.at("audioTrack.id").str ?: lang?.let { "$it.${if (original) 4 else 3}" },
+            audioTrackName = f.at("audioTrack.displayName").str
+                ?: lang?.let { Sys.languageName(it, L.lang) + if (original) " " + tr("(original)") else "" },
             audioDefault = f.at("audioTrack.isDefault").str?.let { it == "true" } ?: true,
-            drc = "drc" in (url.substringAfter("xtags=", "").substringBefore('&')),
+            drc = "drc" in tags,
         )
     }
 }

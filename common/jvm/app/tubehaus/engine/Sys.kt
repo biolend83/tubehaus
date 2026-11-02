@@ -29,6 +29,10 @@ object Sys {
     /** "KR" → "South Korea" (or "대한민국" when [lang] is "ko") */
     fun countryName(code: String, lang: String): String = Locale("", code).getDisplayCountry(Locale(lang)).ifEmpty { code }
 
+    /** "en-US" → "English (United States)" (or "영어(미국)" when [lang] is "ko") */
+    fun languageName(code: String, lang: String): String =
+        Locale.forLanguageTag(code).getDisplayName(Locale(lang)).ifEmpty { code }
+
     fun deviceLanguage(): String = Locale.getDefault().language
     fun deviceRegion(): String = Locale.getDefault().country
 
