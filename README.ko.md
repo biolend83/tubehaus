@@ -36,11 +36,11 @@ TubeHaus는 따로 동작하는 두 가지가 있어요. 이름과 생김새는 
 온 가족이 구독과 기록을 같이 쓰고 싶거나, 아이폰/아이패드에서 설치 없이 보거나, 유튜브가 내 기기 주소를 모르게 하고 싶다면 서버판을 돌리세요.
 **둘 다?** 0.5.4부터 앱을 내 서버에 연결할 수 있어요(설정 → *TubeHaus 서버*). 라이브러리는 모든 기기와 브라우저에서 하나로 쓰고, 영상은 각 앱이 직접 재생해요.
 
-- **📱 앱 받기 (베타):** [안드로이드 APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.10/TubeHaus-0.5.10.apk) (안드로이드 8 이상, 안드로이드 TV는 Downloader 코드 **3155410**) · [Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.10/TubeHaus-0.5.10.msi) · macOS ([M칩](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.10/TubeHaus-0.5.10-mac-arm64.dmg), [인텔](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.10/TubeHaus-0.5.10-mac-x64.dmg)) · [리눅스 .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.10/TubeHaus-0.5.10-linux-amd64.deb) · [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.10/TubeHaus-0.5.10-linux-x86_64.rpm) · [아이패드/아이폰 .ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.10/TubeHaus-0.5.10-ipad.ipa) (베타, [Sideloadly](https://sideloadly.io/)로 설치) · [전체 파일](https://github.com/biolend83/tubehaus/releases/latest) (Windows portable과 ARM, 리눅스 ARM64) · 안드로이드 자동 업데이트는 [Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%20%22io.github.biolend83.tubehaus%22%2C%20%22url%22%3A%20%22https%3A%2F%2Fgithub.com%2Fbiolend83%2Ftubehaus%22%2C%20%22author%22%3A%20%22biolend83%22%2C%20%22name%22%3A%20%22TubeHaus%22%2C%20%22additionalSettings%22%3A%20%22%7B%5C%22filterReleaseTitlesByRegEx%5C%22%3A%20%5C%22%5ETubeHaus%20%5C%22%2C%20%5C%22fallbackToOlderReleases%5C%22%3A%20true%2C%20%5C%22includePrereleases%5C%22%3A%20false%2C%20%5C%22apkFilterRegEx%5C%22%3A%20%5C%22TubeHaus-%5C%5C%5C%5Cd%5C%22%7D%22%7D)으로.
+- **📱 앱 받기 (베타):** [안드로이드 APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.13/TubeHaus-0.5.13.apk) (안드로이드 8 이상, 안드로이드 TV는 Downloader 코드 **3155410**) · [Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.13/TubeHaus-0.5.13.msi) · macOS ([M칩](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.13/TubeHaus-0.5.13-mac-arm64.dmg), [인텔](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.13/TubeHaus-0.5.13-mac-x64.dmg)) · [리눅스 .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.13/TubeHaus-0.5.13-linux-amd64.deb) · [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.13/TubeHaus-0.5.13-linux-x86_64.rpm) · [아이패드/아이폰 .ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.13/TubeHaus-0.5.13-ipad.ipa) (베타, [Sideloadly](https://sideloadly.io/)로 설치) · [전체 파일](https://github.com/biolend83/tubehaus/releases/latest) (Windows portable과 ARM, 리눅스 ARM64) · 안드로이드 자동 업데이트는 [Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%20%22io.github.biolend83.tubehaus%22%2C%20%22url%22%3A%20%22https%3A%2F%2Fgithub.com%2Fbiolend83%2Ftubehaus%22%2C%20%22author%22%3A%20%22biolend83%22%2C%20%22name%22%3A%20%22TubeHaus%22%2C%20%22additionalSettings%22%3A%20%22%7B%5C%22filterReleaseTitlesByRegEx%5C%22%3A%20%5C%22%5ETubeHaus%20%5C%22%2C%20%5C%22fallbackToOlderReleases%5C%22%3A%20true%2C%20%5C%22includePrereleases%5C%22%3A%20false%2C%20%5C%22apkFilterRegEx%5C%22%3A%20%5C%22TubeHaus-%5C%5C%5C%5Cd%5C%22%7D%22%7D)으로.
   플랫폼별 설치 안내와 소스: [`android-app`](https://github.com/biolend83/tubehaus/tree/android-app), [`windows-app`](https://github.com/biolend83/tubehaus/tree/windows-app), [`mac-app`](https://github.com/biolend83/tubehaus/tree/mac-app), [`linux-app`](https://github.com/biolend83/tubehaus/tree/linux-app), [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app)
 - **🍎 아이패드 / 아이폰:** 같은 앱을 iOS 16+용으로 만들었어요(베타). 애플 플레이어로 4K까지, 백그라운드 재생, PIP,
   오프라인 저장, 그리고 앱을 다시 설치하지 않아도 스스로 업데이트되는 유튜브 엔진. 앱스토어에 없어서
-  [.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.10/TubeHaus-0.5.10-ipad.ipa)를 **[Sideloadly](https://sideloadly.io/)**(무료, Windows/Mac)와 내 Apple ID로 설치해요.
+  [.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.13/TubeHaus-0.5.13-ipad.ipa)를 **[Sideloadly](https://sideloadly.io/)**(무료, Windows/Mac)와 내 Apple ID로 설치해요.
   무료 Apple ID는 7일마다 다시 서명해야 해요. 자세한 순서: [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). 설치가 싫다면 사파리에서 서버판을 쓰세요.
 - **🖥️ 서버판 돌리기:** 아래 [빠른 설치 (Docker)](#빠른-설치-docker)를 보세요. 이 README의 나머지는 모두 서버판 이야기예요.
 
@@ -109,7 +109,18 @@ docker compose up -d
 Caddy, WARP가 들어 있는 TubeHaus 서버, 라이브용 PO 토큰 제공기, 라이브 자막용 whisper.cpp,
 공식 Invidious + companion + PostgreSQL 이미지가 한 번에 올라와요. 끝나면 도메인을 열면 돼요.
 
-[Flisk](https://flisk.sh)를 이미 쓰고 있다면 `flisk up`으로도 같은 구성을 띄울 수 있어요: [docs/FLISK.md](docs/FLISK.md) (선택 사항이고, 기본은 계속 docker compose예요).
+**[Flisk](https://flisk.sh)로도 띄울 수 있어요** (선택 사항이고, 기본은 계속 docker compose예요). 같은 컨테이너 여섯 개가
+Flisk용으로도 적혀 있고 같은 `.env`를 읽어요. Flisk를 이미 쓰고 있다면:
+
+```sh
+npm install -g @flisk-sh/flisk   # Flisk 1.4.26 이상
+git clone https://github.com/biolend83/tubehaus && cd tubehaus
+cp .env.example .env
+flisk up                          # flisk status / flisk logs --service tubehaus / flisk down
+```
+
+한 서버에서는 둘 중 하나만 쓰세요. 포트, 볼륨, 업데이트, 기존 설치 옮기기는 [docs/FLISK.md](docs/FLISK.md)에 있어요.
+Flisk 구성은 @odykyi 님이 만들어 주셨어요 (#40, #42).
 
 **외부에 열기 전에 로그인을 붙이세요.** TubeHaus에는 계정 기능이 없어서, 주소를 아는 사람은 누구나 같은 라이브러리를 봐요.
 가장 쉬운 방법은 내장 비밀번호예요. `.env`에 `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER`, `TUBEHAUS_PASSWORD_HASH`를 넣으세요.

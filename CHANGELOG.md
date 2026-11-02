@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.18 — 2026-11-02
+
+### Added
+- The server stack can also run with [Flisk](https://flisk.sh) (`flisk up`), as an option: the same six containers as `docker-compose.yml`, one `service.json` each under `services/tubehaus/`, reading the same `.env` (#40, #42, thanks @odykyi). docker compose stays the main way; see [docs/FLISK.md](docs/FLISK.md)
+
+### Changed
+- README: the Flisk setup in *Quick start*, app download links to 0.5.13, a project page and launch badges
+
 ## v0.7.17 — 2026-11-01
 
 ### Added
