@@ -26,6 +26,14 @@ struct Video: Codable, Hashable, Identifiable {
 
     var avatarURL: URL? { avatar.isEmpty ? nil : URL(string: avatar.hasPrefix("//") ? "https:" + avatar : avatar) }
 
+    /// for the big cards: 1280×720 when the video has it, else the 480×360 one
+    var cardPictures: [URL] {
+        ["hq720", "hqdefault"].compactMap { URL(string: "https://i.ytimg.com/vi/\(id)/\($0).jpg") }
+    }
+
+    /// LIVE, SHORTS or the length, on the picture
+    var badge: String { live ? "LIVE" : short ? "SHORTS" : duration(lengthSec) }
+
     /// "Channel · 1.2M views · 3 days ago"
     var byline: String {
         [author, viewsText, publishedText.isEmpty ? ago(publishedAt) : publishedText].filter { !$0.isEmpty }.joined(separator: " · ")
@@ -170,6 +178,9 @@ struct StreamInfo {
 }
 
 struct Details {
+    var title = ""
+    var author = ""
+    var channelId = ""
     var likesText: String
     var subsText: String
     var avatar: String
@@ -190,6 +201,9 @@ struct Comment: Identifiable, Hashable {
     var published: String
     var byCreator: Bool
     var pinned: Bool
+    var channelId = ""
+    /// its replies, when it has some
+    var repliesToken: String?
 
     var avatarURL: URL? { avatar.isEmpty ? nil : URL(string: avatar.hasPrefix("//") ? "https:" + avatar : avatar) }
 }
@@ -200,6 +214,7 @@ struct ChannelPage {
     var avatar: String
     var banner: String
     var subsText: String
+    var handle = ""
     var videos: Page
 }
 
@@ -213,11 +228,19 @@ struct PlaylistPage {
 /// The engine's operations, typed.
 enum YT {
     static let videosTab = "EgZ2aWRlb3PyBgQKAjoA"
-    /// search filter: videos only
-    static let onlyVideos = "EgIQAQ%3D%3D"
+    /// the search filters, as YouTube writes them
+    enum Filter: String, CaseIterable {
+        case all = "", videos = "EgIQAQ%3D%3D", channels = "EgIQAg%3D%3D", playlists = "EgIQAw%3D%3D"
+        /// videos under 4 minutes (where Shorts are found)
+        case short = "EgIYAQ%3D%3D"
+    }
 
     static func search(_ q: String, videosOnly: Bool = false) async throws -> Page {
-        Page(try await Engine.shared.call("search", [q, videosOnly ? onlyVideos : NSNull()]))
+        try await search(q, filter: videosOnly ? .videos : .all)
+    }
+
+    static func search(_ q: String, filter: Filter) async throws -> Page {
+        Page(try await Engine.shared.call("search", [q, filter == .all ? NSNull() : filter.rawValue]))
     }
     static func searchMore(_ token: String) async throws -> Page { Page(try await Engine.shared.call("searchMore", [token])) }
     static func relatedMore(_ token: String) async throws -> Page { Page(try await Engine.shared.call("relatedMore", [token])) }
@@ -243,7 +266,8 @@ enum YT {
 
     static func details(_ id: String) async throws -> Details {
         let o = try await Engine.shared.call("details", [id]) as? [String: Any] ?? [:]
-        return Details(likesText: o["likesText"] as? String ?? "", subsText: o["subsText"] as? String ?? "",
+        return Details(title: o["title"] as? String ?? "", author: o["author"] as? String ?? "",
+                       channelId: o["channelId"] as? String ?? "", likesText: o["likesText"] as? String ?? "", subsText: o["subsText"] as? String ?? "",
                        avatar: o["avatar"] as? String ?? "", publishedText: o["publishedText"] as? String ?? "",
                        viewsText: o["viewsText"] as? String ?? "",
                        related: (o["related"] as? [[String: Any]] ?? []).compactMap(Item.init),
@@ -257,16 +281,29 @@ enum YT {
             return Comment(id: id, author: c["author"] as? String ?? "", avatar: c["avatar"] as? String ?? "",
                            text: c["text"] as? String ?? "", likes: c["likes"] as? String ?? "",
                            replies: (c["replies"] as? NSNumber)?.intValue ?? 0, published: c["published"] as? String ?? "",
-                           byCreator: c["byCreator"] as? Bool ?? false, pinned: c["pinned"] as? Bool ?? false)
+                           byCreator: c["byCreator"] as? Bool ?? false, pinned: c["pinned"] as? Bool ?? false,
+                           channelId: c["channelId"] as? String ?? "", repliesToken: c["repliesToken"] as? String)
         }
         return (items, o["next"] as? String)
     }
 
-    static func channel(_ id: String) async throws -> ChannelPage {
-        let o = try await Engine.shared.call("channel", [id, videosTab]) as? [String: Any] ?? [:]
+    /// a channel's tabs, as YouTube writes them
+    struct ChannelTab: Identifiable {
+        let name: String
+        let params: String
+        var id: String { params }
+    }
+
+    static let channelTabs = [
+        ChannelTab(name: "Videos", params: videosTab), ChannelTab(name: "Shorts", params: "EgZzaG9ydHPyBgUKA5oBAA%3D%3D"),
+        ChannelTab(name: "Live", params: "EgdzdHJlYW1z8gYECgJ6AA%3D%3D"), ChannelTab(name: "Playlists", params: "EglwbGF5bGlzdHPyBgQKAkIA"),
+    ]
+
+    static func channel(_ id: String, tab: String = videosTab) async throws -> ChannelPage {
+        let o = try await Engine.shared.call("channel", [id, tab]) as? [String: Any] ?? [:]
         return ChannelPage(id: o["id"] as? String ?? id, name: o["name"] as? String ?? "", avatar: o["avatar"] as? String ?? "",
                            banner: o["banner"] as? String ?? "", subsText: o["subsText"] as? String ?? "",
-                           videos: Page(o["items"]))
+                           handle: o["handle"] as? String ?? "", videos: Page(o["items"]))
     }
 
     static func playlist(_ id: String) async throws -> PlaylistPage {

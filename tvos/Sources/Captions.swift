@@ -103,8 +103,9 @@ final class CaptionLayer: UIView {
     private let label = UILabel()
     private var cues: [Subtitles.Cue] = []
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    /// `compact`: the smaller lines for the video playing on its page
+    init(compact: Bool = false) {
+        super.init(frame: .zero)
         isUserInteractionEnabled = false
         box.backgroundColor = UIColor.black.withAlphaComponent(0.72)
         box.layer.cornerRadius = 10
@@ -112,7 +113,7 @@ final class CaptionLayer: UIView {
         label.numberOfLines = 0
         label.textAlignment = .center
         label.textColor = .white
-        let size: CGFloat = [38, 48, 60][max(0, min(2, Settings.captionSize))]
+        let size: CGFloat = [38, 48, 60][max(0, min(2, Settings.captionSize))] * (compact ? 0.55 : 1)
         label.font = .systemFont(ofSize: size, weight: .medium)
         box.translatesAutoresizingMaskIntoConstraints = false
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -124,7 +125,7 @@ final class CaptionLayer: UIView {
             label.topAnchor.constraint(equalTo: box.topAnchor, constant: 10),
             label.bottomAnchor.constraint(equalTo: box.bottomAnchor, constant: -10),
             box.centerXAnchor.constraint(equalTo: centerXAnchor),
-            box.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -80),
+            box.bottomAnchor.constraint(equalTo: bottomAnchor, constant: compact ? -24 : -80),
             box.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.8),
         ])
     }

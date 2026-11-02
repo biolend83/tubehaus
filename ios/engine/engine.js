@@ -531,6 +531,9 @@ async function details(id) {
     if (secs.length) token = str(findFirst(secs[0], "token"));
   }
   return {
+    title: text(at(primary, "title")) || "",
+    author: text(at(owner, "title")) || "",
+    channelId: str(at(owner, "title.runs.0.navigationEndpoint.browseEndpoint.browseId")) || "",
     likesText: str(at(like, "likeButtonViewModel.likeButtonViewModel.toggleButtonViewModel.toggleButtonViewModel.defaultButtonViewModel.buttonViewModel.title")) || "",
     subsText: text(at(owner, "subscriberCountText")) || "",
     avatar: bestImage(at(owner, "thumbnail")) || bestImage(watch ? findFirst(watch, "decoratedAvatarViewModel") : null),

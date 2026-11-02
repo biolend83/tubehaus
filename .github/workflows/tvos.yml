@@ -74,14 +74,18 @@ jobs:
           run -tab search -q "lofi hip hop"; sleep 30; shot 06-search
           run -tab library; sleep 8; shot 07-library
           run -tab settings; sleep 8; shot 08-settings
-          # one video page (streams, details, related videos and comments all come from engine.js)
+          # one video page: it plays on the page, Up next beside it (streams, details, related videos
+          # and comments all come from engine.js; the runner's datacenter IP may get YouTube's bot check)
           run -open jNQXAC9IVRw; sleep 35; shot 09-video
-          # and playing it
-          run -open aqz-KE-bpKQ -autoplay YES; sleep 40; shot 10-playing
+          # OK on the video: the same player full screen
+          run -open aqz-KE-bpKQ -fullscreen YES; sleep 40; shot 10-fullscreen
           sleep 20; shot 11-still-playing
+          run -channel UCX6OQ3DkcsbYNE6H8uQQuVA; sleep 30; shot 12-channel
+          run -tab shorts; sleep 45; shot 13-shorts
+          run -tab library; sleep 10; shot 14-library-after
           xcrun simctl terminate "$udid" $id || true
           xcrun simctl spawn "$udid" log show --last 15m --style compact --predicate 'process == "TubeHaus"' > shots/app.log 2>&1 || true
-          tail -60 shots/app.log
+          grep -i engine shots/app.log | tail -40; tail -60 shots/app.log
           ls ~/Library/Logs/DiagnosticReports/ | grep -i tubehaus && cp ~/Library/Logs/DiagnosticReports/*TubeHaus* shots/ || echo "no crash report"
       - uses: actions/upload-artifact@v4
         if: always()

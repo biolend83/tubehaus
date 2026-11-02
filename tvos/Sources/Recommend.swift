@@ -179,6 +179,65 @@ final class Recommender {
         return rank(cands, n, skip: skip, t)
     }
 
+    nonisolated static func isShort(_ v: Video) -> Bool { v.short || (1...180).contains(v.lengthSec) }
+
+    /// Discover: six topics you don't usually watch, ranked as for someone new (your likes aren't used)
+    func discover(_ n: Int = 40, skip: Set<String> = []) async -> [Video] {
+        let liked = Set(Library.shared.taste.kw.filter { $0.value > 0.5 }.map(\.key))
+        let topics = Self.topics.filter { !liked.contains($0.lowercased()) }.shuffled().prefix(6)
+        var cands: [Cand] = []
+        await withTaskGroup(of: [Cand].self) { g in
+            for k in topics { g.addTask { await self.pool("kw:\(k)") { try await self.search(k, "pop") } } }
+            for await list in g { cands += list }
+        }
+        return rank(cands, n, skip: skip, Taste())
+    }
+
+    /// Shorts for the Shorts tab: from your subscriptions, channels you like, words you like, and popular ones
+    func shorts(skip: Set<String> = []) async -> [Video] {
+        let lib = Library.shared
+        let t = lib.taste
+        var lists: [[Video]] = []
+        if !lib.subscriptions.isEmpty {
+            if SubFeed.shared.videos.isEmpty { await SubFeed.shared.load() }
+            lists.append(SubFeed.shared.videos.filter(Recommender.isShort).shuffled())
+        }
+        let likedCh = t.ch.filter { $0.value > 0.5 && !lib.isSubscribed($0.key) }.sorted { $0.value > $1.value }.prefix(6).map { $0.key }
+        let likedKw = t.kw.filter { $0.value > 0.5 }.sorted { $0.value > $1.value }.prefix(4).map { $0.key }
+        await withTaskGroup(of: [Video].self) { g in
+            for c in likedCh {
+                g.addTask { await self.pool("shorts-ch:\(c)", ttl: 1800) { try await YT.feed(c).map { Cand(v: $0, src: "chan") } }.map(\.v).filter(Recommender.isShort) }
+            }
+            for k in likedKw {
+                g.addTask {
+                    await self.pool("shorts-kw:\(k)", ttl: 1800) {
+                        try await YT.search("\(k) #shorts", filter: .short).items.compactMap(\.video).map { Cand(v: $0, src: "kw") }
+                    }.map(\.v).filter(Recommender.isShort)
+                }
+            }
+            g.addTask {
+                await self.pool("shorts-pop", ttl: 1800) {
+                    try await YT.search("#shorts", filter: .short).items.compactMap(\.video).map { Cand(v: $0, src: "pop") }
+                }.map(\.v).filter(Recommender.isShort)
+            }
+            for await list in g { lists.append(list.shuffled()) }
+        }
+        // one from each list in turn, so no single source fills the screen
+        let hidden = Set(t.hiddenVideos).union(skip)
+        var out: [Video] = []
+        var seen = Set<String>()
+        var i = 0
+        while lists.contains(where: { i < $0.count }) {
+            for l in lists where i < l.count {
+                let v = l[i]
+                if hidden.contains(v.id) || (t.ch[v.channelId] ?? 0) <= -3 || !seen.insert(v.id).inserted { continue }
+                out.append(v)
+            }
+            i += 1
+        }
+        return out
+    }
+
     private func rank(_ items: [Cand], _ n: Int, skip: Set<String>, _ t: Taste) -> [Video] {
         let lib = Library.shared
         let hidden = Set(t.hiddenVideos).union(skip)

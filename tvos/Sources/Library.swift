@@ -18,7 +18,10 @@ final class Library {
     private(set) var history: [Watched] = []
     private(set) var later: [Video] = []
     private(set) var liked: [Video] = []
+    private(set) var disliked: [String] = []
     private(set) var taste = Taste()
+    /// channel names, for the list of what was learned (the scores are kept by channel id)
+    private(set) var names: [String: String] = [:]
 
     private let store = UserDefaults.standard
 
@@ -27,7 +30,9 @@ final class Library {
         history = read("history") ?? []
         later = read("later") ?? []
         liked = read("liked") ?? []
+        disliked = read("disliked") ?? []
         taste = read("taste") ?? Taste()
+        names = read("names") ?? [:]
     }
 
     private func read<T: Decodable>(_ key: String) -> T? {
@@ -142,12 +147,60 @@ final class Library {
             learn(v, keywords: keywords, watched: 0, length: 0, liked: true)
         }
         write("liked", liked)
+        if disliked.contains(v.id) { disliked.removeAll { $0 == v.id }; write("disliked", disliked) }
+    }
+
+    func isDisliked(_ id: String) -> Bool { disliked.contains(id) }
+
+    /// a dislike: less from this channel
+    func toggleDislike(_ v: Video) {
+        if isDisliked(v.id) {
+            disliked.removeAll { $0 == v.id }
+        } else {
+            disliked.append(v.id)
+            if disliked.count > 2000 { disliked.removeFirst(disliked.count - 2000) }
+            if isLiked(v.id) { liked.removeAll { $0.id == v.id }; write("liked", liked) }
+            nudge(v, -1.5)
+        }
+        write("disliked", disliked)
     }
 
     // MARK: what Home learned (see Recommend.swift)
 
     func learn(_ v: Video, keywords: [String], watched: Double, length: Double, liked: Bool = false) {
         taste.learn(v, keywords: keywords, watched: watched, length: length, liked: liked)
+        name(v)
+        write("taste", taste)
+    }
+
+    private func nudge(_ v: Video, _ by: Double) {
+        guard !v.channelId.isEmpty else { return }
+        taste.ch[v.channelId] = min(Taste.cap, max(-Taste.cap, (taste.ch[v.channelId] ?? 0) + by))
+        name(v)
+        write("taste", taste)
+    }
+
+    private func name(_ v: Video) {
+        guard !v.channelId.isEmpty, !v.author.isEmpty, names[v.channelId] != v.author else { return }
+        names[v.channelId] = v.author
+        write("names", names)
+    }
+
+    /// "Don't recommend this channel"
+    func hideChannel(_ v: Video) {
+        guard !v.channelId.isEmpty else { return }
+        taste.ch[v.channelId] = -Taste.cap
+        name(v)
+        write("taste", taste)
+    }
+
+    func forgetChannel(_ id: String) {
+        taste.ch[id] = nil
+        write("taste", taste)
+    }
+
+    func forgetWord(_ w: String) {
+        taste.kw[w] = nil
         write("taste", taste)
     }
 
@@ -190,7 +243,7 @@ enum Settings {
     }
 
     static var hideShorts: Bool {
-        get { UserDefaults.standard.object(forKey: "hideShorts") as? Bool ?? true }
+        get { UserDefaults.standard.object(forKey: "hideShorts") as? Bool ?? false }
         set { UserDefaults.standard.set(newValue, forKey: "hideShorts") }
     }
 
@@ -210,5 +263,21 @@ enum Settings {
     static var captionSize: Int {
         get { UserDefaults.standard.object(forKey: "captionSize") as? Int ?? 1 }
         set { UserDefaults.standard.set(newValue, forKey: "captionSize") }
+    }
+
+    static var hideComments: Bool {
+        get { UserDefaults.standard.bool(forKey: "hideComments") }
+        set { UserDefaults.standard.set(newValue, forKey: "hideComments") }
+    }
+
+    static var hideRelated: Bool {
+        get { UserDefaults.standard.bool(forKey: "hideRelated") }
+        set { UserDefaults.standard.set(newValue, forKey: "hideRelated") }
+    }
+
+    /// the side menu folded away (the button at its top)
+    static var railFolded: Bool {
+        get { UserDefaults.standard.bool(forKey: "railFolded") }
+        set { UserDefaults.standard.set(newValue, forKey: "railFolded") }
     }
 }

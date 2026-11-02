@@ -1,5 +1,8 @@
 import Foundation
 import JavaScriptCore
+import os
+
+private let log = Logger(subsystem: "io.github.biolend83.tubehaus.tv", category: "engine")
 
 /// The same YouTube engine as the iPad app (ios/engine/engine.js), run in Apple's JavaScriptCore.
 /// It decides which requests to make and how to read the answers; this file only does what it
@@ -82,20 +85,31 @@ actor Engine {
         let id = nextCall
         let argsJson = String(decoding: try JSONSerialization.data(withJSONObject: args), as: UTF8.self)
         _ = try run(c, "__run(\(id), \(Self.lit(op)), \(Self.lit(argsJson)), \(Self.lit(env())))")
+        let started = Date()
+        log.info("\(op, privacy: .public) #\(id) started")
         var idle = 0
         while true {
             let t = try run(c, "__take(\(id))")
             let d = (try? JSONSerialization.jsonObject(with: Data(t.utf8))) as? [String: Any] ?? [:]
             if let state = d["state"] as? String, state != "pending" {
-                if state == "ok" { return d["value"] ?? NSNull() }
-                throw EngineError(kind: d["kind"] as? String ?? "OTHER", message: d["message"] as? String ?? "YouTube engine error")
+                let ms = Int(Date().timeIntervalSince(started) * 1000)
+                if state == "ok" {
+                    log.info("\(op, privacy: .public) #\(id) ok in \(ms) ms")
+                    return d["value"] ?? NSNull()
+                }
+                let message = d["message"] as? String ?? "YouTube engine error"
+                log.error("\(op, privacy: .public) #\(id) failed in \(ms) ms: \(message, privacy: .public)")
+                throw EngineError(kind: d["kind"] as? String ?? "OTHER", message: message)
             }
             let drained = try run(c, "__drain()")
             let reqs = (try? JSONSerialization.jsonObject(with: Data(drained.utf8))) as? [[String: Any]] ?? []
             if reqs.isEmpty {
                 // nothing asked: the engine is between steps; look again shortly
                 idle += 1
-                if idle > 3000 { throw EngineError(kind: "OTHER", message: "The YouTube engine didn't answer") }
+                if idle > 3000 || Date().timeIntervalSince(started) > 60 {
+                    log.error("\(op, privacy: .public) #\(id) gave no answer")
+                    throw EngineError(kind: "OTHER", message: "The YouTube engine didn't answer")
+                }
                 try await Task.sleep(nanoseconds: 5_000_000)
                 continue
             }
