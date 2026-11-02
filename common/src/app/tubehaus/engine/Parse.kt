@@ -170,3 +170,105 @@ private fun playlistRenderer(v: JsonElement): Playlist? {
         v.at("shortBylineText").text ?: v.at("longBylineText").text ?: "",
     )
 }
+
+// ---------------------------------------------------------------- channel Home and Posts
+
+/** Where a link in a YouTube text goes, as an address; outside links lose YouTube's redirect page. */
+fun linkOf(e: JsonElement?): String? {
+    if (e == null) return null
+    e.at("urlEndpoint.url").str?.let { u ->
+        return Regex("[?&]q=([^&]+)").find(u)?.groupValues?.get(1)?.let(::urlDecode)
+            ?: if (u.startsWith("/")) "https://www.youtube.com$u" else u
+    }
+    e.at("watchEndpoint.videoId").str?.let { v ->
+        val t = e.at("watchEndpoint.startTimeSeconds").int
+        return "https://www.youtube.com/watch?v=$v" + (t?.let { "&t=${it}s" } ?: "")
+    }
+    val b = e.at("browseEndpoint") ?: return null
+    b.at("canonicalBaseUrl").str?.let { return "https://www.youtube.com$it" }
+    val id = b.at("browseId").str ?: return null
+    return when {
+        id.startsWith("UC") -> "https://www.youtube.com/channel/$id"
+        id.startsWith("VL") -> "https://www.youtube.com/playlist?list=${id.drop(2)}"
+        else -> null
+    }
+}
+
+/** A text's runs joined into one string, with the parts that are links. */
+fun linkedText(e: JsonElement?): Pair<String, List<TextLink>> {
+    val runs = e.at("runs").arr
+    if (runs.isEmpty()) return (e.text ?: "") to emptyList()
+    val sb = StringBuilder()
+    val links = ArrayList<TextLink>()
+    for (r in runs) {
+        val t = r.at("text").str ?: continue
+        val start = sb.length
+        sb.append(t)
+        linkOf(r.at("navigationEndpoint"))?.let { links += TextLink(start, sb.length, it) }
+    }
+    return sb.toString() to links
+}
+
+/**
+ * The rows of a channel's Home tab, from its sections (or the sections a continuation adds):
+ * each titled row of videos, shorts or playlists. The featured video is read separately.
+ */
+fun parseShelves(sections: List<JsonElement>, channelId: String): List<Shelf> = sections.mapNotNull { s ->
+    val c = s.at("itemSectionRenderer.contents.0") ?: s
+    val (kind, v) = (c as? JsonObject)?.entries?.firstOrNull()?.let { it.key to it.value } ?: return@mapNotNull null
+    if (kind in setOf("channelVideoPlayerRenderer", "continuationItemRenderer", "recognitionShelfRenderer")) return@mapNotNull null
+    val items = parseItems(v)
+    if (items.isEmpty()) return@mapNotNull null
+    val title = (v.at("title") ?: v.at("headerRenderer")?.findFirst("title")).text?.trim() ?: ""
+    // "Play all" on a playlist's row, or the tab a row like "Videos" stands for
+    val go = (v.at("endpoint") ?: v.at("title"))?.findFirst("browseEndpoint")
+    val browse = go.at("browseId").str
+    Shelf(title, items, playlistId = browse?.takeIf { it.startsWith("VL") }?.drop(2), tabParams = go.at("params").str?.takeIf { browse == channelId })
+}
+
+/** The posts below [root] (a Posts tab, or a page more of it). */
+fun parsePosts(root: JsonElement?): List<Post> = root?.findAll("backstagePostRenderer")?.mapNotNull(::post) ?: emptyList()
+
+private fun post(p: JsonElement): Post? = try {
+    val id = p.at("postId").str
+    if (id == null) null else {
+        val (text, links) = linkedText(p.at("contentText"))
+        val att = p.at("backstageAttachment")
+        val images = att.at("backstageImageRenderer")?.let { listOf(bestImage(it.at("image"))) }
+            ?: att.at("postMultiImageRenderer.images").arr.map { bestImage(it.at("backstageImageRenderer.image")) }
+        // a video or a playlist the post shares
+        val shared = if (att != null) parseItems(att) else emptyList()
+        val poll = att.at("pollRenderer")
+        Post(
+            id = id,
+            author = p.at("authorText").text ?: "",
+            avatar = bestImage(p.at("authorThumbnail")),
+            published = p.at("publishedTimeText").text ?: "",
+            text = text,
+            links = links,
+            likes = p.at("voteCount").text?.trim() ?: "",
+            replies = p.at("actionButtons")?.findFirst("replyButton")?.findFirst("text").text?.trim() ?: "",
+            images = images.filter { it.isNotEmpty() },
+            video = shared.firstOrNull { it is Video } as? Video,
+            playlist = shared.firstOrNull { it is Playlist } as? Playlist,
+            poll = poll.at("choices").arr.mapNotNull { it.at("text").text },
+            pollVotes = poll.at("totalVotes").text ?: "",
+        )
+    }
+} catch (e: Exception) {
+    null
+}
+
+/**
+ * Chapters written in a description ("0:00 Intro", "1:23 - The part"), as YouTube reads them:
+ * at least three, the first at 0:00, in order. Empty when the description has none.
+ */
+fun chaptersIn(description: String): List<Chapter> {
+    val line = Regex("""^\s*[\[(]?((?:\d{1,2}:)?\d{1,2}:\d{2})[\])]?\s*[-–—:|.]?\s*(.+)$""")
+    val out = description.lineSequence().mapNotNull { l ->
+        val m = line.find(l) ?: return@mapNotNull null
+        Chapter(m.groupValues[2].trim(), secondsOf(m.groupValues[1]) * 1000L)
+    }.toList()
+    if (out.size < 3 || out[0].startMs != 0L || out.zipWithNext().any { (a, b) -> b.startMs <= a.startMs }) return emptyList()
+    return out
+}

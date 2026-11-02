@@ -38,6 +38,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import app.tubehaus.engine.Video
 import app.tubehaus.engine.YouTube
+import app.tubehaus.engine.SearchOptions
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.FlowRow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -45,7 +50,8 @@ import kotlinx.coroutines.launch
 fun SearchScreen(app: AppState, initial: String) {
     var text by remember { mutableStateOf(initial) }
     var query by remember { mutableStateOf(initial) }
-    var filter by remember { mutableStateOf(YouTube.Filter.ALL) }
+    var filter by remember { mutableStateOf(SearchOptions()) }
+    var filters by remember { mutableStateOf(false) }
     var suggestions by remember { mutableStateOf<List<String>>(emptyList()) }
     val focus = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
@@ -142,8 +148,13 @@ fun SearchScreen(app: AppState, initial: String) {
         val grid = prefs.searchGrid
         Row(verticalAlignment = Alignment.CenterVertically) {
             LazyRow(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(listOf(YouTube.Filter.ALL to "All", YouTube.Filter.VIDEOS to "Videos", YouTube.Filter.CHANNELS to "Channels", YouTube.Filter.PLAYLISTS to "Playlists")) { (f, label) ->
-                    FilterChip(filter == f, onClick = { filter = f }, label = { Text(tr(label)) })
+                // the kind of result, then the rest of YouTube's filters in a panel
+                item {
+                    FilterChip(filter.count > 0, onClick = { filters = true },
+                        label = { Text(tr("Filters") + if (filter.count > 0) " (${filter.count})" else "") })
+                }
+                items(listOf(0 to "All", 1 to "Videos", 2 to "Channels", 3 to "Playlists", 4 to "Movies")) { (t, label) ->
+                    FilterChip(filter.type == t, onClick = { filter = filter.copy(type = t) }, label = { Text(tr(label)) })
                 }
             }
             // phones always show one card per row; wider screens can pick a list or a grid
@@ -152,6 +163,7 @@ fun SearchScreen(app: AppState, initial: String) {
                 else Icon(Sym.GridView.outline, tr("Show as a grid"))
             }
         }
+        if (filters) SearchFilters(filter, { filter = it }) { filters = false }
         val pager = rememberPager(query to filter, { YouTube.search(query, filter) }, { YouTube.searchMore(it) })
         when {
             pager.items.isEmpty() && pager.loading -> Busy()
@@ -164,5 +176,29 @@ fun SearchScreen(app: AppState, initial: String) {
         }
         }
         if (bottom) SearchBox(Modifier.imePadding())
+    }
+}
+
+/** YouTube's Filters panel: upload date, length, features and the order of the results. */
+@Composable
+private fun SearchFilters(o: SearchOptions, set: (SearchOptions) -> Unit, close: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = close) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+            @Composable
+            fun group(title: String, options: List<Pair<Int, String>>, now: Int, pick: (Int) -> Unit) {
+                Text(tr(title), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((v, label) in options) FilterChip(now == v, onClick = { pick(v) }, label = { Text(tr(label)) })
+                }
+            }
+            group("Upload date", listOf(0 to "Any time", 1 to "Last hour", 2 to "Today", 3 to "This week", 4 to "This month", 5 to "This year"), o.date) { set(o.copy(date = it)) }
+            group("Duration", listOf(0 to "Any length", 1 to "Under 4 minutes", 3 to "4 - 20 minutes", 2 to "Over 20 minutes"), o.duration) { set(o.copy(duration = it)) }
+            group("Features", listOf(0 to "Any", 1 to "Live"), if (o.live) 1 else 0) { set(o.copy(live = it == 1)) }
+            group("Sort by", listOf(0 to "Relevance", 2 to "Upload date", 3 to "View count", 1 to "Rating"), o.sort) { set(o.copy(sort = it)) }
+            Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { set(SearchOptions(type = o.type)) }) { Text(tr("Reset")) }
+                TextButton(onClick = close) { Text(tr("Done")) }
+            }
+        }
     }
 }

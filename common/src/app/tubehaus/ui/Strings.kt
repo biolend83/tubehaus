@@ -358,6 +358,16 @@ private val KO = mapOf(
     "Cooking" to "요리", "Travel" to "여행", "Sports" to "스포츠", "Comedy" to "코미디", "Movies" to "영화",
     "Podcasts" to "팟캐스트", "Documentaries" to "다큐멘터리", "Fitness" to "운동", "Art" to "예술", "Nature" to "자연",
     "Cars" to "자동차", "Anime" to "애니메이션", "Education" to "교육", "DIY" to "DIY", "Finance" to "경제",
+    // the channel page, chapters, search filters and the player's settings
+    "Search this channel" to "채널 내 검색", "View all" to "모두 보기", "Read more" to "더보기", "Share channel" to "채널 공유",
+    "Chapters" to "챕터", "Filters" to "필터", "Reset" to "초기화",
+    "Any time" to "전체", "Last hour" to "지난 1시간", "Today" to "오늘", "This week" to "이번 주", "This month" to "이번 달", "This year" to "올해",
+    "Duration" to "길이", "Any length" to "전체", "Under 4 minutes" to "4분 미만", "4 - 20 minutes" to "4~20분", "Over 20 minutes" to "20분 초과",
+    "Features" to "기능별", "Any" to "전체", "Sort by" to "정렬기준", "Relevance" to "관련성", "Rating" to "평점",
+    "Loop video" to "동영상 반복", "Sleep timer" to "취침 타이머", "End of video" to "동영상 끝날 때", "{n} min left" to "{n}분 남음",
+    "{n} minutes" to "{n}분", "Sleep timer: paused" to "취침 타이머: 일시중지됨",
+    "Stats for nerds" to "전문가용 통계", "Video ID" to "동영상 ID", "Through" to "연결", "Resolution" to "해상도",
+    "Video codec" to "동영상 코덱", "Audio codec" to "오디오 코덱", "Buffer health" to "버퍼 상태",
     // engine messages
     "No connection to YouTube" to "YouTube에 연결할 수 없어요",
     "No playable streams" to "재생할 수 있는 스트림이 없어요",
