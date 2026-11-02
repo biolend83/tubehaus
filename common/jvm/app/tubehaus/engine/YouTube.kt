@@ -239,6 +239,7 @@ object YouTube {
         val stats = rows.filter { !it.startsWith("@") && it.any(Char::isDigit) }   // [subscribers, videos]
         val old = d.at("header.c4TabbedHeaderRenderer")
         val meta = d.at("metadata.channelMetadataRenderer")
+        val preview = head?.findFirst("descriptionPreviewViewModel")
         return ChannelPage(
             id = id,
             name = head.at("title").text ?: old.at("title").str ?: meta.at("title").str ?: "",
@@ -248,6 +249,33 @@ object YouTube {
             subsText = stats.getOrNull(0) ?: old.at("subscriberCountText").text ?: "",
             videoCountText = stats.getOrNull(1) ?: "",
             items = Page(parseItems(sel), continuationOf(sel)),
+            description = preview.at("description.content").str ?: meta.at("description").str ?: "",
+            // "...more" opens a panel that is loaded with this token
+            aboutToken = (preview ?: head)?.findFirst("continuationCommand").at("token").str,
+        )
+    }
+
+    /** what "...more" on a channel shows: the whole description, links, country, joined date, views */
+    suspend fun channelAbout(token: String): ChannelAbout {
+        val d = InnerTube.call("browse", mapOf("continuation" to token))
+        val a = d.findFirst("aboutChannelViewModel") ?: throw YtError("This channel has no details", YtError.Kind.UNAVAILABLE)
+        return ChannelAbout(
+            description = a.at("description").str ?: "",
+            links = a.at("links").arr.mapNotNull { l ->
+                val m = l.at("channelExternalLinkViewModel") ?: return@mapNotNull null
+                val text = m.at("link.content").str ?: return@mapNotNull null
+                // YouTube's redirect page carries the real address in q=
+                val redirect = m.findFirst("urlEndpoint").at("url").str ?: ""
+                val url = Regex("[?&]q=([^&]+)").find(redirect)?.groupValues?.get(1)?.let(::urlDecode)
+                    ?: if (text.startsWith("http")) text else "https://$text"
+                ChannelLink(m.at("title.content").str ?: text, text, url, m.at("favicon.sources").arr.lastOrNull().at("url").str ?: "")
+            },
+            url = a.at("displayCanonicalChannelUrl").str ?: a.at("canonicalChannelUrl").str ?: "",
+            country = a.at("country").str ?: "",
+            joinedText = a.at("joinedDateText.content").str ?: a.at("joinedDateText").text ?: "",
+            viewsText = a.at("viewCountText").str ?: a.at("viewCountText").text ?: "",
+            subsText = a.at("subscriberCountText").str ?: a.at("subscriberCountText").text ?: "",
+            videoCountText = a.at("videoCountText").str ?: a.at("videoCountText").text ?: "",
         )
     }
 

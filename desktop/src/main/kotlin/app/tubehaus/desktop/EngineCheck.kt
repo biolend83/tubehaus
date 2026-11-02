@@ -112,6 +112,13 @@ fun main() = runBlocking {
         "${c.name} ${c.handle} ${c.subsText} ${c.videoCountText} avatar=${c.avatar.isNotEmpty()} banner=${c.banner.isNotEmpty()} items=${c.items.items.size} more=${c.items.next != null}"
     }
     check("channel more") { YouTube.browseMore(YouTube.channel("UCuAXFkgsw1L7xaCfnd5JJOw").items.next!!).items.size.toString() + " items" }
+    // "...more" on a channel: description, links, joined date
+    check("channel about") {
+        val c = YouTube.channel("UCTlfC-3OQJ0be6YfTL_irOA")
+        val a = YouTube.channelAbout(c.aboutToken ?: error("no token; preview '${c.description.take(30)}'"))
+        require(a.links.isNotEmpty() && a.joinedText.isNotEmpty()) { "links ${a.links.size} joined '${a.joinedText}'" }
+        "'${c.description.lineSequence().first()}' | ${a.description.length} chars, ${a.links.size} links (${a.links.first().title} -> ${a.links.first().url}) | ${a.url} ${a.country} | ${a.joinedText} | ${a.viewsText} | ${a.subsText} | ${a.videoCountText}"
+    }
     check("channel shorts") { YouTube.channel("UCuAXFkgsw1L7xaCfnd5JJOw", YouTube.Tab.SHORTS).items.items.size.toString() + " items" }
     check("channel lists") { YouTube.channel("UCuAXFkgsw1L7xaCfnd5JJOw", YouTube.Tab.PLAYLISTS).items.items.size.toString() + " items" }
     check("playlist") {
