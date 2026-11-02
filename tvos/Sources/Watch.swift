@@ -742,7 +742,7 @@ struct ChannelView: View {
             Status(error: error) { Task { await load() } }
                 .task(id: id) { await load() }
         } else if let p = page {
-            ItemGrid(items: videos.items, more: { await videos.more(YT.browseMore) }) {
+            ItemGrid(items: videos.items, more: { await videos.more(YT.browseMore) }, focusFirst: true) {
                 if !p.banner.isEmpty {
                     Picture(imageURL(p.banner))
                         .aspectRatio(6.2, contentMode: .fit)
@@ -811,7 +811,7 @@ struct PlaylistView: View {
 
     var body: some View {
         if let p = page {
-            ItemList(items: videos.items, more: { await videos.more(YT.browseMore) }) {
+            ItemList(items: videos.items, more: { await videos.more(YT.browseMore) }, focusFirst: true) {
                 HStack(alignment: .center, spacing: 32) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(p.title).font(Fonts.titleLarge).lineLimit(2)

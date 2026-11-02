@@ -146,6 +146,8 @@ struct ShortsView: View {
             }
             .frame(width: g.size.width, height: g.size.height)
         }
+        // black to the edges of the screen, not just inside the TV's safe margins
+        .background(Color.black.ignoresSafeArea())
         .task {
             await model.start()
             focused = true

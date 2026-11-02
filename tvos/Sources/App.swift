@@ -203,7 +203,7 @@ struct Rail: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            IconButton(icon: "sidebar.left", action: fold)
+            IconButton(icon: MenuOpen.name, action: fold)
                 .padding(.top, 16).padding(.bottom, 24)
             RailItem(icon: "house.fill", label: "Home", selected: nav.tab == .home && nav.path.isEmpty) { nav.go(.home) }
             if !Settings.hideShorts {

@@ -46,6 +46,7 @@ struct ImportView: View {
                         .overlay { if server.url == nil && !server.failed { ProgressView() } }
                 }
                 Button("Done") { dismiss() }
+                    .firstFocus()
             }
         }
         .padding(.horizontal, 60)

@@ -111,9 +111,10 @@ struct TopicPicker: View {
                     .padding(.top, 16).padding(.bottom, 40)
                 FlowLayout(spacing: 16) {
                     ForEach(Recommender.topics, id: \.self) { t in
-                        Chip(t, selected: picked.contains(t), filter: true) {
+                        let chip = Chip(t, selected: picked.contains(t), filter: true) {
                             if let i = picked.firstIndex(of: t) { picked.remove(at: i) } else { picked.append(t) }
                         }
+                        if t == Recommender.topics.first { chip.firstFocus() } else { chip }
                     }
                 }
                 .focusSection()
@@ -184,9 +185,9 @@ struct SearchView: View {
                 if feed.items.isEmpty {
                     Status(error: feed.loaded ? (feed.error ?? "No results for “\(searched)”") : nil) { run(searched) }
                 } else if grid {
-                    ItemGrid(items: feed.items, more: { await feed.more(YT.searchMore) })
+                    ItemGrid(items: feed.items, more: { await feed.more(YT.searchMore) }, focusFirst: true)
                 } else {
-                    ItemList(items: feed.items, more: { await feed.more(YT.searchMore) }) { EmptyView() }
+                    ItemList(items: feed.items, more: { await feed.more(YT.searchMore) }, focusFirst: true) { EmptyView() }
                 }
             } else if query.trimmingCharacters(in: .whitespaces).isEmpty {
                 recentList
@@ -308,13 +309,14 @@ struct SubscriptionsView: View {
                     Text("Subscribe to channels, or bring your subscriptions over from another app.")
                         .font(Fonts.bodyMedium).foregroundStyle(Theme.sub).multilineTextAlignment(.center)
                     FilledButton("Import subscriptions") { Nav.shared.push(.importSubs) }
+                        .firstFocus()
                     Text("From YouTube (Google Takeout), NewPipe, FreeTube, Invidious, TubeHaus or OPML")
                         .font(Fonts.bodySmall).foregroundStyle(Theme.sub)
                 }
                 .frame(maxWidth: 1200)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ItemGrid(items: shownVideos.map(Item.video), more: { shown += 40 }) {
+                ItemGrid(items: shownVideos.map(Item.video), more: { shown += 40 }, focusFirst: true) {
                     header
                     if shownVideos.isEmpty {
                         Status(error: feed.loading ? nil : (find.isEmpty ? "Nothing new from your channels" : "Nothing matches “\(find)”")) {
@@ -425,7 +427,9 @@ struct LibraryView: View {
                 } else {
                     ScrollView(.horizontal) {
                         LazyHStack(alignment: .top, spacing: 24) {
-                            ForEach(library.history.prefix(30)) { w in SmallCard(video: w.video) }
+                            ForEach(library.history.prefix(30)) { w in
+                                if w.id == library.history.first?.id { SmallCard(video: w.video).firstFocus() } else { SmallCard(video: w.video) }
+                            }
                         }
                         .padding(.horizontal, 32).padding(.vertical, 20)
                     }
@@ -433,7 +437,12 @@ struct LibraryView: View {
                     .focusSection()
                 }
                 VStack(spacing: 4) {
-                    LibRow(icon: "clock.arrow.circlepath", label: "History", count: library.history.count) { Nav.shared.push(.history) }
+                    if library.history.isEmpty {
+                        LibRow(icon: "clock.arrow.circlepath", label: "History", count: 0) { Nav.shared.push(.history) }
+                            .firstFocus()
+                    } else {
+                        LibRow(icon: "clock.arrow.circlepath", label: "History", count: library.history.count) { Nav.shared.push(.history) }
+                    }
                     LibRow(icon: "clock", label: "Watch later", count: library.later.count) { Nav.shared.push(.later) }
                     LibRow(icon: "hand.thumbsup", label: "Liked videos", count: library.liked.count) { Nav.shared.push(.liked) }
                 }
@@ -646,6 +655,7 @@ struct SettingsView: View {
             LazyVStack(alignment: .leading, spacing: 0) {
                 group("General")
                 item("Language", language.isEmpty ? "\(name(language: Settings.hl)) (from this device)" : name(language: language)) { dialog = .language }
+                    .firstFocus()
                 item("Region", region.isEmpty ? "\(regionName(Settings.gl)) (from this device)" : regionName(region)) { dialog = .region }
 
                 group("Focus")

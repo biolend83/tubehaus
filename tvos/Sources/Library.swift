@@ -47,6 +47,11 @@ final class Library {
 
     func isSubscribed(_ channelId: String) -> Bool { subscriptions.contains { $0.id == channelId } }
 
+    /// the picture of a channel subscribed to, for lists that came without one
+    func avatar(of channelId: String) -> URL? {
+        channelId.isEmpty ? nil : subscriptions.first { $0.id == channelId }?.avatarURL
+    }
+
     func toggleSubscription(_ c: Channel) {
         if isSubscribed(c.id) { subscriptions.removeAll { $0.id == c.id } }
         else { subscriptions.append(c); sortSubs() }

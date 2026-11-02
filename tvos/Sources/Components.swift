@@ -121,13 +121,13 @@ enum Images {
         return nil
     }
 
-    static func load(_ urls: [URL], maxPixels: Int = 1000) async -> UIImage? {
+    static func load(_ urls: [URL], maxPixels: Int = 1000, minWidth: Int = 131) async -> UIImage? {
         if let i = cached(urls) { return i }
         for u in urls {
             let img = await Task.detached(priority: .utility) { () -> UIImage? in
                 guard let (d, r) = try? await URLSession.shared.data(from: u),
                       (r as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-                return Images.decode(d, maxPixels)
+                return Images.decode(d, maxPixels, minWidth)
             }.value
             if Task.isCancelled { return nil }
             if let img {
@@ -139,10 +139,10 @@ enum Images {
         return nil
     }
 
-    static func decode(_ d: Data, _ maxPixels: Int) -> UIImage? {
+    static func decode(_ d: Data, _ maxPixels: Int, _ minWidth: Int) -> UIImage? {
         guard let src = CGImageSourceCreateWithData(d as CFData, nil),
               let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
-              let w = props[kCGImagePropertyPixelWidth] as? Int, w > 130 else { return nil }
+              let w = props[kCGImagePropertyPixelWidth] as? Int, w >= minWidth else { return nil }
         let opts: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
@@ -158,11 +158,14 @@ enum Images {
 struct Picture: View {
     let urls: [URL]
     var maxPixels = 1000
+    /// thumbnails narrower than this are YouTube's grey stand-in; channel pictures are small for real
+    var minWidth = 131
     @State private var image: UIImage?
 
-    init(_ urls: [URL], maxPixels: Int = 1000) {
+    init(_ urls: [URL], maxPixels: Int = 1000, minWidth: Int = 131) {
         self.urls = urls
         self.maxPixels = maxPixels
+        self.minWidth = minWidth
         _image = State(initialValue: Images.cached(urls))
     }
 
@@ -180,7 +183,7 @@ struct Picture: View {
                 if let i = Images.cached(urls) { image = i; return }
                 image = nil      // another video's picture (the next one in Up next)
                 guard !urls.isEmpty else { return }
-                let i = await Images.load(urls, maxPixels: maxPixels)
+                let i = await Images.load(urls, maxPixels: maxPixels, minWidth: minWidth)
                 if !Task.isCancelled { withAnimation(.easeOut(duration: 0.2)) { image = i } }
             }
     }
@@ -196,7 +199,7 @@ struct Avatar: View {
         ZStack {
             Circle().fill(Theme.chip)
             Text(String(name.prefix(1)).uppercased()).font(.system(size: size * 0.42, weight: .medium)).foregroundStyle(Theme.text)
-            if url != nil { Picture(url, maxPixels: 300).clipShape(Circle()) }
+            if let url { Picture([url], maxPixels: 300, minWidth: 1).clipShape(Circle()) }
         }
         .frame(width: size, height: size)
     }
@@ -299,11 +302,35 @@ struct IconButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: icon).font(.system(size: size * 0.75, weight: .regular))
-                .foregroundStyle(Theme.text)
-                .frame(width: size * 1.75, height: size * 1.75)
+            Group {
+                if icon == MenuOpen.name {
+                    MenuOpen().fill(Theme.text).frame(width: size * 0.75, height: size * 0.75)
+                } else {
+                    Image(systemName: icon).font(.system(size: size * 0.75, weight: .regular))
+                }
+            }
+            .foregroundStyle(Theme.text)
+            .frame(width: size * 1.75, height: size * 1.75)
         }
         .buttonStyle(Glow(shape: Circle()))
+    }
+}
+
+/// Android's "menu open" icon (three lines and a ‹) for folding the side menu away; SF Symbols
+/// has nothing like it. Drawn on Material's 24 grid.
+struct MenuOpen: Shape {
+    static let name = "menu.open"
+
+    func path(in r: CGRect) -> Path {
+        let k = min(r.width, r.height) / 24
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: r.minX + x * k, y: r.minY + y * k) }
+        var path = Path()
+        path.addRect(CGRect(origin: p(3, 6), size: CGSize(width: 13 * k, height: 2 * k)))
+        path.addRect(CGRect(origin: p(3, 11), size: CGSize(width: 10 * k, height: 2 * k)))
+        path.addRect(CGRect(origin: p(3, 16), size: CGSize(width: 13 * k, height: 2 * k)))
+        path.addLines([p(21, 8.41), p(19.59, 7), p(14.59, 12), p(19.59, 17), p(21, 15.59), p(17.42, 12)])
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -440,7 +467,7 @@ struct VideoCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 Thumb(urls: video.cardPictures, badge: video.badge, progress: library.progress(video.id))
                 HStack(alignment: .top, spacing: 24) {
-                    Avatar(url: video.avatarURL, name: video.author, size: 72)
+                    Avatar(url: video.avatarURL ?? library.avatar(of: video.channelId), name: video.author, size: 72)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(video.title).font(Fonts.titleSmall).foregroundStyle(Theme.text).lineLimit(2)
                         Text(video.byline).font(Fonts.bodySmall).foregroundStyle(Theme.sub).lineLimit(2)
@@ -643,7 +670,7 @@ struct ItemGrid<Header: View>: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 32) {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
                     ForEach(items) { item in
                         ItemCard(item: item)
                             .focused($focused, equals: item.id)
@@ -674,10 +701,12 @@ extension ItemGrid where Header == EmptyView {
 struct ItemList<Header: View>: View {
     let items: [Item]
     let more: (() async -> Void)?
+    let focusFirst: Bool
     let header: Header
+    @FocusState private var focused: String?
 
-    init(items: [Item], more: (() async -> Void)? = nil, @ViewBuilder header: () -> Header) {
-        self.items = items; self.more = more; self.header = header()
+    init(items: [Item], more: (() async -> Void)? = nil, focusFirst: Bool = false, @ViewBuilder header: () -> Header) {
+        self.items = items; self.more = more; self.focusFirst = focusFirst; self.header = header()
     }
 
     var body: some View {
@@ -686,6 +715,7 @@ struct ItemList<Header: View>: View {
                 header
                 ForEach(items) { item in
                     ItemRow(item: item)
+                        .focused($focused, equals: item.id)
                         .onAppear {
                             if let more, items.suffix(4).contains(where: { $0.id == item.id }) { Task { await more() } }
                         }
@@ -693,7 +723,32 @@ struct ItemList<Header: View>: View {
             }
             .padding(.horizontal, 32).padding(.vertical, 16)
         }
+        .onAppear { if focusFirst, focused == nil { focused = items.first?.id } }
+        .onChange(of: items.first?.id) { if focusFirst, focused == nil { focused = items.first?.id } }
     }
+}
+
+/// Where the remote starts when a page opens. Left alone, tvOS starts at the top left - the
+/// TubeHaus logo or the side menu - where Android starts on the page itself. Only the first time:
+/// coming back to the page keeps the remote where it was.
+struct FirstFocus: ViewModifier {
+    @FocusState private var focused: Bool
+    @State private var done = false
+
+    func body(content: Content) -> some View {
+        content
+            .focused($focused)
+            .task {
+                guard !done else { return }
+                done = true
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                focused = true
+            }
+    }
+}
+
+extension View {
+    func firstFocus() -> some View { modifier(FirstFocus()) }
 }
 
 /// a section's title (Library)
