@@ -5,13 +5,16 @@ import android.content.Intent
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.DefaultMediaNotificationProvider
+import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
 
-/** Puts the app's one player in a media session: notification, lock screen, headset buttons, background play. */
+/**
+ * Puts the app's one player in a media session: notification, lock screen, headset buttons, background play,
+ * and Android Auto, which browses the lists [CarLibrary] gives it.
+ */
 @OptIn(UnstableApi::class)
-class PlaybackService : MediaSessionService() {
-    private var session: MediaSession? = null
+class PlaybackService : MediaLibraryService() {
+    private var session: MediaLibrarySession? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -20,10 +23,11 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         setMediaNotificationProvider(DefaultMediaNotificationProvider.Builder(this).build().apply { setSmallIcon(R.drawable.ic_notification) })
-        session = MediaSession.Builder(this, tube.platform.androidPlayer.exo).setSessionActivity(open).build()
+        val car = CarLibrary(this)
+        session = MediaLibrarySession.Builder(this, CarPlayer(this, tube.platform.androidPlayer.exo, car), car).setSessionActivity(open).build()
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         // swiped away from recents while paused: nothing left to do
