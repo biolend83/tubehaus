@@ -1,5 +1,6 @@
 package app.tubehaus.desktop
 
+import app.tubehaus.ui.tr
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.key.KeyEventType
@@ -57,6 +58,20 @@ class DesktopPlatform : Platform {
         val d = FileDialog(frame, "Save", FileDialog.SAVE).apply { file = name; isVisible = true }
         val f = d.file ?: return done(false)
         done(runCatching { File(d.directory, f).writeBytes(bytes) }.isSuccess)
+    }
+
+    override val canPickFolder get() = true
+
+    override fun pickFolder(start: String, done: (String?) -> Unit) {
+        val c = javax.swing.JFileChooser(File(start).takeIf { it.isDirectory } ?: File(System.getProperty("user.home"))).apply {
+            fileSelectionMode = javax.swing.JFileChooser.DIRECTORIES_ONLY
+            dialogTitle = tr("Download folder")
+        }
+        done(if (c.showOpenDialog(frame) == javax.swing.JFileChooser.APPROVE_OPTION) c.selectedFile.absolutePath else null)
+    }
+
+    override fun openFolder(path: String) {
+        runCatching { File(path).mkdirs(); Desktop.getDesktop().open(File(path)) }
     }
 
     override fun openTextFile(done: (String?) -> Unit) {
