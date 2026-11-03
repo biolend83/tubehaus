@@ -74,7 +74,9 @@ jobs:
           # libmpv needs vulkan-1.dll, which only comes with some graphics drivers: ship the official
           # Khronos loader (Apache-2.0) next to it, or mpv won't load on PCs without one
           # LunarG sometimes lists a new version before its file is up: then take the one before it
-          $vers = @('latest') + @(Invoke-RestMethod https://vulkan.lunarg.com/sdk/versions/windows.json | Select-Object -First 3)
+          # (the list arrives as one array object, so it is indexed rather than piped)
+          $list = Invoke-RestMethod https://vulkan.lunarg.com/sdk/versions/windows.json
+          $vers = @('latest') + $list[0..2]
           foreach ($v in $vers) {
             try { Invoke-WebRequest "https://sdk.lunarg.com/sdk/download/$v/windows/vulkan-runtime-components.zip?u=" -OutFile vkrt.zip; break }
             catch { Write-Warning "no Vulkan runtime $v" }
