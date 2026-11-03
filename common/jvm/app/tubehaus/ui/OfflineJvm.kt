@@ -44,9 +44,40 @@ fun SavedFile.format(f: File) = Format(
  * reads them through the same DASH description it uses online, the desktop's mpv opens them directly.
  */
 class Offline(private val app: AppState) {
-    private val dir = File(app.platform.dataDir.toString(), "offline")
+    /** the app's own folder: the list of saved videos always stays here */
+    private val home = File(app.platform.dataDir.toString(), "offline")
+    /** where the videos' files are: the folder picked in Downloads, or the app's own */
+    private val dir: File get() = app.store.settings.value.offlineDir.ifEmpty { null }?.let(::File) ?: home
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val index = JsonFile(File(dir, "index.json").toOkioPath(), OfflineIndex.serializer(), OfflineIndex(), io)
+    private val index = JsonFile(File(home, "index.json").toOkioPath(), OfflineIndex.serializer(), OfflineIndex(), io)
+    val folder: String get() = dir.absolutePath
+
+    /**
+     * Moves the saved videos to [path] and keeps new ones there. Waits for no download: false
+     * while one is under way, or when the folder can't be written; then nothing has moved.
+     */
+    suspend fun moveTo(path: String): Boolean = withContext(Dispatchers.IO) {
+        if (progress.isNotEmpty()) return@withContext false
+        val from = dir
+        val to = File(path)
+        if (to.canonicalPath == from.canonicalPath) return@withContext true
+        if (!to.isDirectory && !to.mkdirs() || !to.canWrite()) return@withContext false
+        val moved = ArrayList<String>()
+        fun move(a: File, b: File) = a.renameTo(b) || runCatching { a.copyRecursively(b, overwrite = true) }.isSuccess && a.deleteRecursively()
+        for (id in index.value.items.keys) {
+            val a = File(from, id)
+            if (!a.exists()) continue
+            if (move(a, File(to, id))) moved += id
+            else {
+                // put back what already went, so every video still plays from where the list says
+                File(to, id).deleteRecursively()
+                for (m in moved) move(File(to, m), File(from, m))
+                return@withContext false
+            }
+        }
+        app.store.settings.update { it.copy(offlineDir = if (to.canonicalPath == home.canonicalPath) "" else to.absolutePath) }
+        true
+    }
     val saved: StateFlow<OfflineIndex> get() = index.state
 
     /** downloads under way: video id → done 0..1 */
