@@ -368,6 +368,9 @@ private val KO = mapOf(
     "{n} minutes" to "{n}분", "Sleep timer: paused" to "취침 타이머: 일시중지됨",
     "Stats for nerds" to "전문가용 통계", "Video ID" to "동영상 ID", "Through" to "연결", "Resolution" to "해상도",
     "Video codec" to "동영상 코덱", "Audio codec" to "오디오 코덱", "Buffer health" to "버퍼 상태",
+    "Download folder" to "다운로드 폴더", "Open" to "열기", "Change" to "변경", "Moving..." to "옮기는 중...",
+    "Wait until the downloads finish, then try again." to "다운로드가 끝난 뒤 다시 해 주세요.",
+    "TubeHaus can't write to that folder." to "그 폴더에는 TubeHaus가 저장할 수 없어요.",
     // engine messages
     "No connection to YouTube" to "YouTube에 연결할 수 없어요",
     "No playable streams" to "재생할 수 있는 스트림이 없어요",

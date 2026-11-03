@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -124,6 +125,32 @@ fun OfflineDialog(app: AppState, v: Video) {
     )
 }
 
+@Composable
+private fun DownloadFolder(app: AppState) {
+    val scope = rememberCoroutineScope()
+    var folder by remember { mutableStateOf(app.offline.folder) }
+    var note by remember { mutableStateOf("") }
+    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(tr("Download folder"), style = MaterialTheme.typography.titleSmall)
+            Text(folder, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (note.isNotEmpty()) Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        TextButton(onClick = { app.platform.openFolder(folder) }) { Text(tr("Open")) }
+        TextButton(onClick = {
+            app.platform.pickFolder(folder) { picked ->
+                if (picked != null) scope.launch {
+                    note = tr("Moving...")
+                    val ok = app.offline.moveTo(picked)
+                    folder = app.offline.folder
+                    note = if (ok) "" else if (app.offline.progress.isNotEmpty()) tr("Wait until the downloads finish, then try again.")
+                        else tr("TubeHaus can't write to that folder.")
+                }
+            }
+        }) { Text(tr("Change")) }
+    }
+}
+
 /** Library → Downloads: what is being saved, and what is saved (it plays without internet). */
 @Composable
 fun DownloadsScreen(app: AppState) {
@@ -138,6 +165,8 @@ fun DownloadsScreen(app: AppState) {
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp),
             )
+            // desktop: where the files are, and a button to keep them somewhere else
+            if (app.platform.canPickFolder) DownloadFolder(app)
         }
         items(app.offline.pending.values.toList(), key = { "p" + it.id }) { v ->
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
