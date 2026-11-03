@@ -64,6 +64,12 @@ interface Platform {
      * system's own password boxes; a password typed through one waits on its composition
      */
     fun plainKeys(on: Boolean) {}
+    /** desktop: the downloads can be kept in a folder of the user's choosing */
+    val canPickFolder: Boolean get() = false
+    /** desktop: asks for a folder, starting at [start]; null when cancelled */
+    fun pickFolder(start: String, done: (String?) -> Unit) { done(null) }
+    /** desktop: shows a folder in the file manager */
+    fun openFolder(path: String) {}
 }
 
 data class PlayerState(
