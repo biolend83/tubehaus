@@ -116,7 +116,8 @@ class MpvPlayer : VideoPlayer {
             h?.let { return it }
             if (closing) return null
             val l = lib ?: return null
-            val p = l.mpv_create() ?: return null
+            LibMpv.cNumbers()
+            val p = l.mpv_create() ?: run { LibMpv.wontStart = true; return null }
             fun o(k: String, v: String) = l.mpv_set_option_string(p, k, v)
             o("vo", "libmpv")
             if (o("hwdec", "auto-copy-safe") < 0) o("hwdec", "auto-copy")   // GPU decoding, frames copied back for us
