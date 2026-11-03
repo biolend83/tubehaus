@@ -69,12 +69,29 @@ interface LibMpv : Library {
 
         private var firstError: String? = null
 
+        /** libmpv was found but mpv_create gave nothing back */
+        @Volatile var wontStart = false
+
+        private interface CLib : Library { fun setlocale(category: Int, locale: String?): Pointer? }
+
+        /**
+         * libmpv only starts with C's number format (it refuses with "Non-C locale detected"), and
+         * Java switches the process to the system's (en_US.UTF-8, de_DE...) when it starts. Only
+         * numbers change: LC_NUMERIC is 1 in glibc, 4 on macOS. Windows' mpv doesn't check.
+         */
+        fun cNumbers() {
+            val os = System.getProperty("os.name")
+            if (os.startsWith("Windows")) return
+            runCatching { Native.load("c", CLib::class.java).setlocale(if (os.startsWith("Mac")) 4 else 1, "C") }
+        }
+
         /** libmpv-2.dll is there but Windows wouldn't load it: one of the DLLs it needs is missing */
         private val dllPresent: Boolean get() =
             System.getProperty("jna.library.path")?.split(java.io.File.pathSeparator)?.any { java.io.File(it, "libmpv-2.dll").exists() } == true
 
         val MISSING: String get() = System.getProperty("os.name").let { os ->
             when {
+                wontStart -> "mpv is installed but wouldn't start. Please report it on GitHub (Issues) with your system's name and version."
                 os.startsWith("Windows") && dllPresent ->
                     "mpv couldn't start (" + (firstError ?: "unknown error") + "). Updating your graphics driver usually fixes this."
                 os.startsWith("Windows") -> "mpv is missing: put libmpv-2.dll next to TubeHaus"
