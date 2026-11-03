@@ -1,0 +1,3 @@
+- Linux and macOS: the app no longer says mpv is missing when it is installed (#45)
+- Desktop: choose the folder your downloads are kept in (Library > Downloads)
+- Phones, tablets and TVs work as in 0.5.13
