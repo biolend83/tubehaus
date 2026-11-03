@@ -321,6 +321,11 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         sync()
     }
 
+    /** Android Auto: only the sound is loaded while a car is connected, as nothing shows the picture there */
+    fun audioOnly(on: Boolean) {
+        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, on).build()
+    }
+
     override fun setAudioTrack(lang: String) {
         exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setPreferredAudioLanguage(lang).build()
         sync()
