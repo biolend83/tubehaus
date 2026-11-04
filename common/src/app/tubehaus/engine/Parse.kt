@@ -95,6 +95,7 @@ private fun videoRenderer(v: JsonElement): Video? {
         publishedText = v.at("publishedTimeText").text ?: "",
         live = live,
         short = v.at("navigationEndpoint.reelWatchEndpoint") != null || "SHORTS" in overlays,
+        members = badges.any { "MEMBERS" in it },
         avatar = bestImage(v.at("channelThumbnailSupportedRenderers") ?: v.at("channelThumbnail")),
     )
 }
@@ -134,6 +135,8 @@ private fun lockup(v: JsonElement): Item? {
             publishedText = dateText,
             live = live,
             avatar = bestImage(meta?.at("image")),
+            // channel pages put a "Members only" badge in a metadata row of its own
+            members = meta?.findAll("badgeStyle")?.any { (it.str ?: "").contains("MEMBERS") } == true,
         )
     }
     // playlists, mixes, albums, podcasts: all open as a playlist

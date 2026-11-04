@@ -410,7 +410,8 @@ object YouTube {
         }
         val c = channel(channelId, Tab.VIDEOS)
         val now = Sys.nowMs() / 1000
-        return c.items.items.filterIsInstance<Video>().map { v ->
+        // the channel's Videos tab (when the RSS feed is down) also lists members-only videos, which won't play here
+        return c.items.items.filterIsInstance<Video>().filter { !it.members }.map { v ->
             v.copy(author = v.author.ifEmpty { c.name }, channelId = channelId, publishedAt = ago(v.publishedText)?.let { now - it } ?: 0)
         }
     }
