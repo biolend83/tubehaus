@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "0.5.15",
+          "buildVersion": "32",
+          "date": "2026-11-04T10:37:10+00:00",
+          "localizedDescription": "Shared with the 0.5.15 release: YouTube-like channel pages, chapters, seek bar previews, search filters, comment sorts, loop, sleep timer and stats for nerds, what's new in the app, and better subscription groups.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-ipad.ipa",
+          "size": 16192797,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "0.5.13",
           "buildVersion": "30",
           "date": "2026-11-02T14:36:28+00:00",
@@ -86,11 +95,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "0.5.13",
-      "versionDate": "2026-11-02T14:36:28+00:00",
-      "versionDescription": "Shared with the 0.5.13 release: when the player refuses a video's streams (for example after switching Wi-Fi, mobile data or a VPN), the app fetches fresh ones once and carries on where it stopped.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.13/TubeHaus-0.5.13-ipad.ipa",
-      "size": 15739315
+      "version": "0.5.15",
+      "versionDate": "2026-11-04T10:37:10+00:00",
+      "versionDescription": "Shared with the 0.5.15 release: YouTube-like channel pages, chapters, seek bar previews, search filters, comment sorts, loop, sleep timer and stats for nerds, what's new in the app, and better subscription groups.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-ipad.ipa",
+      "size": 16192797
     }
   ],
   "news": [],
