@@ -1,0 +1,5 @@
+- What's new in the app: after an update it shows what changed (also in Settings > About)
+- Android Auto: browse, search and play by voice in the car (sound only)
+- Subscription groups: one newest video per channel from the last 7 days, no members-only videos; Manage and Refresh above the search, and a search in Manage
+- Desktop: pick the sound output, and a message instead of silence when there's no sound
+- Search: no more blank videos when sorting by views
