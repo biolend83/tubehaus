@@ -127,6 +127,14 @@ class Playback(private val app: AppState) {
                     val d = YouTube.details(v.id)
                     if (video?.id == v.id) {
                         details = d
+                        // a video opened from a link or a notification knows only its id; if it then won't play,
+                        // this is where its title and channel come from
+                        video?.let { cur ->
+                            if (cur.title.isEmpty() || cur.author.isEmpty()) video = cur.copy(
+                                title = cur.title.ifEmpty { d.title }, author = cur.author.ifEmpty { d.author },
+                                channelId = cur.channelId.ifEmpty { d.channelId },
+                            )
+                        }
                         Learn.rememberRelated(store, v.id, d.related.filterIsInstance<Video>())
                     }
                 } catch (_: Exception) {}
