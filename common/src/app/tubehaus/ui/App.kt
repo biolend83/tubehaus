@@ -155,6 +155,7 @@ fun App(app: AppState) {
                     }
                     LaunchedEffect(settings.hideBars) { app.platform.setImmersive(settings.hideBars) }
                     LaunchedEffect(settings.longBuffer) { app.platform.player.setReadAhead(settings.longBuffer) }
+                    LaunchedEffect(settings.audioDevice) { app.platform.player.setAudioDevice(settings.audioDevice) }
                     app.update?.let { UpdateDialog(app, it) }
                     app.offline.asking?.let { OfflineDialog(app, it) }
                 }
