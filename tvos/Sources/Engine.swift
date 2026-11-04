@@ -13,7 +13,14 @@ private let log = Logger(subsystem: "io.github.biolend83.tubehaus.tv", category:
 struct EngineError: Error, LocalizedError {
     let kind: String
     let message: String
-    var errorDescription: String? { message }
+    var errorDescription: String? {
+        switch kind {
+        // YouTube's own words ("Sign in to confirm you're not a bot") don't say what to do about it
+        case "LOGIN": return "YouTube wants this network to sign in, which it often does for VPNs and data centers. Try again without a VPN, or on another network."
+        case "AGE": return "This video has an age check, and YouTube only shows it to a signed-in account. You can watch it on YouTube."
+        default: return message
+        }
+    }
 }
 
 actor Engine {
