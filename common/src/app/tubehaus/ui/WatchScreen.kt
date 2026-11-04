@@ -222,6 +222,7 @@ private fun PlayerBox(app: AppState, sideGestures: Boolean = false) {
         }
     }
     st.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp)) }
+    st.soundIssue?.let { Text(tr(it), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) }
 }
 
 /**

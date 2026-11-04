@@ -54,7 +54,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "0.5.14"
+const val VERSION = "0.5.15"
 
 @Composable
 fun SettingsScreen(app: AppState) {
@@ -176,6 +176,7 @@ fun SettingsScreen(app: AppState) {
             item {
                 SItem(tr("Check now"), tr("See if a newer version is out")) { app.checkForUpdates(now = true, quiet = false) }
             }
+            item { SItem(tr("What's new"), tr("What changed in the last versions")) { app.showWhatsNew() } }
             item {
                 SItem("TubeHaus $VERSION", tr("Everything happens on this device: it talks to YouTube directly, with no TubeHaus server, no account and no tracking. Your library and recommendations never leave it.")) {
                     app.platform.openExternal("https://github.com/biolend83/tubehaus/tree/android-app")
