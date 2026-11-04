@@ -113,6 +113,42 @@ class AppState(val platform: Platform, val store: Store) {
         }
     }
 
+    /** the release notes on screen (WhatsNewDialog); empty while they load */
+    var whatsNew by mutableStateOf<List<Remote.Notes>?>(null)
+
+    /** Settings → What's new: the last few versions */
+    fun showWhatsNew() {
+        whatsNew = emptyList()
+        scope.launch {
+            val all = Remote.releaseNotes()
+            if (all == null) { whatsNew = null; toast(tr("Couldn't reach GitHub")); return@launch }
+            whatsNew = all.filter { !Remote.newer(it.version, VERSION) }.take(6).ifEmpty { null }
+        }
+    }
+
+    /**
+     * Once after an update: what changed since the version opened before (only this one's when
+     * that's unknown, coming from 0.5.14 or older). Not on a new install, and only with the update
+     * check on, which is what lets the app look at GitHub.
+     */
+    fun whatsNewAfterUpdate() {
+        val s = store.settings.value
+        if (s.seenVersion == VERSION) return
+        val used = s.welcomed || store.lib.value.subs.isNotEmpty()
+        if (!used || !s.checkUpdates || (s.seenVersion.isNotEmpty() && !Remote.newer(VERSION, s.seenVersion))) {
+            store.settings.update { it.copy(seenVersion = VERSION) }
+            return
+        }
+        scope.launch {
+            // no answer from GitHub: try again next time the app opens
+            val all = Remote.releaseNotes() ?: return@launch
+            store.settings.update { it.copy(seenVersion = VERSION) }
+            val since = s.seenVersion
+            val list = all.filter { !Remote.newer(it.version, VERSION) && (if (since.isEmpty()) it.version == VERSION else Remote.newer(it.version, since)) }.take(5)
+            if (list.isNotEmpty()) whatsNew = list
+        }
+    }
+
     val feed = Feed(store)
     val rec = Recommender(store, feed)
     val playback = Playback(this)

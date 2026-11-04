@@ -53,7 +53,58 @@ object Remote {
         return list.takeIf { it.isNotEmpty() }
     }
 
-    data class Release(val version: String, val page: String, val download: String?)
+    /** [notes]: its "What's new" lines (see [whatsNew]) */
+    data class Release(val version: String, val page: String, val download: String?, val notes: List<String> = emptyList())
+
+    /** one version's "What's new" lines */
+    data class Notes(val version: String, val lines: List<String>)
+
+    /** the releases of [tag]'s line on GitHub, newest first, with what each one changed; null when GitHub can't be reached */
+    suspend fun releaseNotes(tag: String = "app-v"): List<Notes>? {
+        val text = runCatching { Net.get(RELEASES_URL, mapOf("Accept" to "application/vnd.github+json")) }.getOrNull() ?: return null
+        val list = runCatching { parse(text).arr }.getOrNull() ?: return null
+        return list.filter { it.at("draft").bool.not() && it.at("tag_name").str?.startsWith(tag) == true }
+            .map { Notes(it.at("tag_name").str!!.removePrefix(tag), whatsNew(it.at("body").str ?: "")) }
+            .filter { it.lines.isNotEmpty() }
+            .sortedByDescending { version(it.version) }
+    }
+
+    /**
+     * The "### What's new" part of a release's notes, a line each: "- " for a point, "  - " for
+     * one under it, plain for a line between them. Links keep their text, code marks and
+     * *italics* go; **bold** stays marked for the app to show.
+     */
+    fun whatsNew(body: String): List<String> {
+        val lines = body.replace("\r", "").lines()
+        val start = lines.indexOfFirst { it.trimStart().startsWith("#") && it.contains("What's new", ignoreCase = true) }
+        if (start < 0) return emptyList()
+        val out = mutableListOf<String>()
+        for (raw in lines.drop(start + 1)) {
+            if (raw.trimStart().startsWith("#")) break
+            if (raw.isBlank()) continue
+            val indent = raw.length - raw.trimStart().length
+            val t = raw.trimStart()
+            val point = t.startsWith("- ") || t.startsWith("* ")
+            val text = clean(if (point) t.drop(2) else t)
+            when {
+                point && indent >= 2 -> out += "  - $text"
+                point -> out += "- $text"
+                // a line carried on from the point above
+                indent >= 2 && out.isNotEmpty() -> out[out.lastIndex] = out.last() + " " + text
+                else -> out += text
+            }
+        }
+        return out
+    }
+
+    private val link = Regex("""\[([^\]]+)]\([^)]*\)""")
+    private fun clean(s: String): String =
+        s.replace(link, "$1").replace("`", "").replace("<br>", " ")
+            .replace("**", "\u0001").replace("*", "").replace("\u0001", "**")
+            .replace("> [!", "[!").trim()
+
+    /** whether version [a] comes after [b] ("0.5.10" after "0.5.9") */
+    fun newer(a: String, b: String) = version(a) > version(b)
 
     /**
      * The newest release for this app newer than [current], or null. [tag] is the release
@@ -70,7 +121,7 @@ object Remote {
         val v = best.at("tag_name").str!!.removePrefix(tag)
         if (version(v) <= version(current)) return null
         val file = asset?.let { a -> best.at("assets").arr.firstOrNull { it.at("name").str?.endsWith(a) == true }?.at("browser_download_url").str }
-        return Release(v, best.at("html_url").str ?: "https://github.com/biolend83/tubehaus/releases", file)
+        return Release(v, best.at("html_url").str ?: "https://github.com/biolend83/tubehaus/releases", file, whatsNew(best.at("body").str ?: ""))
     }
 
     /** "0.3.10" → comparable, so 0.3.10 sorts after 0.3.9 */
