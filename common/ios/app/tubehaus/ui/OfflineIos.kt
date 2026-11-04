@@ -55,6 +55,10 @@ class Offline(private val app: AppState) {
     val pending = mutableStateMapOf<String, Video>()
     var asking by mutableStateOf<Video?>(null)
 
+    /** the desktop can keep downloads in a folder of its choosing; iOS keeps them where Apple puts them */
+    val folder: String get() = ""
+    suspend fun moveTo(path: String): Boolean = false
+
     private val tasks = HashMap<String, AVAssetDownloadTask>()
     /** where each finished task put its .movpkg (relative to the app's home folder) */
     private val places = HashMap<String, String>()

@@ -30,6 +30,13 @@ object YouTube {
         return Page(parseItems(root), continuationOf(root))
     }
 
+    /** a search with YouTube's filters (upload date, length, live, order) */
+    suspend fun search(query: String, o: SearchOptions): Page<Item> {
+        val d = InnerTube.call("search", mapOf("query" to query, "params" to o.params()))
+        val root = d.at("contents")
+        return Page(parseItems(root), continuationOf(root))
+    }
+
     suspend fun searchMore(token: String): Page<Item> {
         val d = InnerTube.call("search", mapOf("continuation" to token))
         val root = d.at("onResponseReceivedCommands")
@@ -117,6 +124,7 @@ object YouTube {
             captions = caps,
             expiresAt = Sys.nowMs() / 1000 + (sd.at("expiresInSeconds").long ?: 18000),
             client = c.name,
+            storyboard = d.at("storyboards.playerStoryboardSpecRenderer.spec").str,
         )
     }
 
@@ -175,6 +183,18 @@ object YouTube {
             related = parseItems(related),
             relatedNext = continuationOf(related),
             commentsToken = commentsToken,
+            // "Top" / "Newest" sit in the comments panel's header
+            commentSorts = comments.at("header")?.findFirst("sortFilterSubMenuRenderer", emptySet()).at("subMenuItems").arr.mapNotNull { m ->
+                val t = m.findFirst("token", emptySet()).str ?: return@mapNotNull null
+                (m.at("title").str ?: return@mapNotNull null) to t
+            },
+            commentsCount = comments.at("header")?.findFirst("contextualInfo").text ?: "",
+            // the chapters the seek bar shows (the video's own, or YouTube's automatic ones)
+            chapters = d.at("playerOverlays.playerOverlayRenderer.decoratedPlayerBarRenderer.decoratedPlayerBarRenderer.playerBar.multiMarkersPlayerBarRenderer.markersMap").arr
+                .firstOrNull { (it.at("key").str ?: "").contains("CHAPTERS") }?.at("value.chapters").arr.mapNotNull { c ->
+                    val r = c.at("chapterRenderer") ?: return@mapNotNull null
+                    Chapter(r.at("title").text ?: "", r.at("timeRangeStartMillis").long ?: return@mapNotNull null, bestImage(r.at("thumbnail")))
+                },
         )
     }
 
@@ -227,18 +247,27 @@ object YouTube {
     }
 
     // ------------------------------------------------------------------ channels and playlists
-    suspend fun channel(id: String, tab: Tab = Tab.VIDEOS): ChannelPage {
-        val d = InnerTube.call("browse", mapOf("browseId" to id, "params" to urlDecode(tab.params)))
+    /** the search box inside a channel */
+    private const val CHANNEL_SEARCH = "EgZzZWFyY2jyBgQKAloA"
+
+    suspend fun channel(id: String, tab: Tab = Tab.VIDEOS): ChannelPage = channel(id, tab.params)
+
+    /** The tab [params] stands for (one of [ChannelPage.tabs]); null is the channel's first tab, Home. */
+    suspend fun channel(id: String, params: String?): ChannelPage {
+        val d = InnerTube.call("browse", mapOf("browseId" to id, "params" to params?.let(::urlDecode)))
         val tabs = d.at("contents.twoColumnBrowseResultsRenderer.tabs").arr
-        val sel = tabs.firstOrNull { (it.at("tabRenderer.selected").bool) }?.at("tabRenderer.content")
-            ?: tabs.firstOrNull()?.at("tabRenderer.content")
+        val sel = selectedTab(d)
+        val sections = sel.at("sectionListRenderer.contents").arr
+        val player = sections.firstNotNullOfOrNull { it.at("itemSectionRenderer.contents.0.channelVideoPlayerRenderer") }
         val head = d.at("header")?.findFirst("pageHeaderViewModel")
+        val attr = head.at("attribution.attributionViewModel")
         val rows = head.at("metadata.contentMetadataViewModel.metadataRows").arr.map { r ->
             r.at("metadataParts").arr.mapNotNull { it.at("text").text }
         }.flatten()
         val stats = rows.filter { !it.startsWith("@") && it.any(Char::isDigit) }   // [subscribers, videos]
         val old = d.at("header.c4TabbedHeaderRenderer")
         val meta = d.at("metadata.channelMetadataRenderer")
+        val preview = head?.findFirst("descriptionPreviewViewModel")
         return ChannelPage(
             id = id,
             name = head.at("title").text ?: old.at("title").str ?: meta.at("title").str ?: "",
@@ -248,12 +277,85 @@ object YouTube {
             subsText = stats.getOrNull(0) ?: old.at("subscriberCountText").text ?: "",
             videoCountText = stats.getOrNull(1) ?: "",
             items = Page(parseItems(sel), continuationOf(sel)),
+            description = preview.at("description.content").str ?: meta.at("description").str ?: "",
+            // "...more" opens a panel that is loaded with this token
+            aboutToken = (preview ?: head)?.findFirst("continuationCommand").at("token").str,
+            tabs = tabs.mapNotNull { t ->
+                val r = t.at("tabRenderer") ?: return@mapNotNull null
+                val p = r.at("endpoint.browseEndpoint.params").str ?: return@mapNotNull null
+                val kind = r.at("endpoint.commandMetadata.webCommandMetadata.url").str?.substringAfterLast('/') ?: ""
+                ChannelTab(r.at("title").str ?: kind, p, kind)
+            },
+            searchable = tabs.any { it.at("expandableTabRenderer") != null },
+            linkText = attr.at("text.content").str?.trim() ?: "",
+            linkMore = attr.at("suffix.content").str?.trim() ?: "",
+            featured = player?.at("videoId").str?.let { v ->
+                val views = player.at("viewCountText").text ?: ""
+                Video(v, player.at("title").text ?: "", author = head.at("title").text ?: "", channelId = id,
+                    viewsText = views, views = countOf(views), publishedText = player.at("publishedTimeText").text ?: "")
+            },
+            featuredText = player.at("description").text ?: "",
+            shelves = Page(parseShelves(sections, id), continuationOf(sel)),
+            posts = Page(parsePosts(sel), continuationOf(sel)),
+        )
+    }
+
+    /** the content of the tab a browse response opened */
+    private fun selectedTab(d: JsonElement): JsonElement? {
+        val tabs = d.at("contents.twoColumnBrowseResultsRenderer.tabs").arr
+        val t = tabs.firstOrNull { it.at("tabRenderer.selected").bool || it.at("expandableTabRenderer.selected").bool } ?: tabs.firstOrNull()
+        return (t.at("tabRenderer") ?: t.at("expandableTabRenderer")).at("content")
+    }
+
+    /** more rows of a channel's Home tab */
+    suspend fun shelvesMore(token: String, channelId: String): Page<Shelf> {
+        val d = InnerTube.call("browse", mapOf("continuation" to token))
+        val root = d.at("onResponseReceivedActions") ?: d.at("onResponseReceivedEndpoints")
+        val sections = root.arr.flatMap { it.at("appendContinuationItemsAction.continuationItems").arr }
+        return Page(parseShelves(sections, channelId), continuationOf(root))
+    }
+
+    /** more of a channel's posts */
+    suspend fun postsMore(token: String): Page<Post> {
+        val d = InnerTube.call("browse", mapOf("continuation" to token))
+        val root = d.at("onResponseReceivedActions") ?: d.at("onResponseReceivedEndpoints")
+        return Page(parsePosts(root), continuationOf(root))
+    }
+
+    /** the search inside a channel (more pages come from [browseMore]) */
+    suspend fun channelSearch(id: String, query: String): Page<Item> {
+        val d = InnerTube.call("browse", mapOf("browseId" to id, "params" to urlDecode(CHANNEL_SEARCH), "query" to query))
+        val sel = selectedTab(d)
+        return Page(parseItems(sel), continuationOf(sel))
+    }
+
+    /** what "...more" on a channel shows: the whole description, links, country, joined date, views */
+    suspend fun channelAbout(token: String): ChannelAbout {
+        val d = InnerTube.call("browse", mapOf("continuation" to token))
+        val a = d.findFirst("aboutChannelViewModel") ?: throw YtError("This channel has no details", YtError.Kind.UNAVAILABLE)
+        return ChannelAbout(
+            description = a.at("description").str ?: "",
+            links = a.at("links").arr.mapNotNull { l ->
+                val m = l.at("channelExternalLinkViewModel") ?: return@mapNotNull null
+                val text = m.at("link.content").str ?: return@mapNotNull null
+                // YouTube's redirect page carries the real address in q=
+                val redirect = m.findFirst("urlEndpoint").at("url").str ?: ""
+                val url = Regex("[?&]q=([^&]+)").find(redirect)?.groupValues?.get(1)?.let(::urlDecode)
+                    ?: if (text.startsWith("http")) text else "https://$text"
+                ChannelLink(m.at("title.content").str ?: text, text, url, m.at("favicon.sources").arr.lastOrNull().at("url").str ?: "")
+            },
+            url = a.at("displayCanonicalChannelUrl").str ?: a.at("canonicalChannelUrl").str ?: "",
+            country = a.at("country").str ?: "",
+            joinedText = a.at("joinedDateText.content").str ?: a.at("joinedDateText").text ?: "",
+            viewsText = a.at("viewCountText").str ?: a.at("viewCountText").text ?: "",
+            subsText = a.at("subscriberCountText").str ?: a.at("subscriberCountText").text ?: "",
+            videoCountText = a.at("videoCountText").str ?: a.at("videoCountText").text ?: "",
         )
     }
 
     suspend fun browseMore(token: String): Page<Item> {
         val d = InnerTube.call("browse", mapOf("continuation" to token))
-        val root = d.at("onResponseReceivedActions")
+        val root = d.at("onResponseReceivedActions") ?: d.at("onResponseReceivedEndpoints")
         return Page(parseItems(root), continuationOf(root))
     }
 

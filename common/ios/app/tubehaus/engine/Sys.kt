@@ -14,6 +14,7 @@ import platform.Foundation.NSISO8601DateFormatWithInternetDateTime
 import platform.Foundation.NSISO8601DateFormatter
 import platform.Foundation.NSLocale
 import platform.Foundation.NSLocaleCountryCode
+import platform.Foundation.NSLocaleIdentifier
 import platform.Foundation.currentLocale
 import platform.Foundation.dateWithTimeIntervalSince1970
 import platform.Foundation.preferredLanguages
@@ -43,6 +44,10 @@ object Sys {
 
     fun countryName(code: String, lang: String): String =
         NSLocale(localeIdentifier = lang).displayNameForKey(NSLocaleCountryCode, code) ?: code
+
+    /** "en-US" → "English (United States)" (or "영어(미국)" when [lang] is "ko") */
+    fun languageName(code: String, lang: String): String =
+        NSLocale(localeIdentifier = lang).displayNameForKey(NSLocaleIdentifier, code.replace('-', '_')) ?: code
 
     fun deviceLanguage(): String = (NSLocale.preferredLanguages.firstOrNull() as? String)?.substringBefore('-') ?: "en"
     fun deviceRegion(): String = (NSLocale.currentLocale.objectForKey(NSLocaleCountryCode) as? String) ?: ""

@@ -82,3 +82,28 @@ const fd = await run("feed", "UCsXVk37bltHxD1rDPwtNM8Q");
 ok(fd.length > 3 && fd[0].publishedAt > 0, `feed: ${fd.length} videos, newest "${fd[0]?.title}"`);
 try { await run("stream", "xxxxxxxxxxx"); ok(false, "bad id should fail"); }
 catch (e) { ok(e.kind === "UNAVAILABLE" || e.kind === "OTHER" || e.kind === "LOGIN", `bad id fails cleanly: ${e.kind} "${e.message}"`); }
+
+// v3: what the channel pages, chapters, search filters and comment sorts need
+const sf = await run("search", "lofi", "CAMSAhAB");   // sorted by views, videos only (as SearchOptions makes it)
+ok(sf.items.length > 5 && sf.items.every((i) => i.type === "video" && i.title), `search with filters: ${sf.items.length}, first "${sf.items[0]?.title}"`);
+const sb = await run("stream", "dQw4w9WgXcQ");   // a 19-second video has none
+ok(typeof sb.storyboard === "string" && sb.storyboard.includes("$"), `storyboard: ${String(sb.storyboard).slice(0, 50)}`);
+ok(d.commentSorts.length >= 2 && d.commentsCount, `comment sorts: ${d.commentSorts.map((x) => x[0]).join(" / ")}, count ${d.commentsCount}`);
+const dc = await run("details", "Yocja_N5s1I");
+ok(dc.chapters.length >= 3 && dc.chapters[0].startMs === 0, `chapters: ${dc.chapters.length}, "${dc.chapters[1]?.title}" at ${dc.chapters[1]?.startMs} ms`);
+const cs = await run("comments", d.commentSorts[1][1]);
+ok(cs.items.length > 3, `newest comments: ${cs.items.length}`);
+const home = await run("channel", "UCsXVk37bltHxD1rDPwtNM8Q", null);
+ok(home.tabs.length > 2 && home.shelves.items.length > 0, `channel home: tabs ${home.tabs.map((t) => t.kind).join(",")}, ${home.shelves.items.length} shelves, featured ${home.featured?.title}, search ${home.searchable}`);
+ok(home.description && home.aboutToken, `channel description "${home.description.slice(0, 40)}", link "${home.linkText}" ${home.linkMore}`);
+const ab = await run("channelAbout", home.aboutToken);
+ok(ab.description && ab.joinedText, `about: ${ab.links.length} links (${ab.links[0]?.url}), ${ab.country}, ${ab.joinedText}, ${ab.viewsText}`);
+const csr = await run("channelSearch", "UCsXVk37bltHxD1rDPwtNM8Q", "black hole");
+ok(csr.items.length > 2, `channel search: ${csr.items.length}, "${csr.items[0]?.title}"`);
+const postsTab = home.tabs.find((t) => t.kind === "posts" || t.kind === "community");
+if (postsTab) {
+  const pc = await run("channel", "UCsXVk37bltHxD1rDPwtNM8Q", postsTab.params);
+  ok(pc.posts.items.length > 2, `posts: ${pc.posts.items.length}, first "${pc.posts.items[0]?.text.slice(0, 40)}", ${pc.posts.items[0]?.images.length} images, next ${!!pc.posts.next}`);
+  if (pc.posts.next) { const pm = await run("postsMore", pc.posts.next); ok(pm.items.length > 0, `postsMore: ${pm.items.length}`); }
+} else ok(false, "no posts tab");
+if (home.shelves.next) { const sh = await run("shelvesMore", home.shelves.next, "UCsXVk37bltHxD1rDPwtNM8Q"); ok(Array.isArray(sh.items), `shelvesMore: ${sh.items.length} (the last token is often a row's own, as on Android)`); }

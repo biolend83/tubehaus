@@ -40,6 +40,8 @@ object YouTube {
 
     // ------------------------------------------------------------------ the calls
     suspend fun search(query: String, filter: Filter = Filter.ALL): Page<Item> = itemPage(run("search", query, filter.params))
+    /** a search with YouTube's filters (upload date, length, live, order) */
+    suspend fun search(query: String, o: SearchOptions): Page<Item> = itemPage(run("search", query, o.params()))
     suspend fun searchMore(token: String): Page<Item> = itemPage(run("searchMore", token))
     suspend fun suggestions(q: String): List<String> = if (q.isBlank()) emptyList() else run("suggestions", q).arr.mapNotNull { it.str }
     /**
@@ -63,12 +65,44 @@ object YouTube {
         return Page(d.at("items").arr.map(::comment), d.at("next").str)
     }
 
-    suspend fun channel(id: String, tab: Tab = Tab.VIDEOS): ChannelPage {
-        val d = run("channel", id, tab.params)
+    suspend fun channel(id: String, tab: Tab = Tab.VIDEOS): ChannelPage = channel(id, tab.params)
+
+    /** The tab [params] stands for (one of [ChannelPage.tabs]); null is the channel's first tab, Home. */
+    suspend fun channel(id: String, params: String?): ChannelPage {
+        val d = run("channel", id, params)
         return ChannelPage(
             id = d.at("id").str ?: id, name = d.at("name").str ?: "", avatar = d.at("avatar").str ?: "",
             banner = d.at("banner").str ?: "", handle = d.at("handle").str ?: "", subsText = d.at("subsText").str ?: "",
             videoCountText = d.at("videoCountText").str ?: "", items = itemPage(d.at("items")),
+            description = d.at("description").str ?: "", aboutToken = d.at("aboutToken").str,
+            tabs = d.at("tabs").arr.mapNotNull { t ->
+                ChannelTab(t.at("title").str ?: "", t.at("params").str ?: return@mapNotNull null, t.at("kind").str ?: "")
+            },
+            searchable = d.at("searchable").bool, linkText = d.at("linkText").str ?: "", linkMore = d.at("linkMore").str ?: "",
+            featured = d.at("featured")?.let { item(it) as? Video }, featuredText = d.at("featuredText").str ?: "",
+            shelves = shelfPage(d.at("shelves"), id), posts = postPage(d.at("posts")),
+        )
+    }
+
+    /** more rows of a channel's Home tab */
+    suspend fun shelvesMore(token: String, channelId: String): Page<Shelf> = shelfPage(run("shelvesMore", token, channelId), channelId)
+
+    /** more of a channel's posts */
+    suspend fun postsMore(token: String): Page<Post> = postPage(run("postsMore", token))
+
+    /** the search inside a channel (more pages come from [browseMore]) */
+    suspend fun channelSearch(id: String, query: String): Page<Item> = itemPage(run("channelSearch", id, query))
+
+    /** what "...more" on a channel shows: the whole description, links, country, joined date, views */
+    suspend fun channelAbout(token: String): ChannelAbout {
+        val a = run("channelAbout", token)
+        return ChannelAbout(
+            description = a.at("description").str ?: "",
+            links = a.at("links").arr.map { l ->
+                ChannelLink(l.at("title").str ?: "", l.at("text").str ?: "", l.at("url").str ?: "", l.at("icon").str ?: "")
+            },
+            url = a.at("url").str ?: "", country = a.at("country").str ?: "", joinedText = a.at("joinedText").str ?: "",
+            viewsText = a.at("viewsText").str ?: "", subsText = a.at("subsText").str ?: "", videoCountText = a.at("videoCountText").str ?: "",
         )
     }
 
@@ -112,6 +146,26 @@ object YouTube {
     // ------------------------------------------------------------------ JSON → the app's types
     private fun itemPage(e: JsonElement?) = Page(e.at("items").arr.mapNotNull(::item), e.at("next").str)
 
+    private fun shelfPage(e: JsonElement?, channelId: String) = Page(e.at("items").arr.mapNotNull { r ->
+        val items = r.at("items").arr.mapNotNull(::item)
+        if (items.isEmpty()) null else Shelf(r.at("title").str ?: "", items, r.at("playlistId").str, r.at("tabParams").str)
+    }, e.at("next").str)
+
+    private fun postPage(e: JsonElement?) = Page(e.at("items").arr.mapNotNull { p ->
+        Post(
+            id = p.at("id").str ?: return@mapNotNull null, author = p.at("author").str ?: "", avatar = p.at("avatar").str ?: "",
+            published = p.at("published").str ?: "", text = p.at("text").str ?: "",
+            links = p.at("links").arr.mapNotNull { l ->
+                val a = l.arr
+                TextLink(a.getOrNull(0).int ?: return@mapNotNull null, a.getOrNull(1).int ?: return@mapNotNull null, a.getOrNull(2).str ?: return@mapNotNull null)
+            },
+            likes = p.at("likes").str ?: "", replies = p.at("replies").str ?: "",
+            images = p.at("images").arr.mapNotNull { it.str },
+            video = p.at("video")?.let { item(it) as? Video }, playlist = p.at("playlist")?.let { item(it) as? Playlist },
+            poll = p.at("poll").arr.mapNotNull { it.str }, pollVotes = p.at("pollVotes").str ?: "",
+        )
+    }, e.at("next").str)
+
     private fun item(e: JsonElement): Item? {
         val id = e.at("id").str ?: return null
         return when (e.at("type").str) {
@@ -150,12 +204,21 @@ object YouTube {
         video = d.at("video").arr.map(::format), audio = d.at("audio").arr.map(::format),
         captions = d.at("captions").arr.map { Caption(it.at("lang").str ?: "", it.at("name").str ?: "", it.at("url").str ?: "", it.at("auto").bool) },
         expiresAt = d.at("expiresAt").long ?: (Sys.nowMs() / 1000 + 18000), client = d.at("client").str ?: "",
+        storyboard = d.at("storyboard").str,
     )
 
     private fun details(d: JsonElement) = Details(
         likesText = d.at("likesText").str ?: "", subsText = d.at("subsText").str ?: "", avatar = d.at("avatar").str ?: "",
         publishedText = d.at("publishedText").str ?: "", viewsText = d.at("viewsText").str ?: "",
         related = d.at("related").arr.mapNotNull(::item), relatedNext = d.at("relatedNext").str, commentsToken = d.at("commentsToken").str,
+        commentSorts = d.at("commentSorts").arr.mapNotNull { m ->
+            val a = m.arr
+            (a.getOrNull(0).str ?: return@mapNotNull null) to (a.getOrNull(1).str ?: return@mapNotNull null)
+        },
+        commentsCount = d.at("commentsCount").str ?: "",
+        chapters = d.at("chapters").arr.mapNotNull { c ->
+            Chapter(c.at("title").str ?: "", c.at("startMs").long ?: return@mapNotNull null, c.at("thumb").str ?: "")
+        },
     )
 
     private fun comment(c: JsonElement) = Comment(

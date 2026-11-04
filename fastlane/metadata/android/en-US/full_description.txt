@@ -1,0 +1,31 @@
+TubeHaus is a YouTube client that needs no Google account and keeps what you watch on your phone.
+
+<b>Watching</b>
+<ul>
+<li>Plays videos and live streams with Media3 (ExoPlayer)</li>
+<li>Background play, picture-in-picture and media controls on the lock screen</li>
+<li>Captions, playback speed, and downloads to watch offline</li>
+<li>Works on phones, tablets and Android TV / Google TV</li>
+</ul>
+
+<b>Your own feed</b>
+<ul>
+<li>Subscriptions without an account</li>
+<li>Recommendations worked out on the device from what you watch; nothing leaves it, and you can tell it to forget a video or a channel</li>
+<li>Import subscriptions from Google Takeout (CSV), NewPipe, FreeTube or Invidious, and export them again</li>
+</ul>
+
+<b>Calm</b>
+<ul>
+<li>Calm mode and Focus</li>
+<li>Hide Shorts, comments, related videos or thumbnails</li>
+<li>Choose what appears under the video</li>
+<li>Black (AMOLED) theme</li>
+</ul>
+
+<b>Optional server</b>
+TubeHaus can also connect to your own self-hosted TubeHaus server to share one library across the household.
+
+TubeHaus checks GitHub for a new version when it opens and only tells you about it; it never installs anything by itself.
+
+Not affiliated with YouTube or Google.

@@ -1,0 +1,7 @@
+- Channel pages like YouTube's: Home with rows, every tab, Posts, search in the channel, "...more" with links and details, share
+- Chapters in the seek bar, the player and the description; pictures while dragging the seek bar
+- Links, #tags and times in descriptions work
+- Search filters: date, duration, live, sort
+- Comments: Top / Newest; comments on Shorts
+- Loop video, sleep timer, stats for nerds
+- With a server: dubbed videos start in their original language

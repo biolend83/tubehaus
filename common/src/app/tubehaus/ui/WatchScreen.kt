@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.Details
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.ui.draw.clip
@@ -117,13 +118,14 @@ fun WatchScreen(app: AppState) {
                             modifier = Modifier.padding(top = 10.dp))
                     }
                 } else {
-                    val pager = if (pc && token != null) rememberPager(token, { YouTube.comments(token) }, { YouTube.comments(it) }) else null
+                    var pcSorted by remember(token) { mutableStateOf(token) }
+                    val pager = if (pc && token != null) (pcSorted ?: token).let { t -> rememberPager(t, { YouTube.comments(t) }, { YouTube.comments(it) }) } else null
                     LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(if (pc) 12.dp else 16.dp)) {
                         item { PlayerBox(app, sideGestures = pc) }
                         under(app, v)
                         if (pager != null) {
                             item { SectionTitle(tr("Comments")) }
-                            comments(app, pager)
+                            comments(app, pager, commentSorts(token!!, app.playback.details), token, pcSorted ?: token) { pcSorted = it }
                         }
                     }
                 }
@@ -351,10 +353,26 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
                         Text(small, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+                // links open, #tags search, and a time like 3:25 jumps there in the video
                 if (desc.isNotEmpty()) SelectionContainer {
-                    Text(desc, style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 32.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)).padding(14.dp))
+                    LinkedText(desc, app,
+                        Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 32.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)).padding(14.dp),
+                        onTime = { s -> app.platform.player.seekTo(s * 1000L); onClose() })
+                }
+            }
+            // the chapters as cards in a row, as under YouTube's description; a tap jumps there
+            val chapters = app.playback.chapters
+            if (chapters.isNotEmpty()) item {
+                Text(tr("Chapters"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                LazyRow(Modifier.fillMaxWidth().padding(bottom = 32.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(chapters) { c ->
+                        Column(Modifier.width(160.dp).clip(RoundedCornerShape(8.dp)).clickable { app.platform.player.seekTo(c.startMs); onClose() }) {
+                            if (c.thumb.isNotEmpty()) Img(c.thumb, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)))
+                            Text(c.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                            Text(durationMs(c.startMs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
                 }
             }
         }
@@ -442,26 +460,44 @@ private fun LazyListScope.under(app: AppState, v: Video) {
 
 /** The comments with a title and a close button: under the video on a phone, beside it in full screen. */
 @Composable
-fun CommentsPanel(app: AppState, token: String, onClose: () -> Unit) {
+fun CommentsPanel(app: AppState, token: String, info: Details? = app.playback.details, onClose: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(tr("Comments"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            val count = info?.takeIf { it.commentsToken == token }?.commentsCount ?: ""
+            Text(tr("Comments"), style = MaterialTheme.typography.titleMedium)
+            Text(count, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 8.dp).weight(1f))
             IconButton(onClick = onClose) { Icon(Sym.Close.fill, tr("Close")) }
         }
         HorizontalDivider()
-        Comments(app, token)
+        Comments(app, token, info)
     }
 }
 
 /** A scrolling list of comments that loads the next page by itself when you reach the end. */
 @Composable
-private fun Comments(app: AppState, token: String) {
-    val pager = rememberPager(token, { YouTube.comments(token) }, { YouTube.comments(it) })
-    LazyColumn(Modifier.fillMaxSize()) { comments(app, pager) }
+private fun Comments(app: AppState, token: String, info: Details? = app.playback.details) {
+    var sorted by remember(token) { mutableStateOf(token) }
+    val pager = rememberPager(sorted, { YouTube.comments(sorted) }, { YouTube.comments(it) })
+    LazyColumn(Modifier.fillMaxSize()) { comments(app, pager, commentSorts(token, info), token, sorted) { sorted = it } }
 }
 
+/** "Top" and "Newest", as YouTube offers them for this video's comments; each is its own list */
+private fun commentSorts(token: String, info: Details?) = info?.takeIf { it.commentsToken == token }?.commentSorts ?: emptyList()
+
 /** the comments as items of a list, loading the next page when the end comes into view */
-private fun LazyListScope.comments(app: AppState, pager: Pager<Comment>) {
+private fun LazyListScope.comments(
+    app: AppState, pager: Pager<Comment>,
+    sorts: List<Pair<String, String>> = emptyList(), token: String = "", sorted: String = "", sort: (String) -> Unit = {},
+) {
+    if (sorts.size > 1) item("sorts") {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            sorts.forEachIndexed { i, (title, t) ->
+                val on = if (sorted == token) i == 0 else sorted == t
+                FilterChip(on, onClick = { sort(if (i == 0) token else t) }, label = { Text(title) })
+            }
+        }
+    }
     if (pager.items.isEmpty() && pager.loading) item { Busy() }
     if (pager.items.isEmpty() && pager.started && !pager.loading) item { Empty(tr("No comments")) }
     items(pager.items, key = { "c" + it.id }) { CommentView(app, it) }

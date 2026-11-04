@@ -14,7 +14,7 @@
 // collects those with __drain(), answers each with __reply(rid, json), and reads the outcome
 // with __take(id).
 
-var ENGINE_VERSION = 2;
+var ENGINE_VERSION = 3;
 
 // ------------------------------------------------------------------------------ host bridge
 var ENV = { hl: "en", gl: "US", players: null };
@@ -289,6 +289,8 @@ function videoRenderer(v) {
 function lockup(v) {
   var id = str(at(v, "contentId"));
   if (!id) return null;
+  // an ad among the results (search sorted by views has them): no title, nothing to open
+  if (at(v, "metadata.feedAdMetadataViewModel") !== null) return null;
   var type = str(at(v, "contentType")) || "";
   var meta = at(v, "metadata.lockupMetadataViewModel");
   var title = text(at(meta, "title")) || "";
@@ -513,6 +515,7 @@ async function player(id, c) {
     video: formats.filter(function (f) { return f.mime.indexOf("video") === 0; }),
     audio: formats.filter(function (f) { return f.mime.indexOf("video") !== 0; }),
     captions: caps, expiresAt: nowSec() + (num(at(sd, "expiresInSeconds")) || 18000), client: c.name,
+    storyboard: str(at(d, "storyboards.playerStoryboardSpecRenderer.spec")),
   };
 }
 
@@ -540,7 +543,25 @@ async function details(id) {
     publishedText: text(at(primary, "relativeDateText")) || text(at(primary, "dateText")) || "",
     viewsText: text(at(primary, "viewCount.videoViewCountRenderer.viewCount")) || "",
     related: parseItems(related), relatedNext: continuationOf(related), commentsToken: token,
+    // "Top" / "Newest" sit in the comments panel's header
+    commentSorts: arr(at(findFirst(at(comments, "header"), "sortFilterSubMenuRenderer", {}), "subMenuItems")).map(function (m) {
+      var t = str(findFirst(m, "token", {})), title = str(at(m, "title"));
+      return t !== null && title !== null ? [title, t] : null;
+    }).filter(function (x) { return x; }),
+    commentsCount: text(findFirst(at(comments, "header"), "contextualInfo")) || "",
+    chapters: chapters(d),
   };
+}
+
+/** the chapters the seek bar shows (the video's own, or YouTube's automatic ones) */
+function chapters(d) {
+  var markers = arr(at(d, "playerOverlays.playerOverlayRenderer.decoratedPlayerBarRenderer.decoratedPlayerBarRenderer.playerBar.multiMarkersPlayerBarRenderer.markersMap"));
+  var m = markers.filter(function (x) { return (str(at(x, "key")) || "").indexOf("CHAPTERS") >= 0; })[0];
+  return arr(at(m, "value.chapters")).map(function (c) {
+    var r = at(c, "chapterRenderer");
+    var start = num(at(r, "timeRangeStartMillis"));
+    return r && start !== null ? { title: text(at(r, "title")) || "", startMs: start, thumb: bestImage(at(r, "thumbnail")) } : null;
+  }).filter(function (x) { return x; });
 }
 
 async function relatedMore(token) {
@@ -590,17 +611,43 @@ function metaRows(head) {
   });
 }
 
-async function channel(id, tabParams) {
-  var d = await call("browse", { browseId: id, params: decodeURIComponent(tabParams) });
+/** the search box inside a channel */
+var CHANNEL_SEARCH = "EgZzZWFyY2jyBgQKAloA";
+
+function urlDecode(x) {
+  try { return decodeURIComponent(String(x).replace(/\+/g, " ")); } catch (e) { return String(x); }
+}
+
+/** the content of the tab a browse response opened */
+function selectedTab(d) {
   var tabs = arr(at(d, "contents.twoColumnBrowseResultsRenderer.tabs"));
-  var sel = null;
-  for (var i = 0; i < tabs.length; i++) if (bool(at(tabs[i], "tabRenderer.selected"))) { sel = at(tabs[i], "tabRenderer.content"); break; }
-  if (sel === null && tabs.length) sel = at(tabs[0], "tabRenderer.content");
+  var t = tabs.filter(function (x) { return bool(at(x, "tabRenderer.selected")) || bool(at(x, "expandableTabRenderer.selected")); })[0] || tabs[0];
+  return at(at(t, "tabRenderer") || at(t, "expandableTabRenderer"), "content");
+}
+
+/** The tab tabParams stands for (one of the page's tabs); null is the channel's first tab, Home. */
+async function channel(id, tabParams) {
+  var d = await call("browse", { browseId: id, params: tabParams ? urlDecode(tabParams) : null });
+  var tabs = arr(at(d, "contents.twoColumnBrowseResultsRenderer.tabs"));
+  var sel = selectedTab(d);
+  var sections = arr(at(sel, "sectionListRenderer.contents"));
+  var player = null;
+  for (var i = 0; i < sections.length && !player; i++) player = at(sections[i], "itemSectionRenderer.contents.0.channelVideoPlayerRenderer");
   var head = at(d, "header") ? findFirst(at(d, "header"), "pageHeaderViewModel") : null;
+  var attr = at(head, "attribution.attributionViewModel");
   var rows = [].concat.apply([], metaRows(head));
   var stats = rows.filter(function (r) { return r.indexOf("@") !== 0 && /\d/.test(r); });
   var old = at(d, "header.c4TabbedHeaderRenderer");
   var meta = at(d, "metadata.channelMetadataRenderer");
+  var preview = head ? findFirst(head, "descriptionPreviewViewModel") : null;
+  var featured = null;
+  var fid = str(at(player, "videoId"));
+  if (fid) {
+    var views = text(at(player, "viewCountText")) || "";
+    featured = video({ id: fid, title: text(at(player, "title")) || "", author: text(at(head, "title")) || "", channelId: id,
+      viewsText: views, views: countOf(views), publishedText: text(at(player, "publishedTimeText")) || "" });
+  }
+  var next = continuationOf(sel);
   return {
     id: id,
     name: text(at(head, "title")) || str(at(old, "title")) || str(at(meta, "title")) || "",
@@ -609,13 +656,180 @@ async function channel(id, tabParams) {
     handle: rows.filter(function (r) { return r.indexOf("@") === 0; })[0] || "",
     subsText: stats[0] || text(at(old, "subscriberCountText")) || "",
     videoCountText: stats[1] || "",
-    items: { items: parseItems(sel), next: continuationOf(sel) },
+    items: { items: parseItems(sel), next: next },
+    description: str(at(preview, "description.content")) || str(at(meta, "description")) || "",
+    // "...more" opens a panel that is loaded with this token
+    aboutToken: str(at(findFirst(preview || head, "continuationCommand"), "token")),
+    tabs: tabs.map(function (t) {
+      var r = at(t, "tabRenderer");
+      var p = str(at(r, "endpoint.browseEndpoint.params"));
+      if (!r || p === null) return null;
+      var url = str(at(r, "endpoint.commandMetadata.webCommandMetadata.url")) || "";
+      var kind = url.substring(url.lastIndexOf("/") + 1);
+      return { title: str(at(r, "title")) || kind, params: p, kind: kind };
+    }).filter(function (x) { return x; }),
+    searchable: tabs.some(function (t) { return at(t, "expandableTabRenderer") !== null; }),
+    linkText: (str(at(attr, "text.content")) || "").trim(),
+    linkMore: (str(at(attr, "suffix.content")) || "").trim(),
+    featured: featured,
+    featuredText: text(at(player, "description")) || "",
+    shelves: { items: parseShelves(sections, id), next: next },
+    posts: { items: parsePosts(sel), next: next },
+  };
+}
+
+/** Where a link in a YouTube text goes, as an address; outside links lose YouTube's redirect page. */
+function linkOf(e) {
+  if (!e) return null;
+  var u = str(at(e, "urlEndpoint.url"));
+  if (u !== null) {
+    var q = /[?&]q=([^&]+)/.exec(u);
+    if (q) return urlDecode(q[1]);
+    return u.indexOf("/") === 0 ? "https://www.youtube.com" + u : u;
+  }
+  var v = str(at(e, "watchEndpoint.videoId"));
+  if (v !== null) {
+    var t = num(at(e, "watchEndpoint.startTimeSeconds"));
+    return "https://www.youtube.com/watch?v=" + v + (t !== null ? "&t=" + t + "s" : "");
+  }
+  var b = at(e, "browseEndpoint");
+  if (!b) return null;
+  var base = str(at(b, "canonicalBaseUrl"));
+  if (base !== null) return "https://www.youtube.com" + base;
+  var id = str(at(b, "browseId"));
+  if (id === null) return null;
+  if (id.indexOf("UC") === 0) return "https://www.youtube.com/channel/" + id;
+  if (id.indexOf("VL") === 0) return "https://www.youtube.com/playlist?list=" + id.substring(2);
+  return null;
+}
+
+/** A text's runs joined into one string, with the parts that are links: {text, links: [[start, end, url]]} */
+function linkedText(e) {
+  var runs = arr(at(e, "runs"));
+  if (!runs.length) return { text: text(e) || "", links: [] };
+  var sb = "", links = [];
+  runs.forEach(function (r) {
+    var t = str(at(r, "text"));
+    if (t === null) return;
+    var start = sb.length;
+    sb += t;
+    var l = linkOf(at(r, "navigationEndpoint"));
+    if (l !== null) links.push([start, sb.length, l]);
+  });
+  return { text: sb, links: links };
+}
+
+var NOT_SHELVES = { channelVideoPlayerRenderer: 1, continuationItemRenderer: 1, recognitionShelfRenderer: 1 };
+
+/**
+ * The rows of a channel's Home tab, from its sections (or the sections a continuation adds):
+ * each titled row of videos, shorts or playlists. The featured video is read separately.
+ */
+function parseShelves(sections, channelId) {
+  return sections.map(function (s) {
+    var c = at(s, "itemSectionRenderer.contents.0") || s;
+    if (!isObj(c)) return null;
+    var kind = Object.keys(c)[0];
+    if (!kind || NOT_SHELVES[kind]) return null;
+    var v = c[kind];
+    var items = parseItems(v);
+    if (!items.length) return null;
+    var titleEl = at(v, "title") || (at(v, "headerRenderer") ? findFirst(at(v, "headerRenderer"), "title") : null);
+    // "Play all" on a playlist's row, or the tab a row like "Videos" stands for
+    var goFrom = at(v, "endpoint") || at(v, "title");
+    var go = goFrom ? findFirst(goFrom, "browseEndpoint") : null;
+    var browse = str(at(go, "browseId"));
+    return {
+      title: (text(titleEl) || "").trim(), items: items,
+      playlistId: browse && browse.indexOf("VL") === 0 ? browse.substring(2) : null,
+      tabParams: browse === channelId ? str(at(go, "params")) : null,
+    };
+  }).filter(function (x) { return x; });
+}
+
+/** The posts below root (a Posts tab, or a page more of it). */
+function parsePosts(root) {
+  return root ? findAll(root, "backstagePostRenderer").map(post).filter(function (x) { return x; }) : [];
+}
+
+function post(p) {
+  try {
+    var id = str(at(p, "postId"));
+    if (id === null) return null;
+    var body = linkedText(at(p, "contentText"));
+    var att = at(p, "backstageAttachment");
+    var one = at(att, "backstageImageRenderer");
+    var images = one ? [bestImage(at(one, "image"))]
+      : arr(at(att, "postMultiImageRenderer.images")).map(function (i) { return bestImage(at(i, "backstageImageRenderer.image")); });
+    // a video or a playlist the post shares
+    var shared = att ? parseItems(att) : [];
+    var poll = at(att, "pollRenderer");
+    var reply = at(p, "actionButtons") ? findFirst(at(p, "actionButtons"), "replyButton") : null;
+    return {
+      id: id, author: text(at(p, "authorText")) || "", avatar: bestImage(at(p, "authorThumbnail")),
+      published: text(at(p, "publishedTimeText")) || "", text: body.text, links: body.links,
+      likes: (text(at(p, "voteCount")) || "").trim(),
+      replies: (text(reply ? findFirst(reply, "text") : null) || "").trim(),
+      images: images.filter(function (x) { return x; }),
+      video: shared.filter(function (x) { return x.type === "video"; })[0] || null,
+      playlist: shared.filter(function (x) { return x.type === "playlist"; })[0] || null,
+      poll: arr(at(poll, "choices")).map(function (c) { return text(at(c, "text")); }).filter(function (x) { return x !== null; }),
+      pollVotes: text(at(poll, "totalVotes")) || "",
+    };
+  } catch (e) { return null; }
+}
+
+function moreRoot(d) { return at(d, "onResponseReceivedActions") || at(d, "onResponseReceivedEndpoints"); }
+
+/** more rows of a channel's Home tab */
+async function shelvesMore(token, channelId) {
+  var root = moreRoot(await call("browse", { continuation: token }));
+  var sections = [];
+  arr(root).forEach(function (a) { sections = sections.concat(arr(at(a, "appendContinuationItemsAction.continuationItems"))); });
+  return { items: parseShelves(sections, channelId), next: continuationOf(root) };
+}
+
+/** more of a channel's posts */
+async function postsMore(token) {
+  var root = moreRoot(await call("browse", { continuation: token }));
+  return { items: parsePosts(root), next: continuationOf(root) };
+}
+
+/** the search inside a channel (more pages come from browseMore) */
+async function channelSearch(id, query) {
+  var sel = selectedTab(await call("browse", { browseId: id, params: urlDecode(CHANNEL_SEARCH), query: query }));
+  return { items: parseItems(sel), next: continuationOf(sel) };
+}
+
+/** what "...more" on a channel shows: the whole description, links, country, joined date, views */
+async function channelAbout(token) {
+  var d = await call("browse", { continuation: token });
+  var a = findFirst(d, "aboutChannelViewModel");
+  if (!a) throw ytError("This channel has no details", "UNAVAILABLE");
+  return {
+    description: str(at(a, "description")) || "",
+    links: arr(at(a, "links")).map(function (l) {
+      var m = at(l, "channelExternalLinkViewModel");
+      var t = str(at(m, "link.content"));
+      if (!m || t === null) return null;
+      // YouTube's redirect page carries the real address in q=
+      var redirect = str(at(findFirst(m, "urlEndpoint"), "url")) || "";
+      var q = /[?&]q=([^&]+)/.exec(redirect);
+      var url = q ? urlDecode(q[1]) : t.indexOf("http") === 0 ? t : "https://" + t;
+      var icons = arr(at(m, "favicon.sources"));
+      return { title: str(at(m, "title.content")) || t, text: t, url: url, icon: str(at(icons[icons.length - 1], "url")) || "" };
+    }).filter(function (x) { return x; }),
+    url: str(at(a, "displayCanonicalChannelUrl")) || str(at(a, "canonicalChannelUrl")) || "",
+    country: str(at(a, "country")) || "",
+    joinedText: str(at(a, "joinedDateText.content")) || text(at(a, "joinedDateText")) || "",
+    viewsText: str(at(a, "viewCountText")) || text(at(a, "viewCountText")) || "",
+    subsText: str(at(a, "subscriberCountText")) || text(at(a, "subscriberCountText")) || "",
+    videoCountText: str(at(a, "videoCountText")) || text(at(a, "videoCountText")) || "",
   };
 }
 
 async function browseMore(token) {
-  var d = await call("browse", { continuation: token });
-  var root = at(d, "onResponseReceivedActions");
+  var root = moreRoot(await call("browse", { continuation: token }));
   return { items: parseItems(root), next: continuationOf(root) };
 }
 
@@ -714,6 +928,7 @@ var OPS = {
   search: search, searchMore: searchMore, suggestions: suggestions, stream: stream, details: details,
   relatedMore: relatedMore, comments: comments, channel: channel, browseMore: browseMore, playlist: playlist,
   resolve: resolve, feed: feed,
+  shelvesMore: shelvesMore, postsMore: postsMore, channelSearch: channelSearch, channelAbout: channelAbout,
 };
 
 // for the PC test (tools: node engine-test.mjs); ignored in the app

@@ -4,6 +4,8 @@ import app.tubehaus.data.Transfer
 import app.tubehaus.engine.Channel
 import app.tubehaus.engine.Clients
 import app.tubehaus.engine.Remote
+import app.tubehaus.engine.SearchOptions
+import app.tubehaus.engine.Storyboard
 import app.tubehaus.engine.Dash
 import app.tubehaus.engine.Net
 import app.tubehaus.engine.Playlist
@@ -37,6 +39,15 @@ fun main() = runBlocking {
             val v = s.video.maxBy { it.height }
             val a = s.audio.maxBy { it.bitrate }
             "${s.title} | ${s.author} ${s.lengthSec}s, ${s.video.size}v/${s.audio.size}a, top ${v.height}p ${v.codecs} (init ${v.initRange}); video ${first(v.url)}; audio ${first(a.url)}"
+        }
+        // a video with dubs: one track per language, the original the default
+        check("server dubs") {
+            val s = YouTube.stream("0e3GPea1Tyg")
+            val tracks = s.audio.distinctBy { it.audioTrack }
+            require(tracks.size > 1) { "one audio track" }
+            val main = tracks.filter { it.audioDefault }.map { "${it.audioTrack} ${it.audioTrackName}" }
+            require(main.size == 1) { "default tracks: $main" }
+            "${tracks.size} tracks, default $main, others ${tracks.filter { !it.audioDefault }.take(3).map { it.audioTrackName }}"
         }
         check("server captions") {
             val c = YouTube.stream("jNQXAC9IVRw").captions.first()
@@ -91,6 +102,28 @@ fun main() = runBlocking {
         val d = YouTube.details("dQw4w9WgXcQ")
         "likes=${d.likesText} subs=${d.subsText} views=${d.viewsText} date=${d.publishedText} related=${d.related.size} more=${d.relatedNext != null} comments=${d.commentsToken != null}"
     }
+    check("storyboard") {
+        val s = YouTube.stream("dQw4w9WgXcQ")
+        val b = Storyboard.parse(s.storyboard) ?: error("${s.client}: no storyboard")
+        val f = b.frame(60_000, s.lengthSec * 1000L)
+        val r = Net.client.newCall(Request.Builder().url(f.url).build()).execute()
+        val code = r.code; r.close()
+        "${s.client}: ${b.width}x${b.height} ${b.cols}x${b.rows} frame(1:00)=${f.col},${f.row} HTTP $code"
+    }
+    check("chapters") {
+        val d = YouTube.details("qp0HIF3SfI4")
+        "${d.chapters.size} chapters: " + d.chapters.take(3).joinToString { "${it.startMs / 1000}s ${it.title} thumb=${it.thumb.isNotEmpty()}" }
+    }
+    check("comment sorts") {
+        val d = YouTube.details("dQw4w9WgXcQ")
+        val newest = d.commentSorts.getOrNull(1)?.second?.let { YouTube.comments(it).items.size } ?: -1
+        "count=${d.commentsCount} sorts=${d.commentSorts.map { it.first }} newest page=$newest"
+    }
+    check("search filters") {
+        val o = SearchOptions(type = 1, date = 4, duration = 2, sort = 3)
+        val r = YouTube.search("music", o).items.filterIsInstance<Video>()
+        "${o.params()}: ${r.size} videos, under 20m (want 0)=${r.count { it.lengthSec in 1 until 1200 }}"
+    }
     check("related more") { YouTube.relatedMore(YouTube.details("dQw4w9WgXcQ").relatedNext!!).items.size.toString() + " items" }
     check("comments") {
         val p = YouTube.comments(YouTube.details("dQw4w9WgXcQ").commentsToken!!)
@@ -103,6 +136,40 @@ fun main() = runBlocking {
         "${c.name} ${c.handle} ${c.subsText} ${c.videoCountText} avatar=${c.avatar.isNotEmpty()} banner=${c.banner.isNotEmpty()} items=${c.items.items.size} more=${c.items.next != null}"
     }
     check("channel more") { YouTube.browseMore(YouTube.channel("UCuAXFkgsw1L7xaCfnd5JJOw").items.next!!).items.size.toString() + " items" }
+    // "...more" on a channel: description, links, joined date
+    check("channel about") {
+        val c = YouTube.channel("UCTlfC-3OQJ0be6YfTL_irOA")
+        val a = YouTube.channelAbout(c.aboutToken ?: error("no token; preview '${c.description.take(30)}'"))
+        require(a.links.isNotEmpty() && a.joinedText.isNotEmpty()) { "links ${a.links.size} joined '${a.joinedText}'" }
+        "'${c.description.lineSequence().first()}' | ${a.description.length} chars, ${a.links.size} links (${a.links.first().title} -> ${a.links.first().url}) | ${a.url} ${a.country} | ${a.joinedText} | ${a.viewsText} | ${a.subsText} | ${a.videoCountText}"
+    }
+    // a channel opens on Home as on YouTube: its own tabs, the featured video and its rows
+    check("channel home") {
+        val c = YouTube.channel("UCTlfC-3OQJ0be6YfTL_irOA", null as String?)
+        require(c.tabs.isNotEmpty() && c.shelves.items.isNotEmpty()) { "tabs ${c.tabs.size} shelves ${c.shelves.items.size}" }
+        "tabs ${c.tabs.joinToString(",") { it.kind }} search=${c.searchable} | link '${c.linkText}' '${c.linkMore}' | featured ${c.featured?.title?.take(20)} | " +
+            "${c.shelves.items.size} rows: " + c.shelves.items.take(3).joinToString(" / ") { "${it.title} (${it.items.size}, pl=${it.playlistId != null})" }
+    }
+    check("channel home more") {
+        val c = YouTube.channel("UCuAXFkgsw1L7xaCfnd5JJOw", null as String?)
+        val more = c.shelves.next?.let { YouTube.shelvesMore(it, c.id).items.size } ?: -1
+        "${c.shelves.items.size} rows (${c.shelves.items.joinToString(", ") { it.title }}), more=$more"
+    }
+    check("channel posts") {
+        val c = YouTube.channel("UCTlfC-3OQJ0be6YfTL_irOA", null as String?)
+        val t = c.tabs.first { it.kind == "posts" }
+        val p = YouTube.channel(c.id, t.params).posts
+        require(p.items.isNotEmpty()) { "no posts" }
+        val more = p.next?.let { YouTube.postsMore(it).items.size } ?: -1
+        val x = p.items.first()
+        "${p.items.size} posts, more=$more | ${x.published} '${x.text.take(25)}' links ${p.items.sumOf { it.links.size }} " +
+            "images ${p.items.sumOf { it.images.size }} videos ${p.items.count { it.video != null }} playlists ${p.items.count { it.playlist != null }} polls ${p.items.count { it.poll.isNotEmpty() }}"
+    }
+    check("channel search") {
+        val r = YouTube.channelSearch("UCTlfC-3OQJ0be6YfTL_irOA", "방정식")
+        require(r.items.isNotEmpty()) { "none" }
+        "${r.items.size} items, more=${r.next?.let { YouTube.browseMore(it).items.size }}"
+    }
     check("channel shorts") { YouTube.channel("UCuAXFkgsw1L7xaCfnd5JJOw", YouTube.Tab.SHORTS).items.items.size.toString() + " items" }
     check("channel lists") { YouTube.channel("UCuAXFkgsw1L7xaCfnd5JJOw", YouTube.Tab.PLAYLISTS).items.items.size.toString() + " items" }
     check("playlist") {
