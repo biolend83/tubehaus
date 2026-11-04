@@ -136,6 +136,19 @@ fun main() = runBlocking {
         "${c.name} ${c.handle} ${c.subsText} ${c.videoCountText} avatar=${c.avatar.isNotEmpty()} banner=${c.banner.isNotEmpty()} items=${c.items.items.size} more=${c.items.next != null}"
     }
     check("channel more") { YouTube.browseMore(YouTube.channel("UCuAXFkgsw1L7xaCfnd5JJOw").items.next!!).items.size.toString() + " items" }
+    // a members-only video on a channel's Videos tab is known by its badge (Dammit Jeff, a few pages down)
+    check("members only") {
+        var page = YouTube.channel("UCXOSur_wiS9TK0WUhJrYrlA").items
+        val seen = ArrayList<app.tubehaus.engine.Video>()
+        repeat(8) {
+            seen += page.items.filterIsInstance<app.tubehaus.engine.Video>()
+            if (seen.any { it.members }) return@repeat
+            page = YouTube.browseMore(page.next ?: return@repeat)
+        }
+        val m = seen.filter { it.members }
+        require(m.isNotEmpty()) { "none marked in ${seen.size} videos" }
+        "${m.size} of ${seen.size} marked, e.g. '${m.first().title}'"
+    }
     // "...more" on a channel: description, links, joined date
     check("channel about") {
         val c = YouTube.channel("UCTlfC-3OQJ0be6YfTL_irOA")
@@ -185,10 +198,10 @@ fun main() = runBlocking {
     }
     check("update check") {
         val a = Remote.newerRelease("app-v", "0.2.0", ".apk")
-        val d = Remote.newerRelease("desktop-v", "0.2.0", ".msi")
+        val d = Remote.newerRelease("app-v", "0.2.0", ".msi")
         require(a != null && d != null) { "no release found" }
         require(Remote.newerRelease("app-v", "99.0.0", ".apk") == null) { "offered an older version" }
-        "android ${a.version} ${a.download}; desktop ${d.version} ${d.download}"
+        "android ${a.version}, windows ${d.version}, ${a.notes.size} lines of notes"
     }
     check("client list") {
         // the repository's clients.json, read the way an installed app reads its saved copy
