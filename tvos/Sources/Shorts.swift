@@ -167,7 +167,12 @@ struct ShortsView: View {
                 .opacity(model.ready ? 1 : 0)
             LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: .center, endPoint: .bottom)
             VStack(alignment: .leading, spacing: 12) {
-                if let e = model.error { Text(e).font(Fonts.bodyMedium).foregroundStyle(Theme.error) }
+                // on a dark pill: the picture behind it can be white, and red on white is hard to read
+                if let e = model.error {
+                    Text(e).font(Fonts.bodyMedium).foregroundStyle(.white)
+                        .padding(.horizontal, 20).padding(.vertical, 10)
+                        .background(Capsule().fill(Color.black.opacity(0.8)))
+                }
                 if !v.author.isEmpty { Text(v.author.hasPrefix("@") ? v.author : "@" + v.author).font(Fonts.titleSmall) }
                 Text(v.title).font(Fonts.bodyMedium).lineLimit(2)
                 GeometryReader { b in
