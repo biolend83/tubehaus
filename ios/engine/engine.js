@@ -14,7 +14,7 @@
 // collects those with __drain(), answers each with __reply(rid, json), and reads the outcome
 // with __take(id).
 
-var ENGINE_VERSION = 3;
+var ENGINE_VERSION = 4;
 
 // ------------------------------------------------------------------------------ host bridge
 var ENV = { hl: "en", gl: "US", players: null };
@@ -549,6 +549,10 @@ async function details(id) {
       return t !== null && title !== null ? [title, t] : null;
     }).filter(function (x) { return x; }),
     commentsCount: text(findFirst(at(comments, "header"), "contextualInfo")) || "",
+    // the title and channel as the watch page shows them (a video opened from a link knows only its id)
+    title: text(at(primary, "title")) || "",
+    author: text(at(owner, "title")) || "",
+    channelId: str(at(owner, "navigationEndpoint.browseEndpoint.browseId")) || "",
     chapters: chapters(d),
   };
 }

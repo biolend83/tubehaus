@@ -216,6 +216,7 @@ object YouTube {
             (a.getOrNull(0).str ?: return@mapNotNull null) to (a.getOrNull(1).str ?: return@mapNotNull null)
         },
         commentsCount = d.at("commentsCount").str ?: "",
+        title = d.at("title").str ?: "", author = d.at("author").str ?: "", channelId = d.at("channelId").str ?: "",
         chapters = d.at("chapters").arr.mapNotNull { c ->
             Chapter(c.at("title").str ?: "", c.at("startMs").long ?: return@mapNotNull null, c.at("thumb").str ?: "")
         },

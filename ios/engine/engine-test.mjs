@@ -68,6 +68,7 @@ const st = await run("stream", "jNQXAC9IVRw");
 ok(st.hls && st.title, `stream: "${st.title}" by ${st.author}, hls ${!!st.hls}, ${st.video.length} video + ${st.audio.length} audio formats, client ${st.client}`);
 const d = await run("details", "dQw4w9WgXcQ");
 ok(d.related.length > 5 && d.commentsToken, `details: ${d.related.length} related, likes ${d.likesText}, subs ${d.subsText}, comments ${!!d.commentsToken}`);
+ok(d.title && d.author && d.channelId.startsWith("UC"), `details: title "${d.title}" by ${d.author} (${d.channelId})`);
 const c = await run("comments", d.commentsToken);
 ok(c.items.length > 5, `comments: ${c.items.length}, first by ${c.items[0]?.author}: "${c.items[0]?.text.slice(0, 40)}"`);
 const ch = await run("channel", "UCsXVk37bltHxD1rDPwtNM8Q", "EgZ2aWRlb3PyBgQKAjoA");
