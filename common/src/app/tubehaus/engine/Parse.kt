@@ -101,6 +101,8 @@ private fun videoRenderer(v: JsonElement): Video? {
 
 private fun lockup(v: JsonElement): Item? {
     val id = v.at("contentId").str ?: return null
+    // an ad among the results (search sorted by views has them): no title, nothing to open
+    if (v.at("metadata.feedAdMetadataViewModel") != null) return null
     val type = v.at("contentType").str ?: ""
     val meta = v.at("metadata.lockupMetadataViewModel")
     val title = meta.at("title").text ?: ""
