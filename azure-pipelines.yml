@@ -1,0 +1,49 @@
+# The iPad .ipa on Azure DevOps (a second Mac besides GitHub's), started by hand from Azure.
+# Same steps as the ipa job in .github/workflows/ios.yml. The free Azure plan gives one job of
+# at most 60 minutes and 1800 minutes a month, so it never runs by itself on a push.
+trigger: none
+pr: none
+
+pool:
+  vmImage: macOS-15
+
+variables:
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx4g
+
+jobs:
+  - job: ipa
+    displayName: iPad .ipa
+    timeoutInMinutes: 60
+    steps:
+      - checkout: self
+        fetchDepth: 1
+      - script: |
+          set -e
+          echo "##vso[task.setvariable variable=JAVA_HOME]$JAVA_HOME_21_X64"
+          sysctl -n hw.memsize hw.ncpu machdep.cpu.brand_string || true
+          xcodebuild -version
+        displayName: Java 21, what Mac this is
+      - script: |
+          set -e
+          ./gradlew :ios:linkReleaseFrameworkIosArm64 --no-configuration-cache --stacktrace
+          mkdir -p ios/build/kit && cp -R ios/build/bin/iosArm64/releaseFramework/TubeHausKit.framework ios/build/kit/
+        displayName: Kotlin → TubeHausKit.framework
+      - script: |
+          set -e
+          brew install xcodegen
+          cd ios/app && xcodegen generate
+        displayName: Xcode project
+      - script: >-
+          xcodebuild -project ios/app/TubeHaus.xcodeproj -scheme TubeHaus -sdk iphoneos -configuration Release
+          -derivedDataPath build/xcode CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+        displayName: Build the app (unsigned)
+      - script: |
+          set -e
+          app=build/xcode/Build/Products/Release-iphoneos/TubeHaus.app
+          test -x "$app/TubeHaus"
+          mkdir -p out/Payload && cp -R "$app" out/Payload/
+          cd out && zip -qr TubeHaus.ipa Payload && unzip -l TubeHaus.ipa | tail -3
+          du -h TubeHaus.ipa
+        displayName: Package TubeHaus.ipa
+      - publish: out/TubeHaus.ipa
+        artifact: TubeHaus-iPad
