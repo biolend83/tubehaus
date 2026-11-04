@@ -76,6 +76,11 @@ class MpvPlayer : VideoPlayer {
     /** the subtitle track added to the file (shown or not): the captions button only flips its visibility */
     @Volatile private var loadedCaption: Caption? = null
     @Volatile private var loadedTranslate: String? = null
+    /** the audio stream added to the video (null: none, as for a live stream), and whether it was added again after failing */
+    @Volatile private var audioUrl: String? = null
+    @Volatile private var audioRetried = false
+    /** polls in a row that found the same sound problem (it must last a second before it's shown) */
+    private var soundBad = 0
 
     val available get() = lib != null
 
@@ -229,7 +234,15 @@ class MpvPlayer : VideoPlayer {
     override fun setAudioDevice(name: String) {
         if (name == audioDevice) return
         audioDevice = name
-        if (h != null) set("audio-device", name.ifEmpty { "auto" })
+        val p = h ?: return
+        set("audio-device", name.ifEmpty { "auto" })
+        // mpv dropped the sound when the last device wouldn't open: take it up again on this one
+        val l = lib!!
+        if (stream != null && str(l, p, "current-tracks/audio/id") == null) {
+            val n = num(l, p, "track-list/count")?.toInt() ?: 0
+            (0 until n).firstOrNull { str(l, p, "track-list/$it/type") == "audio" }
+                ?.let { str(l, p, "track-list/$it/id") }?.let { set("aid", it) }
+        }
     }
 
     private fun set(k: String, v: String) {
@@ -278,6 +291,7 @@ class MpvPlayer : VideoPlayer {
             val waiting = str(l, p, "paused-for-cache") == "yes" || str(l, p, "seeking") == "yes"
             val speed = num(l, p, "speed")
             val cached = num(l, p, "demuxer-cache-time")
+            val sound = soundProblem(l, p, playing = pos != null && !paused && !idle)
             st.update {
                 it.copy(
                     videoId = s.id,
@@ -288,9 +302,36 @@ class MpvPlayer : VideoPlayer {
                     durationMs = dur?.let { x -> (x * 1000).toLong() } ?: (s.lengthSec * 1000L),
                     speed = speed?.toFloat() ?: it.speed,
                     bufferedMs = cached?.let { x -> (x * 1000).toLong() } ?: 0,
+                    soundIssue = sound,
                 )
             }
         }
+    }
+
+    /**
+     * mpv plays the picture on in silence when the sound can't play, and says so only in its log:
+     * find out why, so the app can say it. Checked while playing, and shown once it lasts a second.
+     */
+    private fun soundProblem(l: LibMpv, p: Pointer, playing: Boolean): String? {
+        if (!playing) return st.value.soundIssue
+        val track = str(l, p, "current-tracks/audio/id")
+        // a track that's there but not playing: mpv drops it when the sound device won't open
+        val listed = (0 until (num(l, p, "track-list/count")?.toInt() ?: 0)).any { str(l, p, "track-list/$it/type") == "audio" }
+        val problem = when {
+            track == null && listed -> "No sound: the speaker or headphones wouldn't open. Pick one in Settings → Playback → Sound output."
+            // the audio stream (a separate download) failed: add it once more
+            track == null && audioUrl != null -> {
+                if (!audioRetried && soundBad >= 5) { audioRetried = true; soundBad = 0; cmd("audio-add", audioUrl!!, "select"); return null }
+                "The sound didn't load. Try playing the video again."
+            }
+            track == null -> null
+            str(l, p, "current-ao").isNullOrEmpty() -> "No sound: the speaker or headphones wouldn't open. Pick one in Settings → Playback → Sound output."
+            str(l, p, "ao-mute") == "yes" || num(l, p, "ao-volume")?.let { it <= 0.0 } == true -> "No sound: TubeHaus is muted or at 0 in the system's volume mixer."
+            else -> null
+        }
+        if (problem == null) { soundBad = 0; return null }
+        soundBad++
+        return if (soundBad >= 5) problem else st.value.soundIssue
     }
 
     // ------------------------------------------------------------------ choosing streams
@@ -323,6 +364,9 @@ class MpvPlayer : VideoPlayer {
         st.update { it.copy(heights = heights, height = pinned, buffering = true, audioTracks = languages, audioTrack = audioNow) }
         val url: String
         cmd("change-list", "audio-files", "clr", "")
+        audioUrl = null
+        audioRetried = false
+        soundBad = 0
         if (s.live || s.video.isEmpty()) {
             url = s.hls ?: return
         } else {
@@ -331,7 +375,7 @@ class MpvPlayer : VideoPlayer {
             // through the local proxy, which fetches in 10 MB pieces (YouTube crawls on one long request);
             // a downloaded video is opened straight from its files
             url = source(v.url)
-            pickAudio(s)?.let { a -> cmd("change-list", "audio-files", "append", source(a.url)) }
+            pickAudio(s)?.let { a -> audioUrl = source(a.url); cmd("change-list", "audio-files", "append", audioUrl!!) }
         }
         set("start", if (startMs > 0) "+%.1f".format(java.util.Locale.ROOT, startMs / 1000.0) else "none")
         set("loop-file", if (opts.loop) "inf" else "no")
