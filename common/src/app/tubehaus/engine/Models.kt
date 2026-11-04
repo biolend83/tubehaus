@@ -17,6 +17,8 @@ data class Video(
     val live: Boolean = false,
     val short: Boolean = false,
     val avatar: String = "",
+    /** for the channel's paying members only (the "Members only" badge): it won't play without their account */
+    val members: Boolean = false,
 ) : Item {
     val thumb: String get() = "https://i.ytimg.com/vi/$id/hqdefault.jpg"
     val thumbHigh: String get() = "https://i.ytimg.com/vi/$id/maxresdefault.jpg"

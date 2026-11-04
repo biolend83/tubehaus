@@ -21,6 +21,8 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -107,11 +109,20 @@ fun SubsScreen(app: AppState) {
         header = {
             Column {
                 if (lib.groups.isNotEmpty()) tabs()
-                if (group != null) Text(
-                    tr("Unwatched, from the last 7 days: each channel's newest first, up to {n}").replace("{n}", "$GROUP_FEED_MAX"),
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
+                // above the search, where they're seen at once
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (group != null) Text(
+                        tr("Each channel's newest video from the last 7 days, if you haven't watched it"),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f).padding(start = 4.dp, end = 8.dp),
+                    ) else Spacer(Modifier.weight(1f))
+                    OutlinedButton(onClick = { app.go(Screen.ManageSubs) }, contentPadding = PaddingValues(horizontal = 14.dp)) {
+                        Icon(Sym.Settings.outline, null, Modifier.size(18.dp)); Text(tr("Manage"), Modifier.padding(start = 6.dp))
+                    }
+                    OutlinedButton(onClick = { scope.launch { load(true) } }, contentPadding = PaddingValues(horizontal = 14.dp), modifier = Modifier.padding(start = 8.dp)) {
+                        Icon(Sym.Replay.outline, null, Modifier.size(18.dp)); Text(tr("Refresh"), Modifier.padding(start = 6.dp))
+                    }
+                }
                 OutlinedTextField(
                     query, { query = it }, singleLine = true,
                     placeholder = { Text(tr("Search this feed")) },
@@ -127,35 +138,22 @@ fun SubsScreen(app: AppState) {
                         }
                     }
                 }
-                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { app.go(Screen.ManageSubs) }) { Text(tr("Manage")) }
-                    TextButton(onClick = { scope.launch { load(true) } }) { Text(tr("Refresh")) }
-                }
             }
         },
     )
 }
 
-private const val GROUP_FEED_MAX = 20
-
 /**
- * A group's feed (asked for by a PocketTube user): only what you haven't watched from the last
- * 7 days, the newest video of every channel first, then each one's second newest and so on, so one
- * busy channel can't fill it; at most [GROUP_FEED_MAX], so it ends instead of scrolling on.
+ * A group's feed (asked for by PocketTube users): one video per channel, its newest, when it came
+ * out in the last 7 days and you haven't watched it yet; members-only videos left out. So it ends
+ * after a screen or so instead of scrolling on, and a busy channel can't fill it.
  */
 private fun groupFeed(items: List<Video>, watched: Set<String>): List<Video> {
     val since = Sys.nowMs() / 1000 - 7 * 86400
-    val byChannel = items.filter { it.id !in watched && (it.publishedAt == 0L || it.publishedAt >= since) }
-        .distinctBy { it.id }.groupBy { it.channelId }.values.map { l -> l.sortedByDescending { it.publishedAt } }
-    val out = ArrayList<Video>()
-    var round = 0
-    while (out.size < GROUP_FEED_MAX) {
-        val layer = byChannel.mapNotNull { it.getOrNull(round) }.sortedByDescending { it.publishedAt }
-        if (layer.isEmpty()) break
-        out += layer.take(GROUP_FEED_MAX - out.size)
-        round++
-    }
-    return out
+    return items.filter { !it.members }.distinctBy { it.id }.groupBy { it.channelId }.values
+        .map { l -> l.maxBy { it.publishedAt } }
+        .filter { it.id !in watched && (it.publishedAt == 0L || it.publishedAt >= since) }
+        .sortedByDescending { it.publishedAt }
 }
 
 /** The groups as tabs above the subscriptions: All (unless switched off), then each group. */
@@ -176,7 +174,11 @@ fun ManageSubsScreen(app: AppState) {
     val lib by app.store.lib.state.collectAsState()
     var confirm by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { app.fillSubInfo() }
-    val subs = lib.subs.entries.sortedBy { it.value.name.lowercase() }.toList()
+    val all = lib.subs.entries.sortedBy { it.value.name.lowercase() }.toList()
+    // the channel list narrows as you type, to find the ones to put in a group
+    var query by remember { mutableStateOf("") }
+    val subs = if (query.isBlank()) all else all.filter { (cid, s) -> s.name.ifEmpty { cid }.contains(query.trim(), ignoreCase = true) }
+    val set by app.store.settings.state.collectAsState()
     var newGroup by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<String?>(null) }
     var deleting by remember { mutableStateOf<String?>(null) }
@@ -202,15 +204,35 @@ fun ManageSubsScreen(app: AppState) {
                 IconButton(onClick = { deleting = g.name }) { Icon(Sym.Close.outline, tr("Delete")) }
             }
         }
+        // the same switch as in Settings, here where the groups are made
+        if (lib.groups.isNotEmpty()) item {
+            Row(Modifier.fillMaxWidth().clickable { app.store.settings.update { it.copy(subsHideAll = !set.subsHideAll) } }.padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(tr("Only my groups in Subscriptions"), style = MaterialTheme.typography.bodyLarge)
+                    Text(tr("With subscription groups: no \"All\" tab, just the groups"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(set.subsHideAll, { b -> app.store.settings.update { it.copy(subsHideAll = b) } })
+            }
+        }
         item { HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline) }
         item {
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(tr("{n} channels").replace("{n}", "${subs.size}"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                if (subs.isNotEmpty()) TextButton(onClick = { confirm = true }) { Text(tr("Unsubscribe from all"), color = MaterialTheme.colorScheme.error) }
+                Text(tr("{n} channels").replace("{n}", "${all.size}"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                if (all.isNotEmpty()) TextButton(onClick = { confirm = true }) { Text(tr("Unsubscribe from all"), color = MaterialTheme.colorScheme.error) }
             }
         }
+        if (all.size > 5) item {
+            OutlinedTextField(
+                query, { query = it }, singleLine = true,
+                placeholder = { Text(tr("Search your subscriptions")) },
+                leadingIcon = { Icon(Sym.Search.outline, null) },
+                trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Sym.Close.outline, tr("Clear")) } },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
         if (subs.isEmpty()) item {
-            Text(tr("No subscriptions"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
+            Text(tr(if (all.isEmpty()) "No subscriptions" else "Nothing here"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
         }
         items(subs, key = { it.key }) { (cid, s) ->
             Row(
@@ -245,7 +267,7 @@ fun ManageSubsScreen(app: AppState) {
     sorting?.let { cid -> GroupPicker(app, cid) { sorting = null } }
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
-        title = { Text(tr("Unsubscribe from all {n} channels?").replace("{n}", "${subs.size}")) },
+        title = { Text(tr("Unsubscribe from all {n} channels?").replace("{n}", "${all.size}")) },
         text = { Text(tr("Your history and playlists stay. You can import subscriptions again at any time.")) },
         confirmButton = {
             TextButton(onClick = { app.store.unsubscribeAll(); confirm = false }) { Text(tr("Unsubscribe from all"), color = MaterialTheme.colorScheme.error) }
