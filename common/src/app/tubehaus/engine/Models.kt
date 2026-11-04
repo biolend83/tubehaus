@@ -126,6 +126,10 @@ data class Details(
     val commentSorts: List<Pair<String, String>> = emptyList(),
     val commentsCount: String = "",
     val chapters: List<Chapter> = emptyList(),
+    /** the title and channel as the watch page shows them (a video opened from a link knows only its id) */
+    val title: String = "",
+    val author: String = "",
+    val channelId: String = "",
 )
 
 /** A chapter of a video: its title, where it starts and its picture. */
