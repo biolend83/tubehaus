@@ -165,6 +165,8 @@ private val KO = mapOf(
     "Tap the video to pause" to "영상을 탭해서 일시정지",
     "A tap plays or pauses; the controls show with it" to "탭하면 재생하거나 멈추고, 조작 버튼도 함께 보여요",
     "Read further ahead" to "더 멀리 미리 받기",
+    "Sound output" to "소리 출력",
+    "System default" to "시스템 기본값",
     "About 20 minutes of the video instead of 5, for fewer stops on a fast connection. Uses more memory" to "영상을 5분 대신 약 20분까지 미리 받아서 빠른 인터넷에서 덜 끊겨요. 메모리를 더 써요",
     "(from the next start)" to "(다음 실행부터)",
     "Beside the video" to "영상 옆에 먼저 보일 것",

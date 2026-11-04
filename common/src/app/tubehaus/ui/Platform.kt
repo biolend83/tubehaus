@@ -132,6 +132,10 @@ interface VideoPlayer {
     fun setLoop(on: Boolean)
     /** read about 20 minutes ahead instead of 5 */
     fun setReadAhead(long: Boolean) {}
+    /** the desktop: the sound outputs to choose from, as (name, description); empty where the system picks */
+    fun audioDevices(): List<Pair<String, String>> = emptyList()
+    /** one of [audioDevices]; "" = the system's default */
+    fun setAudioDevice(name: String) {}
     /**
      * A small, already softened picture of the frame showing now, for the glow around the video
      * in the dark theme (Ambient mode); null where the platform can't take one
