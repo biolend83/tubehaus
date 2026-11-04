@@ -97,6 +97,8 @@ data class PlayerState(
     /** 0..1, only where the app has its own volume (the desktop) */
     val volume: Float = 1f,
     val muted: Boolean = false,
+    /** why nothing can be heard while the picture plays (the desktop player finds out); null: all is well */
+    val soundIssue: String? = null,
 )
 
 data class PlayOptions(
