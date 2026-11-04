@@ -467,7 +467,11 @@ struct VideoCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 Thumb(urls: video.cardPictures, badge: video.badge, progress: library.progress(video.id))
                 HStack(alignment: .top, spacing: 24) {
-                    Avatar(url: video.avatarURL ?? library.avatar(of: video.channelId), name: video.author, size: 72)
+                    // a channel's own page leaves its name off its videos; an empty circle would stand in for nothing
+                    let avatar = video.avatarURL ?? library.avatar(of: video.channelId)
+                    if avatar != nil || !video.author.isEmpty {
+                        Avatar(url: avatar, name: video.author, size: 72)
+                    }
                     VStack(alignment: .leading, spacing: 4) {
                         Text(video.title).font(Fonts.titleSmall).foregroundStyle(Theme.text).lineLimit(2)
                         Text(video.byline).font(Fonts.bodySmall).foregroundStyle(Theme.sub).lineLimit(2)
