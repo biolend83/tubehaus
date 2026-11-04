@@ -133,6 +133,8 @@ data class Settings(
     val offlineHeight: Int = 720,
     /** desktop: where downloads are kept; "" = the app's own folder */
     val offlineDir: String = "",
+    /** desktop: the sound output mpv plays to (a name from its list); "" = the system's default */
+    val audioDevice: String = "",
     /** Android: the TV layout and remote keys; 0 when the device is a TV, 1 always, 2 never */
     val tvMode: Int = 0,
     /** dark theme: the video's colours glow softly around it, as on YouTube */

@@ -30,6 +30,9 @@ import com.sun.jna.ptr.PointerByReference
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
@@ -131,6 +134,7 @@ class MpvPlayer : VideoPlayer {
             if (o("sub-border-style", "opaque-box") >= 0) { o("sub-border-color", "#BF080808"); o("sub-border-size", "6"); o("sub-shadow-offset", "0") }
             else o("sub-border-size", "2.5")
             o("audio-display", "no"); o("audio-client-name", "TubeHaus")
+            o("audio-device", audioDevice.ifEmpty { "auto" })
             o("terminal", "no"); o("msg-level", "all=warn")
             if (l.mpv_initialize(p) < 0) { l.mpv_terminate_destroy(p); return null }
             val res = PointerByReference()
@@ -205,6 +209,27 @@ class MpvPlayer : VideoPlayer {
     override fun setReadAhead(long: Boolean) {
         set("cache-secs", if (long) "1200" else "300"); set("demuxer-readahead-secs", if (long) "1200" else "300")
         set("demuxer-max-bytes", if (long) "2GiB" else "500MiB")
+    }
+
+    /** Settings → Sound output (#46): for example ALSA when PipeWire's default doesn't play */
+    @Volatile private var audioDevice = ""
+
+    override fun audioDevices(): List<Pair<String, String>> {
+        val p = mpv() ?: return emptyList()
+        val text = str(lib!!, p, "audio-device-list") ?: return emptyList()
+        return runCatching {
+            kotlinx.serialization.json.Json.parseToJsonElement(text).jsonArray.mapNotNull { e ->
+                val o = e.jsonObject
+                val name = o["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                name to (o["description"]?.jsonPrimitive?.content ?: "")
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    override fun setAudioDevice(name: String) {
+        if (name == audioDevice) return
+        audioDevice = name
+        if (h != null) set("audio-device", name.ifEmpty { "auto" })
     }
 
     private fun set(k: String, v: String) {
