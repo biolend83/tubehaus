@@ -9,11 +9,7 @@ keeps your subscriptions, history and playlists on the iPad, and works out recom
 
 **[⬇ TubeHaus-0.5.15-ipad.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-ipad.ipa)** (iOS 16+, beta) · install it with **[Sideloadly](https://sideloadly.io/)**
 
-<<<<<<< HEAD
 Install and update TubeHaus from a source: **AltStore** `https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/altstore/altstore.json` · **SideStore** `https://raw.githubusercontent.com/biolend83/tubehaus/ios-app/altstore/sidestore.json`
-=======
-**[⬇ Android APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15.apk)** · **[⬇ Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15.msi)** · **[⬇ macOS](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-mac-arm64.dmg)** · **[⬇ Linux .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-linux-amd64.deb)** · **[⬇ iPad / iPhone](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-ipad.ipa)** (0.5.15, beta)
->>>>>>> origin/android-app
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · **iPad / iPhone** · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
@@ -41,45 +37,11 @@ There is no jailbreak and no paid developer account, and your Apple ID only goes
 
 ## Install
 
-<<<<<<< HEAD
 1. Download **[TubeHaus-0.5.15-ipad.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-ipad.ipa)** and install **[Sideloadly](https://sideloadly.io/)** on your PC or Mac.
 2. Connect the iPad with a cable (tap *Trust This Computer* on the iPad if it asks).
 3. Drop the .ipa into Sideloadly, enter your Apple ID and press **Start**.
 4. On the iPad: Settings → General → **VPN & Device Management** → tap your Apple ID → *Trust*.
 5. If it asks, turn on Settings → Privacy & Security → **Developer Mode** and restart.
-=======
-- **Android 8.0+** — [the APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15.apk)
-  (beta). Open it on the phone and allow installing from your browser when asked.
-  Updates: the app tells you itself, or use Obtainium: [one tap to add it](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%20%22io.github.biolend83.tubehaus%22%2C%20%22url%22%3A%20%22https%3A%2F%2Fgithub.com%2Fbiolend83%2Ftubehaus%22%2C%20%22author%22%3A%20%22biolend83%22%2C%20%22name%22%3A%20%22TubeHaus%22%2C%20%22additionalSettings%22%3A%20%22%7B%5C%22filterReleaseTitlesByRegEx%5C%22%3A%20%5C%22%5ETubeHaus%20%5C%22%2C%20%5C%22fallbackToOlderReleases%5C%22%3A%20true%2C%20%5C%22includePrereleases%5C%22%3A%20false%2C%20%5C%22apkFilterRegEx%5C%22%3A%20%5C%22TubeHaus-%5C%5C%5C%5Cd%5C%22%7D%22%7D) (already set up), or by hand:
-  *Add app* → source URL `https://github.com/biolend83/tubehaus` → under *Filter release titles by
-  regular expression* enter `^TubeHaus `, turn on *Fallback to older releases*, and under
-  *Filter APKs by regular expression* enter `TubeHaus-\d`. The filter
-  matters: the same repository also has server releases ("Server 0.7.x") with no APK in them.
-- **Android TV / Google TV** — the same APK. In the *Downloader* app, enter the code **3155410**
-  (or the address `aftv.news/3155410`): it always gives the newest version. Or use *Send Files to TV*; TubeHaus then shows on the TV's home screen. Settings → *TV mode* turns the
-  TV layout on for boxes that don't say they are a TV.
-- **Windows 10/11** — [the installer](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15.msi) or [setup .exe](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-win-x64-setup.exe), or a
-  [portable .zip](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-win-x64-portable.zip) that needs no install; on Windows on ARM, the
-  [ARM .zip](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-win-arm64-portable.zip) (beta, mpv built in). Windows may warn that the publisher is unknown, because the installer
-  isn't code-signed: choose *More info* → *Run anyway*.
-- **macOS** — [Apple Silicon .dmg](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-mac-arm64.dmg) or [Intel .dmg](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-mac-x64.dmg) (beta;
-  .zip versions are on the release page).
-  It uses Homebrew's mpv: `brew install mpv`. The app isn't signed by Apple yet, so the first time
-  right-click it → *Open* → *Open*.
-- **iPad / iPhone (iOS 16+)** — [the .ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-ipad.ipa) (beta). Apple installs only apps it signed, so
-  you sign it yourself with **[Sideloadly](https://sideloadly.io/)** (free, Windows or Mac) and your Apple ID: connect the
-  iPad with a cable, drop the .ipa into Sideloadly, enter your Apple ID, press *Start*. Then on the
-  iPad: Settings → General → *VPN & Device Management* → trust your Apple ID, and turn on
-  Settings → Privacy & Security → *Developer Mode* if it asks. With a free Apple ID the app has to be
-  re-signed every 7 days (Sideloadly can do that by itself over Wi-Fi). It's the same app, built for
-  iOS: Apple's player with picture-in-picture, background play and offline downloads. More on the
-  [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app) branch.
-- **Linux (x86-64 and ARM64)** — [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-linux-amd64.deb) for Debian/Ubuntu, [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-linux-x86_64.rpm)
-  for Fedora/openSUSE, or [a tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-linux-x64.tar.gz) to unpack anywhere and run `TubeHaus/bin/TubeHaus`.
-  ARM64 (Raspberry Pi 4/5 and others): [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-linux-arm64.deb), [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-linux-aarch64.rpm),
-  [tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-linux-arm64.tar.gz).
-  It uses your system's mpv: `sudo apt install libmpv2` (Fedora: `sudo dnf install mpv-libs`, Arch: `mpv`). New and not yet tested much: reports welcome.
->>>>>>> origin/android-app
 
 **Every 7 days:** with a free Apple ID the signature lasts 7 days. Sideloadly can re-sign the app by
 itself over Wi-Fi (turn on its auto-refresh), or just repeat step 3. Your library stays.
