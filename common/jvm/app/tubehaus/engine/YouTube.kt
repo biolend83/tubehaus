@@ -175,6 +175,9 @@ object YouTube {
             ?: watch?.findAll("itemSectionRenderer")?.firstOrNull { it.at("sectionIdentifier").str == "comment-item-section" }
                 ?.findFirst("token").str
         return Details(
+            title = primary.at("title").text ?: "",
+            author = owner.at("title").text ?: "",
+            channelId = owner.at("navigationEndpoint.browseEndpoint.browseId").str ?: "",
             likesText = like.at("likeButtonViewModel.likeButtonViewModel.toggleButtonViewModel.toggleButtonViewModel.defaultButtonViewModel.buttonViewModel.title").str ?: "",
             subsText = owner.at("subscriberCountText").text ?: "",
             avatar = bestImage(owner.at("thumbnail")).ifEmpty { bestImage(watch?.findFirst("decoratedAvatarViewModel")) },
