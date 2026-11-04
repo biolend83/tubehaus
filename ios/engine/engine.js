@@ -14,7 +14,7 @@
 // collects those with __drain(), answers each with __reply(rid, json), and reads the outcome
 // with __take(id).
 
-var ENGINE_VERSION = 4;
+var ENGINE_VERSION = 5;
 
 // ------------------------------------------------------------------------------ host bridge
 var ENV = { hl: "en", gl: "US", players: null };
@@ -206,6 +206,8 @@ function video(o) {
     type: "video", id: o.id, title: o.title || "", author: o.author || "", channelId: o.channelId || "",
     lengthSec: o.lengthSec || 0, viewsText: o.viewsText || "", views: o.views || 0, publishedText: o.publishedText || "",
     publishedAt: o.publishedAt || 0, live: !!o.live, short: !!o.short, avatar: o.avatar || "",
+    // for the channel's paying members only (the "Members only" badge): it won't play without their account
+    members: !!o.members,
   };
 }
 
@@ -283,6 +285,7 @@ function videoRenderer(v) {
     live: badges.indexOf("BADGE_STYLE_TYPE_LIVE_NOW") >= 0 || overlays.indexOf("LIVE") >= 0,
     short: at(v, "navigationEndpoint.reelWatchEndpoint") !== null || overlays.indexOf("SHORTS") >= 0,
     avatar: bestImage(at(v, "channelThumbnailSupportedRenderers") || at(v, "channelThumbnail")),
+    members: badges.some(function (b) { return b.indexOf("MEMBERS") >= 0; }),
   });
 }
 
@@ -319,6 +322,8 @@ function lockup(v) {
       lengthSec: badgeText.indexOf(":") >= 0 ? secondsOf(badgeText) : 0,
       viewsText: viewsText, views: countOf(viewsText), publishedText: dateText,
       live: live, avatar: bestImage(at(meta, "image")),
+      // channel pages put a "Members only" badge in a metadata row of its own
+      members: meta ? findAll(meta, "badgeStyle").some(function (b) { return (str(b) || "").indexOf("MEMBERS") >= 0; }) : false,
     });
   }
   // playlists, mixes, albums, podcasts: all open as a playlist
@@ -896,7 +901,8 @@ async function feed(channelId) {
   }
   var c = await channel(channelId, TAB_VIDEOS);
   var now = nowSec();
-  return c.items.items.filter(function (x) { return x.type === "video"; }).map(function (v) {
+  // the Videos tab also lists members-only videos, which won't play here
+  return c.items.items.filter(function (x) { return x.type === "video" && !x.members; }).map(function (v) {
     var a = ago(v.publishedText);
     v.author = v.author || c.name;
     v.channelId = channelId;

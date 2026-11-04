@@ -108,3 +108,16 @@ if (postsTab) {
   if (pc.posts.next) { const pm = await run("postsMore", pc.posts.next); ok(pm.items.length > 0, `postsMore: ${pm.items.length}`); }
 } else ok(false, "no posts tab");
 if (home.shelves.next) { const sh = await run("shelvesMore", home.shelves.next, "UCsXVk37bltHxD1rDPwtNM8Q"); ok(Array.isArray(sh.items), `shelvesMore: ${sh.items.length} (the last token is often a row's own, as on Android)`); }
+
+// members-only videos: marked on a channel's Videos tab, and left out of the feed read from it (when RSS is down)
+{
+  const jeff = "UCXOSur_wiS9TK0WUhJrYrlA";
+  let page = await run("channel", jeff, "EgZ2aWRlb3PyBgQKAjoA"), items = page.items.items, next = page.items.next;
+  for (let i = 0; i < 7 && next && !items.some((v) => v.members); i++) { const m = await run("browseMore", next); items = items.concat(m.items); next = m.next; }
+  const marked = items.filter((v) => v.members);
+  ok(marked.length > 0, `members only: ${marked.length} of ${items.length} marked, e.g. "${marked[0]?.title}"`);
+  js("rssDownUntil = Date.now() + 3600000");
+  const f = await run("feed", jeff);
+  ok(f.length > 0 && f.every((v) => !v.members), `feed from the Videos tab: ${f.length} videos, none members-only`);
+  js("rssDownUntil = 0");
+}
