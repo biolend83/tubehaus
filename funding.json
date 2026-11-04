@@ -1,0 +1,69 @@
+{
+  "$schema": "https://fundingjson.org/schema/v1.1.0.json",
+  "version": "v1.1.0",
+  "entity": {
+    "type": "individual",
+    "role": "maintainer",
+    "name": "biolend83",
+    "email": "biolend83+tubehaus@gmail.com",
+    "phone": "",
+    "description": "Independent maintainer of TubeHaus, a free and open-source YouTube app that runs entirely on the user's device, on Android, Android TV, Android Auto, Windows, macOS, Linux, iPad/iPhone and Apple TV.",
+    "webpageUrl": {
+      "url": "https://github.com/biolend83",
+      "wellKnown": ""
+    }
+  },
+  "projects": [
+    {
+      "guid": "tubehaus",
+      "name": "TubeHaus",
+      "description": "TubeHaus is a free YouTube app that runs entirely on the user's device: no Google account, no ads, and no server in between. Subscriptions, history, playlists and recommendations are computed and kept locally, and users decide what they see (subscription groups with a short, finite feed, a focus mode that hides recommendations, no tracking). It is one app for every screen: Android phones, tablets, Android TV and Android Auto, Windows, macOS and Linux, plus iPad/iPhone and an Apple TV beta. It has its own YouTube engine written from scratch in Kotlin (no NewPipeExtractor or yt-dlp), one shared codebase for every platform, and fixes that reach users without an app update (the streaming client list is fetched daily, and on iOS the engine itself can be updated). An optional self-hosted server syncs a library with a web version. Public since October 2026, with 230+ GitHub stars, 20 releases and thousands of downloads in its first weeks, and features shaped by user requests on Reddit and GitHub.",
+      "webpageUrl": {
+        "url": "https://github.com/biolend83/tubehaus",
+        "wellKnown": "https://github.com/biolend83/tubehaus/blob/main/.well-known/funding-manifest-urls"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/biolend83/tubehaus",
+        "wellKnown": "https://github.com/biolend83/tubehaus/blob/main/.well-known/funding-manifest-urls"
+      },
+      "licenses": [
+        "spdx:GPL-3.0-only",
+        "spdx:AGPL-3.0-only"
+      ],
+      "tags": [
+        "video",
+        "privacy",
+        "youtube",
+        "android",
+        "desktop",
+        "media-player",
+        "kotlin",
+        "cross-platform"
+      ]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "bank",
+        "type": "bank",
+        "address": "",
+        "description": "Bank transfer. Account details are provided on request."
+      }
+    ],
+    "plans": [
+      {
+        "guid": "yearly-development",
+        "status": "active",
+        "name": "Yearly development",
+        "description": "A year of development and maintenance: keeping the YouTube engine working as YouTube changes, signed apps for iPad, iPhone, Apple TV, Windows and macOS (Apple Developer membership, code signing), test hardware (Apple TV, Android Auto head unit), and CI and hosting costs.",
+        "amount": 10000,
+        "currency": "USD",
+        "frequency": "yearly",
+        "channels": [
+          "bank"
+        ]
+      }
+    ]
+  }
+}
