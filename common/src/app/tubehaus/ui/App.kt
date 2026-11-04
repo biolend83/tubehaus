@@ -49,6 +49,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -149,6 +153,7 @@ fun App(app: AppState) {
                     LaunchedEffect(Unit) {
                         app.fillSubInfo()
                         app.sync.refreshSoon()
+                        app.whatsNewAfterUpdate()
                         // at start, and every hour for a window left open (Android also asks each time
                         // the app comes back to the front: MainActivity.onStart)
                         while (true) { app.checkForUpdates(); kotlinx.coroutines.delay(3_600_000) }
@@ -157,6 +162,7 @@ fun App(app: AppState) {
                     LaunchedEffect(settings.longBuffer) { app.platform.player.setReadAhead(settings.longBuffer) }
                     LaunchedEffect(settings.audioDevice) { app.platform.player.setAudioDevice(settings.audioDevice) }
                     app.update?.let { UpdateDialog(app, it) }
+                    app.whatsNew?.let { WhatsNewDialog(app, it) }
                     app.offline.asking?.let { OfflineDialog(app, it) }
                 }
             }
@@ -429,6 +435,11 @@ private fun UpdateDialog(app: AppState, r: app.tubehaus.engine.Remote.Release) {
         text = {
             Column {
                 Text(tr("You have {v}.").replace("{v}", VERSION) + " " + tr(r.download?.let { "Download it and install it over this one; your library stays." } ?: "Pick the file for your system on the release page."))
+                if (r.notes.isNotEmpty()) {
+                    Text(tr("What's new"), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+                    // focusable: a TV remote can reach the notes and scroll them
+                    Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState()).focusable()) { NoteLines(r.notes) }
+                }
                 got?.let { p ->
                     LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth().padding(top = 14.dp))
                     Text(if (p >= 1f) tr("Opening the installer...") else "${(p * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))

@@ -141,4 +141,6 @@ data class Settings(
     val ambient: Boolean = true,
     val checkedAt: Long = 0,
     val skipVersion: String = "",
+    /** the version last opened: when the app opens on a newer one, it shows what's new */
+    val seenVersion: String = "",
 )
