@@ -137,6 +137,15 @@ fun SettingsScreen(app: AppState) {
                 Toggle(tr("Read further ahead"), tr("About 20 minutes of the video instead of 5, for fewer stops on a fast connection. Uses more memory") +
                     if (app.platform.name == "android") " " + tr("(from the next start)") else "", s.longBuffer) { b -> set { it.copy(longBuffer = b) } }
             }
+            if (app.platform.player.hasVolume) item {
+                // the desktop: which speaker or headphones (#46); the list is read again each time Settings opens
+                val devices = remember { app.platform.player.audioDevices() }
+                if (devices.isNotEmpty()) {
+                    val opts = listOf("" to tr("System default")) + devices.filter { it.first != "auto" }.map { (n, d) -> n to d.ifEmpty { n } }
+                    val now = opts.firstOrNull { it.first == s.audioDevice }?.second ?: s.audioDevice
+                    Choice(tr("Sound output"), now, opts) { c -> set { it.copy(audioDevice = c) } }
+                }
+            }
             item {
                 Choice(tr("Beside the video"), tr(if (s.sideTab == "comments") "Comments" else "Up next"),
                     listOf("next" to tr("Up next"), "comments" to tr("Comments"))) { c -> set { it.copy(sideTab = c) } }
