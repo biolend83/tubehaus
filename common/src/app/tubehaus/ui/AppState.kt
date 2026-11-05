@@ -38,9 +38,12 @@ sealed interface Screen {
     data object ManageSubs : Screen
     /** videos saved on this device */
     data object Downloads : Screen
+    /** one of YouTube's topic pages (TOPICS): Music, Live, News... */
+    data class Topic(val key: String) : Screen
 }
 
-val TABS = listOf(Screen.Home, Screen.Shorts, Screen.Subs, Screen.Library)
+/** the screens a tab opens: going to one starts over from it (Music and Live are tabs at the top on phones) */
+val TABS = listOf(Screen.Home, Screen.Shorts, Screen.Subs, Screen.Library) + TOP_TOPICS.map { Screen.Topic(it) }
 
 class AppState(val platform: Platform, val store: Store) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)

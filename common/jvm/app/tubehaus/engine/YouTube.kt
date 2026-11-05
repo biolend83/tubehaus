@@ -198,6 +198,7 @@ object YouTube {
                     val r = c.at("chapterRenderer") ?: return@mapNotNull null
                     Chapter(r.at("title").text ?: "", r.at("timeRangeStartMillis").long ?: return@mapNotNull null, bestImage(r.at("thumbnail")))
                 },
+            heat = heatOf(d),
         )
     }
 

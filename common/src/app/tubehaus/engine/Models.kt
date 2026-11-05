@@ -132,6 +132,8 @@ data class Details(
     val title: String = "",
     val author: String = "",
     val channelId: String = "",
+    /** YouTube's "Most replayed" wave over the seek bar */
+    val heat: Heat = Heat(),
 )
 
 /** A chapter of a video: its title, where it starts and its picture. */
