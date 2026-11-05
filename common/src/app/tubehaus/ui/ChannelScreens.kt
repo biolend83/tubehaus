@@ -396,7 +396,7 @@ private fun ChannelAboutSheet(app: AppState, h: ChannelPage, onClose: () -> Unit
                 val desc = info?.description?.ifEmpty { null } ?: h.description
                 if (desc.isNotEmpty()) {
                     Heading(tr("Description"))
-                    SelectionContainer {
+                    SelectableInSheet(app) {
                         LinkedText(desc, app, Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)).padding(14.dp))
                     }
                 }

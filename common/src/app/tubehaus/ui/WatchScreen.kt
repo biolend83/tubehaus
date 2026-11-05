@@ -386,7 +386,7 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
                     }
                 }
                 // links open, #tags search, and a time like 3:25 jumps there in the video
-                if (desc.isNotEmpty()) SelectionContainer {
+                if (desc.isNotEmpty()) SelectableInSheet(app) {
                     LinkedText(desc, app,
                         Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 32.dp)
                             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)).padding(14.dp),

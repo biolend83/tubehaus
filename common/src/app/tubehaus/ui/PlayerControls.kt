@@ -863,7 +863,7 @@ private fun ColumnScope.SettingsPages(app: AppState, dismiss: () -> Unit) {
                 tr("Speed") to "${st.speed}x",
                 s?.live?.takeIf { it }?.let { tr("LIVE") to (s.hls?.let { "HLS" } ?: "") },
             ).filter { it.second.isNotEmpty() }
-            SelectionContainer {
+            SelectableInSheet(app) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
                     for ((k, x) in lines) Row(Modifier.padding(vertical = 3.dp)) {
                         Text(k, Modifier.width(120.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
