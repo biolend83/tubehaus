@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.SponsorBlock
 import app.tubehaus.engine.Sys
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.background
@@ -54,7 +55,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "0.5.15"
+const val VERSION = "0.5.16"
 
 @Composable
 fun SettingsScreen(app: AppState) {
@@ -105,6 +106,14 @@ fun SettingsScreen(app: AppState) {
             item { Toggle(tr("Only my groups in Subscriptions"), tr("With subscription groups: no \"All\" tab, just the groups"), s.subsHideAll) { b -> set { it.copy(subsHideAll = b) } } }
             item { Toggle(tr("Hide Shorts"), tr("No Shorts tab, no Shorts in lists"), s.hideShorts || s.calm) { b -> set { it.copy(hideShorts = b) } } }
             item { Toggle(tr("Hide related videos"), tr("Nothing suggested next to or under a video"), s.hideRelated) { b -> set { it.copy(hideRelated = b) } } }
+            item { Toggle(tr("Show dislikes"), tr("An estimate from Return YouTube Dislike (returnyoutubedislikeapi.com), which is sent the video's ID"), s.showDislikes) { b -> set { it.copy(showDislikes = b) } } }
+            // DeArrow: no clickbait; its thumbnails can be switched off on their own
+            item { Toggle("DeArrow", tr("Titles and thumbnails people chose instead of clickbait (dearrow.ajay.app). Only 4 characters of a hash are sent, not the video"), s.dearrow) { b -> set { it.copy(dearrow = b) } } }
+            item {
+                Box(Modifier.padding(start = 24.dp).alpha(if (s.dearrow) 1f else 0.4f)) {
+                    Toggle(tr("DeArrow thumbnails"), tr("A frame people picked, straight from DeArrow's server"), s.dearrowThumbs, enabled = s.dearrow) { b -> set { it.copy(dearrowThumbs = b) } }
+                }
+            }
             // immersive mode: what is left under the video, down to just the player
             item { Group(tr("Immersive mode")) }
             item {
@@ -120,6 +129,20 @@ fun SettingsScreen(app: AppState) {
                 Box(Modifier.padding(start = 24.dp).alpha(if (s.underVideo == 0) 1f else 0.4f)) {
                     Toggle(tr(label), "", k !in s.hideUnder, enabled = s.underVideo == 0) { b ->
                         set { it.copy(hideUnder = if (b) it.hideUnder - k else (it.hideUnder + k).distinct()) }
+                    }
+                }
+            }
+
+            item { Group("SponsorBlock") }
+            item { Toggle("SponsorBlock", tr("Skips sponsors and other parts people marked inside videos (sponsor.ajay.app). Only 4 characters of a hash are sent, not the video"), s.sponsor) { b -> set { it.copy(sponsor = b) } } }
+            item {
+                Text(tr("Switched on: skipped by itself. Off: a button offers to skip it."),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+            }
+            items(SponsorBlock.CATS) { c ->
+                Box(Modifier.padding(start = 24.dp).alpha(if (s.sponsor) 1f else 0.4f)) {
+                    Toggle(tr(c.label), "", c.key in s.sponsorCats, enabled = s.sponsor) { b ->
+                        set { it.copy(sponsorCats = if (b) (it.sponsorCats + c.key).distinct() else it.sponsorCats - c.key) }
                     }
                 }
             }
@@ -154,6 +177,7 @@ fun SettingsScreen(app: AppState) {
                 Toggle(tr("Ambient mode"), tr("In the dark theme, the video's colours glow softly around it"), s.ambient) { b -> set { it.copy(ambient = b) } }
             }
             item { Toggle(tr("Captions"), tr("Turn captions on when a video has them"), s.captions) { b -> set { it.copy(captions = b) } } }
+            item { Toggle(tr("Most replayed"), tr("A wave over the seek bar shows the parts people watch again"), s.heatmap) { b -> set { it.copy(heatmap = b) } } }
             if (app.platform.name == "android") item {
                 Toggle(tr("Background play"), tr("Keep playing with the screen off or in another app"), s.backgroundPlay) { b -> set { it.copy(backgroundPlay = b) } }
             }

@@ -135,6 +135,29 @@ fun main() = runBlocking {
         val c = YouTube.channel("UCuAXFkgsw1L7xaCfnd5JJOw")
         "${c.name} ${c.handle} ${c.subsText} ${c.videoCountText} avatar=${c.avatar.isNotEmpty()} banner=${c.banner.isNotEmpty()} items=${c.items.items.size} more=${c.items.next != null}"
     }
+    // the phone's top tabs (Music, Live) and More: YouTube's topic pages, one flat list each
+    check("topics") {
+        val n = app.tubehaus.ui.TOPICS.mapValues { (_, id) -> YouTube.channel(id, null as String?).items.items.size }
+        require(n.getValue("Music") > 0 && n.getValue("Live") > 0) { n.toString() }
+        n.entries.joinToString { "${it.key} ${it.value}" }
+    }
+    // "Most replayed" from the watch page's answer, and DeArrow's choice for a video it is known to have
+    check("most replayed") {
+        val h = YouTube.details("dQw4w9WgXcQ").heat
+        require(h.points.size >= 10) { "no heat" }
+        "${h.points.size} points span=${h.spanMs / 1000}s peak=${h.peakMs?.div(1000)}s"
+    }
+    check("dearrow") {
+        require(app.tubehaus.engine.DeArrow.prefixOf("dQw4w9WgXcQ") == "5f6b") { "hash" }
+        val b = app.tubehaus.engine.DeArrow.brand("dQw4w9WgXcQ")
+        "title=${b?.title} time=${b?.timeSec}"
+    }
+    // Despacito: SponsorBlock has its non-music parts and a highlight
+    check("sponsorblock") {
+        val s = app.tubehaus.engine.SponsorBlock.segments("kJQP7kiw5Fk", listOf("sponsor"))
+        require(s.isNotEmpty()) { "no segments" }
+        s.joinToString { "${it.category} ${it.startMs / 1000}-${it.endMs / 1000}s" }
+    }
     check("channel more") { YouTube.browseMore(YouTube.channel("UCuAXFkgsw1L7xaCfnd5JJOw").items.next!!).items.size.toString() + " items" }
     // a members-only video on a channel's Videos tab is known by its badge (Dammit Jeff, a few pages down)
     check("members only") {

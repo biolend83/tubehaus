@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.dp
 import app.tubehaus.data.Transfer
 import app.tubehaus.data.SubGroup
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.FilterChip
 import app.tubehaus.engine.Video
 import app.tubehaus.engine.Sys
 import kotlinx.coroutines.launch
@@ -161,9 +160,9 @@ private fun groupFeed(items: List<Video>, watched: Set<String>): List<Video> {
 private fun GroupTabs(app: AppState, groups: List<SubGroup>, selected: String?, hideAll: Boolean) {
     fun pick(name: String) = app.store.settings.update { it.copy(subsGroup = name) }
     LazyRow(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (!hideAll) item { FilterChip(selected == null, onClick = { pick("") }, label = { Text(tr("All")) }) }
+        if (!hideAll) item { Chip(selected == null, onClick = { pick("") }, label = tr("All")) }
         items(groups, key = { "g" + it.name }) { g ->
-            FilterChip(selected == g.name, onClick = { pick(g.name) }, label = { Text(g.name) })
+            Chip(selected == g.name, onClick = { pick(g.name) }, label = g.name)
         }
     }
 }
