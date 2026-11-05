@@ -139,6 +139,16 @@ data class Settings(
     val tvMode: Int = 0,
     /** dark theme: the video's colours glow softly around it, as on YouTube */
     val ambient: Boolean = true,
+    /** the "Most replayed" wave over the seek bar */
+    val heatmap: Boolean = true,
+    /** DeArrow: titles (and with [dearrowThumbs] thumbnails) people chose instead of clickbait */
+    val dearrow: Boolean = true,
+    val dearrowThumbs: Boolean = true,
+    /** the dislike count under a video (Return YouTube Dislike's estimate) */
+    val showDislikes: Boolean = true,
+    /** SponsorBlock: the parts people marked in videos; the kinds in [sponsorCats] are skipped by themselves */
+    val sponsor: Boolean = true,
+    val sponsorCats: List<String> = listOf("sponsor", "selfpromo", "interaction"),
     val checkedAt: Long = 0,
     val skipVersion: String = "",
     /** the version last opened: when the app opens on a newer one, it shows what's new */
