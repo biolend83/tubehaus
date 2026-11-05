@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "0.5.16",
+          "buildVersion": "33",
+          "date": "2026-11-05T08:40:03+00:00",
+          "localizedDescription": "Shared with the 0.5.16 release: YouTube's topic pages (Music, Live, News, Sports and more), SponsorBlock with Jump to the highlight, dislike counts, DeArrow titles and thumbnails, the \"Most replayed\" wave, and channel pictures on every card.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-ipad.ipa",
+          "size": 16320096,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "0.5.15",
           "buildVersion": "32",
           "date": "2026-11-04T10:37:10+00:00",
@@ -95,11 +104,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "0.5.15",
-      "versionDate": "2026-11-04T10:37:10+00:00",
-      "versionDescription": "Shared with the 0.5.15 release: YouTube-like channel pages, chapters, seek bar previews, search filters, comment sorts, loop, sleep timer and stats for nerds, what's new in the app, and better subscription groups.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-ipad.ipa",
-      "size": 16192797
+      "version": "0.5.16",
+      "versionDate": "2026-11-05T08:40:03+00:00",
+      "versionDescription": "Shared with the 0.5.16 release: YouTube's topic pages (Music, Live, News, Sports and more), SponsorBlock with Jump to the highlight, dislike counts, DeArrow titles and thumbnails, the \"Most replayed\" wave, and channel pictures on every card.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-ipad.ipa",
+      "size": 16320096
     }
   ],
   "news": [],
