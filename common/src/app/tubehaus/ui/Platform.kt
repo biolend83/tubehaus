@@ -35,6 +35,8 @@ interface Platform {
      * can't, and the release page is opened instead.
      */
     fun installUpdate(url: String, progress: (Float) -> Unit, done: (Boolean) -> Unit): Boolean = false
+    /** Android: signed with the release key (TubeHaus-release-*.apk, IzzyOnDroid) rather than the debug key of TubeHaus-*.apk */
+    val releaseKey: Boolean get() = false
     /** iPad: the YouTube engine (engine.js) is updated on its own; its version, null elsewhere */
     fun engineVersion(): Int? = null
     /** iPad: the newest engine.js from GitHub now: its version when one was put in, 0 when up to date, -1 when it failed */
