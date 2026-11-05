@@ -1,13 +1,10 @@
 package app.tubehaus.ui
 
 import app.tubehaus.engine.Sys
-import androidx.compose.material3.AssistChip
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.collectAsState
 import app.tubehaus.engine.InnerTube
 import androidx.compose.foundation.BorderStroke
@@ -86,21 +83,30 @@ fun HomeScreen(app: AppState) {
         if (HomeCache.items.isEmpty() || Sys.nowMs() - HomeCache.at > 30 * 60_000) load(false)
     }
     when {
-        HomeCache.items.isEmpty() && loading -> Busy()
+        HomeCache.items.isEmpty() && loading -> Skeleton()
         HomeCache.items.isEmpty() && error != null -> Problem(error!!) { scope.launch { load(false) } }
         HomeCache.items.isEmpty() -> Empty(tr("Nothing to show yet. Search for something you like"))
         else -> ItemGrid(
             HomeCache.items, app, loading = loading,
             onEnd = { load(true) },
             header = {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // one row of chips as on YouTube: where the feed comes from, then All / Discover; the
+                // chip already chosen, tapped again, brings a fresh feed (as does the refresh at the end)
+                val fresh = { app.rec.clearCache(); scope.launch { load(false) }; Unit }
+                fun show(discover: Boolean) {
+                    if (app.discover == discover) fresh()
+                    else { app.discover = discover; HomeCache.items.clear(); scope.launch { load(false) } }
+                }
+                Row(
+                    // on a wide screen the cards already sit inside the grid's margin, so the chips line up with them
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                        .padding(horizontal = if (LocalCompact.current) 12.dp else 0.dp, vertical = if (LocalCompact.current) 8.dp else 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (LocalCompact.current) 8.dp else 12.dp), verticalAlignment = Alignment.CenterVertically,
+                ) {
                     RegionPicker(app) { HomeCache.items.clear(); app.rec.clearCache(); scope.launch { load(false) } }
-                    FilterChip(app.discover, onClick = {
-                        app.discover = !app.discover; HomeCache.items.clear(); scope.launch { load(false) }
-                    }, label = { Text(tr("Discover")) }, leadingIcon = { Icon(Sym.Explore.outline, null, Modifier.size(18.dp)) },
-                        modifier = Modifier.padding(start = 8.dp))
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = { app.rec.clearCache(); scope.launch { load(false) } }) { Text(tr("Refresh")) }
+                    Chip(!app.discover, onClick = { show(false) }, label = tr("All"))
+                    Chip(app.discover, onClick = { show(true) }, label = tr("Discover"), icon = Sym.Explore.outline)
+                    Chip(false, onClick = fresh, label = tr("Refresh"), icon = Sym.Replay.outline)
                 }
                 if (app.discover) Text(tr("Videos from topics you don't usually watch. Your likes aren't used here."),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -117,8 +123,8 @@ private fun RegionPicker(app: AppState, changed: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     val now = s.region.ifEmpty { app.platform.deviceRegion() }.uppercase()
     Box {
-        val name = Sys.countryName(now, InnerTube.hl)
-        AssistChip(onClick = { open = true }, label = { Text(name) }, leadingIcon = { Icon(Sym.Public.outline, null, Modifier.size(18.dp)) })
+        // a short chip: the globe and the two letters (the full name is in the menu)
+        Chip(false, onClick = { open = true }, label = now, icon = Sym.Public.outline)
         DropdownMenu(open, onDismissRequest = { open = false }) {
             val common = listOf("US", "GB", "CA", "AU", "IN", "DE", "FR", "ES", "IT", "NL", "TR", "BR", "MX", "JP", "KR", "ID")
             DropdownMenuItem(text = { Text(tr("This device") + " (" + app.platform.deviceRegion().uppercase() + ")") }, onClick = {

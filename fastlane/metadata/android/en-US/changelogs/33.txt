@@ -1,0 +1,7 @@
+- YouTube's topic pages: Music and Live as tabs at the top, News, Sports, Learning, Gaming and Fashion & beauty under More
+- Phones: Home, Shorts and Library at the bottom as in YouTube's app; Subscriptions is a tab at the top of Home
+- SponsorBlock: skip sponsors and other marked parts (pick which in Settings), with Undo, and jump to the highlight
+- Dislike counts (Return YouTube Dislike) and the like ratio under the video
+- DeArrow: titles and thumbnails chosen by people instead of clickbait
+- The "Most replayed" wave over the progress bar
+- Channel pictures on every card, and grey placeholders while a page loads

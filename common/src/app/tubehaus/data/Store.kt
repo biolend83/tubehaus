@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
@@ -80,11 +82,13 @@ class Store(dir: Path) {
     val settings = JsonFile(dir / "settings.json", Settings.serializer(), Settings(), scope)
     /** changes for the connected server, kept on disk until it has them */
     val queue = JsonFile(dir / "sync-queue.json", ListSerializer(SyncOp.serializer()), emptyList(), scope)
+    /** channel id -> its picture, for cards whose list came without one (see channelAvatar) */
+    val avatars = JsonFile(dir / "avatars.json", MapSerializer(String.serializer(), String.serializer()), emptyMap(), scope)
     /** set by ServerSync: something was queued */
     var onQueued: (() -> Unit)? = null
 
     fun flush() {
-        lib.flushNow(); taste.flushNow(); settings.flushNow(); queue.flushNow()
+        lib.flushNow(); taste.flushNow(); settings.flushNow(); queue.flushNow(); avatars.flushNow()
     }
 
     /** with a server connected: the same change for it (the endpoints the web version uses) */

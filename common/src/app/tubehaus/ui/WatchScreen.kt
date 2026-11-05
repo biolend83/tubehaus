@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.Dislikes
 import app.tubehaus.engine.Details
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.ModalBottomSheet
@@ -35,7 +36,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
@@ -71,6 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.tubehaus.engine.Channel
 import app.tubehaus.engine.Comment
 import app.tubehaus.engine.Playlist
@@ -111,13 +113,13 @@ fun WatchScreen(app: AppState) {
                     // the description, buttons and channel move into the panel (Details)
                     Column(Modifier.weight(1f).fillMaxHeight().padding(12.dp), verticalArrangement = Arrangement.Center) {
                         PlayerBox(app, sideGestures = true)
-                        if (set.underVideo != 2) Text(v.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        if (set.underVideo != 2) Text(titleOf(v, app), style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 10.dp))
                     }
                 } else {
                     LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp)) {
                         item { PlayerBox(app) }
-                        under(app, v)
+                        under(app, v, flush = true)
                     }
                 }
                 val tabs = buildList {
@@ -130,7 +132,7 @@ fun WatchScreen(app: AppState) {
                     Column(Modifier.width(sideWidth).padding(top = 8.dp, end = 8.dp)) {
                         if (tabs.size > 1) {
                             Row(Modifier.padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                for ((k, label) in tabs) FilterChip(shown == k, onClick = { side = k }, label = { Text(label) })
+                                for ((k, label) in tabs) Chip(shown == k, onClick = { side = k }, label = label)
                             }
                         }
                         when {
@@ -144,15 +146,25 @@ fun WatchScreen(app: AppState) {
         } else {
             Column(Modifier.fillMaxSize()) {
                 PlayerBox(app)
-                if (commentsOpen && token != null) {
-                    // the comments take the space under the video; the video keeps playing above
-                    CommentsPanel(app, token) { commentsOpen = false }
-                } else {
+                Box(Modifier.fillMaxSize()) {
                     LazyColumn(Modifier.fillMaxSize()) {
                         under(app, v)
                         if (token != null) item { CommentsTeaser(token) { commentsOpen = true } }
                         // phones: full-width cards; an upright tablet: rows with a larger picture
                         if (narrow) related(app, big = true) else related(app, big = false, thumb = 240.dp)
+                    }
+                    // the comments slide up over the space under the video, as on YouTube, and back
+                    // down when closed; the video keeps playing above
+                    androidx.compose.animation.AnimatedVisibility(
+                        commentsOpen && token != null,
+                        enter = androidx.compose.animation.slideInVertically(tween(Motion.MEDIUM, easing = Motion.emphasizedIn)) { it } +
+                            androidx.compose.animation.fadeIn(tween(Motion.SHORT)),
+                        exit = androidx.compose.animation.slideOutVertically(tween(Motion.SHORT + 50, easing = Motion.emphasizedOut)) { it } +
+                            androidx.compose.animation.fadeOut(tween(Motion.SHORT + 50)),
+                    ) {
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                            if (token != null) CommentsPanel(app, token) { commentsOpen = false }
+                        }
                     }
                 }
             }
@@ -271,7 +283,7 @@ private fun Modifier.ambientGlow(frame: ImageBitmap?): Modifier {
 }
 
 @Composable
-private fun Info(app: AppState, v: Video) {
+private fun Info(app: AppState, v: Video, flush: Boolean = false) {
     val pb = app.playback
     val d = pb.details
     val lib by app.store.lib.state.collectAsState()
@@ -280,19 +292,28 @@ private fun Info(app: AppState, v: Video) {
     fun has(part: String) = part !in hidden
     var sheet by remember(v.id) { mutableStateOf(false) }
     val viewsText = d?.viewsText?.takeIf { it.isNotEmpty() } ?: v.views.takeIf { it > 0 }?.let { tr("{n} views").replace("{n}", compact(it)) } ?: ""
-    Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-        // the title and one quiet line under it; either opens the description
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { sheet = true }) {
-            if (has("title")) Text(v.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            val line = listOfNotNull(
-                viewsText.takeIf { !calm && has("views") },
-                d?.publishedText?.takeIf { has("date") },
-            ).filter { it.isNotEmpty() }.joinToString("  ")
-            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                if (has("description") && !pb.stream?.description.isNullOrEmpty())
-                    Text(tr("...more"), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 6.dp))
+    val line = listOfNotNull(
+        viewsText.takeIf { !calm && has("views") },
+        d?.publishedText?.takeIf { has("date") },
+    ).filter { it.isNotEmpty() }.joinToString("  ")
+    val desc = pb.stream?.description?.takeIf { has("description") } ?: ""
+    // a computer (not a phone or a tablet) lays it out as YouTube's website does: a larger title, a
+    // larger channel line, and the views, date and the start of the description in a grey box below
+    // flush: beside the up-next panel, where the page's margin already lines it up with the video
+    val desk = !LocalCompact.current && !app.platform.touch
+    Column(Modifier.padding(horizontal = if (flush) 0.dp else 12.dp, vertical = 10.dp)) {
+        if (desk) {
+            if (has("title")) Text(titleOf(v, app), fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        } else {
+            // the title and one quiet line under it; either opens the description
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { sheet = true }) {
+                if (has("title")) Text(titleOf(v, app), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    if (desc.isNotEmpty())
+                        Text(tr("...more"), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 6.dp))
+                }
             }
         }
         // the channel and its subscribe button side by side, then the buttons
@@ -300,17 +321,27 @@ private fun Info(app: AppState, v: Video) {
         if (has("channel") || showSub) Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             if (has("channel")) {
                 val open = { if (v.channelId.isNotEmpty()) app.go(Screen.Channel(v.channelId, v.author)) }
-                Avatar(d?.avatar?.ifEmpty { null } ?: v.avatar.ifEmpty { null } ?: lib.subs[v.channelId]?.thumb ?: "", 36, Modifier.clickable { open() })
-                Column(Modifier.weight(1f, fill = false).padding(start = 10.dp).clickable { open() }) {
-                    Text(v.author, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Avatar(d?.avatar?.ifEmpty { null } ?: v.avatar.ifEmpty { null } ?: lib.subs[v.channelId]?.thumb ?: "", if (desk) 40 else 36, Modifier.clickable { open() })
+                Column(Modifier.weight(1f, fill = false).padding(start = if (desk) 12.dp else 10.dp).clickable { open() }) {
+                    Text(v.author, style = if (desk) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (!calm && has("subscribers") && !d?.subsText.isNullOrEmpty())
                         Text(d!!.subsText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(if (desk) 24.dp else 12.dp))
             }
             if (showSub) SubscribeButton(v.channelId, v.author, d?.avatar?.ifEmpty { null } ?: v.avatar, app)
         }
         Actions(app, v, ::has)
+        if (desk && (line.isNotEmpty() || desc.isNotEmpty())) Column(
+            Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant).clickable { sheet = true }.padding(12.dp),
+        ) {
+            if (line.isNotEmpty()) Text(line, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+            if (desc.isNotEmpty()) {
+                Text(desc, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Text(tr("...more"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
     }
     if (sheet) DescriptionSheet(app, v, viewsText) { sheet = false }
 }
@@ -384,26 +415,53 @@ private fun Actions(app: AppState, v: Video, has: (String) -> Boolean) {
     val saved = lib.wl.any { it.id == v.id }
     var pick by remember { mutableStateOf(false) }
     val calm = app.store.settings.value.calm
+    // the dislike count YouTube hides: Return YouTube Dislike's estimate
+    var votes by remember(v.id) { mutableStateOf<Dislikes.Votes?>(null) }
+    val showVotes = app.store.settings.value.showDislikes && !calm
+    if (showVotes) LaunchedEffect(v.id) { votes = Dislikes.votes(v.id) }
+    // the thumb pops when you press it, as on YouTube: squeezed, then springing past its size and back
+    val scope = rememberCoroutineScope()
+    val upPop = remember { Animatable(1f) }
+    val downPop = remember { Animatable(1f) }
+    fun pop(a: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>) = scope.launch {
+        a.animateTo(0.7f, tween(80))
+        a.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.35f, stiffness = 500f))
+    }
     LazyRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (has("likes")) item {
-            Row(Modifier.height(36.dp).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+          Box(Modifier.clip(RoundedCornerShape(18.dp))) {
+            Row(Modifier.height(36.dp).background(MaterialTheme.colorScheme.surfaceVariant),
                 verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.fillMaxHeight().tvClickable(RoundedCornerShape(18.dp)) {
                     app.store.setInList("likes", v, !liked)
-                    if (!liked) Learn.nudgeChannel(app.store, v.channelId, v.author, 1.0)
+                    if (!liked) { Learn.nudgeChannel(app.store, v.channelId, v.author, 1.0); pop(upPop) }
                 }.padding(start = 12.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(if (liked) Sym.ThumbUp.fill else Sym.ThumbUp.outline, tr("Like"), Modifier.size(20.dp))
-                    val n = pb.details?.likesText?.takeIf { !calm } ?: ""
+                    Icon(if (liked) Sym.ThumbUp.fill else Sym.ThumbUp.outline, tr("Like"), Modifier.size(20.dp).graphicsLayer { scaleX = upPop.value; scaleY = upPop.value; rotationZ = (1f - upPop.value) * -40f })
+                    // YouTube's count; where the channel hides it, the estimate
+                    val n = pb.details?.likesText?.takeIf { !calm && it.any(Char::isDigit) }
+                        ?: votes?.likes?.takeIf { showVotes && it > 0 }?.let(::compact) ?: pb.details?.likesText?.takeIf { !calm } ?: ""
                     if (n.isNotEmpty()) Text(n, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 6.dp))
                 }
                 Box(Modifier.width(1.dp).height(20.dp).background(MaterialTheme.colorScheme.outline))
                 Box(Modifier.fillMaxHeight().tvClickable(RoundedCornerShape(18.dp)) {
                     app.store.setInList("dislikes", v, !disliked)
-                    if (!disliked) Learn.nudgeChannel(app.store, v.channelId, v.author, -1.5)
+                    if (!disliked) { Learn.nudgeChannel(app.store, v.channelId, v.author, -1.5); pop(downPop) }
                 }.padding(start = 10.dp, end = 12.dp), contentAlignment = Alignment.Center) {
-                    Icon(if (disliked) Sym.ThumbDown.fill else Sym.ThumbDown.outline, tr("Dislike"), Modifier.size(20.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(if (disliked) Sym.ThumbDown.fill else Sym.ThumbDown.outline, tr("Dislike"), Modifier.size(20.dp).graphicsLayer { scaleX = downPop.value; scaleY = downPop.value })
+                        val d = votes?.dislikes?.takeIf { showVotes }
+                        if (d != null) Text(compact(d), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 6.dp))
+                    }
                 }
             }
+            // how many of the votes are likes: a thin line along the bottom of the pill, as YouTube once had
+            val vt = votes?.takeIf { showVotes && it.likes + it.dislikes > 0 }
+            if (vt != null) Box(Modifier.matchParentSize().padding(horizontal = 14.dp), contentAlignment = Alignment.BottomStart) {
+                Box(Modifier.fillMaxWidth().height(2.dp).background(MaterialTheme.colorScheme.outline)) {
+                    Box(Modifier.fillMaxWidth(vt.likes.toFloat() / (vt.likes + vt.dislikes)).height(2.dp).background(MaterialTheme.colorScheme.onSurface))
+                }
+            }
+          }
         }
         if (has("later")) item { Chip(if (saved) Sym.WatchLater.fill else Sym.WatchLater.outline, tr("Watch later")) { app.store.setInList("wl", v, !saved) } }
         if (has("save")) item { Chip(Sym.LibraryAdd.outline, tr("Save")) { pick = true } }
@@ -440,11 +498,11 @@ private fun Chip(icon: ImageVector, label: String, onClick: () -> Unit) {
 }
 
 /** What sits under the video, by Settings → Under the video: everything, only the title, or nothing. */
-private fun LazyListScope.under(app: AppState, v: Video) {
+private fun LazyListScope.under(app: AppState, v: Video, flush: Boolean = false) {
     when (app.store.settings.value.underVideo) {
-        0 -> item { Info(app, v) }
+        0 -> item { Info(app, v, flush) }
         1 -> item {
-            Text(v.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2,
+            Text(titleOf(v, app), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
         }
     }
@@ -478,7 +536,7 @@ private fun Comments(app: AppState, token: String, info: Details? = app.playback
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 sorts.forEachIndexed { i, (title, t) ->
                     val on = if (sorted == token) i == 0 else sorted == t
-                    FilterChip(on, onClick = { sorted = if (i == 0) token else t }, label = { Text(title) })
+                    Chip(on, onClick = { sorted = if (i == 0) token else t }, label = title)
                 }
             }
         }
@@ -541,11 +599,13 @@ private fun CommentView(app: AppState, c: Comment, reply: Boolean = false) {
     Row(Modifier.fillMaxWidth().padding(start = if (reply) 52.dp else 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)) {
         Avatar(c.avatar, if (reply) 24 else 32, Modifier.clickable { if (c.channelId.isNotEmpty()) app.go(Screen.Channel(c.channelId, c.author)) })
         Column(Modifier.weight(1f).padding(start = 10.dp)) {
-            Text(
-                listOf(c.author, c.published).filter { it.isNotEmpty() }.joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = if (c.byCreator) FontWeight.Bold else null,
-            )
+            // as YouTube: the name in the text colour, the time after it in grey
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(c.author, style = MaterialTheme.typography.bodySmall, fontWeight = if (c.byCreator) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (c.published.isNotEmpty()) Text(c.published, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+            }
             SelectionContainer { Text(c.text, style = MaterialTheme.typography.bodyMedium) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (!calm && c.likes.isNotEmpty()) {
