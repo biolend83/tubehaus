@@ -121,8 +121,9 @@ body.guide-open #scrim { opacity: 1; pointer-events: auto; }
   border-bottom: 1px solid var(--line); position: sticky; top: var(--mast); z-index: 50; }
 .chips::-webkit-scrollbar { display: none; }
 .chips.small { margin: 0 0 16px; padding: 0; background: none; border: 0; position: static; }
-.chip { flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: var(--chip); border: 1px solid var(--line); display: flex; align-items: center; font-size: 14px; white-space: nowrap; }
+.chip { flex: none; height: 32px; padding: 0 12px; border-radius: 8px; background: var(--chip); border: 0; display: flex; align-items: center; font-size: 14px; font-weight: 500; white-space: nowrap; transition: background-color .15s, color .15s; }
 .chip:hover { background: var(--chip-h); }
+.chip:active { transform: scale(.96); }
 .chip.on { background: var(--chip-on); color: var(--chip-on-fg); border-color: transparent; }
 
 /* ------------------------------------------------ cards */
@@ -177,10 +178,18 @@ body.guide-open #scrim { opacity: 1; pointer-events: auto; }
 .card.pl .th.stack::before { content: ""; position: absolute; inset: -4px 8px auto; height: 4px; background: var(--fg3); }
 .card.pl .th .dur { left: auto; right: 4px; }
 .card.pl .s { color: var(--fg2); margin-top: 4px; }
+/* a playlist has no channel picture: its title starts under the thumbnail's edge, as on YouTube */
+.card.grid.pl .meta { grid-template-columns: 1fr 24px; }
+.card.grid.pl .meta .tx { grid-column: 1; }
 .card.short .th { aspect-ratio: 9/16; border-radius: 8px; }
 .card.short .meta { margin-top: 8px; padding-right: 24px; }
 .card.short .t { font-size: 16px; line-height: 22px; }
 .card.short .dots { position: absolute; right: 0; bottom: 20px; }
+/* a topic page (Music, Live, News...): YouTube's own shelves, each with a title */
+.topic-shelf { margin-bottom: 40px; padding-bottom: 32px; border-bottom: 1px solid var(--line); }
+.topic-shelf:last-child { border-bottom: 0; }
+.topic-shelf .shelf-h { font-size: 20px; }
+.topic-more { display: block; margin: 24px auto 0; }
 .shorts-shelf { margin-bottom: 40px; padding-bottom: 24px; border-bottom: 4px solid var(--line); }
 .shelf-h { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 20px; }
 .shorts-row { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 64px) / 6); gap: 16px; overflow-x: auto; scrollbar-width: none; }
@@ -597,6 +606,10 @@ body[data-route="shorts"] { overflow: hidden; }
 .ytp-sbmarks { position: absolute; left: 0; right: 0; bottom: 7px; height: 3px; pointer-events: none; }
 .ytp-prog:hover .ytp-sbmarks, .ytp.scrubbing .ytp-sbmarks { height: 5px; }
 .ytp-sbmarks i { position: absolute; top: 0; bottom: 0; opacity: .8; }
+/* "Most replayed": a soft white wave rising over the bar while the pointer is on it, as on YouTube */
+.ytp-heat { position: absolute; left: 0; width: 100%; bottom: 12px; height: 36px; pointer-events: none; opacity: 0; transform: scaleY(.3); transform-origin: bottom; transition: opacity .2s, transform .3s cubic-bezier(.2, 0, 0, 1); }
+.ytp-heat path { fill: rgba(255, 255, 255, .28); }
+.ytp-prog:hover .ytp-heat, .ytp.scrubbing .ytp-heat { opacity: 1; transform: none; }
 .ytp-scrub { position: absolute; bottom: 8px; width: 13px; height: 13px; margin-left: -6.5px; margin-bottom: -5px; border-radius: 50%; background: #f00; transform: scale(0); transition: transform .1s; pointer-events: none; }
 .ytp-prog:hover .ytp-scrub, .ytp.scrubbing .ytp-scrub { transform: scale(1); }
 @media (pointer: coarse) { .ytp-scrub { transform: scale(.9); } .ytp-prog { height: 28px; } }

@@ -1,6 +1,7 @@
 // App skeleton: router, shared state (my library), cards, popup menus, dialogs
 import { $, $$, el, esc, icon, api, lib, settings, local, toast, copy, fmtTime, fmtViews, ago, exactTime, thumb, normVideo, metaOf, pickThumb, dropCache, PUBLIC } from "./util.js";
 import { Player } from "./player.js";
+import { knownAvatar } from "./avatars.js";
 import { $t, $tMsg, fmtShort, LANG, LOCALE } from "./i18n.js";
 
 export const player = new Player();
@@ -114,7 +115,7 @@ export function avatar(src, cls = "") {
   return src ? `<img class="av ${cls}" loading="lazy" src="${esc(src)}" alt="">` : `<span class="av ph ${cls}">${icon("account")}</span>`;
 }
 export function chAvatar(v) {
-  const s = v.authorThumb || state.lib.subs[v.authorId]?.thumb;
+  const s = v.authorThumb || state.lib.subs[v.authorId]?.thumb || knownAvatar(v.authorId);
   return s;
 }
 

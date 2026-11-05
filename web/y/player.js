@@ -11,6 +11,7 @@ const SB_CATS = {
   music_offtopic: [$t("음악 아닌 부분"), "#ff9900"], filler: [$t("잡담"), "#7300ff"],
 };
 export { SB_CATS };
+const HIGHLIGHT = "poi_highlight";
 
 // ---------------------------------------------------------------- captions (WebVTT)
 function vttTime(s) {
@@ -64,11 +65,13 @@ async function sponsorSegments(id) {
     const h = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(id)))]
       .map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 4);
     // 'filler' is so frequent that it is fetched only when chosen for auto-skip
-    const cats = encodeURIComponent(JSON.stringify(Object.keys(SB_CATS).filter((c) => c !== "filler" || settings.sponsorCats.includes(c))));
-    const r = await fetch(`https://sponsor.ajay.app/api/skipSegments/${h}?categories=${cats}`, { referrerPolicy: "no-referrer" });
+    // and the highlight: a point to jump to, not a part to skip
+    const cats = encodeURIComponent(JSON.stringify([...Object.keys(SB_CATS).filter((c) => c !== "filler" || settings.sponsorCats.includes(c)), HIGHLIGHT]));
+    const acts = encodeURIComponent(JSON.stringify(["skip", "poi"]));
+    const r = await fetch(`https://sponsor.ajay.app/api/skipSegments/${h}?categories=${cats}&actionTypes=${acts}`, { referrerPolicy: "no-referrer" });
     if (!r.ok) return [];
     const hit = (await r.json()).find((x) => x.videoID === id);
-    return (hit ? hit.segments : []).filter((s) => s.actionType === "skip" || !s.actionType)
+    return (hit ? hit.segments : []).filter((s) => s.actionType === "skip" || !s.actionType || (s.actionType === "poi" && s.category === HIGHLIGHT))
       .map((s) => ({ start: s.segment[0], end: s.segment[1], cat: s.category }));
   } catch { return []; }
 }
@@ -136,6 +139,7 @@ export class Player {
   <div class="ytp-stats"></div>
   <div class="ytp-bottom">
     <div class="ytp-prog">
+      <svg class="ytp-heat" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"></svg>
       <div class="ytp-segs"></div><div class="ytp-sbmarks"></div><div class="ytp-scrub"></div>
       <div class="ytp-tip"><div class="ytp-tipimg"></div><div class="ytp-tipchap"></div><div class="ytp-tiptime"></div></div>
     </div>
@@ -218,6 +222,7 @@ export class Player {
     this.retried = 0;
     this.skipped = new Set();
     this.segments = [];
+    this.heat = null;
     this.cues = null;
     this.capTrack = null;
     this.ended = false;
@@ -269,6 +274,10 @@ export class Player {
     this.syncQualityLabel();
     this.mediaSession();
     sponsorSegments(info.videoId).then((s) => { if (this.info === info) { this.segments = s; this.drawSegs(); } });
+    if (!this.live && settings.heatmap) {
+      fetch(`/api/p/yt/heat?v=${encodeURIComponent(info.videoId)}`, { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null))
+        .then((h) => { if (this.info === info && h && h.heat && h.heat.length) { this.heat = h; this.drawHeat(); } }).catch(() => { });
+    }
     if (autoplay) this.play();
   }
 
@@ -630,8 +639,29 @@ export class Player {
       `<div class="seg" style="flex:${Math.max(0.001, (c.end - c.start) / dur)}"><i class="ld"></i><i class="hv"></i><i class="pl"></i></div>`).join("");
     this.segEls = $$(".seg", this.q(".ytp-segs"));
     this.q(".ytp-sbmarks").innerHTML = this.segments.map((s) =>
-      `<i style="left:${(s.start / dur) * 100}%;width:${((s.end - s.start) / dur) * 100}%;background:${SB_CATS[s.cat]?.[1] || "#0f0"}"></i>`).join("");
+      `<i style="left:${(s.start / dur) * 100}%;width:${s.cat === HIGHLIGHT ? "4px" : ((s.end - s.start) / dur) * 100 + "%"};background:${s.cat === HIGHLIGHT ? "#ff1684" : SB_CATS[s.cat]?.[1] || "#0f0"}"></i>`).join("");
     this.q(".ytp-prog").classList.toggle("chaptered", segs.length > 1);
+    this.drawHeat();
+  }
+  // "Most replayed": YouTube's wave over the progress bar, from /api/p/yt/heat (a hundred equal slices,
+  // 0..1 each). Drawn as a smooth curve; shown while the pointer is on the bar, as on YouTube
+  drawHeat() {
+    const svg = this.q(".ytp-heat");
+    const h = this.live ? null : this.heat;
+    const dur = this.range()[1] || this.info?.lengthSeconds || 0;
+    if (!svg) return;
+    if (!h || !h.heat.length || !dur) { svg.innerHTML = ""; return; }
+    const n = h.heat.length, w = 1000 * Math.min(1, (h.span || dur) / dur);
+    const pts = h.heat.map((v, i) => [((i + 0.5) / n) * w, 100 - Math.max(0.04, v) * 92]);
+    const f = (x) => x.toFixed(1);
+    let d = `M0,100 L0,${f(pts[0][1])}`;
+    pts.forEach(([x, y], i) => {
+      const [px, py] = i ? pts[i - 1] : [0, pts[0][1]];
+      const mx = (px + x) / 2;
+      d += ` C${f(mx)},${f(py)} ${f(mx)},${f(y)} ${f(x)},${f(y)}`;
+    });
+    d += ` L${f(w)},${f(pts[n - 1][1])} L${f(w)},100 Z`;
+    svg.innerHTML = `<path d="${d}"/>`;
   }
   paintProgress(hoverT) {
     const v = this.video;
@@ -678,7 +708,9 @@ export class Player {
         }
       } else img.style.display = "none";
       const ch = this.chapters.find((c) => t >= c.start && t < c.end);
-      this.q(".ytp-tipchap").textContent = ch ? ch.title : "";
+      // near the peak YouTube says "Most replayed" where the chapter name would be
+      const hot = this.heat && this.heat.peak != null && Math.abs(t - this.heat.peak) <= Math.max(2, (this.range()[1] || 0) * 0.012);
+      this.q(".ytp-tipchap").textContent = hot ? $t("가장 많이 다시 본 장면") : ch ? ch.title : "";
       this.q(".ytp-tiptime").textContent = this.live ? "-" + fmtTime(this.range()[1] - t) : fmtTime(t);
       tip.classList.add("show");
       const w = tip.offsetWidth, x0 = Math.max(4, Math.min(b.width - w - 4, x - b.left - w / 2));
@@ -801,7 +833,7 @@ export class Player {
     on(".ytp-unmute", () => this.unmute());
     on(".ytp-livebadge", () => this.seek(this.range()[1]));
     on(".ytp-chap", () => this.on.chapters?.());
-    on(".ytp-skipbtn", () => { const s = this.pendingSkip; if (s) { this.seek(s.end); this.skipped.add(s); } });
+    on(".ytp-skipbtn", () => { const s = this.pendingSkip; if (s) { this.seek(s.cat === HIGHLIGHT ? s.start : s.end); this.skipped.add(s); } });
     const sl = this.q(".ytp-volbar input");
     sl.addEventListener("input", () => { v.volume = +sl.value; v.muted = +sl.value === 0; });
     sl.addEventListener("click", (e) => e.stopPropagation());
@@ -1152,10 +1184,17 @@ export class Player {
     const v = this.video, t = v.currentTime;
     const btn = this.q(".ytp-skipbtn");
     // where segments overlap, the auto-skip categories win
-    const hits = this.segments.filter((x) => t >= x.start && t < x.end - 0.3);
+    const hits = this.segments.filter((x) => x.cat !== HIGHLIGHT && t >= x.start && t < x.end - 0.3);
     const s = hits.find((x) => settings.sponsorCats.includes(x.cat) && !this.skipped.has(x)) || hits[0];
     this.pendingSkip = s;
-    if (!s) { btn.classList.remove("show"); return; }
+    if (!s) {
+      // the highlight: offered in the first 20 seconds, while it is still ahead
+      const hl = this.segments.find((x) => x.cat === HIGHLIGHT && !this.skipped.has(x) && t < x.start - 2 && t < 20);
+      this.pendingSkip = hl;
+      if (hl) { btn.innerHTML = `${$t("하이라이트로 이동")} ${icon("skip")}`; btn.classList.add("show"); }
+      else btn.classList.remove("show");
+      return;
+    }
     const auto = settings.sponsorCats.includes(s.cat);
     if (auto && !this.skipped.has(s) && !v.paused) {
       this.skipped.add(s);

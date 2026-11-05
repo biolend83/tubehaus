@@ -21,8 +21,11 @@ const feedNorm = (items) => remember(items.map((x) => normVideo({ ...x, authorTh
 // ---------------------------------------------------------------- home
 const CHIPS = [
   ["all", $t("전체")], ["live", $t("실시간")], ["music", $t("음악")], ["news", $t("뉴스")], ["game", $t("게임")],
-  ["sports", $t("스포츠")], ["movie", $t("영화")], ["cook", $t("요리")], ["recent", $t("최근에 업로드된 동영상")], ["watched", $t("감상한 동영상")],
+  ["sports", $t("스포츠")], ["learn", $t("학습")], ["fashion", $t("패션·뷰티")], ["movie", $t("영화")], ["cook", $t("요리")],
+  ["recent", $t("최근에 업로드된 동영상")], ["watched", $t("감상한 동영상")],
 ];
+// chips that open YouTube's own topic page (the server reads it): its shelves, in YouTube's order
+const CHIP_TOPIC = { live: "live", music: "music", news: "news", game: "gaming", sports: "sports", learn: "learning", fashion: "fashion" };
 const CHIP_SEARCH = {
   live: { q: $t("라이브"), features: "live", sort: "relevance" },
   music: { q: $t("음악"), date: "week", sort: "views" },
@@ -30,6 +33,8 @@ const CHIP_SEARCH = {
   sports: { q: $t("스포츠 하이라이트"), date: "week", sort: "views" },
   movie: { q: $t("영화 리뷰"), date: "month", sort: "views" },
   cook: { q: $t("요리 레시피"), date: "month", sort: "views" },
+  learn: { q: $t("강의"), date: "month", sort: "views" },
+  fashion: { q: $t("패션·뷰티"), date: "week", sort: "views" },
 };
 
 export async function home(page, m, alive) {
@@ -42,6 +47,9 @@ export async function home(page, m, alive) {
   await state.libReady;
   let pool = [];
   let more = null;
+  // a topic: YouTube's shelves for it; when the region has none (News in some countries) or the
+  // server can't reach YouTube, the search or trending list below as before
+  if (CHIP_TOPIC[chip] && await topicShelves(box, CHIP_TOPIC[chip], alive)) return;
   if (chip === "all") {
     pool = await homeMix();
   } else if (chip === "recent") {
@@ -73,6 +81,43 @@ export async function home(page, m, alive) {
   step();
   infinite(box, async () => (i < pool.length ? step() : more ? more() : false));
   if (chip === "all" && !settings.calm) shortsShelf($(".shorts-shelf", page));
+}
+
+async function topicShelves(box, key, alive) {
+  let d;
+  try { d = await lib(`topic?key=${key}&region=${REGION}&hl=${LANG}`, { ttl: 900000, quiet: true }); } catch { return false; }
+  if (!alive()) return true;
+  const shelves = (d.shelves || []).map((s) => {
+    const items = s.items || [];
+    const vids = norm(items.filter((x) => x.type === "video"));
+    const byId = new Map(vids.map((v) => [v.id, v]));
+    // keep YouTube's order of videos and playlists
+    return { title: s.title, list: items.map((x) => (x.type === "playlist" ? { pl: x } : byId.get(x.videoId))).filter(Boolean) };
+  }).filter((s) => s.list.length);
+  if (!shelves.length) return false;
+  const SHOW = 8;   // two rows of a wide window; the rest behind "N more"
+  const cardOf = (x) => (x.pl ? playlistCard(x.pl) : card(x, x.short ? "short" : "grid"));
+  const wrap = el(`<div class="topic"></div>`);
+  wrap.innerHTML = shelves.map((s, i) => {
+    const shorts = s.list.every((x) => x.short);
+    const body = shorts
+      ? `<div class="shorts-row">${s.list.map(cardOf).join("")}</div>`
+      : `<div class="vgrid">${s.list.map((x, k) => (k < SHOW ? cardOf(x) : cardOf(x).replace(/^<div class="card/, '<div hidden class="card'))).join("")}</div>`
+        + (s.list.length > SHOW ? `<button class="pill ghost topic-more">${$t("{0}개 더보기", s.list.length - SHOW)}</button>` : "");
+    return `<section class="topic-shelf">${s.title ? `<div class="shelf-h"><b>${esc(s.title)}</b></div>` : ""}${body}</section>`;
+  }).join("");
+  wrap.addEventListener("click", (e) => {
+    const b = e.target.closest(".topic-more");
+    if (!b) return;
+    const sec = b.closest(".topic-shelf");
+    const open = !sec.classList.toggle("open");
+    const cards = $$(".vgrid > .card", sec);
+    cards.forEach((c, k) => { if (k >= SHOW) c.hidden = open; });
+    b.textContent = open ? $t("{0}개 더보기", cards.length - SHOW) : $t("간략히 보기");
+  });
+  box.replaceWith(wrap);
+  fillProgress(wrap);
+  return true;
 }
 
 async function homeMix() {
@@ -609,6 +654,7 @@ export function settingsPage(page) {
     ${IPHONE ? tog("nativeIphone", $t("iPhone 기본 플레이어"), $t("Safari 자체 플레이어로 재생해요. 다른 앱 위 PIP 와 AirPlay 가 되고, 화질은 자동으로 정해져요 (다음 영상부터 적용)")) : ""}
     ${tog("resume", $t("이어서 보기"), $t("보던 곳부터 재생 (모든 기기 공유)"))}
     ${tog("miniplayer", $t("미니 플레이어"), $t("다른 페이지로 가도 작은 화면으로 계속 재생"))}
+    ${tog("heatmap", $t("가장 많이 다시 본 장면"), $t("재생바 위에 사람들이 많이 다시 본 구간을 물결 모양으로 보여줘요"))}
     ${PUBLIC ? "" : `<h3>${$t("TV로 보내기")}</h3>
     ${tog("castReceive", $t("이 기기에서 받기"), $t("다른 기기가 'TV로 보내기'로 이 화면에 영상을 보낼 수 있어요 (TV 모드면 늘 켜짐)"))}
     ${row($t("이 기기 이름"), `<input data-k="deviceName" maxlength="40" placeholder="${$t("예: 거실 TV")}" value="${esc(S.deviceName || "")}" style="height:36px;padding:0 10px;border:1px solid var(--input-line);background:var(--input);min-width:160px">`, $t("보낼 때 목록에 이렇게 보여요"))}`}
@@ -621,6 +667,8 @@ export function settingsPage(page) {
     ${tog("sponsor", "SponsorBlock", $t("영상 속 협찬·광고 구간을 건너뛰어요 (sponsor.ajay.app, 영상 ID 앞 4글자만 보내요)"))}
     <div class="sbcats">${Object.entries(SB_CATS).map(([k, [l, c]]) => `<label class="chk"><input type="checkbox" data-cat="${k}" ${S.sponsorCats.includes(k) ? "checked" : ""}><i style="background:${c}"></i>${$t("{0} 자동 건너뛰기", l)}</label>`).join("")}</div>
     ${tog("dislikes", $t("싫어요 수 보기"), $t("Return YouTube Dislike 의 추정치"))}
+    ${tog("dearrow", "DeArrow", $t("낚시성 제목과 썸네일을 사람들이 고친 것으로 바꿔요 (dearrow.ajay.app, 영상 ID 앞 4글자만 보내요)"))}
+    ${tog("dearrowThumbs", $t("DeArrow 썸네일"), $t("사람들이 고른 장면을 썸네일로 써요 (이 서버를 거쳐 받아요)"))}
     <h3>${$t("내 데이터")}</h3>
     ${PUBLIC ? `<p class="sub pub-note">${$t("공개 서버예요. 구독과 기록은 이 브라우저에만 저장되고 서버에는 남지 않아요. 브라우저 데이터를 지우면 사라지니 가끔 내보내기로 백업해 두세요.")}</p>` : ""}
     <div class="set-btns"><a class="pill ghost" href="/feed/channels" data-nav>${$t("구독 관리 · 가져오기")}</a>

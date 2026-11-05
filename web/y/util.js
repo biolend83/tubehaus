@@ -80,6 +80,9 @@ const DEFAULTS = {
   sponsor: true,
   sponsorCats: ["sponsor", "selfpromo", "interaction"],
   dislikes: true,
+  heatmap: true,          // "Most replayed" over the progress bar
+  dearrow: true,          // DeArrow titles
+  dearrowThumbs: true,    // and thumbnails
   miniplayer: true,
   annotations: true,
 };

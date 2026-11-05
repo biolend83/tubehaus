@@ -5,6 +5,8 @@ import { player, routes, state, loadLib, navigate, render, renderGuideSubs, popu
 import * as P from "./pages.js";
 import { watch, shorts, initMini, dockMini, stopPlayer } from "./watch.js";
 import { initTV } from "./tv.js";
+import { initDeArrow } from "./dearrow.js";
+import { initAvatars } from "./avatars.js";
 import { startReceiver, deviceName } from "./cast.js";
 import { $t, LANG, LANGS, LOCALE, REGION, FIRST_VISIT, translateDom, langLabel } from "./i18n.js";
 
@@ -279,6 +281,8 @@ function step(name, fn) {
 step("mini", initMini);
 step("hover", initCardHover);
 step("tv", initTV);
+step("dearrow", initDeArrow);
+step("avatars", initAvatars);
 step("cast", () => modeReady.then((pub) => { if (!pub) startReceiver(); }));   // no send-to-TV on public instances
 addEventListener("settings", (e) => { if (e.detail === "castReceive") startReceiver(); });
 loadLib().then(async (L) => {

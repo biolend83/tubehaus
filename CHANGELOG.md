@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.7.19 — 2026-11-05
+
+### Added
+- Home: the Live, Music, News, Gaming, Sports, Learning and Fashion & beauty chips show YouTube's own topic pages, shelf by shelf in YouTube's order ("Trending", "This week's best", "Live now", ...), with charts and albums as playlists. A long shelf shows two rows and "N more". Learning and Fashion & beauty are new chips. Where YouTube has nothing for the region (News in some countries) or can't be reached, the chip falls back to the search it used before
+- `GET /api/p/yt/topic?key=music|live|news|sports|learning|gaming|fashion&region=KR&hl=ko`: a topic page as titled shelves of Invidious-shaped videos and playlists, read from YouTube's browse API through `YT_PROXY` and kept 30 minutes. Open on public instances too (stateless)
+- **DeArrow**: clickbait titles and thumbnails are replaced, as the cards appear, with the ones [DeArrow](https://dearrow.ajay.app)'s users chose (the original title stays as the tooltip). The browser asks with 4 characters of the video ID's hash, like SponsorBlock; the thumbnails come through the server (`GET /api/p/yt/dathumb?v=&t=`) so DeArrow doesn't see the viewer. On by default; Settings has a switch for titles and one for thumbnails
+- **"Most replayed"**: the player draws YouTube's heat wave over the progress bar while the pointer is on it, and the tooltip says "Most replayed" at the peak. `GET /api/p/yt/heat?v=` reads it from YouTube's watch page answer through `YT_PROXY`, kept 6 hours. A switch in Settings
+- SponsorBlock **highlights**: where people marked a video's highlight, the progress bar shows a pink mark and, in the first 20 seconds, the skip button offers "Jump to the highlight"
+
+### Changed
+- Every video card shows its channel's picture. Many YouTube lists come without one, and only subscriptions had it saved, so cards showed an empty circle; the browser now asks the server for that channel's picture (a few channels at a time, `/api/v1/channels/<id>?fields=authorThumbnails`) and keeps it
+- Chips are flat with rounded corners, as on YouTube today; playlist cards no longer leave a gap where a channel picture would be
+- README: app download links to 0.5.16
+
 ## v0.7.18 — 2026-11-02
 
 ### Added

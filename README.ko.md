@@ -36,11 +36,11 @@ TubeHaus는 따로 동작하는 두 가지가 있어요. 이름과 생김새는 
 온 가족이 구독과 기록을 같이 쓰고 싶거나, 아이폰/아이패드에서 설치 없이 보거나, 유튜브가 내 기기 주소를 모르게 하고 싶다면 서버판을 돌리세요.
 **둘 다?** 0.5.4부터 앱을 내 서버에 연결할 수 있어요(설정 → *TubeHaus 서버*). 라이브러리는 모든 기기와 브라우저에서 하나로 쓰고, 영상은 각 앱이 직접 재생해요.
 
-- **📱 앱 받기 (베타):** [안드로이드 APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15.apk) (안드로이드 8 이상, 안드로이드 TV는 Downloader 코드 **3155410**) · [Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15.msi) · macOS ([M칩](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-mac-arm64.dmg), [인텔](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-mac-x64.dmg)) · [리눅스 .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-linux-amd64.deb) · [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-linux-x86_64.rpm) · [아이패드/아이폰 .ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-ipad.ipa) (베타, [Sideloadly](https://sideloadly.io/)로 설치) · [전체 파일](https://github.com/biolend83/tubehaus/releases/latest) (Windows portable과 ARM, 리눅스 ARM64) · 안드로이드 자동 업데이트는 [Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%20%22io.github.biolend83.tubehaus%22%2C%20%22url%22%3A%20%22https%3A%2F%2Fgithub.com%2Fbiolend83%2Ftubehaus%22%2C%20%22author%22%3A%20%22biolend83%22%2C%20%22name%22%3A%20%22TubeHaus%22%2C%20%22additionalSettings%22%3A%20%22%7B%5C%22filterReleaseTitlesByRegEx%5C%22%3A%20%5C%22%5ETubeHaus%20%5C%22%2C%20%5C%22fallbackToOlderReleases%5C%22%3A%20true%2C%20%5C%22includePrereleases%5C%22%3A%20false%2C%20%5C%22apkFilterRegEx%5C%22%3A%20%5C%22TubeHaus-%5C%5C%5C%5Cd%5C%22%7D%22%7D)으로.
+- **📱 앱 받기 (베타):** [안드로이드 APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16.apk) (안드로이드 8 이상, 안드로이드 TV는 Downloader 코드 **3155410**) · [Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16.msi) · macOS ([M칩](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-mac-arm64.dmg), [인텔](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-mac-x64.dmg)) · [리눅스 .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-linux-amd64.deb) · [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-linux-x86_64.rpm) · [아이패드/아이폰 .ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-ipad.ipa) (베타, [Sideloadly](https://sideloadly.io/)로 설치) · [전체 파일](https://github.com/biolend83/tubehaus/releases/latest) (Windows portable과 ARM, 리눅스 ARM64) · 안드로이드 자동 업데이트는 [Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%20%22io.github.biolend83.tubehaus%22%2C%20%22url%22%3A%20%22https%3A%2F%2Fgithub.com%2Fbiolend83%2Ftubehaus%22%2C%20%22author%22%3A%20%22biolend83%22%2C%20%22name%22%3A%20%22TubeHaus%22%2C%20%22additionalSettings%22%3A%20%22%7B%5C%22filterReleaseTitlesByRegEx%5C%22%3A%20%5C%22%5ETubeHaus%20%5C%22%2C%20%5C%22fallbackToOlderReleases%5C%22%3A%20true%2C%20%5C%22includePrereleases%5C%22%3A%20false%2C%20%5C%22apkFilterRegEx%5C%22%3A%20%5C%22TubeHaus-%5C%5C%5C%5Cd%5C%22%7D%22%7D)으로.
   플랫폼별 설치 안내와 소스: [`android-app`](https://github.com/biolend83/tubehaus/tree/android-app), [`windows-app`](https://github.com/biolend83/tubehaus/tree/windows-app), [`mac-app`](https://github.com/biolend83/tubehaus/tree/mac-app), [`linux-app`](https://github.com/biolend83/tubehaus/tree/linux-app), [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app)
 - **🍎 아이패드 / 아이폰:** 같은 앱을 iOS 16+용으로 만들었어요(베타). 애플 플레이어로 4K까지, 백그라운드 재생, PIP,
   오프라인 저장, 그리고 앱을 다시 설치하지 않아도 스스로 업데이트되는 유튜브 엔진. 앱스토어에 없어서
-  [.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-ipad.ipa)를 **[Sideloadly](https://sideloadly.io/)**(무료, Windows/Mac)와 내 Apple ID로 설치해요.
+  [.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-ipad.ipa)를 **[Sideloadly](https://sideloadly.io/)**(무료, Windows/Mac)와 내 Apple ID로 설치해요.
   무료 Apple ID는 7일마다 다시 서명해야 해요. 자세한 순서: [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). 설치가 싫다면 사파리에서 서버판을 쓰세요.
 - **🖥️ 서버판 돌리기:** 아래 [빠른 설치 (Docker)](#빠른-설치-docker)를 보세요. 이 README의 나머지는 모두 서버판 이야기예요.
 
@@ -79,8 +79,9 @@ Invidious 팀에 감사드려요.
 
 ## 그 밖의 기능
 
-- 유튜브와 같은 화면: 홈, 검색, 채널, 재생목록, 구독, 기록, 보관함, 인기 급상승
-- [Shaka Player](https://github.com/shaka-project/shaka-player) 기반 플레이어: 챕터, 탐색 미리보기, SponsorBlock, 재생 속도, 수면 타이머, 통계, 미니 플레이어, 영화관 모드, 앰비언트 모드, 잠금 화면과 블루투스 버튼 조작
+- 유튜브와 같은 화면: 홈, 검색, 채널, 재생목록, 구독, 기록, 보관함, 인기 급상승, 그리고 유튜브의 주제 페이지(음악, 실시간, 뉴스, 게임, 스포츠, 학습, 패션·뷰티)를 선반 그대로
+- **낚시 제목 끝:** [DeArrow](https://dearrow.ajay.app) 로 올린 사람 대신 사람들이 고른 제목과 썸네일을 보여줘요(기본으로 켜짐, 설정에서 끌 수 있어요)
+- [Shaka Player](https://github.com/shaka-project/shaka-player) 기반 플레이어: 챕터, 탐색 미리보기, 재생바 위 **"가장 많이 다시 본 장면"** 물결, SponsorBlock("하이라이트로 이동" 포함), 재생 속도, 수면 타이머, 통계, 미니 플레이어, 영화관 모드, 앰비언트 모드, 잠금 화면과 블루투스 버튼 조작
 - **모든 기기가 같은 라이브러리:** 구독(RSS 기반 피드), 시청 기록, 이어보기, 나중에 볼 동영상, 좋아요, 재생목록
 - **TV로 보내기:** 폰에서 영상을 고르면 TV에서 재생돼요(크롬캐스트 필요 없음)
 - **고화질 저장:** 1080p와 4K는 영상과 소리가 따로 와요. 서버가 둘 다 받아 ffmpeg로 합쳐 줘요
@@ -88,7 +89,8 @@ Invidious 팀에 감사드려요.
 - **TV 모드:** TV 브라우저에서 리모컨(방향키, 확인, 뒤로)만으로 조작해요
 - 싫어요 수(Return YouTube Dislike), 댓글, 스크립트
 
-브라우저가 직접 하는 선택 기능: SponsorBlock(영상 ID 대신 해시 앞부분만 보내요), Return YouTube Dislike.
+브라우저가 직접 하는 선택 기능: SponsorBlock과 DeArrow(둘 다 영상 ID 대신 해시 앞부분만 보내요), Return YouTube Dislike.
+DeArrow 썸네일은 서버를 거쳐 받아서, DeArrow에는 보는 사람 대신 서버가 보여요.
 
 ## 필요한 것
 
@@ -173,7 +175,7 @@ Invidious, NewPipe, FreeTube 내보내기 파일, OPML, TubeHaus 백업을 가�
 내 데이터가 TubeHaus에 갇히는 일은 없어요.
 
 **밖으로 정보를 보내나요?**
-아니요. 계정도 원격 수집도 없어요. 밖으로 나가는 요청은 유튜브(Invidious와 WARP를 거쳐서)와, 브라우저의 선택 기능(SponsorBlock, Return YouTube Dislike)뿐이에요.
+아니요. 계정도 원격 수집도 없어요. 밖으로 나가는 요청은 유튜브(Invidious와 WARP를 거쳐서), DeArrow 썸네일 서버(서버에서, DeArrow 썸네일을 켰을 때), 그리고 브라우저의 선택 기능(SponsorBlock, DeArrow, Return YouTube Dislike)뿐이에요.
 
 **폰과 TV에서는 어떻게 접속하나요?**
 웹앱이에요. 브라우저에서 내 주소를 열거나, "홈 화면에 추가"로 앱처럼 설치하면 돼요. TV 브라우저에서는 리모컨으로 조작하는 TV 모드가 켜져요.

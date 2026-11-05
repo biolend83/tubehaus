@@ -1613,6 +1613,344 @@ def shorts_next(qs):
             "learned": {"channels": len([1 for s in d["ch"].values() if s > 0]), "keywords": len(d["kw"])}}
 
 
+# ---------- YouTube's topic pages: Music, Live, News, Sports, Learning, Gaming, Fashion & beauty ----------
+# The pages YouTube's own app opens from its top tabs and from "Explore". Each is a channel of YouTube's
+# whose first tab is a few titled shelves ("Live now", "This week's best", ...). Read straight from
+# YouTube's browse API (through YT_PROXY like every other YouTube request), then the same shapes as
+# Invidious' API, so the web page draws them with its usual cards. What they hold depends on the
+# region: some are empty in some countries (News in Korea), and the web page falls back to a search.
+TOPICS = {
+    "music": "UC-9-kyTW8ZkZNDHQJ6FgpwQ", "live": "UC4R8DWoMoI7CAwX8_LjQHig", "news": "UCYfdidRxbB8Qhf0Nx7ioOYw",
+    "sports": "UCEgdi0XIXXZ-qJOFPf4JSKw", "learning": "UCtFRv9O2AHqOZjjynzrv-xg", "gaming": "UCOpNcN46UbXVtpKMrmU4Abg",
+    "fashion": "UCrpQ4p1Ql_hG8rKXIKM1MOQ",
+}
+TOPIC_TTL = 1800          # YouTube refreshes these pages a few times a day
+topic_cache = {}          # (key, region, hl) -> (time, answer)
+topic_lock = threading.Lock()
+WEB_CLIENT = {"clientName": "WEB", "clientVersion": "2.20251101.00.00"}
+BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+
+
+def yt_browse(body, region="US", hl="en", timeout=15):
+    data = json.dumps({"context": {"client": dict(WEB_CLIENT, hl=hl, gl=region)}, **body}).encode()
+    req = urllib.request.Request("https://www.youtube.com/youtubei/v1/browse?prettyPrint=false", data=data,
+                                 headers={"Content-Type": "application/json", "User-Agent": BROWSER_UA})
+    return json.loads(YT.open(req, timeout=timeout).read())
+
+
+def _dig(o, *path):
+    for k in path:
+        if isinstance(o, dict):
+            o = o.get(k)
+        elif isinstance(o, list) and isinstance(k, int) and -len(o) <= k < len(o):
+            o = o[k]
+        else:
+            return None
+    return o
+
+
+def _txt(o):
+    """YouTube's text in any of its three forms: simpleText, runs, or a view model's content."""
+    if isinstance(o, str):
+        return o
+    if not isinstance(o, dict):
+        return ""
+    if isinstance(o.get("simpleText"), str):
+        return o["simpleText"]
+    if isinstance(o.get("runs"), list):
+        return "".join(r.get("text", "") for r in o["runs"] if isinstance(r, dict))
+    if isinstance(o.get("content"), str):
+        return o["content"]
+    return ""
+
+
+def _all(o, key, skip=()):
+    """every value stored under key below o, in document order"""
+    out = []
+
+    def walk(e):
+        if isinstance(e, list):
+            for x in e:
+                walk(x)
+        elif isinstance(e, dict):
+            for k, v in e.items():
+                if k == key:
+                    out.append(v)
+                elif k not in skip:
+                    walk(v)
+    walk(o)
+    return out
+
+
+def _secs(t):
+    """'1:02:03' -> 3723; anything else -> 0"""
+    if not isinstance(t, str) or not re.fullmatch(r"\d+(:\d{1,2}){1,2}", t.strip()):
+        return 0
+    n = 0
+    for part in t.strip().split(":"):
+        n = n * 60 + int(part)
+    return n
+
+
+def _thumbs(o):
+    """a list of {url, width, height} from YouTube's thumbnails or image sources, smallest first"""
+    src = _dig(o, "thumbnails") or _dig(o, "sources") or []
+    out = []
+    for s in src if isinstance(src, list) else []:
+        u = s.get("url") if isinstance(s, dict) else None
+        if isinstance(u, str) and u:
+            out.append({"url": ("https:" + u) if u.startswith("//") else u, "width": s.get("width") or 0, "height": s.get("height") or 0})
+    return sorted(out, key=lambda x: x["width"])
+
+
+def _byline(o):
+    """(channel name, UC id) from a byline text with a browse link"""
+    name = _txt(o)
+    ids = [i for i in _all(o, "browseId") if isinstance(i, str) and re.fullmatch(r"UC[\w-]{22}", i)]
+    return name, ids[0] if ids else ""
+
+
+def _video(vid, title, author="", author_id="", length=0, views_text="", published_text="", live=False, upcoming=False,
+           short=False, avatar=None):
+    return {"type": "video", "videoId": vid, "title": title, "author": author, "authorId": author_id,
+            "lengthSeconds": length, "viewCountText": views_text, "publishedText": published_text,
+            "liveNow": live, "isUpcoming": upcoming, "short": short, "authorThumbnails": avatar or []}
+
+
+def topic_item(kind, v):
+    """One item of a browse answer as Invidious would give it, or None (ads, channels, oddities)."""
+    if kind in ("videoRenderer", "gridVideoRenderer", "compactVideoRenderer"):
+        vid = v.get("videoId")
+        if not isinstance(vid, str) or not re.fullmatch(r"[\w-]{11}", vid):
+            return None
+        author, cid = _byline(v.get("longBylineText") or v.get("ownerText") or v.get("shortBylineText") or {})
+        badges = [b for b in _all(v.get("badges") or [], "style") if isinstance(b, str)]
+        overlays = [b for b in _all(v.get("thumbnailOverlays") or [], "style") if isinstance(b, str)]
+        if any("MEMBERS" in b for b in badges):
+            return None                     # members only: it won't play without their account
+        live = "BADGE_STYLE_TYPE_LIVE_NOW" in badges or "LIVE" in overlays
+        upcoming = "UPCOMING" in overlays or bool(v.get("upcomingEventData"))
+        length = _secs(_txt(v.get("lengthText"))) or next(
+            (_secs(_txt(_dig(o, "thumbnailOverlayTimeStatusRenderer", "text"))) for o in v.get("thumbnailOverlays") or []
+             if isinstance(o, dict) and "thumbnailOverlayTimeStatusRenderer" in o), 0)
+        return _video(vid, _txt(v.get("title")), author, cid, length,
+                      _txt(v.get("viewCountText")) or _txt(v.get("shortViewCountText")), _txt(v.get("publishedTimeText")),
+                      live, upcoming, "SHORTS" in overlays or bool(_dig(v, "navigationEndpoint", "reelWatchEndpoint")),
+                      _thumbs(_dig(v, "channelThumbnailSupportedRenderers", "channelThumbnailWithLinkRenderer", "thumbnail")
+                              or v.get("channelThumbnail") or {}))
+    if kind == "lockupViewModel":
+        cid_ = v.get("contentId")
+        if not isinstance(cid_, str) or _dig(v, "metadata", "feedAdMetadataViewModel"):
+            return None
+        meta = _dig(v, "metadata", "lockupMetadataViewModel") or {}
+        title = _txt(meta.get("title"))
+        rows = []
+        for row in _dig(meta, "metadata", "contentMetadataViewModel", "metadataRows") or []:
+            parts = [_txt(p.get("text")) for p in (row.get("metadataParts") or []) if isinstance(p, dict)]
+            parts = [p for p in parts if p]
+            if parts:
+                rows.append(parts)
+        # the channel is the metadata part that links to one ("재생목록" / "Playlist" next to it does not)
+        owner = next((_txt(p.get("text")) for row in _dig(meta, "metadata", "contentMetadataViewModel", "metadataRows") or []
+                      for p in row.get("metadataParts") or [] if isinstance(p, dict)
+                      and any(isinstance(i, str) and i.startswith("UC") for i in _all(p.get("text") or {}, "browseId"))), "")
+        badges = _all(v.get("contentImage") or {}, "thumbnailBadgeViewModel")
+        badge = next((b.get("text") for b in badges if isinstance(b, dict) and isinstance(b.get("text"), str)), "")
+        live = any("LIVE" in str(b.get("badgeStyle", "")) for b in badges if isinstance(b, dict))
+        ids = [i for i in _all(meta, "browseId", skip=("menuButton",)) if isinstance(i, str) and re.fullmatch(r"UC[\w-]{22}", i)]
+        ctype = v.get("contentType") or ""
+        if ctype == "LOCKUP_CONTENT_TYPE_VIDEO" or (not ctype and re.fullmatch(r"[\w-]{11}", cid_)):
+            author = rows[0][0] if len(rows) > 1 else ""
+            stats = rows[-1] if rows else []
+            return _video(cid_, title, author, ids[0] if ids else "", _secs(badge), stats[0] if stats else "",
+                          stats[1] if len(stats) > 1 else "", live, False, False, _thumbs(_dig(meta, "image", "decoratedAvatarViewModel", "avatar", "avatarViewModel", "image") or {}))
+        if ctype in ("LOCKUP_CONTENT_TYPE_PLAYLIST", "LOCKUP_CONTENT_TYPE_PODCAST") and re.fullmatch(r"(PL|OLAK|RDCLAK)[\w-]+", cid_):
+            # a playlist (an album, a chart): it opens on the playlist page. Mixes ("stations") are left
+            # out: they are made for one listener on YouTube and don't open as a playlist
+            th = _thumbs(_dig(v, "contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel", "image") or {})
+            count = re.sub(r"\D", "", badge or "")
+            return {"type": "playlist", "playlistId": cid_, "title": title, "author": owner,
+                    "authorId": ids[0] if ids else "", "videoCount": int(count) if count else None,
+                    "playlistThumbnail": th[-1]["url"] if th else ""}
+        return None
+    if kind == "shortsLockupViewModel":
+        vid = _dig(v, "onTap", "innertubeCommand", "reelWatchEndpoint", "videoId")
+        if not isinstance(vid, str):
+            ent = v.get("entityId") or ""
+            vid = ent.rsplit("-", 1)[-1] if isinstance(ent, str) else ""
+        if not re.fullmatch(r"[\w-]{11}", vid or ""):
+            return None
+        return _video(vid, _txt(_dig(v, "overlayMetadata", "primaryText")), views_text=_txt(_dig(v, "overlayMetadata", "secondaryText")), short=True)
+    if kind == "reelItemRenderer":
+        vid = v.get("videoId")
+        if not isinstance(vid, str) or not re.fullmatch(r"[\w-]{11}", vid):
+            return None
+        return _video(vid, _txt(v.get("headline")), views_text=_txt(v.get("viewCountText")), short=True)
+    return None
+
+
+ITEM_KINDS = ("videoRenderer", "gridVideoRenderer", "compactVideoRenderer", "lockupViewModel", "shortsLockupViewModel", "reelItemRenderer")
+
+
+def topic_items(root):
+    """every item below root, in order, once each"""
+    out, seen = [], set()
+
+    def walk(e):
+        if isinstance(e, list):
+            for x in e:
+                walk(x)
+        elif isinstance(e, dict):
+            for k, v in e.items():
+                if k in ITEM_KINDS and isinstance(v, dict):
+                    try:
+                        it = topic_item(k, v)
+                    except Exception:
+                        it = None             # one odd item must never sink the whole page
+                    key = it and (it.get("videoId") or it.get("playlistId"))
+                    if key and key not in seen:
+                        seen.add(key)
+                        out.append(it)
+                elif k not in ("continuationItemRenderer", "menu", "menuRenderer"):
+                    walk(v)
+    walk(root)
+    return out
+
+
+def topic_shelves(d):
+    """[{title, items}] from a topic page's first tab, in YouTube's order; a page without shelves is one untitled shelf"""
+    tabs = _dig(d, "contents", "twoColumnBrowseResultsRenderer", "tabs") or []
+    sel = next((t for t in tabs if _dig(t, "tabRenderer", "selected")), tabs[0] if tabs else None)
+    content = _dig(sel, "tabRenderer", "content") or {}
+    shelves = []
+    for kind in ("richShelfRenderer", "shelfRenderer"):
+        for sh in _all(content, kind):
+            items = topic_items(sh.get("contents") or sh.get("content") or [])
+            if items:
+                shelves.append({"title": _txt(sh.get("title")), "items": items})
+        if shelves:
+            break
+    if not shelves:
+        items = topic_items(content)
+        if items:
+            shelves.append({"title": "", "items": items})
+    return shelves
+
+
+def topic_page(qs):
+    key = (qs.get("key") or "").lower()
+    if key not in TOPICS:
+        return {"error": "unknown topic"}
+    region = (qs.get("region") or "US").upper()
+    region = region if re.fullmatch(r"[A-Z]{2}", region) else "US"
+    hl = qs.get("hl") or "en"
+    hl = hl if re.fullmatch(r"[a-z]{2}(-[A-Za-z]{2,4})?", hl) else "en"
+    ck = (key, region, hl)
+    with topic_lock:
+        hit = topic_cache.get(ck)
+    if hit and time.time() - hit[0] < TOPIC_TTL:
+        return hit[1]
+    try:
+        shelves = topic_shelves(yt_browse({"browseId": TOPICS[key]}, region, hl))
+    except Exception as ex:
+        log("topic", f"{key} {region} FAIL {repr(ex)[:100]}")
+        if hit:
+            return hit[1]                     # an old copy beats an error
+        return {"error": "YouTube didn't answer"}
+    out = {"key": key, "region": region, "shelves": shelves}
+    with topic_lock:
+        topic_cache[ck] = (time.time(), out)
+        if len(topic_cache) > 200:            # many regions x languages: keep the newest
+            for k in sorted(topic_cache, key=lambda k: topic_cache[k][0])[:50]:
+                topic_cache.pop(k, None)
+    return out
+
+
+# ---------- "Most replayed": the heat line YouTube draws over its progress bar ----------
+# YouTube's watch page carries, for videos with enough views, a hundred points of how much each part of
+# the video is replayed, and where the peak is. Read from its /next answer (through YT_PROXY), kept
+# 6 hours; the web player draws it above the progress bar.
+HEAT_TTL, HEAT_MISS_TTL = 6 * 3600, 600
+heat_cache = {}           # video id -> (time, answer)
+heat_lock = threading.Lock()
+
+
+def yt_next(video_id, timeout=12):
+    data = json.dumps({"context": {"client": dict(WEB_CLIENT, hl="en", gl="US")}, "videoId": video_id}).encode()
+    req = urllib.request.Request("https://www.youtube.com/youtubei/v1/next?prettyPrint=false", data=data,
+                                 headers={"Content-Type": "application/json", "User-Agent": BROWSER_UA})
+    return json.loads(YT.open(req, timeout=timeout).read())
+
+
+def heat_from_next(d):
+    """{heat: [0..1 per equal slice], span: seconds the slices cover, peak: seconds of "Most replayed" or None}"""
+    for m in _dig(d, "frameworkUpdates", "entityBatchUpdate", "mutations") or []:
+        ml = _dig(m, "payload", "macroMarkersListEntity", "markersList")
+        if not isinstance(ml, dict) or ml.get("markerType") != "MARKER_TYPE_HEATMAP":
+            continue
+        pts, end = [], 0
+        for mk in (ml.get("markers") or [])[:400]:
+            if not isinstance(mk, dict):
+                continue
+            try:
+                pts.append(max(0.0, min(1.0, round(float(mk.get("intensityScoreNormalized") or 0), 3))))
+                end = max(end, int(mk.get("startMillis") or 0) + int(mk.get("durationMillis") or 0))
+            except (TypeError, ValueError):
+                pts.append(0.0)
+        dec = _dig(ml, "markersDecoration", "timedMarkerDecorations", 0, "decorationTimeMillis")
+        peak = round(int(dec) / 1000, 1) if isinstance(dec, (int, str)) and str(dec).isdigit() else None
+        if len(pts) >= 10 and end > 0:
+            return {"heat": pts, "span": round(end / 1000, 1), "peak": peak}
+    return {"heat": [], "span": 0, "peak": None}
+
+
+def heat_page(qs):
+    vid = qs.get("v") or ""
+    if not re.fullmatch(r"[\w-]{11}", vid):
+        return {"error": "bad video id"}
+    with heat_lock:
+        hit = heat_cache.get(vid)
+    if hit and time.time() - hit[0] < (HEAT_TTL if hit[1]["heat"] else HEAT_MISS_TTL):
+        return hit[1]
+    try:
+        out = heat_from_next(yt_next(vid))
+    except Exception as ex:
+        log("heat", f"{vid} FAIL {repr(ex)[:100]}")
+        return hit[1] if hit else {"heat": [], "span": 0, "peak": None}
+    with heat_lock:
+        heat_cache[vid] = (time.time(), out)
+        if len(heat_cache) > 3000:
+            for k in sorted(heat_cache, key=lambda k: heat_cache[k][0])[:500]:
+                heat_cache.pop(k, None)
+    return out
+
+
+# ---------- DeArrow thumbnails ----------
+# DeArrow (dearrow.ajay.app, by the SponsorBlock people) replaces clickbait titles and thumbnails with
+# ones its users chose. The browser asks for titles itself, sending only 4 characters of the video ID's
+# hash, like SponsorBlock; the thumbnails are frames that DeArrow's server cuts, and those come through
+# here so DeArrow sees this server instead of each viewer.
+DEARROW_THUMB = "https://dearrow-thumb.ajay.app/api/v1/getThumbnail"
+
+
+def dearrow_thumb(qs):
+    """(status, content type, bytes)"""
+    vid, t = qs.get("v") or "", qs.get("t") or ""
+    if not re.fullmatch(r"[\w-]{11}", vid) or not re.fullmatch(r"\d{1,6}(\.\d{1,6})?", t):
+        return 400, "text/plain", b"bad request"
+    url = DEARROW_THUMB + "?" + urllib.parse.urlencode({"videoID": vid, "time": t})
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "TubeHaus"}), timeout=15) as r:
+            ctype = r.headers.get("Content-Type") or ""
+            body = r.read(2_000_000)
+            if r.status != 200 or not ctype.startswith("image/") or not body:
+                return 404, "text/plain", b"no thumbnail"
+            return 200, ctype, body
+    except Exception as ex:
+        log("dearrow", f"{vid} FAIL {repr(ex)[:100]}")
+        return 404, "text/plain", b"no thumbnail"
+
+
 RSS_DOWN = {"until": 0, "fails": 0}   # YouTube takes its RSS feeds down now and then (404 for every channel)
 RSS_DOWN_AFTER = 8        # failures in a row before that's assumed; one 404 is often just a deleted channel
 
@@ -2403,7 +2741,7 @@ def public_blocked(method, path):
         return False
     if "/api/p/yt/" not in path and not path.endswith("/latest_version"):
         return False
-    allowed = {("GET", "/yt/feed"), ("GET", "/yt/shorts/next"), ("POST", "/yt/import"), ("POST", "/yt/export")}
+    allowed = {("GET", "/yt/feed"), ("GET", "/yt/shorts/next"), ("GET", "/yt/topic"), ("GET", "/yt/heat"), ("GET", "/yt/dathumb"), ("POST", "/yt/import"), ("POST", "/yt/export")}
     return not any(method == m and path.endswith(suffix) for m, suffix in allowed)
 
 
@@ -2587,6 +2925,21 @@ class H(BaseHTTPRequestHandler):
             return
         if p.endswith("/yt/shorts/next"):
             return self.send(200, shorts_next(self.qs()))
+        if p.endswith("/yt/heat"):
+            d = heat_page(self.qs())
+            return self.send(400 if d.get("error") else 200, d)
+        if p.endswith("/yt/dathumb"):
+            code, ctype, body = dearrow_thumb(self.qs())
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Cache-Control", "public, max-age=604800" if code == 200 else "public, max-age=600")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if p.endswith("/yt/topic"):
+            d = topic_page(self.qs())
+            return self.send(404 if d.get("error") == "unknown topic" else 502 if d.get("error") else 200, d)
         if "/yt/" in p and "/api/p/" in self.path:
             if p.endswith("/yt/lib"):
                 return self.send(200, ytlib_get())

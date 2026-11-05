@@ -42,11 +42,11 @@ TubeHaus comes in two separate forms. They share the look and the name, but they
 Want one library for the whole household, iPhone/iPad without sideloading, or to keep YouTube away from your devices' addresses? Run the server.
 **Both?** Since 0.5.4 the app can connect to your server (Settings → *TubeHaus server*): one library on every device and in the browser, while each app still plays videos itself.
 
-- **📱 Get the app (beta):** [Android APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15.apk) (Android 8+; on Android TV, Downloader code **3155410**) · [Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15.msi) · macOS ([Apple Silicon](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-mac-arm64.dmg), [Intel](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-mac-x64.dmg)) · [Linux .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-linux-amd64.deb) · [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-linux-x86_64.rpm) · [iPad/iPhone .ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-ipad.ipa) (beta; install it with [Sideloadly](https://sideloadly.io/)) · [all files](https://github.com/biolend83/tubehaus/releases/latest) (Windows portable and ARM, Linux ARM64) · Android updates with [Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%20%22io.github.biolend83.tubehaus%22%2C%20%22url%22%3A%20%22https%3A%2F%2Fgithub.com%2Fbiolend83%2Ftubehaus%22%2C%20%22author%22%3A%20%22biolend83%22%2C%20%22name%22%3A%20%22TubeHaus%22%2C%20%22additionalSettings%22%3A%20%22%7B%5C%22filterReleaseTitlesByRegEx%5C%22%3A%20%5C%22%5ETubeHaus%20%5C%22%2C%20%5C%22fallbackToOlderReleases%5C%22%3A%20true%2C%20%5C%22includePrereleases%5C%22%3A%20false%2C%20%5C%22apkFilterRegEx%5C%22%3A%20%5C%22TubeHaus-%5C%5C%5C%5Cd%5C%22%7D%22%7D).
+- **📱 Get the app (beta):** [Android APK](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16.apk) (Android 8+; on Android TV, Downloader code **3155410**) · [Windows](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16.msi) · macOS ([Apple Silicon](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-mac-arm64.dmg), [Intel](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-mac-x64.dmg)) · [Linux .deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-linux-amd64.deb) · [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-linux-x86_64.rpm) · [iPad/iPhone .ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-ipad.ipa) (beta; install it with [Sideloadly](https://sideloadly.io/)) · [all files](https://github.com/biolend83/tubehaus/releases/latest) (Windows portable and ARM, Linux ARM64) · Android updates with [Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%20%22io.github.biolend83.tubehaus%22%2C%20%22url%22%3A%20%22https%3A%2F%2Fgithub.com%2Fbiolend83%2Ftubehaus%22%2C%20%22author%22%3A%20%22biolend83%22%2C%20%22name%22%3A%20%22TubeHaus%22%2C%20%22additionalSettings%22%3A%20%22%7B%5C%22filterReleaseTitlesByRegEx%5C%22%3A%20%5C%22%5ETubeHaus%20%5C%22%2C%20%5C%22fallbackToOlderReleases%5C%22%3A%20true%2C%20%5C%22includePrereleases%5C%22%3A%20false%2C%20%5C%22apkFilterRegEx%5C%22%3A%20%5C%22TubeHaus-%5C%5C%5C%5Cd%5C%22%7D%22%7D).
   Install notes and source per platform: [`android-app`](https://github.com/biolend83/tubehaus/tree/android-app), [`windows-app`](https://github.com/biolend83/tubehaus/tree/windows-app), [`mac-app`](https://github.com/biolend83/tubehaus/tree/mac-app), [`linux-app`](https://github.com/biolend83/tubehaus/tree/linux-app), [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app)
 - **🍎 iPad / iPhone:** the same app, built for iOS 16+ (beta): Apple's player up to 4K, background play, picture-in-picture,
   offline downloads, and a YouTube engine that updates itself without reinstalling. It isn't in the App Store, so you install the
-  [.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.15/TubeHaus-0.5.15-ipad.ipa) with **[Sideloadly](https://sideloadly.io/)** (free, Windows or Mac)
+  [.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-ipad.ipa) with **[Sideloadly](https://sideloadly.io/)** (free, Windows or Mac)
   and your Apple ID; with a free Apple ID it is re-signed every 7 days. Step by step: [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). No sideloading wanted? Use the server version in Safari.
 - **🖥️ Run the server:** see [Quick start (Docker)](#quick-start-docker) below. The rest of this README is about the server version.
 
@@ -86,8 +86,9 @@ account menu or Settings. View counts and dates follow each language's own style
 
 ## Everything else
 
-- YouTube-identical UI: home, search, channels, playlists, subscriptions, history, library, trending
-- Custom player on [Shaka Player](https://github.com/shaka-project/shaka-player) (DASH/HLS): chapters, storyboard seek previews, SponsorBlock, speed, sleep timer, stats, mini player, theater mode, ambient mode, Media Session (lock screen / Bluetooth keys)
+- YouTube-identical UI: home, search, channels, playlists, subscriptions, history, library, trending, and YouTube's own topic pages (Music, Live, News, Gaming, Sports, Learning, Fashion & beauty) shelf by shelf
+- **No more clickbait**: [DeArrow](https://dearrow.ajay.app) titles and thumbnails, chosen by people instead of the uploader (on by default, one switch in Settings)
+- Custom player on [Shaka Player](https://github.com/shaka-project/shaka-player) (DASH/HLS): chapters, storyboard seek previews, **"Most replayed"** wave over the progress bar, SponsorBlock (with "Jump to the highlight"), speed, sleep timer, stats, mini player, theater mode, ambient mode, Media Session (lock screen / Bluetooth keys)
 - **One library for every device**: subscriptions (with an RSS-based feed), watch history, resume positions, Watch Later, likes, playlists
 - **Send to TV**: pick a video on your phone and it starts on the TV (no Chromecast; open screens long-poll the server)
 - **High-quality offline save**: 1080p/4K come as separate video and audio; the server fetches both and merges them with ffmpeg
@@ -95,7 +96,8 @@ account menu or Settings. View counts and dates follow each language's own style
 - **TV mode**: full remote-control navigation (arrows / OK / Back) for TV browsers
 - Dislike counts (Return YouTube Dislike), comments, transcripts
 
-Optional lookups the browser makes itself: SponsorBlock (by a hash prefix, not the video ID) and Return YouTube Dislike.
+Optional lookups the browser makes itself: SponsorBlock and DeArrow (both by a hash prefix, not the video ID) and Return YouTube Dislike.
+DeArrow's thumbnails come through the server, so DeArrow sees the server rather than each viewer.
 
 *(Formerly HomeTube, renamed to avoid a clash with an unrelated project of the same name.)*
 
@@ -282,8 +284,9 @@ subscriptions CSV and `watch-history.json`), Invidious, NewPipe and FreeTube exp
 Invidious-format file, a Takeout-style CSV, or OPML for any feed reader. Your data is never stuck here.
 
 **Does anything phone home?**
-No. There are no accounts and no telemetry. The only outside requests are YouTube (through Invidious and WARP)
-and, from the browser, the optional SponsorBlock and Return YouTube Dislike lookups.
+No. There are no accounts and no telemetry. The only outside requests are YouTube (through Invidious and WARP),
+DeArrow's thumbnail server (from the server, for the optional DeArrow thumbnails) and, from the browser, the optional
+SponsorBlock, DeArrow and Return YouTube Dislike lookups.
 
 **How do phones and TVs connect?**
 It's a web app: open your address in the browser, or use "Add to Home Screen" to install it like an app.
@@ -416,7 +419,7 @@ Opened a useful issue, sent a pull request or tested an app? You belong here too
 - [Shaka Player](https://github.com/shaka-project/shaka-player) (Apache-2.0) — bundled in `web/y/lib/`
 - Layout after [varun-jasti/Youtube-UI-UX](https://github.com/varun-jasti/Youtube-UI-UX) (MIT); progress bar and volume after [pncsoares/youtube-video-player-clone](https://github.com/pncsoares/youtube-video-player-clone) (MIT)
 - Icons: Material Symbols (Apache-2.0)
-- [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT), [SponsorBlock](https://sponsor.ajay.app), [Return YouTube Dislike](https://returnyoutubedislike.com)
+- [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT), [SponsorBlock](https://sponsor.ajay.app), [DeArrow](https://dearrow.ajay.app), [Return YouTube Dislike](https://returnyoutubedislike.com)
 - Cloudflare WARP
 
 ## Disclaimer

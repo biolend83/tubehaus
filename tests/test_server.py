@@ -605,6 +605,118 @@ class FeedFallback(unittest.TestCase):
         self.assertEqual(ts.RSS_DOWN["until"], 0)
 
 
+class TopicPages(unittest.TestCase):
+    """YouTube's topic pages (Music, Live, ...): shelves read from its browse answer."""
+
+    def answer(self):
+        by = {"runs": [{"text": "Some Channel", "navigationEndpoint": {"browseEndpoint": {"browseId": "UC" + "a" * 22}}}]}
+        video = {"videoRenderer": {"videoId": "aaaaaaaaaaa", "title": {"runs": [{"text": "A video"}]}, "longBylineText": by,
+                                   "lengthText": {"simpleText": "1:02:03"}, "viewCountText": {"simpleText": "1,234 views"},
+                                   "publishedTimeText": {"simpleText": "2 days ago"}}}
+        members = {"videoRenderer": {"videoId": "bbbbbbbbbbb", "title": {"simpleText": "Members"}, "longBylineText": by,
+                                     "badges": [{"metadataBadgeRenderer": {"style": "BADGE_STYLE_TYPE_MEMBERS_ONLY"}}]}}
+        playlist = {"lockupViewModel": {
+            "contentId": "PL" + "c" * 32, "contentType": "LOCKUP_CONTENT_TYPE_PLAYLIST",
+            "contentImage": {"collectionThumbnailViewModel": {"primaryThumbnail": {"thumbnailViewModel": {
+                "image": {"sources": [{"url": "https://i.ytimg.com/vi/ccccccccccc/hqdefault.jpg", "width": 480, "height": 360}]},
+                "overlays": [{"thumbnailOverlayBadgeViewModel": {"thumbnailBadges": [{"thumbnailBadgeViewModel": {"text": "100 videos"}}]}}]}}}},
+            "metadata": {"lockupMetadataViewModel": {"title": {"content": "Top 100"}, "metadata": {"contentMetadataViewModel": {"metadataRows": [
+                {"metadataParts": [{"text": {"content": "Charts", "commandRuns": [{"onTap": {"innertubeCommand": {"browseEndpoint": {"browseId": "UC" + "d" * 22}}}}]}},
+                                   {"text": {"content": "Playlist"}}]}]}}}}}}
+        station = {"lockupViewModel": {"contentId": "RD" + "e" * 30, "contentType": "LOCKUP_CONTENT_TYPE_STATION",
+                                       "metadata": {"lockupMetadataViewModel": {"title": {"content": "Mix"}}}}}
+        shelf = lambda title, items: {"richSectionRenderer": {"content": {"richShelfRenderer": {
+            "title": {"runs": [{"text": title}]}, "contents": [{"richItemRenderer": {"content": i}} for i in items]}}}}
+        return {"contents": {"twoColumnBrowseResultsRenderer": {"tabs": [{"tabRenderer": {"selected": True, "content": {
+            "richGridRenderer": {"contents": [shelf("Charts", [playlist, station]), shelf("Best of the week", [video, members, video]),
+                                              shelf("Nothing", [station])]}}}}]}}}
+
+    def setUp(self):
+        ts.topic_cache.clear()
+
+    def test_shelves_in_order_with_videos_and_playlists(self):
+        shelves = ts.topic_shelves(self.answer())
+        self.assertEqual([s["title"] for s in shelves], ["Charts", "Best of the week"])   # an empty shelf is left out
+        pl = shelves[0]["items"]
+        self.assertEqual(len(pl), 1)                                                    # the mix is left out
+        self.assertEqual(pl[0]["type"], "playlist")
+        self.assertEqual(pl[0]["videoCount"], 100)
+        self.assertEqual(pl[0]["author"], "Charts")                                     # not "Playlist"
+        v = shelves[1]["items"]
+        self.assertEqual(len(v), 1)                                                     # members only and the repeat are left out
+        self.assertEqual((v[0]["videoId"], v[0]["author"], v[0]["authorId"], v[0]["lengthSeconds"]),
+                         ("aaaaaaaaaaa", "Some Channel", "UC" + "a" * 22, 3723))
+
+    def test_grid_video_length_from_its_overlay(self):
+        g = {"videoId": "fffffffffff", "title": {"simpleText": "Game"},
+             "thumbnailOverlays": [{"thumbnailOverlayTimeStatusRenderer": {"text": {"simpleText": "53:08"}, "style": "DEFAULT"}}]}
+        self.assertEqual(ts.topic_item("gridVideoRenderer", g)["lengthSeconds"], 3188)
+
+    def test_unknown_topic(self):
+        self.assertEqual(ts.topic_page({"key": "nope"}), {"error": "unknown topic"})
+
+    def test_cached_then_an_old_copy_when_youtube_fails(self):
+        calls = []
+        real = ts.yt_browse
+        try:
+            ts.yt_browse = lambda body, region, hl: calls.append((body["browseId"], region, hl)) or self.answer()
+            a = ts.topic_page({"key": "music", "region": "kr", "hl": "ko"})
+            self.assertEqual(calls, [(ts.TOPICS["music"], "KR", "ko")])
+            self.assertEqual(ts.topic_page({"key": "music", "region": "KR", "hl": "ko"}), a)
+            self.assertEqual(len(calls), 1)
+            ts.topic_cache[("music", "KR", "ko")] = (0, a)                              # gone stale
+
+            def down(*args):
+                raise OSError("timed out")
+            ts.yt_browse = down
+            self.assertEqual(ts.topic_page({"key": "music", "region": "KR", "hl": "ko"}), a)
+            self.assertIn("error", ts.topic_page({"key": "live", "region": "KR", "hl": "ko"}))
+        finally:
+            ts.yt_browse = real
+
+
+class MostReplayed(unittest.TestCase):
+    """The "Most replayed" heat line, from YouTube's /next answer."""
+
+    def answer(self, n=100, peak="2140"):
+        markers = [{"startMillis": str(i * 2000), "durationMillis": "2000", "intensityScoreNormalized": (i % 10) / 9} for i in range(n)]
+        ml = {"markerType": "MARKER_TYPE_HEATMAP", "markers": markers,
+              "markersDecoration": {"timedMarkerDecorations": [{"decorationTimeMillis": peak, "label": {"runs": [{"text": "Most replayed"}]}}]}}
+        return {"frameworkUpdates": {"entityBatchUpdate": {"mutations": [
+            {"payload": {"somethingElse": {}}}, {"payload": {"macroMarkersListEntity": {"markersList": ml}}}]}}}
+
+    def setUp(self):
+        ts.heat_cache.clear()
+
+    def test_heat_points_span_and_peak(self):
+        h = ts.heat_from_next(self.answer())
+        self.assertEqual(len(h["heat"]), 100)
+        self.assertEqual(h["heat"][9], 1.0)
+        self.assertEqual(h["span"], 200.0)
+        self.assertEqual(h["peak"], 2.1)
+
+    def test_no_heat_for_small_videos(self):
+        self.assertEqual(ts.heat_from_next({})["heat"], [])
+        self.assertEqual(ts.heat_from_next(self.answer(n=3))["heat"], [])
+        self.assertIsNone(ts.heat_from_next(self.answer(peak=None))["peak"])
+
+    def test_bad_id_and_cache(self):
+        self.assertIn("error", ts.heat_page({"v": "../etc"}))
+        calls = []
+        real = ts.yt_next
+        try:
+            ts.yt_next = lambda vid: calls.append(vid) or self.answer()
+            a = ts.heat_page({"v": "aaaaaaaaaaa"})
+            self.assertEqual(ts.heat_page({"v": "aaaaaaaaaaa"}), a)
+            self.assertEqual(calls, ["aaaaaaaaaaa"])
+        finally:
+            ts.yt_next = real
+
+    def test_dearrow_thumb_checks_its_input(self):
+        self.assertEqual(ts.dearrow_thumb({"v": "aaaaaaaaaaa", "t": "1;x"})[0], 400)
+        self.assertEqual(ts.dearrow_thumb({"v": "a/b", "t": "1.5"})[0], 400)
+
+
 class Health(unittest.TestCase):
     def test_health(self):
         h = ts.health()

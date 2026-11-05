@@ -283,7 +283,7 @@ function renderInfo(page, info) {
   const hashtags = (info.keywords || []).slice(0, 3);
   box.innerHTML = `
     <div class="w-tags">${hashtags.map((k) => `<a href="/results?search_query=${encodeURIComponent(k)}" data-nav>#${esc(k.replace(/\s+/g, ""))}</a>`).join(" ")}</div>
-    <h1 class="w-title">${esc(info.title)}</h1>
+    <h1 class="w-title" data-da-vid="${esc(v.id)}">${esc(info.title)}</h1>
     <div class="w-row">
       <div class="w-owner">
         <a href="/channel/${esc(info.authorId)}" data-nav>${avatar(av, "md")}</a>
