@@ -95,8 +95,11 @@ class IosPlatform : Platform {
         present(vc)
     }
 
-    // the app draws full screen itself; the status bar is already hidden there by the system on iPad
-    override fun setFullscreen(on: Boolean) {}
+    /** set by the Swift side (ios/app/App.swift): hides the status bar (clock, Wi-Fi, battery) and the home indicator */
+    var hideBars: (Boolean) -> Unit = {}
+
+    // the app draws full screen itself; iOS keeps the clock and battery over the video unless told
+    override fun setFullscreen(on: Boolean) = hideBars(on)
 
     override fun brightness(): Float = UIScreen.mainScreen.brightness.toFloat()
     override fun setBrightness(v: Float) { UIScreen.mainScreen.brightness = v.toDouble().coerceIn(0.0, 1.0) }

@@ -26,9 +26,13 @@ import platform.UIKit.UIApplicationDidEnterBackgroundNotification
 import platform.UIKit.UIApplicationWillEnterForegroundNotification
 import platform.UIKit.UIViewController
 
-/** The app, for the Swift side (ios/app/App.swift): one Compose screen in a view controller. */
-fun MainViewController(): UIViewController {
+/**
+ * The app, for the Swift side (ios/app/App.swift): one Compose screen in a view controller.
+ * [hideBars] is called with true in full screen, when the status bar and the home indicator should go.
+ */
+fun MainViewController(hideBars: (Boolean) -> Unit): UIViewController {
     val platform = IosPlatform()
+    platform.hideBars = hideBars
     val state = AppState(platform, Store(platform.dataDir))
     val center = NSNotificationCenter.defaultCenter
     // written to disk before iOS may end the app; synced when it comes back
