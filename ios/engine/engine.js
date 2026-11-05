@@ -14,7 +14,7 @@
 // collects those with __drain(), answers each with __reply(rid, json), and reads the outcome
 // with __take(id).
 
-var ENGINE_VERSION = 5;
+var ENGINE_VERSION = 6;
 
 // ------------------------------------------------------------------------------ host bridge
 var ENV = { hl: "en", gl: "US", players: null };
@@ -559,7 +559,27 @@ async function details(id) {
     author: text(at(owner, "title")) || "",
     channelId: str(at(owner, "navigationEndpoint.browseEndpoint.browseId")) || "",
     chapters: chapters(d),
+    heat: heat(d),
   };
+}
+
+/** YouTube's "Most replayed": 0..1 for equal slices covering spanMs, and the peak it labels (null: none) */
+function heat(d) {
+  var ms = arr(at(d, "frameworkUpdates.entityBatchUpdate.mutations"));
+  for (var i = 0; i < ms.length; i++) {
+    var ml = at(ms[i], "payload.macroMarkersListEntity.markersList");
+    if (!ml || str(at(ml, "markerType")) !== "MARKER_TYPE_HEATMAP") continue;
+    var end = 0;
+    var pts = arr(at(ml, "markers")).slice(0, 400).map(function (mk) {
+      end = Math.max(end, (num(at(mk, "startMillis")) || 0) + (num(at(mk, "durationMillis")) || 0));
+      var v = Number(str(at(mk, "intensityScoreNormalized")));
+      return isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
+    });
+    if (pts.length >= 10 && end > 0) {
+      return { points: pts, spanMs: end, peakMs: num(at(ml, "markersDecoration.timedMarkerDecorations.0.decorationTimeMillis")) };
+    }
+  }
+  return null;
 }
 
 /** the chapters the seek bar shows (the video's own, or YouTube's automatic ones) */

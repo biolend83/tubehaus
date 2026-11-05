@@ -2,6 +2,12 @@ package app.tubehaus.ui
 
 import app.tubehaus.engine.Sys
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleOut
@@ -69,8 +75,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.material3.NavigationRailItemDefaults
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
@@ -184,12 +194,16 @@ private fun tvKey(app: AppState, e: KeyEvent): Boolean {
 
 private data class Tab(val screen: Screen, val label: String, val on: ImageVector, val off: ImageVector)
 
+/**
+ * The tabs: on a phone, as in YouTube's app now, the bottom bar is Home, Shorts and Library, and
+ * Subscriptions moved to the tabs at the top (TopTabs); the side menu of tablets, desktops and TVs keeps all four.
+ */
 @Composable
-private fun tabs(app: AppState): List<Tab> {
+private fun tabs(app: AppState, phone: Boolean): List<Tab> {
     return listOfNotNull(
         Tab(Screen.Home, tr("Home"), Sym.Home.fill, Sym.Home.outline),
         if (app.noShorts) null else Tab(Screen.Shorts, tr("Shorts"), Sym.Bolt.fill, Sym.Bolt.outline),
-        Tab(Screen.Subs, tr("Subscriptions"), Sym.Subscriptions.fill, Sym.Subscriptions.outline),
+        if (phone) null else Tab(Screen.Subs, tr("Subscriptions"), Sym.Subscriptions.fill, Sym.Subscriptions.outline),
         Tab(Screen.Library, tr("Library"), Sym.VideoLibrary.fill, Sym.VideoLibrary.outline),
     )
 }
@@ -243,16 +257,7 @@ private fun Shell(app: AppState) {
                     exit = slideOutVertically(tween(Motion.SHORT, easing = Motion.emphasizedOut)) { it } + fadeOut(tween(Motion.SHORT)),
                 ) { MiniPlayer(app) }
                 if (compact && cur !is Screen.Watch) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) {
-                    NavigationBar(containerColor = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
-                        for (t in tabs(app)) {
-                            val sel = root == t.screen
-                            NavigationBarItem(
-                                selected = sel, onClick = { app.go(t.screen) },
-                                icon = { Icon(if (sel) t.on else t.off, null) },
-                                label = { Text(t.label, fontSize = 11.sp) },
-                            )
-                        }
-                    }
+                    PhoneBar(app, root)
                 }
             }
         },
@@ -269,12 +274,21 @@ private fun Shell(app: AppState) {
                         }
                     },
                 ) {
-                    for (t in tabs(app)) {
-                        val sel = root == t.screen
+                    for (t in tabs(app, phone = false)) {
+                        val sel = t.screen.lit(root)
                         NavigationRailItem(
                             selected = sel, onClick = { app.go(t.screen) },
                             icon = { Icon(if (sel) t.on else t.off, null) },
-                            label = { Text(t.label, fontSize = 11.sp) },
+                            // YouTube's narrow menu: small plain labels, the filled icon alone marks the open page
+                            label = { Text(t.label, fontSize = if (app.platform.tv) 11.sp else 10.sp, maxLines = 1,
+                                fontWeight = if (sel && app.platform.tv) FontWeight.SemiBold else FontWeight.Normal) },
+                            // as on YouTube: the filled icon says which page is open, no pill behind it
+                            // (a TV keeps the pill, it is easier to see from the sofa)
+                            colors = if (app.platform.tv) NavigationRailItemDefaults.colors() else NavigationRailItemDefaults.colors(
+                                indicatorColor = Color.Transparent,
+                                selectedIconColor = MaterialTheme.colorScheme.onSurface, selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurface, unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            ),
                         )
                     }
                     // below a line, smaller: back to the last video, and the settings
@@ -325,6 +339,7 @@ private fun Shell(app: AppState) {
                         is Screen.Playlist -> PlaylistScreen(app, cur.id, cur.title)
                         is Screen.Local -> LocalListScreen(app, cur.key)
                         Screen.Downloads -> DownloadsScreen(app)
+                        is Screen.Topic -> TopicScreen(app, cur.key)
                     }
                   }
                 }
@@ -336,6 +351,48 @@ private fun Shell(app: AppState) {
                     exit = fadeOut(tween(Motion.SHORT)) + scaleOut(tween(Motion.SHORT), targetScale = 0.9f),
                 ) { FloatingPlayer(app, moveFloat) }
               }
+            }
+        }
+    }
+}
+
+/** whether this tab is the open one: Home also for the pages of the top tabs that sit under it (Music, Live; Subscriptions on phones) */
+private fun Screen.lit(root: Screen?): Boolean = when {
+    root == null -> false
+    this == Screen.Home -> root == Screen.Home || (root is Screen.Topic && root.key in TOP_TOPICS)
+    else -> root == this
+}
+
+/**
+ * The phone's bottom bar as YouTube draws it: a hairline on top, the icons and small labels close
+ * together, the open one filled; no pill. Subscriptions lights Home, as it is one of Home's top tabs here.
+ */
+@Composable
+private fun PhoneBar(app: AppState, root: Screen?) {
+    val c = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth().background(c.background).windowInsetsPadding(NavigationBarDefaults.windowInsets)) {
+        HorizontalDivider(thickness = 0.5.dp, color = c.outline.copy(alpha = 0.6f))
+        Row(Modifier.fillMaxWidth().height(54.dp), verticalAlignment = Alignment.CenterVertically) {
+            for (t in tabs(app, phone = true)) {
+                val sel = t.screen.lit(root) || (t.screen == Screen.Home && root == Screen.Subs)
+                // pressed as in YouTube's app: a grey circle swells behind the icon, which dips and
+                // springs back when let go
+                val touch = remember { MutableInteractionSource() }
+                val pressed by touch.collectIsPressedAsState()
+                val dip by animateFloatAsState(if (pressed) 0.86f else 1f,
+                    if (pressed) tween(Motion.SHORT) else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
+                val shade by animateFloatAsState(if (pressed) 0.12f else 0f, tween(if (pressed) 90 else Motion.LONG))
+                val ink = c.onSurface
+                Column(
+                    Modifier.weight(1f).fillMaxHeight()
+                        .drawBehind { if (shade > 0f) drawCircle(ink.copy(alpha = shade), radius = 26.dp.toPx() * (0.7f + 0.3f * (shade / 0.12f))) }
+                        .selectable(sel, interactionSource = touch, indication = null, role = Role.Tab, onClick = { app.go(t.screen) }),
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(if (sel) t.on else t.off, null, Modifier.size(24.dp).graphicsLayer { scaleX = dip; scaleY = dip }, tint = c.onSurface)
+                    Text(t.label, fontSize = 10.sp, maxLines = 1, color = c.onSurface,
+                        fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.padding(top = 3.dp))
+                }
             }
         }
     }
@@ -419,6 +476,8 @@ private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null) {
             IconButton(onClick = { app.go(Screen.Search()) }) { Icon(Sym.Search.outline, tr("Search")) }
             if (LocalCompact.current || onMenu != null) IconButton(onClick = { app.go(Screen.Settings) }) { Icon(Sym.Settings.outline, tr("Settings")) }
         }
+        // every device: Home, Subscriptions, Music, Live and More under the logo, on those pages themselves
+        if (app.stack.size == 1 && app.current.underHome()) TopTabs(app)
         if (!LocalCompact.current) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
     }
 }

@@ -363,6 +363,9 @@ private val KO = mapOf(
     "Views" to "조회수",
     "Uploaded" to "게시일",
     "Minimize" to "작게 보기",
+    // YouTube's topic pages: Music and Live at the top on phones, the rest under More
+    "Learning" to "학습", "Fashion & beauty" to "패션/뷰티",
+    "YouTube shows nothing here for your region" to "유튜브가 이 지역에는 여기에 보여주는 게 없어요",
     // starter topics
     "Music" to "음악", "Gaming" to "게임", "News" to "뉴스", "Science" to "과학", "Technology" to "기술",
     "Cooking" to "요리", "Travel" to "여행", "Sports" to "스포츠", "Comedy" to "코미디", "Movies" to "영화",
@@ -384,4 +387,27 @@ private val KO = mapOf(
     // engine messages
     "No connection to YouTube" to "YouTube에 연결할 수 없어요",
     "No playable streams" to "재생할 수 있는 스트림이 없어요",
+    // Most replayed, DeArrow
+    "Most replayed" to "가장 많이 다시 본 장면",
+    "A wave over the seek bar shows the parts people watch again" to "재생바 위에 사람들이 많이 다시 본 구간을 물결 모양으로 보여줘요",
+    "Titles and thumbnails people chose instead of clickbait (dearrow.ajay.app). Only 4 characters of a hash are sent, not the video" to "낚시 제목·썸네일 대신 사람들이 고른 것을 보여줘요 (dearrow.ajay.app). 영상 대신 해시 앞 4글자만 보내요",
+    "DeArrow thumbnails" to "DeArrow 썸네일",
+    "A frame people picked, straight from DeArrow's server" to "사람들이 고른 장면을 썸네일로 써요 (DeArrow 서버에서 바로 받아요)",
+    "Show dislikes" to "싫어요 수 보기",
+    "An estimate from Return YouTube Dislike (returnyoutubedislikeapi.com), which is sent the video's ID" to "Return YouTube Dislike(returnyoutubedislikeapi.com)의 추정치예요. 영상 ID가 그쪽으로 가요",
+    // SponsorBlock
+    "Skips sponsors and other parts people marked inside videos (sponsor.ajay.app). Only 4 characters of a hash are sent, not the video" to "영상 속 협찬·광고처럼 사람들이 표시한 구간을 건너뛰어요 (sponsor.ajay.app). 영상 대신 해시 앞 4글자만 보내요",
+    "Switched on: skipped by itself. Off: a button offers to skip it." to "켜면 저절로 건너뛰고, 끄면 건너뛰기 버튼만 보여줘요.",
+    "Sponsor" to "스폰서",
+    "Self-promotion" to "자체 홍보",
+    "Subscribe and like reminders" to "구독·좋아요 요청",
+    "Intro" to "인트로",
+    "Endcards and credits" to "엔딩",
+    "Preview and recap" to "미리보기·요약",
+    "Non-music part" to "음악 아닌 부분",
+    "Filler" to "잡담",
+    "{n} skipped" to "{n} 건너뜀",
+    "Undo" to "실행취소",
+    "Skip {n}" to "{n} 건너뛰기",
+    "Jump to the highlight" to "하이라이트로 이동",
 )

@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.SponsorBlock
 import app.tubehaus.engine.Sys
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +55,55 @@ class Playback(private val app: AppState) {
         private set
     private var sleepJob: Job? = null
 
+    /** SponsorBlock: the parts of this video people marked (empty while switched off or unknown) */
+    var segments by mutableStateOf<List<SponsorBlock.Segment>>(emptyList())
+        private set
+    /** the part playing now that isn't skipped by itself, or the highlight near the start: the player offers a button */
+    var skippable by mutableStateOf<SponsorBlock.Segment?>(null)
+        private set
+    /** the part just skipped by itself: the player says so for a few seconds, with Undo */
+    var justSkipped by mutableStateOf<SponsorBlock.Segment?>(null)
+        private set
+    private val skipped = HashSet<String>()
+    private var noticeJob: Job? = null
+
+    /** the button: past the part, or to the highlight */
+    fun skipSegment() {
+        val s = skippable ?: return
+        skipped += s.uuid
+        skippable = null
+        player.seekTo(if (s.category == SponsorBlock.HIGHLIGHT) s.startMs else s.endMs)
+    }
+
+    /** back to where the skipped part began; it then plays through */
+    fun undoSkip() {
+        val s = justSkipped ?: return
+        justSkipped = null
+        player.seekTo(s.startMs)
+    }
+
+    private fun sponsorCheck(st: PlayerState) {
+        val set = store.settings.value
+        if (!set.sponsor || segments.isEmpty()) { skippable = null; return }
+        val pos = st.positionMs
+        // where parts overlap, one skipped by itself wins
+        val hits = segments.filter { it.category != SponsorBlock.HIGHLIGHT && pos >= it.startMs && pos < it.endMs - 300 }
+        val seg = hits.firstOrNull { it.category in set.sponsorCats && it.uuid !in skipped } ?: hits.firstOrNull()
+        if (seg != null && seg.category in set.sponsorCats && seg.uuid !in skipped) {
+            if (!st.playing) return
+            skipped += seg.uuid
+            skippable = null
+            player.seekTo(seg.endMs)
+            justSkipped = seg
+            noticeJob?.cancel()
+            noticeJob = app.scope.launch { delay(5000); justSkipped = null }
+            return
+        }
+        // the highlight: offered in the first 20 seconds, while it is still ahead
+        val hl = segments.firstOrNull { it.category == SponsorBlock.HIGHLIGHT && it.uuid !in skipped && pos < it.startMs - 2000 && pos < 20_000 }
+        skippable = seg?.takeIf { it.category !in set.sponsorCats } ?: hl
+    }
+
     fun loopVideo(on: Boolean) { loop = on; player.setLoop(on) }
 
     /** pause after [minutes]; [END] at the end of this video; 0 turns the timer off */
@@ -100,6 +150,7 @@ class Playback(private val app: AppState) {
                 if (s.videoId != v.id) return@collectLatest
                 if (s.error != null && !refreshed) { refreshed = true; refresh(v, s.positionMs); return@collectLatest }
                 if (s.positionMs > watchedMs) watchedMs = s.positionMs
+                sponsorCheck(s)
                 val now = Sys.nowMs()
                 if (s.playing && now - lastSave > 5000) {
                     lastSave = now
@@ -123,8 +174,13 @@ class Playback(private val app: AppState) {
         endHandled = false
         refreshed = false
         loop = false
+        segments = emptyList(); skippable = null; justSkipped = null; skipped.clear()
         job?.cancel()
         job = app.scope.launch {
+            if (store.settings.value.sponsor) launch {
+                val s = SponsorBlock.segments(v.id, store.settings.value.sponsorCats)
+                if (video?.id == v.id) segments = s
+            }
             launch {
                 try {
                     val d = YouTube.details(v.id)
@@ -268,6 +324,7 @@ class Playback(private val app: AppState) {
         job?.cancel()
         player.stop()
         video = null; stream = null; details = null; error = null; errorAge = false; queue = emptyList()
+        segments = emptyList(); skippable = null; justSkipped = null
     }
 
     fun skipNext() {

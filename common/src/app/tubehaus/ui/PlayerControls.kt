@@ -1,5 +1,16 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.SponsorBlock
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.foundation.layout.requiredHeight
+import kotlin.math.abs
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
 import coil3.compose.AsyncImage
@@ -352,6 +363,7 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
             if (touch) TouchOverlay(app, st, fullscreen, dragging, { dragging = it; poke++ }, { dragging = null }, ::seekBy, { poke++ }, { settings = true })
             else MouseOverlay(app, st, fullscreen, dragging, { dragging = it; poke++ }, { dragging = null }, settings, { settings = it; poke++ }, playFocus.takeIf { tv })
         }
+        SponsorPill(app, lifted = shown || st.ended || !st.playing)
         // a thin progress line while the controls are hidden (not in full screen)
         if (!shown && !fullscreen && st.durationMs > 0 && st.playing) {
             Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(2.dp).background(Color(0x55FFFFFF))) {
@@ -624,13 +636,20 @@ private fun SeekBar(app: AppState, st: PlayerState, dragging: Float?, onDrag: (F
     if (st.durationMs <= 0) { Spacer(Modifier.height(24.dp)); return }
     val chapters = app.playback.chapters
     val board = app.playback.storyboard
+    val live = app.playback.video?.live == true
+    val heat = app.playback.details?.heat?.takeIf { app.store.settings.value.heatmap && !live }
     Track(
         value = dragging ?: (st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f),
         buffered = (st.bufferedMs.toFloat() / st.durationMs).coerceIn(0f, 1f),
         color = Red, onDrag = onDrag, onDone = onDone,
         modifier = Modifier.fillMaxWidth(),
         marks = chapters.drop(1).map { it.startMs.toFloat() / st.durationMs },
-        above = if (app.playback.video?.live == true) null else { f ->
+        heat = heat?.points ?: emptyList(),
+        spans = if (live || !app.store.settings.value.sponsor) emptyList() else app.playback.segments.map { s ->
+            (s.startMs.toFloat() / st.durationMs)..(s.endMs.toFloat() / st.durationMs) to Color(SponsorBlock.color(s.category))
+        },
+        heatSpan = (heat?.spanMs ?: 0L).toFloat() / st.durationMs,
+        above = if (live) null else { f ->
             val ms = (f * st.durationMs).toLong()
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (board != null && !app.store.settings.value.hideThumbs) {
@@ -645,7 +664,10 @@ private fun SeekBar(app: AppState, st: PlayerState, dragging: Float?, onDrag: (F
                         )
                     }
                 }
-                val title = chapters.lastOrNull { it.startMs <= ms }?.title ?: ""
+                // near the top of the wave: YouTube's own label for it
+                val peak = heat?.peakMs
+                val hot = peak != null && abs(ms - peak) <= maxOf(2000L, st.durationMs * 12 / 1000)
+                val title = if (hot) tr("Most replayed") else chapters.lastOrNull { it.startMs <= ms }?.title ?: ""
                 if (title.isNotEmpty()) Text(title, color = Color.White, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.widthIn(max = 220.dp).padding(top = 4.dp).background(Color(0x99000000), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp))
                 Text(durationMs(ms), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium,
@@ -667,6 +689,11 @@ internal fun Track(
     marks: List<Float> = emptyList(),
     /** drawn above the handle while it is held (the seek bar's preview) */
     above: (@Composable (Float) -> Unit)? = null,
+    /** "Most replayed": 0..1 for equal slices of the first [heatSpan] of the bar */
+    heat: List<Float> = emptyList(),
+    heatSpan: Float = 1f,
+    /** parts drawn in a colour of their own (SponsorBlock's); a single point shows as a short mark */
+    spans: List<Pair<ClosedFloatingPointRange<Float>, Color>> = emptyList(),
 ) {
     var hover by remember { mutableStateOf(false) }
     var held by remember { mutableStateOf<Float?>(null) }
@@ -707,9 +734,21 @@ internal fun Track(
     ) {
         val thick = if (active) 5.dp else 3.dp
         val wide = maxWidth
+        // "Most replayed": YouTube's wave standing on the bar while the pointer is on it or a finger drags
+        if (heat.size >= 2) {
+            val grow by animateFloatAsState(if (active) 1f else 0f, tween(180))
+            if (grow > 0f) Canvas(
+                Modifier.fillMaxWidth(heatSpan.coerceIn(0.05f, 1f)).requiredHeight(HEAT_H).offset(y = -(HEAT_H / 2 + thick / 2))
+                    .graphicsLayer { alpha = grow; scaleY = 0.3f + 0.7f * grow; transformOrigin = TransformOrigin(0.5f, 1f) },
+            ) { drawPath(heatPath(heat, size), Color(0x47FFFFFF)) }
+        }
         Box(Modifier.fillMaxWidth().height(thick).background(Color(0x44FFFFFF))) {
             if (buffered > 0f) Box(Modifier.fillMaxWidth(buffered).height(thick).background(Color(0x77FFFFFF)))
             Box(Modifier.fillMaxWidth(shown).height(thick).background(color))
+            for ((r, c) in spans) {
+                val a = r.start.coerceIn(0f, 1f)
+                Box(Modifier.offset(x = wide * a).width(maxOf(3.dp, wide * (r.endInclusive.coerceIn(a, 1f) - a))).height(thick).background(c))
+            }
             for (m in marks) if (m in 0.01f..0.99f) Box(Modifier.offset(x = wide * m - 1.dp).width(2.dp).height(thick).background(Color(0xCC000000)))
         }
         val full = constraints.maxWidth
@@ -722,6 +761,52 @@ internal fun Track(
         val knob = if (held != null) 20.dp else if (active) 14.dp else 12.dp
         Box(Modifier.offset(x = maxWidth * shown - knob / 2).size(knob).background(color, CircleShape))
     }
+}
+
+/** SponsorBlock on the video: "Skip sponsor" (or "Jump to the highlight"), and "Sponsor skipped · Undo" after one went by itself */
+@Composable
+private fun BoxScope.SponsorPill(app: AppState, lifted: Boolean) {
+    val pb = app.playback
+    val done = pb.justSkipped
+    val seg = done ?: pb.skippable ?: return
+    val name = tr(SponsorBlock.cat(seg.category)?.label ?: "Sponsor")
+    Row(
+        Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = if (lifted) 76.dp else 16.dp)
+            .clip(RoundedCornerShape(18.dp)).background(Color(0xD91F1F1F)).border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(18.dp))
+            .clickable { if (done != null) pb.undoSkip() else pb.skipSegment() }
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(8.dp).background(Color(SponsorBlock.color(seg.category)), CircleShape))
+        Spacer(Modifier.width(8.dp))
+        val text = when {
+            done != null -> tr("{n} skipped").replace("{n}", name)
+            seg.category == SponsorBlock.HIGHLIGHT -> tr("Jump to the highlight")
+            else -> tr("Skip {n}").replace("{n}", name)
+        }
+        Text(text, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        if (done != null) Text("   " + tr("Undo"), color = Color(0xFF3EA6FF), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        else Icon(Sym.SkipNext.fill, null, tint = Color.White, modifier = Modifier.padding(start = 4.dp).size(18.dp))
+    }
+}
+
+private val HEAT_H = 36.dp
+
+/** the wave through the slices' middles: flat curves between them, as YouTube draws it */
+private fun heatPath(pts: List<Float>, s: Size): Path = Path().apply {
+    val n = pts.size
+    fun x(i: Int) = s.width * (i + 0.5f) / n
+    fun y(i: Int) = s.height * (1f - maxOf(0.04f, pts[i]) * 0.92f)
+    moveTo(0f, s.height)
+    lineTo(0f, y(0))
+    lineTo(x(0), y(0))
+    for (i in 1 until n) {
+        val mx = (x(i - 1) + x(i)) / 2
+        cubicTo(mx, y(i - 1), mx, y(i), x(i), y(i))
+    }
+    lineTo(s.width, y(n - 1))
+    lineTo(s.width, s.height)
+    close()
 }
 
 /**

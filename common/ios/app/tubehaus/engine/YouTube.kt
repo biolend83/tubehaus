@@ -220,6 +220,10 @@ object YouTube {
         chapters = d.at("chapters").arr.mapNotNull { c ->
             Chapter(c.at("title").str ?: "", c.at("startMs").long ?: return@mapNotNull null, c.at("thumb").str ?: "")
         },
+        // "Most replayed" (an older engine.js has none: then there is no wave)
+        heat = d.at("heat")?.let { h ->
+            Heat(h.at("points").arr.map { it.str?.toFloatOrNull() ?: 0f }, h.at("spanMs").long ?: 0, h.at("peakMs").long)
+        } ?: Heat(),
     )
 
     private fun comment(c: JsonElement) = Comment(

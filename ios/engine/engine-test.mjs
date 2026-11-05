@@ -67,6 +67,7 @@ ok(sug.length > 3, `suggestions: ${sug.slice(0, 3).join(", ")}`);
 const st = await run("stream", "jNQXAC9IVRw");
 ok(st.hls && st.title, `stream: "${st.title}" by ${st.author}, hls ${!!st.hls}, ${st.video.length} video + ${st.audio.length} audio formats, client ${st.client}`);
 const d = await run("details", "dQw4w9WgXcQ");
+ok(d.heat && d.heat.points.length >= 10 && d.heat.spanMs > 0, `most replayed: ${d.heat?.points.length} points over ${d.heat?.spanMs} ms, peak ${d.heat?.peakMs} ms`);
 ok(d.related.length > 5 && d.commentsToken, `details: ${d.related.length} related, likes ${d.likesText}, subs ${d.subsText}, comments ${!!d.commentsToken}`);
 ok(d.title && d.author && d.channelId.startsWith("UC"), `details: title "${d.title}" by ${d.author} (${d.channelId})`);
 const c = await run("comments", d.commentsToken);

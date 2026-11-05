@@ -150,11 +150,10 @@ fun SearchScreen(app: AppState, initial: String) {
             LazyRow(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 // the kind of result, then the rest of YouTube's filters in a panel
                 item {
-                    FilterChip(filter.count > 0, onClick = { filters = true },
-                        label = { Text(tr("Filters") + if (filter.count > 0) " (${filter.count})" else "") })
+                    Chip(filter.count > 0, onClick = { filters = true }, label = tr("Filters") + if (filter.count > 0) " (${filter.count})" else "")
                 }
                 items(listOf(0 to "All", 1 to "Videos", 2 to "Channels", 3 to "Playlists", 4 to "Movies")) { (t, label) ->
-                    FilterChip(filter.type == t, onClick = { filter = filter.copy(type = t) }, label = { Text(tr(label)) })
+                    Chip(filter.type == t, onClick = { filter = filter.copy(type = t) }, label = tr(label))
                 }
             }
             // phones always show one card per row; wider screens can pick a list or a grid
@@ -166,12 +165,12 @@ fun SearchScreen(app: AppState, initial: String) {
         if (filters) SearchFilters(filter, { filter = it }) { filters = false }
         val pager = rememberPager(query to filter, { YouTube.search(query, filter) }, { YouTube.searchMore(it) })
         when {
-            pager.items.isEmpty() && pager.loading -> Busy()
+            pager.items.isEmpty() && pager.loading -> Skeleton(rows = !compact && !grid, wide = true)
             pager.items.isEmpty() && pager.error != null -> Problem(pager.error!!) { scope.launch { pager.load() } }
             pager.items.isEmpty() && pager.started -> Empty(tr("No results"))
             else -> ItemGrid(
                 pager.items.filter { !(app.noShorts && it is Video && it.short) }, app,
-                loading = pager.loading, onEnd = { pager.loadMore() }, rows = !compact && !grid,
+                loading = pager.loading, onEnd = { pager.loadMore() }, rows = !compact && !grid, wideRows = true,
             )
         }
         }
