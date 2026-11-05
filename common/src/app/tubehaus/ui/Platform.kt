@@ -35,6 +35,10 @@ interface Platform {
      * can't, and the release page is opened instead.
      */
     fun installUpdate(url: String, progress: (Float) -> Unit, done: (Boolean) -> Unit): Boolean = false
+    /** iPad: the YouTube engine (engine.js) is updated on its own; its version, null elsewhere */
+    fun engineVersion(): Int? = null
+    /** iPad: the newest engine.js from GitHub now: its version when one was put in, 0 when up to date, -1 when it failed */
+    suspend fun updateEngine(): Int = -1
     /** Android: hide the status and navigation bars outside full screen too */
     fun setImmersive(on: Boolean) {}
     /** screen brightness for the player's swipe gesture, 0..1; null where there is none (the desktop) */

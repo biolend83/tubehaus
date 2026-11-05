@@ -167,15 +167,27 @@ object Engine {
      * Every six hours at most: a newer engine.js from GitHub goes into the folder and is used
      * from the next call. A file that doesn't load as an engine is never saved.
      */
-    suspend fun update() {
+    suspend fun update(): Int = update(force = false)
+
+    /**
+     * [force]: now, from Settings, past GitHub's few-minute cache. The new version when one was put
+     * in, 0 when the one here is the newest, -1 when GitHub couldn't be reached (or sent a broken file).
+     */
+    suspend fun update(force: Boolean): Int {
         val now = Sys.nowMs()
-        if (now - lastCheck < CHECK_EVERY_MS) return
+        if (!force && now - lastCheck < CHECK_EVERY_MS) return 0
         lastCheck = now
-        val text = runCatching { Net.get(UPDATE_URL) }.getOrNull() ?: return
+        val text = runCatching { Net.get(if (force) "$UPDATE_URL?t=$now" else UPDATE_URL) }.getOrNull() ?: return -1
         val v = versionOf(text)
-        if (v <= maxOf(version, versionOf(read(folderFile)), versionOf(NSBundle.mainBundle.pathForResource("engine", "js")?.let(::read)))) return
-        if (start(text) == null) return
+        if (v < 0) return -1
+        if (v <= inUse()) return 0
+        if (start(text) == null) return -1
         runCatching { okio.Path.Companion.run { folderFile.toPath() }.writeText(text) }
         lock.withLock { ctx = null }
+        version = v; source = "folder"
+        return v
     }
+
+    /** the version used for the next call: the loaded one, or the higher of the folder's and the built-in */
+    fun inUse(): Int = maxOf(version, versionOf(read(folderFile)), versionOf(NSBundle.mainBundle.pathForResource("engine", "js")?.let(::read)))
 }

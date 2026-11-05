@@ -200,6 +200,29 @@ fun SettingsScreen(app: AppState) {
             item {
                 SItem(tr("Check now"), tr("See if a newer version is out")) { app.checkForUpdates(now = true, quiet = false) }
             }
+            app.platform.engineVersion()?.let { first ->
+                item {
+                    var engine by remember { mutableStateOf(first) }
+                    var busy by remember { mutableStateOf(false) }
+                    SItem(
+                        tr("Update the YouTube engine"),
+                        if (busy) tr("Checking…") else tr("Version {n}. Fixes for when YouTube changes something, without reinstalling the app").replace("{n}", engine.toString()),
+                    ) {
+                        if (!busy) {
+                            busy = true
+                            app.scope.launch {
+                                val r = app.platform.updateEngine()
+                                busy = false
+                                when {
+                                    r > 0 -> { engine = r; app.toast(tr("Engine updated to version {n}").replace("{n}", r.toString())) }
+                                    r == 0 -> app.toast(tr("The engine is up to date"))
+                                    else -> app.toast(tr("Couldn't reach GitHub. Try again later."))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             item { SItem(tr("What's new"), tr("What changed in the last versions")) { app.showWhatsNew() } }
             item {
                 SItem("TubeHaus $VERSION", tr("Everything happens on this device: it talks to YouTube directly, with no TubeHaus server, no account and no tracking. Your library and recommendations never leave it.")) {

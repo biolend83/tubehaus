@@ -14,7 +14,7 @@
 // collects those with __drain(), answers each with __reply(rid, json), and reads the outcome
 // with __take(id).
 
-var ENGINE_VERSION = 6;
+var ENGINE_VERSION = 7;
 
 // ------------------------------------------------------------------------------ host bridge
 var ENV = { hl: "en", gl: "US", players: null };
@@ -149,14 +149,24 @@ function findFirst(e, key, skip) {
   return r.length ? r[0] : null;
 }
 
-/** "1.2M views" / "1,234 views" → a number */
+/** "1.2M views" / "1,234 views" → a number; also "조회수 4,812만회", "1.3천만", "2억", "12万回", "3.4億" */
+var UNITS = { K: 1e3, "천": 1e3, "千": 1e3, M: 1e6, B: 1e9, "만": 1e4, "万": 1e4, "萬": 1e4, "억": 1e8, "億": 1e8, "亿": 1e8 };
 function countOf(s) {
   if (!s || !String(s).trim()) return 0;
-  var m = /([\d.,]+)\s*([KMB])?/i.exec(s);
+  var m = /(\d[\d.,]*)\s*([KMB]|[천만억千万萬億亿]+)?/i.exec(s);
   if (!m) return 0;
-  var mult = { K: 1e3, M: 1e6, B: 1e9 }[(m[2] || "").toUpperCase()] || 1;
-  var n = mult === 1 ? parseFloat(m[1].replace(/,/g, "").replace(/\./g, "")) : parseFloat(m[1].replace(/,/g, "."));
-  return Math.trunc((isNaN(n) ? 0 : n) * mult);
+  var raw = m[1].replace(/[.,]+$/, "");
+  var mult = 1, u = (m[2] || "").toUpperCase();
+  for (var i = 0; i < u.length; i++) mult *= UNITS[u[i]] || 1;
+  var n;
+  if (mult === 1) n = parseFloat(raw.replace(/[.,]/g, ""));
+  else if (raw.indexOf(",") >= 0 && raw.indexOf(".") >= 0)
+    n = raw.lastIndexOf(",") > raw.lastIndexOf(".") ? parseFloat(raw.replace(/\./g, "").replace(",", ".")) : parseFloat(raw.replace(/,/g, ""));
+  else if (raw.indexOf(",") >= 0) n = /^\d{1,3}(,\d{3})+$/.test(raw) ? parseFloat(raw.replace(/,/g, "")) : parseFloat(raw.replace(",", "."));
+  else n = parseFloat(raw);
+  if (isNaN(n)) return 0;
+  // 2.3억 is 230000000, not 229999999.99...
+  return mult === 1 ? Math.trunc(n) : Math.round(n * mult);
 }
 
 /** "1:02:03" → 3723 */

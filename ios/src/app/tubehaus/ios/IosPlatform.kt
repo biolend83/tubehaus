@@ -101,6 +101,13 @@ class IosPlatform : Platform {
     // the app draws full screen itself; iOS keeps the clock and battery over the video unless told
     override fun setFullscreen(on: Boolean) = hideBars(on)
 
+    override fun engineVersion(): Int = app.tubehaus.engine.Engine.inUse()
+    override suspend fun updateEngine(): Int {
+        val r = app.tubehaus.engine.Engine.update(force = true)
+        runCatching { app.tubehaus.patch.TubePatch.update(force = true) }
+        return r
+    }
+
     override fun brightness(): Float = UIScreen.mainScreen.brightness.toFloat()
     override fun setBrightness(v: Float) { UIScreen.mainScreen.brightness = v.toDouble().coerceIn(0.0, 1.0) }
 }

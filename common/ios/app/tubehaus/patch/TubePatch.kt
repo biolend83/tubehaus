@@ -118,9 +118,9 @@ object TubePatch {
     }
 
     /** every six hours at most: a newer patch.js from GitHub into the folder, then loaded */
-    suspend fun update() {
+    suspend fun update(force: Boolean = false) {
         val now = Sys.nowMs()
-        if (now - lastCheck < CHECK_EVERY_MS) return
+        if (!force && now - lastCheck < CHECK_EVERY_MS) return
         lastCheck = now
         val text = runCatching { Net.get(UPDATE_URL) }.getOrNull() ?: return
         if (versionOf(text) <= maxOf(version, versionOf(read(folderFile)), versionOf(builtIn()))) return

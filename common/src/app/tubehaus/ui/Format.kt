@@ -34,10 +34,20 @@ fun ago(epoch: Long): String {
 }
 
 @Patchable
-fun compact(n: Long): String = when {
+fun compact(n: Long): String = if (L.lang == "ko") compactKo(n) else when {
     n >= 1_000_000_000 -> (oneDecimal(n / 1e9) + "B").replace(".0B", "B")
     n >= 1_000_000 -> (oneDecimal(n / 1e6) + "M").replace(".0M", "M")
     n >= 1_000 -> (oneDecimal(n / 1e3) + "K").replace(".0K", "K")
+    else -> n.toString()
+}
+
+/** as YouTube writes it in Korean: 1.2천, 3.4만, 48만, 4812만, 2.3억 */
+private fun compactKo(n: Long): String = when {
+    n >= 1_000_000_000 -> "${n / 100_000_000}억"
+    n >= 100_000_000 -> (oneDecimal(n / 1e8) + "억").replace(".0억", "억")
+    n >= 100_000 -> "${n / 10_000}만"
+    n >= 10_000 -> (oneDecimal(n / 1e4) + "만").replace(".0만", "만")
+    n >= 1_000 -> (oneDecimal(n / 1e3) + "천").replace(".0천", "천")
     else -> n.toString()
 }
 
