@@ -43,8 +43,24 @@ class TubeApp : Application() {
 
 val Context.tube: TubeApp get() = applicationContext as TubeApp
 
+/** the release key's certificate (TubeHaus-release-*.apk); TubeHaus-*.apk is signed with a debug key */
+private const val RELEASE_KEY_SHA256 = "2d827d6ab148e56e3b45d6b84ec6e7cf8e36a4c6bb90babbb994f2fb7dfea595"
+
 class AndroidPlatform(private val app: Application) : Platform {
     override val name = "android"
+
+    /** the certificate this copy is signed with is the release key's (its SHA-256, as apksigner prints it) */
+    override val releaseKey: Boolean by lazy {
+        runCatching {
+            val pm = app.packageManager
+            val certs = if (Build.VERSION.SDK_INT >= 28)
+                pm.getPackageInfo(app.packageName, PackageManager.GET_SIGNING_CERTIFICATES).signingInfo?.apkContentsSigners
+            else @Suppress("DEPRECATION") pm.getPackageInfo(app.packageName, PackageManager.GET_SIGNATURES).signatures
+            certs.orEmpty().any { s ->
+                java.security.MessageDigest.getInstance("SHA-256").digest(s.toByteArray()).joinToString("") { "%02x".format(it) } == RELEASE_KEY_SHA256
+            }
+        }.getOrDefault(false)
+    }
     override val dataDir: Path = File(app.filesDir, "tubehaus").toOkioPath()
     override val cacheDir: Path = app.cacheDir.toOkioPath()
     /** a TV says so by its UI mode (Android TV, Google TV) or the leanback feature */
