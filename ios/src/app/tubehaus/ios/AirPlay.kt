@@ -18,7 +18,7 @@ fun AirPlayButton(modifier: Modifier) {
             AVRoutePickerView().apply {
                 backgroundColor = UIColor.clearColor
                 tintColor = UIColor.whiteColor
-                activeTintColor = UIColor.systemBlueColor
+                activeTintColor = UIColor.colorWithRed(0.0, 0.48, 1.0, 1.0)   // the system blue
                 prioritizesVideoDevices = true
             }
         },
