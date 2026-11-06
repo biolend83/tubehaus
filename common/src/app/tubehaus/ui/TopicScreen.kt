@@ -57,7 +57,7 @@ fun TopicScreen(app: AppState, key: String) {
     val noShorts = app.noShorts
     val items: List<Item> = pager.items.filter { !(noShorts && it is Video && it.short) && !(it is Video && it.members) }
     // a topic opened from "More" has a title above it; the top tabs already say which one is open
-    val titled = key !in TOP_TOPICS
+    val titled = key !in TOP_TOPICS || app.platform.tv
     when {
         items.isEmpty() && pager.error != null -> Problem(pager.error!!) { scope.launch { pager.load() } }
         // grey shapes while the first page comes, as on YouTube

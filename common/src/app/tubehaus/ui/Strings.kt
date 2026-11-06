@@ -460,6 +460,13 @@ private val KO by lazy { mapOf(
     "The connection to the device broke" to "기기와의 연결이 끊어졌어요",
     "The device closed the connection" to "기기가 연결을 닫았어요",
     "The device stopped playing" to "기기에서 재생이 멈췄어요",
+    "Press Back again to leave" to "뒤로를 한 번 더 누르면 나가요",
+    "See all" to "모두 보기",
+    "Continue watching" to "이어서 보기",
+    "Recommended for you" to "맞춤 동영상",
+    "Latest from your subscriptions" to "구독 채널의 최신 동영상",
+    "More to watch" to "더 볼거리",
+    "Videos you watch, save and like show up here" to "시청하고 저장하고 좋아요한 동영상이 여기에 나와요",
 ) }
 
 // Español. Machine-made, not yet read by a native speaker: corrections welcome
@@ -921,6 +928,13 @@ private val ES by lazy { mapOf(
     "The connection to the device broke" to "Se cortó la conexión con el dispositivo",
     "The device closed the connection" to "El dispositivo cerró la conexión",
     "The device stopped playing" to "El dispositivo dejó de reproducir",
+    "Press Back again to leave" to "Pulsa Atrás otra vez para salir",
+    "See all" to "Ver todo",
+    "Continue watching" to "Seguir viendo",
+    "Recommended for you" to "Recomendados para ti",
+    "Latest from your subscriptions" to "Lo último de tus suscripciones",
+    "More to watch" to "Más para ver",
+    "Videos you watch, save and like show up here" to "Aquí aparecen los vídeos que ves, guardas y te gustan",
 ) }
 
 // 日本語. Machine-made, not yet read by a native speaker: corrections welcome
@@ -1382,6 +1396,13 @@ private val JA by lazy { mapOf(
     "The connection to the device broke" to "デバイスとの接続が切れました",
     "The device closed the connection" to "デバイスが接続を閉じました",
     "The device stopped playing" to "デバイスで再生が止まりました",
+    "Press Back again to leave" to "もう一度戻るを押すと終了します",
+    "See all" to "すべて表示",
+    "Continue watching" to "続きを見る",
+    "Recommended for you" to "あなたへのおすすめ",
+    "Latest from your subscriptions" to "登録チャンネルの最新動画",
+    "More to watch" to "その他のおすすめ",
+    "Videos you watch, save and like show up here" to "視聴・保存・高評価した動画がここに表示されます",
 ) }
 
 // Deutsch. Machine-made, not yet read by a native speaker: corrections welcome
@@ -1843,6 +1864,13 @@ private val DE by lazy { mapOf(
     "The connection to the device broke" to "Die Verbindung zum Gerät ist abgebrochen",
     "The device closed the connection" to "Das Gerät hat die Verbindung beendet",
     "The device stopped playing" to "Das Gerät hat die Wiedergabe beendet",
+    "Press Back again to leave" to "Zum Beenden noch einmal Zurück drücken",
+    "See all" to "Alle ansehen",
+    "Continue watching" to "Weiterschauen",
+    "Recommended for you" to "Für dich empfohlen",
+    "Latest from your subscriptions" to "Neu von deinen Abos",
+    "More to watch" to "Mehr zum Ansehen",
+    "Videos you watch, save and like show up here" to "Videos, die du ansiehst, speicherst und magst, erscheinen hier",
 ) }
 
 // 简体中文 (Simplified Chinese). Machine-made, not yet read by a native speaker: corrections welcome
@@ -2304,6 +2332,13 @@ private val ZH by lazy { mapOf(
     "The connection to the device broke" to "与设备的连接中断了",
     "The device closed the connection" to "设备关闭了连接",
     "The device stopped playing" to "设备停止了播放",
+    "Press Back again to leave" to "再按一次返回键退出",
+    "See all" to "查看全部",
+    "Continue watching" to "继续观看",
+    "Recommended for you" to "为你推荐",
+    "Latest from your subscriptions" to "订阅频道的最新视频",
+    "More to watch" to "更多内容",
+    "Videos you watch, save and like show up here" to "你观看、保存和点赞的视频会显示在这里",
 ) }
 
 // Português (Portuguese). Machine-made, not yet read by a native speaker: corrections welcome
@@ -2765,6 +2800,13 @@ private val PT by lazy { mapOf(
     "The connection to the device broke" to "A conexão com o dispositivo caiu",
     "The device closed the connection" to "O dispositivo encerrou a conexão",
     "The device stopped playing" to "O dispositivo parou a reprodução",
+    "Press Back again to leave" to "Pressione Voltar de novo para sair",
+    "See all" to "Ver tudo",
+    "Continue watching" to "Continuar assistindo",
+    "Recommended for you" to "Recomendados para você",
+    "Latest from your subscriptions" to "Novidades das suas inscrições",
+    "More to watch" to "Mais para assistir",
+    "Videos you watch, save and like show up here" to "Os vídeos que você assiste, salva e curte aparecem aqui",
 ) }
 
 // Français (French). Machine-made, not yet read by a native speaker: corrections welcome
@@ -3226,6 +3268,13 @@ private val FR by lazy { mapOf(
     "The connection to the device broke" to "La connexion à l'appareil a été coupée",
     "The device closed the connection" to "L'appareil a fermé la connexion",
     "The device stopped playing" to "L'appareil a arrêté la lecture",
+    "Press Back again to leave" to "Appuyez de nouveau sur Retour pour quitter",
+    "See all" to "Tout afficher",
+    "Continue watching" to "Reprendre la lecture",
+    "Recommended for you" to "Recommandé pour vous",
+    "Latest from your subscriptions" to "Les dernières vidéos de vos abonnements",
+    "More to watch" to "Plus à regarder",
+    "Videos you watch, save and like show up here" to "Les vidéos que vous regardez, enregistrez et aimez s'affichent ici",
 ) }
 
 // Русский (Russian). Machine-made, not yet read by a native speaker: corrections welcome
@@ -3687,6 +3736,13 @@ private val RU by lazy { mapOf(
     "The connection to the device broke" to "Соединение с устройством прервалось",
     "The device closed the connection" to "Устройство закрыло соединение",
     "The device stopped playing" to "Устройство остановило воспроизведение",
+    "Press Back again to leave" to "Нажмите «Назад» ещё раз, чтобы выйти",
+    "See all" to "Показать все",
+    "Continue watching" to "Продолжить просмотр",
+    "Recommended for you" to "Рекомендуем вам",
+    "Latest from your subscriptions" to "Новое на ваших каналах",
+    "More to watch" to "Ещё видео",
+    "Videos you watch, save and like show up here" to "Здесь появятся видео, которые вы смотрите, сохраняете и отмечаете",
 ) }
 
 // हिन्दी (Hindi). Machine-made, not yet read by a native speaker: corrections welcome
@@ -4148,6 +4204,13 @@ private val HI by lazy { mapOf(
     "The connection to the device broke" to "डिवाइस से कनेक्शन टूट गया",
     "The device closed the connection" to "डिवाइस ने कनेक्शन बंद कर दिया",
     "The device stopped playing" to "डिवाइस ने चलाना बंद कर दिया",
+    "Press Back again to leave" to "बाहर जाने के लिए फिर से बैक दबाएं",
+    "See all" to "सभी देखें",
+    "Continue watching" to "देखना जारी रखें",
+    "Recommended for you" to "आपके लिए सुझाए गए",
+    "Latest from your subscriptions" to "आपकी सदस्यताओं से नए वीडियो",
+    "More to watch" to "देखने के लिए और",
+    "Videos you watch, save and like show up here" to "आप जो वीडियो देखते, सहेजते और पसंद करते हैं, वे यहां दिखेंगे",
 ) }
 
 // Bahasa Indonesia (Indonesian). Machine-made, not yet read by a native speaker: corrections welcome
@@ -4609,6 +4672,13 @@ private val ID by lazy { mapOf(
     "The connection to the device broke" to "Koneksi ke perangkat terputus",
     "The device closed the connection" to "Perangkat menutup koneksi",
     "The device stopped playing" to "Perangkat berhenti memutar",
+    "Press Back again to leave" to "Tekan Kembali sekali lagi untuk keluar",
+    "See all" to "Lihat semua",
+    "Continue watching" to "Lanjutkan menonton",
+    "Recommended for you" to "Direkomendasikan untuk Anda",
+    "Latest from your subscriptions" to "Terbaru dari langganan Anda",
+    "More to watch" to "Tontonan lainnya",
+    "Videos you watch, save and like show up here" to "Video yang Anda tonton, simpan, dan sukai muncul di sini",
 ) }
 
 // Türkçe (Turkish). Machine-made, not yet read by a native speaker: corrections welcome
@@ -5070,6 +5140,13 @@ private val TR by lazy { mapOf(
     "The connection to the device broke" to "Cihazla bağlantı koptu",
     "The device closed the connection" to "Cihaz bağlantıyı kapattı",
     "The device stopped playing" to "Cihaz oynatmayı durdurdu",
+    "Press Back again to leave" to "Çıkmak için Geri'ye tekrar basın",
+    "See all" to "Tümünü gör",
+    "Continue watching" to "İzlemeye devam et",
+    "Recommended for you" to "Sizin için önerilenler",
+    "Latest from your subscriptions" to "Aboneliklerinizden en yeniler",
+    "More to watch" to "İzlenecek daha fazlası",
+    "Videos you watch, save and like show up here" to "İzlediğiniz, kaydettiğiniz ve beğendiğiniz videolar burada görünür",
 ) }
 
 // বাংলা (Bengali). Machine-made, not yet read by a native speaker: corrections welcome
@@ -5531,4 +5608,11 @@ private val BN by lazy { mapOf(
     "The connection to the device broke" to "ডিভাইসের সাথে সংযোগ ভেঙে গেছে",
     "The device closed the connection" to "ডিভাইসটি সংযোগ বন্ধ করেছে",
     "The device stopped playing" to "ডিভাইসটি চালানো বন্ধ করেছে",
+    "Press Back again to leave" to "বের হতে আবার ব্যাক চাপুন",
+    "See all" to "সব দেখুন",
+    "Continue watching" to "দেখা চালিয়ে যান",
+    "Recommended for you" to "আপনার জন্য প্রস্তাবিত",
+    "Latest from your subscriptions" to "আপনার সদস্যতা থেকে সর্বশেষ",
+    "More to watch" to "আরও দেখার মতো",
+    "Videos you watch, save and like show up here" to "আপনি যে ভিডিওগুলো দেখেন, সংরক্ষণ করেন ও পছন্দ করেন সেগুলো এখানে দেখাবে",
 ) }
