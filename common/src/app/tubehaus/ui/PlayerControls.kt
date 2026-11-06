@@ -28,6 +28,7 @@ import kotlin.math.pow
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
@@ -38,6 +39,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -109,21 +111,22 @@ import kotlinx.coroutines.delay
 @Composable
 fun VideoArea(app: AppState, modifier: Modifier = Modifier, fullscreen: Boolean = false, sideGestures: Boolean = false) {
     Box(modifier.background(Color.Black)) {
-        app.platform.player.View(Modifier.fillMaxSize())
+        app.player.View(Modifier.fillMaxSize())
         Controls(app, fullscreen, sideGestures)
     }
 }
 
 /** Keyboard shortcuts while a video is on screen (YouTube's). True when the key was used. */
 fun playerKey(app: AppState, key: Key): Boolean {
-    val player = app.platform.player
+    val player = app.player
     val st = player.state.value
     if (st.videoId == null) return false
     fun seekBy(sec: Int) = player.seekTo((st.positionMs + sec * 1000L).coerceIn(0, maxOf(0, st.durationMs - 500)))
     fun volumeBy(d: Float) {
         val v = (st.volume + d).coerceIn(0f, 1f)
         player.setVolume(v); player.setMuted(false)
-        app.store.settings.update { it.copy(volume = v) }
+        // a TV's volume while casting is the TV's own, not the one this device remembers
+        if (app.casting.link == null) app.store.settings.update { it.copy(volume = v) }
     }
     when (key) {
         Key.Spacebar, Key.K -> if (st.playing) player.pause() else player.play()
@@ -155,7 +158,7 @@ private fun actual(p: Float) = p.coerceIn(0f, 1f).toDouble().pow(2.2).toFloat().
 @Composable
 private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) {
     val touch = app.platform.touch
-    val player = app.platform.player
+    val player = app.player
     val st by player.state.collectAsState()
     var shown by remember { mutableStateOf(true) }
     var poke by remember { mutableIntStateOf(0) }          // any touch or mouse move restarts the hide timer
@@ -168,6 +171,7 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
     val videoFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
     var toBar by remember { mutableStateOf(false) }
+    var inBar by remember { mutableStateOf(false) }
     var eatBack by remember { mutableStateOf(false) }
     // read inside the pointer loops, which outlive the composition they started in
     val playingNow by rememberUpdatedState(st.playing)
@@ -185,9 +189,17 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
     if (tv) {
         LaunchedEffect(Unit) { runCatching { videoFocus.requestFocus() } }
         // the buttons fade away: the focus goes back to the video instead of getting lost
-        LaunchedEffect(shown) { if (!shown) runCatching { videoFocus.requestFocus() } }
+        LaunchedEffect(shown) { if (!shown) { inBar = false; runCatching { videoFocus.requestFocus() } } }
+        // the buttons may still be fading in: keep asking until the focus is on them
         LaunchedEffect(toBar, shown) {
-            if (toBar && shown) { delay(60); runCatching { playFocus.requestFocus() }; toBar = false }
+            if (toBar && shown) {
+                for (i in 0 until 10) {
+                    delay(60)
+                    if (inBar) break
+                    runCatching { playFocus.requestFocus() }
+                }
+                toBar = false
+            }
         }
     }
 
@@ -212,7 +224,10 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
                 seekBy(side * 10)
                 jump = side to ((if (jump?.first == side) jump!!.second else 0) + 10)
             }
-            Key.DirectionUp, Key.DirectionDown -> if (fullscreen) toBar = true else return false
+            // down always goes to the buttons (settings, full screen), also in the small player on the
+            // watch page; from there down again leaves for the page. Up leaves the small player
+            Key.DirectionDown -> toBar = true
+            Key.DirectionUp -> if (fullscreen) toBar = true else return false
             else -> return playerKey(app, key)
         }
         shown = true; poke++
@@ -361,7 +376,7 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
         }
         AnimatedVisibility(shown || st.ended || !st.playing && !touch, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             if (touch) TouchOverlay(app, st, fullscreen, dragging, { dragging = it; poke++ }, { dragging = null }, ::seekBy, { poke++ }, { settings = true })
-            else MouseOverlay(app, st, fullscreen, dragging, { dragging = it; poke++ }, { dragging = null }, settings, { settings = it; poke++ }, playFocus.takeIf { tv })
+            else MouseOverlay(app, st, fullscreen, dragging, { dragging = it; poke++ }, { dragging = null }, settings, { settings = it; poke++ }, playFocus.takeIf { tv }) { inBar = it }
         }
         SponsorPill(app, lifted = shown || st.ended || !st.playing)
         // a thin progress line while the controls are hidden (not in full screen)
@@ -386,7 +401,7 @@ private fun TouchOverlay(
     app: AppState, st: PlayerState, fullscreen: Boolean, dragging: Float?,
     onDrag: (Float) -> Unit, onDragEnd: () -> Unit, seekBy: (Int) -> Unit, poke: () -> Unit, openSettings: () -> Unit,
 ) {
-    val player = app.platform.player
+    val player = app.player
     Box(Modifier.fillMaxSize().background(Color(0x66000000))) {
         // top: a chevron that folds the video into the mini player (in full screen: back out of it),
         // the title and channel in full screen; captions and settings on the right
@@ -402,6 +417,7 @@ private fun TouchOverlay(
                     if (!v?.author.isNullOrEmpty()) Text(v!!.author, color = Color(0xCCFFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1)
                 }
             }
+            CastButton(app) { poke() }
             CaptionsButton(app, st) { poke() }
             IconButton(onClick = openSettings) { Icon(Sym.Settings.outline, tr("Settings"), tint = Color.White) }
         }
@@ -476,8 +492,9 @@ private fun MouseOverlay(
     app: AppState, st: PlayerState, fullscreen: Boolean, dragging: Float?,
     onDrag: (Float) -> Unit, onDragEnd: () -> Unit, settings: Boolean, setSettings: (Boolean) -> Unit,
     playFocus: FocusRequester? = null,
+    onBarFocus: (Boolean) -> Unit = {},
 ) {
-    val player = app.platform.player
+    val player = app.player
     Box(Modifier.fillMaxSize()) {
         // full screen: the title over a shade at the top
         if (fullscreen) {
@@ -506,6 +523,7 @@ private fun MouseOverlay(
         // bottom: seek bar, then the buttons
         Column(
             Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                .onFocusChanged { onBarFocus(it.hasFocus) }
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xAA000000))))
                 .padding(horizontal = 12.dp).padding(top = 24.dp, bottom = 4.dp),
         ) {
@@ -521,6 +539,7 @@ private fun MouseOverlay(
                 TimeText(app, st, dragging)
                 Spacer(Modifier.weight(1f))
                 if (st.speed != 1f) Text("${st.speed}x", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(end = 4.dp))
+                CastButton(app, iconSize = 26)
                 CaptionsButton(app, st) {}
                 Box {
                     Bar(Sym.Settings.fill, tr("Settings")) { setSettings(!settings) }
@@ -541,14 +560,14 @@ private fun Bar(icon: ImageVector, label: String, modifier: Modifier = Modifier,
 
 @Composable
 private fun Volume(app: AppState, st: PlayerState) {
-    val player = app.platform.player
+    val player = app.player
     Bar(if (st.muted || st.volume == 0f) Sym.VolumeOff.fill else Sym.VolumeUp.fill, tr(if (st.muted) "Unmute" else "Mute")) {
         player.setMuted(!st.muted)
     }
     Track(
         value = if (st.muted) 0f else st.volume, color = Color.White,
         onDrag = { v -> player.setMuted(false); player.setVolume(v) },
-        onDone = { v -> app.store.settings.update { it.copy(volume = v) } },
+        onDone = { v -> if (app.casting.link == null) app.store.settings.update { it.copy(volume = v) } },
         modifier = Modifier.width(88.dp).padding(end = 4.dp),
     )
 }
@@ -577,7 +596,7 @@ private fun TimeText(app: AppState, st: PlayerState, dragging: Float?) {
 /** every chapter with its picture and time; the one playing is marked, a press jumps there */
 @Composable
 internal fun ChaptersSheet(app: AppState, onClose: () -> Unit) {
-    val player = app.platform.player
+    val player = app.player
     val pos = player.state.collectAsState().value.positionMs
     val chapters = app.playback.chapters
     val now = chapters.lastOrNull { it.startMs <= pos }
@@ -613,7 +632,7 @@ private fun FullscreenButton(app: AppState, fullscreen: Boolean) {
 /** On or off with one press: the track in your language, or YouTube's translation of one. */
 @Composable
 private fun CaptionsButton(app: AppState, st: PlayerState, onPress: () -> Unit) {
-    val player = app.platform.player
+    val player = app.player
     val caps = app.playback.stream?.captions ?: emptyList()
     if (caps.isEmpty()) return
     IconButton(onClick = {
@@ -765,7 +784,7 @@ internal fun Track(
 
 /** SponsorBlock on the video: "Skip sponsor" (or "Jump to the highlight"), and "Sponsor skipped · Undo" after one went by itself */
 @Composable
-private fun BoxScope.SponsorPill(app: AppState, lifted: Boolean) {
+internal fun BoxScope.SponsorPill(app: AppState, lifted: Boolean) {
     val pb = app.playback
     val done = pb.justSkipped
     val seg = done ?: pb.skippable ?: return
@@ -814,10 +833,11 @@ private fun heatPath(pts: List<Float>, s: Size): Path = Path().apply {
  * a sheet on phones, a menu on the desktop.
  */
 @Composable
-private fun ColumnScope.SettingsPages(app: AppState, dismiss: () -> Unit) {
-    val player = app.platform.player
+internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compose.runtime.MutableState<String>? = null, dismiss: () -> Unit) {
+    val player = app.player
     val st by player.state.collectAsState()
-    var page by remember { mutableStateOf("") }
+    val own = remember { mutableStateOf("") }
+    var page by (pageState ?: own)
     when (page) {
         "" -> {
             SheetRow(Sym.HighQuality.outline, tr("Quality"), if (st.height > 0) "${st.height}p" else tr("Auto")) { page = "q" }
@@ -902,18 +922,35 @@ private fun ColumnScope.SettingsPages(app: AppState, dismiss: () -> Unit) {
     }
 }
 
+/** a row of the settings sheet; with a remote or keyboard the focused one turns solid, so you can see where you are */
+@Composable
+private fun SheetLine(onClick: () -> Unit, content: @Composable androidx.compose.foundation.layout.RowScope.(Boolean) -> Unit) {
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val focused by src.collectIsFocusedAsState()
+    val cs = MaterialTheme.colorScheme
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides if (focused) cs.surface else androidx.compose.material3.LocalContentColor.current) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp).clip(RoundedCornerShape(12.dp))
+                .background(if (focused) cs.onSurface else Color.Transparent)
+                .clickable(src, androidx.compose.foundation.LocalIndication.current, onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) { content(focused) }
+    }
+}
+
 @Composable
 private fun SheetRow(icon: ImageVector, label: String, value: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+    SheetLine(onClick) { focused ->
         Icon(icon, null)
         Text(label, Modifier.weight(1f).padding(start = 20.dp), style = MaterialTheme.typography.bodyLarge)
-        Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, color = if (focused) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 private fun Pick(label: String, on: Boolean, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+    SheetLine(onClick) {
         Box(Modifier.width(40.dp)) { if (on) Icon(Sym.Check.fill, null) }
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }

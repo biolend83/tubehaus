@@ -1,0 +1,4 @@
+- Cast to a TV: Google Cast from Android and the desktop, without Google Play Services
+- A new TV layout like the YouTube TV app: a menu on the left, a big picture on top, rows of videos and a full-screen player
+- Taste profiles: separate recommendations for separate moods, and export/import them as a file
+- Eight more languages: Chinese, Portuguese, French, Russian, Hindi, Indonesian, Turkish and Bengali

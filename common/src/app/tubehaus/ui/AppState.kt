@@ -161,6 +161,9 @@ class AppState(val platform: Platform, val store: Store) {
 
     val feed = Feed(store)
     val rec = Recommender(store, feed)
+    /** the player in use: this device's own, or a TV's while casting */
+    val player by lazy { SwitchPlayer(platform.player, scope) }
+    val casting by lazy { Casting(this) }
     val playback = Playback(this)
     /** videos saved to watch without internet */
     val offline by lazy { Offline(this) }
@@ -192,7 +195,11 @@ class AppState(val platform: Platform, val store: Store) {
     }
 
     /** false when there is nowhere to go back to (the app may close) */
+    /** the TV's pages: Back first moves to the menu, and on Home asks to be pressed again (TvApp) */
+    var tvBack: (() -> Boolean)? = null
+
     fun back(): Boolean {
+        tvBack?.let { if (it()) return true }
         if (fullscreen) { setFull(false); return true }
         if (stack.size > 1) { lastMove = -1; stack.removeAt(stack.size - 1); return true }
         if (stack.last() != Screen.Home) { lastMove = 0; stack[0] = Screen.Home; return true }

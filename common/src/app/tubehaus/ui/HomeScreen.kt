@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.tubehaus.engine.Item
 import app.tubehaus.rec.Learn
+import app.tubehaus.rec.Profiles
 import kotlinx.coroutines.launch
 
 /** Remembered across visits to the tab so going back to Home doesn't reshuffle it. */
@@ -58,7 +59,8 @@ fun HomeScreen(app: AppState) {
         }
         return
     }
-    var askTopics by remember { mutableStateOf(app.rec.needsTopics()) }
+    val profile = app.store.settings.state.collectAsState().value.profile
+    var askTopics by remember(profile) { mutableStateOf(app.rec.needsTopics()) }
     if (askTopics) {
         TopicPicker(app) { askTopics = false }
         return
@@ -104,6 +106,7 @@ fun HomeScreen(app: AppState) {
                     horizontalArrangement = Arrangement.spacedBy(if (LocalCompact.current) 8.dp else 12.dp), verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RegionPicker(app) { HomeCache.items.clear(); app.rec.clearCache(); scope.launch { load(false) } }
+                    ProfilePicker(app) { HomeCache.items.clear(); app.rec.clearCache(); scope.launch { load(false) } }
                     Chip(!app.discover, onClick = { show(false) }, label = tr("All"))
                     Chip(app.discover, onClick = { show(true) }, label = tr("Discover"), icon = Sym.Explore.outline)
                     Chip(false, onClick = fresh, label = tr("Refresh"), icon = Sym.Replay.outline)
@@ -113,6 +116,48 @@ fun HomeScreen(app: AppState) {
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             },
         )
+    }
+}
+
+fun profileLabel(name: String) = name.ifEmpty { tr("Main") }
+
+/** Imports a profile file; shows what it was added as, or returns null (nothing said) when it isn't one. */
+fun importProfile(app: AppState, text: String): String? =
+    Profiles.import(app.store, text, tr("Imported"))?.also { n ->
+        app.toast(tr("Imported the profile “{p}”").replace("{p}", n))
+    }
+
+/** the home feed is built again next time (after a profile changed elsewhere) */
+fun clearHome() = HomeCache.items.clear()
+
+/**
+ * Taste profiles (rec/Profiles): a chip with the one in use, the others and a new one in its menu.
+ * With only the main profile it is just the icon.
+ */
+@Composable
+fun ProfilePicker(app: AppState, changed: () -> Unit) {
+    val s by app.store.settings.state.collectAsState()
+    val parked by app.store.profiles.state.collectAsState()
+    val names = remember(s.profile, parked) { Profiles.names(app.store) }
+    var open by remember { mutableStateOf(false) }
+    var naming by remember { mutableStateOf(false) }
+    Box {
+        Chip(false, onClick = { open = true }, label = if (names.size > 1) profileLabel(s.profile) else "", icon = Sym.Psychology.outline)
+        DropdownMenu(open, onDismissRequest = { open = false }) {
+            for (n in names) DropdownMenuItem(
+                text = { Text(profileLabel(n)) },
+                leadingIcon = { if (n == s.profile) androidx.compose.material3.Icon(Sym.Check.outline, null) },
+                onClick = { open = false; if (n != s.profile) { Profiles.switch(app.store, n); changed() } },
+            )
+            DropdownMenuItem(text = { Text(tr("New profile")) }, leadingIcon = { androidx.compose.material3.Icon(Sym.Add.outline, null) },
+                onClick = { open = false; naming = true })
+            DropdownMenuItem(text = { Text(tr("Manage profiles")) }, leadingIcon = { androidx.compose.material3.Icon(Sym.Settings.outline, null) },
+                onClick = { open = false; app.go(Screen.Learned) })
+        }
+    }
+    if (naming) NameDialog(tr("New profile"), "", { naming = false }) { name ->
+        if (name in names) app.toast(tr("That name is already used"))
+        else { Profiles.switch(app.store, name); changed() }
     }
 }
 
@@ -162,6 +207,8 @@ fun TopicPicker(app: AppState, done: () -> Unit) {
             Modifier.widthIn(max = 640.dp).verticalScroll(rememberScrollState()).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            val profile = app.store.settings.state.collectAsState().value.profile
+            if (profile.isNotEmpty()) Box(Modifier.padding(bottom = 12.dp)) { ProfilePicker(app) { clearHome(); app.rec.clearCache() } }
             Text(tr("What do you like to watch?"), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
             Text(
                 tr("Pick a few topics to start. Your recommendations are worked out on this device, from what you watch - nothing leaves it."),

@@ -17,9 +17,9 @@ private val ITEM_KEYS = setOf(
 private val ID = Regex("[\\w-]{11}")
 private val UC = Regex("UC[\\w-]{22}")
 /** "1.2M views", "조회수 79만회", "12K watching" */
-private val VIEWS = Regex("(?i)\\bviews?\\b|\\bwatching\\b|조회수|시청 ?중")
+private val VIEWS = Regex("(?i)\\bviews?\\b|\\bwatching\\b|조회수|시청 ?중|vues?\\b|visualiza|просмотр|व्यू|ditonton|görüntüleme|ভিউ|观看|回視聴|Aufrufe")
 /** "3 days ago", "3일 전", "Streamed 2 weeks ago" */
-private val AGO = Regex("(?i)\\bago\\b|전$|^streamed|스트리밍")
+private val AGO = Regex("(?i)\\bago\\b|전\$|^streamed|스트리밍|^il y a|^há |назад|पहले|yang lalu|önce|আগে|前\$|^hace |^vor ")
 
 /** Every item below [root], in order, without duplicates. */
 fun parseItems(root: JsonElement?): List<Item> {
