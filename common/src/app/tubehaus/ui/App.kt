@@ -153,7 +153,7 @@ fun App(app: AppState) {
                                 settings.lang.isEmpty() -> LanguagePicker(app)
                                 !settings.welcomed && app.store.lib.value.subs.isEmpty() -> Welcome(app)
                                 app.pip -> Box(Modifier.fillMaxSize().background(Color.Black)) {
-                                    app.platform.player.View(Modifier.fillMaxSize())
+                                    app.player.View(Modifier.fillMaxSize())
                                 }
                                 app.fullscreen && app.current is Screen.Watch -> FullscreenWatch(app)
                                 else -> Shell(app)
@@ -169,9 +169,10 @@ fun App(app: AppState) {
                         while (true) { app.checkForUpdates(); kotlinx.coroutines.delay(3_600_000) }
                     }
                     LaunchedEffect(settings.hideBars) { app.platform.setImmersive(settings.hideBars) }
-                    LaunchedEffect(settings.longBuffer) { app.platform.player.setReadAhead(settings.longBuffer) }
-                    LaunchedEffect(settings.audioDevice) { app.platform.player.setAudioDevice(settings.audioDevice) }
+                    LaunchedEffect(settings.longBuffer) { app.player.setReadAhead(settings.longBuffer) }
+                    LaunchedEffect(settings.audioDevice) { app.player.setAudioDevice(settings.audioDevice) }
                     app.update?.let { UpdateDialog(app, it) }
+                    if (app.casting.picking) CastDialog(app)
                     app.whatsNew?.let { WhatsNewDialog(app, it) }
                     app.offline.asking?.let { OfflineDialog(app, it) }
                 }
@@ -529,7 +530,7 @@ private fun UpdateDialog(app: AppState, r: app.tubehaus.engine.Remote.Release) {
 @Composable
 private fun FloatingPlayer(app: AppState, move: (Offset, IntSize) -> Unit) {
     val v = app.playback.video ?: return
-    val st by app.platform.player.state.collectAsState()
+    val st by app.player.state.collectAsState()
     var size by remember { mutableStateOf(IntSize.Zero) }
     Surface(
         // drag it anywhere by the picture or the title; a click (no drag) still opens the video
@@ -540,7 +541,7 @@ private fun FloatingPlayer(app: AppState, move: (Offset, IntSize) -> Unit) {
     ) {
         Column {
             Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black).clickable { app.go(Screen.Watch(v.id)) }) {
-                if (st.videoId == v.id) app.platform.player.View(Modifier.fillMaxSize())
+                if (st.videoId == v.id) app.player.View(Modifier.fillMaxSize())
                 else if (!app.store.settings.value.hideThumbs) Img(v.thumb, Modifier.fillMaxSize())
                 if (st.durationMs > 0) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color(0x55FFFFFF))) {
                     Box(Modifier.fillMaxWidth((st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f)).height(3.dp).background(Red))
@@ -551,7 +552,7 @@ private fun FloatingPlayer(app: AppState, move: (Offset, IntSize) -> Unit) {
                     Text(v.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(v.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
-                IconButton(onClick = { if (st.playing) app.platform.player.pause() else app.platform.player.play() }) {
+                IconButton(onClick = { if (st.playing) app.player.pause() else app.player.play() }) {
                     Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"))
                 }
                 IconButton(onClick = { app.playback.close() }) { Icon(Sym.Close.fill, tr("Close")) }
@@ -563,7 +564,7 @@ private fun FloatingPlayer(app: AppState, move: (Offset, IntSize) -> Unit) {
 @Composable
 private fun MiniPlayer(app: AppState) {
     val v = app.playback.video ?: return
-    val st by app.platform.player.state.collectAsState()
+    val st by app.player.state.collectAsState()
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)) {
         if (st.durationMs > 0) {
             Box(Modifier.fillMaxWidth().height(2.dp).background(MaterialTheme.colorScheme.outline)) {
@@ -580,7 +581,7 @@ private fun MiniPlayer(app: AppState) {
                 Text(v.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(v.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
-            IconButton(onClick = { if (st.playing) app.platform.player.pause() else app.platform.player.play() }) {
+            IconButton(onClick = { if (st.playing) app.player.pause() else app.player.play() }) {
                 Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"))
             }
             IconButton(onClick = { app.playback.close() }) { Icon(Sym.Close.fill, tr("Close")) }

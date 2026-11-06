@@ -42,6 +42,9 @@ class DesktopPlatform : Platform {
     override val touch = false
     val mpv = MpvPlayer()
     override val player get() = mpv
+    override val caster: app.tubehaus.ui.Caster by lazy {
+        app.tubehaus.cast.GoogleCast(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main))
+    }
     var window: WindowState? = null
     var frame: Frame? = null
 

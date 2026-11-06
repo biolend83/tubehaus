@@ -161,6 +161,9 @@ class AppState(val platform: Platform, val store: Store) {
 
     val feed = Feed(store)
     val rec = Recommender(store, feed)
+    /** the player in use: this device's own, or a TV's while casting */
+    val player by lazy { SwitchPlayer(platform.player, scope) }
+    val casting by lazy { Casting(this) }
     val playback = Playback(this)
     /** videos saved to watch without internet */
     val offline by lazy { Offline(this) }
