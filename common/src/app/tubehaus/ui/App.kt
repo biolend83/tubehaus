@@ -119,7 +119,7 @@ fun App(app: AppState) {
     val settings by app.store.settings.state.collectAsState()
     val lang = settings.lang.ifEmpty { "en" }
     L.lang = lang
-    InnerTube.hl = lang
+    InnerTube.hl = if (lang == "zh") "zh-CN" else lang
     InnerTube.gl = settings.region.ifEmpty { app.platform.deviceRegion() }.uppercase()
     setSingletonImageLoaderFactory { ctx ->
         ImageLoader.Builder(ctx)
