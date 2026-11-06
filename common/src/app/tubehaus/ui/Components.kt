@@ -497,17 +497,20 @@ fun ItemGrid(
     // the large rows' picture shrinks with the window, so a narrow one still leaves room for the title
     val bigThumb = when { maxWidth > 900.dp -> 360.dp; maxWidth > 640.dp -> 246.dp; else -> 168.dp }
     LazyVerticalGrid(
-        columns = if (big) GridCells.Fixed(1) else if (rows) GridCells.Adaptive(560.dp) else GridCells.Adaptive(320.dp),
+        columns = if (big) GridCells.Fixed(1) else if (rows) GridCells.Adaptive(560.dp) else if (tv) GridCells.Fixed(4) else GridCells.Adaptive(320.dp),
         state = state,
         modifier = Modifier.let { if (big) it.widthIn(max = 1120.dp) else it }.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(if (LocalCompact.current) 0.dp else 16.dp),
-        contentPadding = PaddingValues(horizontal = if (LocalCompact.current) 0.dp else 24.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (LocalCompact.current) 0.dp else if (tv) 22.dp else 16.dp),
+        contentPadding = PaddingValues(horizontal = if (LocalCompact.current) 0.dp else if (tv) TV_EDGE else 24.dp, vertical = if (tv) 16.dp else 8.dp),
     ) {
         if (header != null) item(span = { GridItemSpan(maxLineSpan) }) { header() }
         items(list, key = { it.id }, span = { if (it is Video && !rows) GridItemSpan(1) else GridItemSpan(maxLineSpan) }) {
             Box(if (tv && it.id == list[0].id) Modifier.focusRequester(first) else Modifier) {
                 when (it) {
-                    is Video -> if (rows) VideoRow(it, app, thumbWidth = if (big) bigThumb else 168.dp, big = big) else VideoCard(it, app)
+                    is Video -> if (rows) VideoRow(it, app, thumbWidth = if (big) bigThumb else 168.dp, big = big)
+                        // TV: the big-screen card, which grows in a white frame when chosen
+                        else if (tv) TvCard(it, app, Modifier.fillMaxWidth().padding(bottom = 30.dp))
+                        else VideoCard(it, app)
                     is Channel -> ChannelRow(it, app)
                     is Playlist -> PlaylistRow(it, app)
                 }

@@ -39,6 +39,14 @@ fun compact(n: Long): String = when (L.lang) {
     "ja" -> compactJa(n)
     "es" -> compactWith(n, " mil M", " M", " mil")
     "de" -> compactWith(n, " Mrd.", " Mio.", " Tsd.")
+    "zh" -> compactJa(n).replace('億', '亿')
+    "pt" -> compactWith(n, " bi", " mi", " mil")
+    "fr" -> compactWith(n, " Md", " M", " k")
+    "ru" -> compactWith(n, " млрд", " млн", " тыс.")
+    "id" -> compactWith(n, " M", " jt", " rb")
+    "tr" -> compactWith(n, " Mr", " Mn", " B")
+    "hi" -> compactIndic(n, " क॰", " लाख", " हज़ार")
+    "bn" -> compactIndic(n, " কোটি", " লাখ", " হাজার")
     else -> compactEn(n)
 }
 
@@ -74,6 +82,17 @@ private fun compactWith(n: Long, b: String, m: String, k: String): String {
     return when {
         n >= 1_000_000_000 -> f(n / 1e9, b)
         n >= 1_000_000 -> f(n / 1e6, m)
+        n >= 1_000 -> f(n / 1e3, k)
+        else -> n.toString()
+    }
+}
+
+/** Hindi and Bengali count in lakhs (100000) and crores (10000000), with a decimal point: "1.6 লাখ" */
+private fun compactIndic(n: Long, crore: String, lakh: String, k: String): String {
+    fun f(x: Double, u: String) = oneDecimal(x).removeSuffix(".0") + u
+    return when {
+        n >= 10_000_000 -> f(n / 1e7, crore)
+        n >= 100_000 -> f(n / 1e5, lakh)
         n >= 1_000 -> f(n / 1e3, k)
         else -> n.toString()
     }

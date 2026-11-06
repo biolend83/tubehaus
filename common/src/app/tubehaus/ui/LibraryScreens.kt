@@ -469,6 +469,8 @@ fun PlaylistPicker(v: Video, app: AppState, dismiss: () -> Unit) {
 fun importFile(app: AppState, done: (Boolean) -> Unit = {}) {
     app.platform.openTextFile { text ->
         if (text == null) return@openTextFile done(false)
+        // a taste profile someone exported lands next to the other profiles
+        importProfile(app, text)?.let { return@openTextFile done(true) }
         val p = Transfer.parse(text)
         if (p.format == null || p.empty) {
             app.toast(tr("Couldn't find anything to import in this file"))

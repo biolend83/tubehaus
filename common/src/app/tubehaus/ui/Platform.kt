@@ -21,6 +21,10 @@ interface Platform {
     /** videos can be saved to watch without internet (every app does; a platform without it can say so) */
     val canDownload: Boolean get() = true
     val player: VideoPlayer
+    /** Google Cast: the TVs on this Wi-Fi to send videos to (Android, the desktop); null where there is none */
+    val caster: Caster? get() = null
+    /** iPad: the system's AirPlay button, drawn in the player's controls; null elsewhere */
+    val airplay: (@Composable (Modifier) -> Unit)? get() = null
 
     /** a share sheet where there is one; false when the link was copied to the clipboard instead */
     fun share(title: String, url: String): Boolean

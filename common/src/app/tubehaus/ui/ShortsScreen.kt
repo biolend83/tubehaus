@@ -80,7 +80,7 @@ fun ShortsScreen(app: AppState) {
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val player = app.platform.player
+    val player = app.player
     suspend fun more() {
         if (loading) return
         loading = true
@@ -209,7 +209,7 @@ private fun Modifier.wheelPages(pager: PagerState, scope: CoroutineScope): Modif
 
 @Composable
 private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
-    val player = app.platform.player
+    val player = app.player
     val st by player.state.collectAsState()
     val lib by app.store.lib.state.collectAsState()
     val full = s?.asVideo() ?: v

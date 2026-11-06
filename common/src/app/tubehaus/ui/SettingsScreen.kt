@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -45,6 +46,7 @@ import kotlinx.coroutines.launch
 import app.tubehaus.data.Settings
 import app.tubehaus.data.Transfer
 import app.tubehaus.rec.Learn
+import app.tubehaus.rec.Profiles
 import kotlin.math.abs
 
 /** the parts under a video that Settings → Focus can hide one by one */
@@ -55,7 +57,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "0.5.17"
+const val VERSION = "0.5.18"
 
 @Composable
 fun SettingsScreen(app: AppState) {
@@ -414,9 +416,59 @@ private fun Choice(title: String, value: String, options: List<Pair<String, Stri
 @Composable
 fun LearnedScreen(app: AppState) {
     val t by app.store.taste.state.collectAsState()
+    val st by app.store.settings.state.collectAsState()
+    val parked by app.store.profiles.state.collectAsState()
+    val names = remember(st.profile, parked) { Profiles.names(app.store) }
     var confirm by remember { mutableStateOf(false) }
+    var naming by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf<String?>(null) }
+    var deleting by remember { mutableStateOf<String?>(null) }
     Narrow {
         LazyColumn(Modifier.fillMaxSize()) {
+            item { SectionTitle(tr("Profiles")) }
+            item {
+                Text(
+                    tr("Separate tastes, such as one for documentaries and one for music. What you watch teaches only the profile in use; switch it from Home."),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+            items(names, key = { "p:" + it }) { n ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(profileLabel(n), Modifier.weight(1f), maxLines = 1)
+                    if (n == st.profile) Text(tr("In use"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 12.dp))
+                    else TextButton(onClick = { Profiles.switch(app.store, n); app.rec.clearCache(); clearHome() }) { Text(tr("Use")) }
+                    Box {
+                        var menu by remember { mutableStateOf(false) }
+                        TextButton(onClick = { menu = true }) {
+                            androidx.compose.material3.Icon(Sym.MoreVert.fill, tr("More"), Modifier.size(18.dp))
+                        }
+                        DropdownMenu(menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(text = { Text(tr("Export")) }, onClick = {
+                                menu = false
+                                val (file, bytes) = Profiles.export(app.store, n)
+                                app.platform.saveFile(file, "application/json", bytes) { ok -> if (ok) app.toast(tr("Saved")) }
+                            })
+                            if (n.isNotEmpty()) {
+                                DropdownMenuItem(text = { Text(tr("Rename")) }, onClick = { menu = false; renaming = n })
+                                DropdownMenuItem(text = { Text(tr("Delete")) }, onClick = { menu = false; deleting = n })
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                Row(Modifier.padding(horizontal = 8.dp)) {
+                    TextButton(onClick = { naming = true }) { Text(tr("New profile")) }
+                    TextButton(onClick = {
+                        app.platform.openTextFile { text ->
+                            if (text != null && importProfile(app, text) == null) app.toast(tr("This file isn't a TubeHaus profile"))
+                        }
+                    }) { Text(tr("Import a profile")) }
+                }
+            }
+            if (names.size > 1) item { SectionTitle(tr("Profile: {p}").replace("{p}", profileLabel(st.profile))) }
             item {
                 Column(Modifier.padding(16.dp)) {
                     Text(tr("What TubeHaus learned about you"), style = MaterialTheme.typography.titleLarge)
@@ -453,6 +505,24 @@ fun LearnedScreen(app: AppState) {
                 }
             }
         }
+    }
+    if (naming) NameDialog(tr("New profile"), "", { naming = false }) { name ->
+        if (name in names) app.toast(tr("That name is already used"))
+        else { Profiles.switch(app.store, name); app.rec.clearCache(); clearHome() }
+    }
+    renaming?.let { old ->
+        NameDialog(tr("Rename"), old, { renaming = null }) { name ->
+            if (name != old && !Profiles.rename(app.store, old, name)) app.toast(tr("That name is already used"))
+        }
+    }
+    deleting?.let { n ->
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text(tr("Delete the profile “{p}”?").replace("{p}", n)) },
+            text = { Text(tr("What it learned is forgotten. Your library stays.")) },
+            confirmButton = { TextButton(onClick = { Profiles.delete(app.store, n); app.rec.clearCache(); clearHome(); deleting = null }) { Text(tr("Delete")) } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text(tr("Cancel")) } },
+        )
     }
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
