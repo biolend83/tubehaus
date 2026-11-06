@@ -40,6 +40,8 @@ class DesktopPlatform : Platform {
     override val dataDir: Path = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else "$home/.config", "TubeHaus").toOkioPath()
     override val cacheDir: Path = File(System.getenv("LOCALAPPDATA") ?: if (isMac) "$home/Library/Caches" else "$home/.cache", "TubeHaus").toOkioPath()
     override val touch = false
+    // TUBEHAUS_TV=1: the TV layout on a computer, driven with the arrow keys, Enter and Escape (to try it without a TV)
+    override val tv = System.getenv("TUBEHAUS_TV") == "1"
     val mpv = MpvPlayer()
     override val player get() = mpv
     override val caster: app.tubehaus.ui.Caster by lazy {
@@ -182,12 +184,14 @@ private fun startApp() {
                 if (e.type != KeyEventType.KeyDown) false
                 else when (e.key) {
                     // Esc leaves the window's own full screen too (macOS's green button) before it goes back
-                    Key.Escape -> if (!state.fullscreen && ws.placement == WindowPlacement.Fullscreen) {
+                    // the TV layout (TUBEHAUS_TV) takes Esc as the remote's Back, and the arrows itself
+                    Key.Escape -> if (platform.tv) false else if (!state.fullscreen && ws.placement == WindowPlacement.Fullscreen) {
                         ws.placement = WindowPlacement.Floating; true
                     } else state.back()
                     Key.F11 -> { state.setFull(!state.fullscreen); true }
                     // the player's keys (space, arrows, J/K/L, F, M) where a video is on screen
                     else -> when {
+                        platform.tv -> false
                         state.current is Screen.Shorts -> state.shortsKeys?.invoke(e.key) ?: false
                         state.fullscreen || state.current is Screen.Watch -> playerKey(state, e.key)
                         else -> false

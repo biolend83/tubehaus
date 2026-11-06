@@ -157,7 +157,7 @@ fun SearchScreen(app: AppState, initial: String) {
                 }
             }
             // phones always show one card per row; wider screens can pick a list or a grid
-            if (!compact) IconButton(onClick = { app.store.settings.update { it.copy(searchGrid = !grid) } }) {
+            if (!compact && !app.platform.tv) IconButton(onClick = { app.store.settings.update { it.copy(searchGrid = !grid) } }) {
                 if (grid) Icon(Sym.ViewList.outline, tr("Show as a list"))
                 else Icon(Sym.GridView.outline, tr("Show as a grid"))
             }
@@ -165,12 +165,12 @@ fun SearchScreen(app: AppState, initial: String) {
         if (filters) SearchFilters(filter, { filter = it }) { filters = false }
         val pager = rememberPager(query to filter, { YouTube.search(query, filter) }, { YouTube.searchMore(it) })
         when {
-            pager.items.isEmpty() && pager.loading -> Skeleton(rows = !compact && !grid, wide = true)
+            pager.items.isEmpty() && pager.loading -> Skeleton(rows = !compact && !grid && !app.platform.tv, wide = true)
             pager.items.isEmpty() && pager.error != null -> Problem(pager.error!!) { scope.launch { pager.load() } }
             pager.items.isEmpty() && pager.started -> Empty(tr("No results"))
             else -> ItemGrid(
                 pager.items.filter { !(app.noShorts && it is Video && it.short) }, app,
-                loading = pager.loading, onEnd = { pager.loadMore() }, rows = !compact && !grid, wideRows = true,
+                loading = pager.loading, onEnd = { pager.loadMore() }, rows = !compact && !grid && !app.platform.tv, wideRows = true,
             )
         }
         }

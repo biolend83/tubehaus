@@ -155,6 +155,8 @@ fun App(app: AppState) {
                                 app.pip -> Box(Modifier.fillMaxSize().background(Color.Black)) {
                                     app.player.View(Modifier.fillMaxSize())
                                 }
+                                // a TV: its own big-screen layout and player
+                                tv -> TvApp(app)
                                 app.fullscreen && app.current is Screen.Watch -> FullscreenWatch(app)
                                 else -> Shell(app)
                             }

@@ -39,6 +39,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -783,7 +784,7 @@ internal fun Track(
 
 /** SponsorBlock on the video: "Skip sponsor" (or "Jump to the highlight"), and "Sponsor skipped · Undo" after one went by itself */
 @Composable
-private fun BoxScope.SponsorPill(app: AppState, lifted: Boolean) {
+internal fun BoxScope.SponsorPill(app: AppState, lifted: Boolean) {
     val pb = app.playback
     val done = pb.justSkipped
     val seg = done ?: pb.skippable ?: return
@@ -832,10 +833,11 @@ private fun heatPath(pts: List<Float>, s: Size): Path = Path().apply {
  * a sheet on phones, a menu on the desktop.
  */
 @Composable
-private fun ColumnScope.SettingsPages(app: AppState, dismiss: () -> Unit) {
+internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compose.runtime.MutableState<String>? = null, dismiss: () -> Unit) {
     val player = app.player
     val st by player.state.collectAsState()
-    var page by remember { mutableStateOf("") }
+    val own = remember { mutableStateOf("") }
+    var page by (pageState ?: own)
     when (page) {
         "" -> {
             SheetRow(Sym.HighQuality.outline, tr("Quality"), if (st.height > 0) "${st.height}p" else tr("Auto")) { page = "q" }
@@ -920,18 +922,35 @@ private fun ColumnScope.SettingsPages(app: AppState, dismiss: () -> Unit) {
     }
 }
 
+/** a row of the settings sheet; with a remote or keyboard the focused one turns solid, so you can see where you are */
+@Composable
+private fun SheetLine(onClick: () -> Unit, content: @Composable androidx.compose.foundation.layout.RowScope.(Boolean) -> Unit) {
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val focused by src.collectIsFocusedAsState()
+    val cs = MaterialTheme.colorScheme
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides if (focused) cs.surface else androidx.compose.material3.LocalContentColor.current) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp).clip(RoundedCornerShape(12.dp))
+                .background(if (focused) cs.onSurface else Color.Transparent)
+                .clickable(src, androidx.compose.foundation.LocalIndication.current, onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) { content(focused) }
+    }
+}
+
 @Composable
 private fun SheetRow(icon: ImageVector, label: String, value: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+    SheetLine(onClick) { focused ->
         Icon(icon, null)
         Text(label, Modifier.weight(1f).padding(start = 20.dp), style = MaterialTheme.typography.bodyLarge)
-        Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, color = if (focused) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 private fun Pick(label: String, on: Boolean, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+    SheetLine(onClick) {
         Box(Modifier.width(40.dp)) { if (on) Icon(Sym.Check.fill, null) }
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }
