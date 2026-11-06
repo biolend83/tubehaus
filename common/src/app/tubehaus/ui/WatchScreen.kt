@@ -175,7 +175,7 @@ fun WatchScreen(app: AppState) {
 @Composable
 private fun PlayerBox(app: AppState, sideGestures: Boolean = false) {
     val pb = app.playback
-    val st by app.platform.player.state.collectAsState()
+    val st by app.player.state.collectAsState()
     val touch = app.platform.touch
     // Ambient mode: in the dark theme the video's colours glow around it, a fresh frame each second
     val showing = pb.error == null && !pb.loading && st.videoId == pb.video?.id
@@ -185,9 +185,9 @@ private fun PlayerBox(app: AppState, sideGestures: Boolean = false) {
         glow = null
         if (!ambient || !showing) return@LaunchedEffect
         while (true) {
-            app.platform.player.frame()?.let { glow = it }
+            app.player.frame()?.let { glow = it }
             // paused: the picture only changes when you seek
-            delay(if (app.platform.player.state.value.playing) 1000 else 2500)
+            delay(if (app.player.state.value.playing) 1000 else 2500)
         }
     }
     Box(
@@ -381,7 +381,7 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
                     LinkedText(desc, app,
                         Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 32.dp)
                             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)).padding(14.dp),
-                        onTime = { s -> app.platform.player.seekTo(s * 1000L); onClose() })
+                        onTime = { s -> app.player.seekTo(s * 1000L); onClose() })
                 }
             }
             // the chapters as cards in a row, as under YouTube's description; a tap jumps there
@@ -390,7 +390,7 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
                 Text(tr("Chapters"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
                 LazyRow(Modifier.fillMaxWidth().padding(bottom = 32.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(chapters) { c ->
-                        Column(Modifier.width(160.dp).clip(RoundedCornerShape(8.dp)).clickable { app.platform.player.seekTo(c.startMs); onClose() }) {
+                        Column(Modifier.width(160.dp).clip(RoundedCornerShape(8.dp)).clickable { app.player.seekTo(c.startMs); onClose() }) {
                             if (c.thumb.isNotEmpty()) Img(c.thumb, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)))
                             Text(c.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                             Text(durationMs(c.startMs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)

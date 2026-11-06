@@ -25,6 +25,11 @@ import app.tubehaus.data.Store
 import app.tubehaus.ui.AppState
 import app.tubehaus.ui.Platform
 import app.tubehaus.ui.VideoPlayer
+import app.tubehaus.ui.Caster
+import app.tubehaus.cast.GoogleCast
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import java.io.File
 import okio.Path
 import okio.Path.Companion.toOkioPath
@@ -82,6 +87,19 @@ class AndroidPlatform(private val app: Application) : Platform {
         AndroidPlayer(app)
     }
     override val player: VideoPlayer get() = androidPlayer
+
+    /** lets multicast packets in while looking for Cast devices (Android drops them otherwise) */
+    private val multicastLock by lazy {
+        (app.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager)
+            .createMulticastLock("tubehaus-cast").apply { setReferenceCounted(false) }
+    }
+    override val caster: Caster by lazy {
+        GoogleCast(
+            CoroutineScope(SupervisorJob() + Dispatchers.Main),
+            awake = { d -> CastService.set(app, d) },
+            multicast = { on -> runCatching { if (on) multicastLock.acquire() else multicastLock.release() } },
+        )
+    }
 
     /** set by the activity: runs file pickers and full screen, which need an Activity */
     var activity: MainActivity? = null

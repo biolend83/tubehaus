@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         tube.platform.activity = this
         if (Build.VERSION.SDK_INT >= 31) lifecycleScope.launch {
-            state.platform.player.state.map { it.playing }.distinctUntilChanged().collect { runCatching { setPictureInPictureParams(pipParams()) } }
+            state.player.state.map { it.playing }.distinctUntilChanged().collect { runCatching { setPictureInPictureParams(pipParams()) } }
         }
         setContent {
             Box(Modifier.fillMaxSize().let { if (state.fullscreen || state.pip) it else it.safeDrawingPadding() }) { App(state) }
@@ -195,7 +195,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun watchingVideo() = state.playback.video != null && state.platform.player.state.value.playing
+    /** while casting, the volume keys turn the TV up and down */
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        val l = state.casting.link
+        if (l != null && (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            l.setVolume(l.state.value.volume + if (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP) 0.05f else -0.05f)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    private fun watchingVideo() = state.playback.video != null && state.casting.link == null && state.player.state.value.playing
 
     private fun pipParams(): PictureInPictureParams {
         val b = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9))

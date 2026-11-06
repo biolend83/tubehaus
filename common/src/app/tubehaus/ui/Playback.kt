@@ -137,7 +137,7 @@ class Playback(private val app: AppState) {
     private var watchedMs = 0L          // the furthest point reached, for learning
     private var learned = false
     private var endHandled = false
-    private val player get() = app.platform.player
+    private val player get() = app.player
     private val store get() = app.store
 
     init {
@@ -222,7 +222,14 @@ class Playback(private val app: AppState) {
         }
     }
 
-    private fun start(s: Stream, startSec: Long?) {
+    /** the same video again from [posMs] on whichever player is in use now (casting started or stopped) */
+    fun replay(posMs: Long, autoplay: Boolean = true) {
+        val s = stream ?: return
+        endHandled = false
+        start(s, posMs / 1000, autoplay)
+    }
+
+    private fun start(s: Stream, startSec: Long?, autoplay: Boolean = true) {
         val set = store.settings.value
         val cap = if (app.platform.metered()) set.maxHeightMobileData else set.maxHeight
         val choice = captionChoice(s)
@@ -231,7 +238,7 @@ class Playback(private val app: AppState) {
             PlayOptions(
                 startMs = (startSec ?: 0) * 1000,
                 maxHeight = if (cap <= 0) Int.MAX_VALUE else cap,
-                autoplay = true,
+                autoplay = autoplay,
                 speed = set.speed,
                 captions = choice?.first?.takeIf { set.captions },
                 captionLang = set.captionLang.ifEmpty { lang() },

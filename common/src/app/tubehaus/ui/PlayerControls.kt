@@ -109,14 +109,14 @@ import kotlinx.coroutines.delay
 @Composable
 fun VideoArea(app: AppState, modifier: Modifier = Modifier, fullscreen: Boolean = false, sideGestures: Boolean = false) {
     Box(modifier.background(Color.Black)) {
-        app.platform.player.View(Modifier.fillMaxSize())
+        app.player.View(Modifier.fillMaxSize())
         Controls(app, fullscreen, sideGestures)
     }
 }
 
 /** Keyboard shortcuts while a video is on screen (YouTube's). True when the key was used. */
 fun playerKey(app: AppState, key: Key): Boolean {
-    val player = app.platform.player
+    val player = app.player
     val st = player.state.value
     if (st.videoId == null) return false
     fun seekBy(sec: Int) = player.seekTo((st.positionMs + sec * 1000L).coerceIn(0, maxOf(0, st.durationMs - 500)))
@@ -155,7 +155,7 @@ private fun actual(p: Float) = p.coerceIn(0f, 1f).toDouble().pow(2.2).toFloat().
 @Composable
 private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) {
     val touch = app.platform.touch
-    val player = app.platform.player
+    val player = app.player
     val st by player.state.collectAsState()
     var shown by remember { mutableStateOf(true) }
     var poke by remember { mutableIntStateOf(0) }          // any touch or mouse move restarts the hide timer
@@ -386,7 +386,7 @@ private fun TouchOverlay(
     app: AppState, st: PlayerState, fullscreen: Boolean, dragging: Float?,
     onDrag: (Float) -> Unit, onDragEnd: () -> Unit, seekBy: (Int) -> Unit, poke: () -> Unit, openSettings: () -> Unit,
 ) {
-    val player = app.platform.player
+    val player = app.player
     Box(Modifier.fillMaxSize().background(Color(0x66000000))) {
         // top: a chevron that folds the video into the mini player (in full screen: back out of it),
         // the title and channel in full screen; captions and settings on the right
@@ -402,6 +402,7 @@ private fun TouchOverlay(
                     if (!v?.author.isNullOrEmpty()) Text(v!!.author, color = Color(0xCCFFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1)
                 }
             }
+            CastButton(app) { poke() }
             CaptionsButton(app, st) { poke() }
             IconButton(onClick = openSettings) { Icon(Sym.Settings.outline, tr("Settings"), tint = Color.White) }
         }
@@ -477,7 +478,7 @@ private fun MouseOverlay(
     onDrag: (Float) -> Unit, onDragEnd: () -> Unit, settings: Boolean, setSettings: (Boolean) -> Unit,
     playFocus: FocusRequester? = null,
 ) {
-    val player = app.platform.player
+    val player = app.player
     Box(Modifier.fillMaxSize()) {
         // full screen: the title over a shade at the top
         if (fullscreen) {
@@ -521,6 +522,7 @@ private fun MouseOverlay(
                 TimeText(app, st, dragging)
                 Spacer(Modifier.weight(1f))
                 if (st.speed != 1f) Text("${st.speed}x", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(end = 4.dp))
+                CastButton(app, iconSize = 26)
                 CaptionsButton(app, st) {}
                 Box {
                     Bar(Sym.Settings.fill, tr("Settings")) { setSettings(!settings) }
@@ -541,7 +543,7 @@ private fun Bar(icon: ImageVector, label: String, modifier: Modifier = Modifier,
 
 @Composable
 private fun Volume(app: AppState, st: PlayerState) {
-    val player = app.platform.player
+    val player = app.player
     Bar(if (st.muted || st.volume == 0f) Sym.VolumeOff.fill else Sym.VolumeUp.fill, tr(if (st.muted) "Unmute" else "Mute")) {
         player.setMuted(!st.muted)
     }
@@ -577,7 +579,7 @@ private fun TimeText(app: AppState, st: PlayerState, dragging: Float?) {
 /** every chapter with its picture and time; the one playing is marked, a press jumps there */
 @Composable
 internal fun ChaptersSheet(app: AppState, onClose: () -> Unit) {
-    val player = app.platform.player
+    val player = app.player
     val pos = player.state.collectAsState().value.positionMs
     val chapters = app.playback.chapters
     val now = chapters.lastOrNull { it.startMs <= pos }
@@ -613,7 +615,7 @@ private fun FullscreenButton(app: AppState, fullscreen: Boolean) {
 /** On or off with one press: the track in your language, or YouTube's translation of one. */
 @Composable
 private fun CaptionsButton(app: AppState, st: PlayerState, onPress: () -> Unit) {
-    val player = app.platform.player
+    val player = app.player
     val caps = app.playback.stream?.captions ?: emptyList()
     if (caps.isEmpty()) return
     IconButton(onClick = {
@@ -815,7 +817,7 @@ private fun heatPath(pts: List<Float>, s: Size): Path = Path().apply {
  */
 @Composable
 private fun ColumnScope.SettingsPages(app: AppState, dismiss: () -> Unit) {
-    val player = app.platform.player
+    val player = app.player
     val st by player.state.collectAsState()
     var page by remember { mutableStateOf("") }
     when (page) {
