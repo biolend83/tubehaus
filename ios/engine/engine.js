@@ -14,7 +14,7 @@
 // collects those with __drain(), answers each with __reply(rid, json), and reads the outcome
 // with __take(id).
 
-var ENGINE_VERSION = 7;
+var ENGINE_VERSION = 8;
 
 // ------------------------------------------------------------------------------ host bridge
 var ENV = { hl: "en", gl: "US", players: null };
@@ -150,13 +150,14 @@ function findFirst(e, key, skip) {
 }
 
 /** "1.2M views" / "1,234 views" → a number; also "조회수 4,812만회", "1.3천만", "2억", "12万回", "3.4億" */
-var UNITS = { K: 1e3, "천": 1e3, "千": 1e3, M: 1e6, B: 1e9, "만": 1e4, "万": 1e4, "萬": 1e4, "억": 1e8, "億": 1e8, "亿": 1e8 };
+var UNITS = { k: 1e3, m: 1e6, b: 1e9, mil: 1e3, milm: 1e9, tsd: 1e3, mio: 1e6, mrd: 1e9, "천": 1e3, "千": 1e3, "만": 1e4, "万": 1e4, "萬": 1e4, "억": 1e8, "億": 1e8, "亿": 1e8 };
 function countOf(s) {
   if (!s || !String(s).trim()) return 0;
-  var m = /(\d[\d.,]*)\s*([KMB]|[천만억千万萬億亿]+)?/i.exec(s);
+  // a Latin unit must end its word: "12 mil" (es), "1,2 Mio." (de), but not the M of "12 members"
+  var m = /(\d[\d.,]*)\s*(?:(mil\s*M|mil|Mrd|Mio|Tsd|[KMB])(?![a-z])|([천만억千万萬億亿]+))?/i.exec(s);
   if (!m) return 0;
   var raw = m[1].replace(/[.,]+$/, "");
-  var mult = 1, u = (m[2] || "").toUpperCase();
+  var mult = m[2] ? UNITS[m[2].toLowerCase().replace(/\s+/g, "")] || 1 : 1, u = m[3] || "";
   for (var i = 0; i < u.length; i++) mult *= UNITS[u[i]] || 1;
   var n;
   if (mult === 1) n = parseFloat(raw.replace(/[.,]/g, ""));

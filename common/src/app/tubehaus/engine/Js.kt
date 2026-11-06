@@ -87,11 +87,14 @@ val NOISE = setOf(
  */
 fun countOf(s: String?): Long {
     if (s.isNullOrBlank()) return 0
-    val m = Regex("""(\d[\d.,]*)\s*([KMB]|[천만억千万萬億亿]+)?""", RegexOption.IGNORE_CASE).find(s) ?: return 0
+    // a Latin unit must end its word: "12 mil" (es), "1,2 Mio." (de), but not the M of "12 members"
+    val m = Regex("""(\d[\d.,]*)\s*(?:(mil\s*M|mil|Mrd|Mio|Tsd|[KMB])(?![a-z])|([천만억千万萬億亿]+))?""", RegexOption.IGNORE_CASE).find(s) ?: return 0
     val raw = m.groupValues[1].trimEnd('.', ',')
-    var mult = 1.0
-    for (c in m.groupValues[2].uppercase()) mult *= when (c) {
-        'K', '천', '千' -> 1e3; 'M' -> 1e6; 'B' -> 1e9; '만', '万', '萬' -> 1e4; '억', '億', '亿' -> 1e8; else -> 1.0
+    var mult = when (m.groupValues[2].lowercase().replace(" ", "")) {
+        "milm", "mrd", "b" -> 1e9; "mio", "m" -> 1e6; "mil", "tsd", "k" -> 1e3; else -> 1.0
+    }
+    for (c in m.groupValues[3]) mult *= when (c) {
+        '천', '千' -> 1e3; '만', '万', '萬' -> 1e4; '억', '億', '亿' -> 1e8; else -> 1.0
     }
     val n = when {
         mult == 1.0 -> raw.replace(",", "").replace(".", "").toDoubleOrNull()
