@@ -28,6 +28,7 @@ import kotlin.math.pow
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
@@ -169,6 +170,7 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
     val videoFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
     var toBar by remember { mutableStateOf(false) }
+    var inBar by remember { mutableStateOf(false) }
     var eatBack by remember { mutableStateOf(false) }
     // read inside the pointer loops, which outlive the composition they started in
     val playingNow by rememberUpdatedState(st.playing)
@@ -186,9 +188,17 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
     if (tv) {
         LaunchedEffect(Unit) { runCatching { videoFocus.requestFocus() } }
         // the buttons fade away: the focus goes back to the video instead of getting lost
-        LaunchedEffect(shown) { if (!shown) runCatching { videoFocus.requestFocus() } }
+        LaunchedEffect(shown) { if (!shown) { inBar = false; runCatching { videoFocus.requestFocus() } } }
+        // the buttons may still be fading in: keep asking until the focus is on them
         LaunchedEffect(toBar, shown) {
-            if (toBar && shown) { delay(60); runCatching { playFocus.requestFocus() }; toBar = false }
+            if (toBar && shown) {
+                for (i in 0 until 10) {
+                    delay(60)
+                    if (inBar) break
+                    runCatching { playFocus.requestFocus() }
+                }
+                toBar = false
+            }
         }
     }
 
@@ -213,7 +223,10 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
                 seekBy(side * 10)
                 jump = side to ((if (jump?.first == side) jump!!.second else 0) + 10)
             }
-            Key.DirectionUp, Key.DirectionDown -> if (fullscreen) toBar = true else return false
+            // down always goes to the buttons (settings, full screen), also in the small player on the
+            // watch page; from there down again leaves for the page. Up leaves the small player
+            Key.DirectionDown -> toBar = true
+            Key.DirectionUp -> if (fullscreen) toBar = true else return false
             else -> return playerKey(app, key)
         }
         shown = true; poke++
@@ -362,7 +375,7 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
         }
         AnimatedVisibility(shown || st.ended || !st.playing && !touch, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             if (touch) TouchOverlay(app, st, fullscreen, dragging, { dragging = it; poke++ }, { dragging = null }, ::seekBy, { poke++ }, { settings = true })
-            else MouseOverlay(app, st, fullscreen, dragging, { dragging = it; poke++ }, { dragging = null }, settings, { settings = it; poke++ }, playFocus.takeIf { tv })
+            else MouseOverlay(app, st, fullscreen, dragging, { dragging = it; poke++ }, { dragging = null }, settings, { settings = it; poke++ }, playFocus.takeIf { tv }) { inBar = it }
         }
         SponsorPill(app, lifted = shown || st.ended || !st.playing)
         // a thin progress line while the controls are hidden (not in full screen)
@@ -478,6 +491,7 @@ private fun MouseOverlay(
     app: AppState, st: PlayerState, fullscreen: Boolean, dragging: Float?,
     onDrag: (Float) -> Unit, onDragEnd: () -> Unit, settings: Boolean, setSettings: (Boolean) -> Unit,
     playFocus: FocusRequester? = null,
+    onBarFocus: (Boolean) -> Unit = {},
 ) {
     val player = app.player
     Box(Modifier.fillMaxSize()) {
@@ -508,6 +522,7 @@ private fun MouseOverlay(
         // bottom: seek bar, then the buttons
         Column(
             Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                .onFocusChanged { onBarFocus(it.hasFocus) }
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xAA000000))))
                 .padding(horizontal = 12.dp).padding(top = 24.dp, bottom = 4.dp),
         ) {
