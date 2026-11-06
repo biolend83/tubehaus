@@ -110,7 +110,45 @@ class DesktopPlatform : Platform {
     )
 }
 
+// a crash (also one before the window opens) is written to crash.log in the data folder and shown,
+// so that "it closes right after start" comes with a reason that can be sent in
+private var shown = false
+
+fun crashed(where: String, e: Throwable) {
+    val dir = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else "$home/.config", "TubeHaus")
+    val log = File(dir, "crash.log")
+    val text = buildString {
+        append("TubeHaus ").append(System.getProperty("jpackage.app-version") ?: "dev").append(" — ").append(java.time.LocalDateTime.now()).append('\n')
+        append(System.getProperty("os.name")).append(' ').append(System.getProperty("os.version")).append(' ').append(System.getProperty("os.arch"))
+        append(", Java ").append(System.getProperty("java.version")).append(", ").append(where).append("\n\n")
+        append(e.stackTraceToString()).append("\n")
+    }
+    runCatching { dir.mkdirs(); log.appendText(text) }
+    System.err.print(text)
+    // a message only when nothing of the app is on screen any more (a hiccup in a running window is just logged)
+    if (shown || java.awt.Frame.getFrames().any { it.isVisible }) return
+    shown = true
+    runCatching {
+        javax.swing.JOptionPane.showMessageDialog(
+            null,
+            "TubeHaus stopped because of an error:\n${e.javaClass.simpleName}: ${e.message ?: ""}\n\nThe details are in\n${log.absolutePath}\nPlease attach that file to a report at github.com/biolend83/tubehaus/issues",
+            "TubeHaus",
+            javax.swing.JOptionPane.ERROR_MESSAGE,
+        )
+    }
+}
+
 fun main() {
+    Thread.setDefaultUncaughtExceptionHandler { t, e -> crashed("thread " + t.name, e) }
+    try {
+        startApp()
+    } catch (e: Throwable) {
+        crashed("start", e)
+        Runtime.getRuntime().halt(1)
+    }
+}
+
+private fun startApp() {
     // macOS: the title bar's light or dark look is fixed when the window system starts, so it is
     // chosen here from the saved theme (dark and black: dark; light: light; otherwise the system's)
     if (isMac) {
