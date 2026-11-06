@@ -33,6 +33,17 @@ fun tr(s: String): String {
 fun textOverride(key: String, lang: String): String = ""
 
 private val KO = mapOf(
+    "Main" to "기본",
+    "Profiles" to "프로필",
+    "New profile" to "새 프로필",
+    "Manage profiles" to "프로필 관리",
+    "Separate tastes, such as one for documentaries and one for music. What you watch teaches only the profile in use; switch it from Home." to "다큐용, 음악용처럼 취향을 나눠 둘 수 있어요. 본 영상은 지금 쓰는 프로필에만 반영되고, 홈에서 바꿀 수 있어요.",
+    "In use" to "사용 중",
+    "Use" to "사용",
+    "Profile: {p}" to "프로필: {p}",
+    "That name is already used" to "이미 있는 이름이에요",
+    "Delete the profile “{p}”?" to "“{p}” 프로필을 삭제할까요?",
+    "What it learned is forgotten. Your library stays." to "배운 취향은 지워지고 보관함은 그대로예요.",
     "1 minute ago" to "1분 전", "{n} minutes ago" to "{n}분 전",
     "1 hour ago" to "1시간 전", "{n} hours ago" to "{n}시간 전",
     "1 day ago" to "1일 전", "{n} days ago" to "{n}일 전",
@@ -423,6 +434,17 @@ private val KO = mapOf(
 
 // Español. Machine-made, not yet read by a native speaker: corrections welcome
 private val ES = mapOf(
+    "Main" to "Principal",
+    "Profiles" to "Perfiles",
+    "New profile" to "Nuevo perfil",
+    "Manage profiles" to "Gestionar perfiles",
+    "Separate tastes, such as one for documentaries and one for music. What you watch teaches only the profile in use; switch it from Home." to "Gustos separados, como uno para documentales y otro para música. Lo que ves solo enseña al perfil en uso; cámbialo desde Inicio.",
+    "In use" to "En uso",
+    "Use" to "Usar",
+    "Profile: {p}" to "Perfil: {p}",
+    "That name is already used" to "Ese nombre ya existe",
+    "Delete the profile “{p}”?" to "¿Eliminar el perfil «{p}»?",
+    "What it learned is forgotten. Your library stays." to "Se olvida lo que aprendió. Tu biblioteca se queda.",
     "1 minute ago" to "hace 1 minuto",
     "{n} minutes ago" to "hace {n} minutos",
     "1 hour ago" to "hace 1 hora",
@@ -854,6 +876,17 @@ private val ES = mapOf(
 
 // 日本語. Machine-made, not yet read by a native speaker: corrections welcome
 private val JA = mapOf(
+    "Main" to "メイン",
+    "Profiles" to "プロフィール",
+    "New profile" to "新しいプロフィール",
+    "Manage profiles" to "プロフィールを管理",
+    "Separate tastes, such as one for documentaries and one for music. What you watch teaches only the profile in use; switch it from Home." to "ドキュメンタリー用、音楽用のように好みを分けておけます。見た動画は使用中のプロフィールだけに反映され、ホームから切り替えられます。",
+    "In use" to "使用中",
+    "Use" to "使う",
+    "Profile: {p}" to "プロフィール: {p}",
+    "That name is already used" to "その名前はすでに使われています",
+    "Delete the profile “{p}”?" to "プロフィール「{p}」を削除しますか？",
+    "What it learned is forgotten. Your library stays." to "学習した内容は消えますが、ライブラリはそのままです。",
     "1 minute ago" to "1 分前",
     "{n} minutes ago" to "{n} 分前",
     "1 hour ago" to "1 時間前",
@@ -1285,6 +1318,17 @@ private val JA = mapOf(
 
 // Deutsch. Machine-made, not yet read by a native speaker: corrections welcome
 private val DE = mapOf(
+    "Main" to "Standard",
+    "Profiles" to "Profile",
+    "New profile" to "Neues Profil",
+    "Manage profiles" to "Profile verwalten",
+    "Separate tastes, such as one for documentaries and one for music. What you watch teaches only the profile in use; switch it from Home." to "Getrennte Vorlieben, etwa eine für Dokus und eine für Musik. Was du ansiehst, prägt nur das aktive Profil; wechsle es auf der Startseite.",
+    "In use" to "Aktiv",
+    "Use" to "Verwenden",
+    "Profile: {p}" to "Profil: {p}",
+    "That name is already used" to "Diesen Namen gibt es schon",
+    "Delete the profile “{p}”?" to "Das Profil „{p}“ löschen?",
+    "What it learned is forgotten. Your library stays." to "Was es gelernt hat, wird vergessen. Deine Mediathek bleibt.",
     "1 minute ago" to "vor 1 Minute",
     "{n} minutes ago" to "vor {n} Minuten",
     "1 hour ago" to "vor 1 Stunde",
