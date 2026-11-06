@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "0.5.17",
+          "buildVersion": "34",
+          "date": "2026-11-06T07:10:26+00:00",
+          "localizedDescription": "Shared with the 0.5.17 release: Spanish, Japanese and German, view counts read right in every language, no clock and battery over fullscreen videos, a button to update the YouTube engine, and ...more no longer closing the app.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.17/TubeHaus-0.5.17-ipad.ipa",
+          "size": 16414212,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "0.5.16",
           "buildVersion": "33",
           "date": "2026-11-05T08:40:03+00:00",
@@ -104,11 +113,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "0.5.16",
-      "versionDate": "2026-11-05T08:40:03+00:00",
-      "versionDescription": "Shared with the 0.5.16 release: YouTube's topic pages (Music, Live, News, Sports and more), SponsorBlock with Jump to the highlight, dislike counts, DeArrow titles and thumbnails, the \"Most replayed\" wave, and channel pictures on every card.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.16/TubeHaus-0.5.16-ipad.ipa",
-      "size": 16320096
+      "version": "0.5.17",
+      "versionDate": "2026-11-06T07:10:26+00:00",
+      "versionDescription": "Shared with the 0.5.17 release: Spanish, Japanese and German, view counts read right in every language, no clock and battery over fullscreen videos, a button to update the YouTube engine, and ...more no longer closing the app.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.17/TubeHaus-0.5.17-ipad.ipa",
+      "size": 16414212
     }
   ],
   "news": [],
