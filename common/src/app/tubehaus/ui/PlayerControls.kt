@@ -123,7 +123,8 @@ fun playerKey(app: AppState, key: Key): Boolean {
     fun volumeBy(d: Float) {
         val v = (st.volume + d).coerceIn(0f, 1f)
         player.setVolume(v); player.setMuted(false)
-        app.store.settings.update { it.copy(volume = v) }
+        // a TV's volume while casting is the TV's own, not the one this device remembers
+        if (app.casting.link == null) app.store.settings.update { it.copy(volume = v) }
     }
     when (key) {
         Key.Spacebar, Key.K -> if (st.playing) player.pause() else player.play()
@@ -550,7 +551,7 @@ private fun Volume(app: AppState, st: PlayerState) {
     Track(
         value = if (st.muted) 0f else st.volume, color = Color.White,
         onDrag = { v -> player.setMuted(false); player.setVolume(v) },
-        onDone = { v -> app.store.settings.update { it.copy(volume = v) } },
+        onDone = { v -> if (app.casting.link == null) app.store.settings.update { it.copy(volume = v) } },
         modifier = Modifier.width(88.dp).padding(end = 4.dp),
     )
 }
