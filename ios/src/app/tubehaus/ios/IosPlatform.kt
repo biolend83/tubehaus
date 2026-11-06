@@ -36,6 +36,8 @@ class IosPlatform : Platform {
     override val cacheDir: Path = folder(NSCachesDirectory)
     override val touch = true
     override val player = IosPlayer()
+    /** AirPlay instead of Google Cast: the system's button and list of TVs */
+    override val airplay: (@androidx.compose.runtime.Composable (androidx.compose.ui.Modifier) -> Unit)? = { m -> AirPlayButton(m) }
 
     /** the window's view controller, to present sheets from; set by MainViewController */
     var root: UIViewController? = null
