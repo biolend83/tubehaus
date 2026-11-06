@@ -127,6 +127,10 @@ docker compose pull         # 미리 빌드된 이미지 (amd64, arm64)
 docker compose up -d
 ```
 
+**공개 도메인에 올릴 거라면 `.env`에 로그인부터 넣으세요:** `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER`, `TUBEHAUS_PASSWORD_HASH`
+(해시는 `docker compose run --rm caddy caddy hash-password`로 만들고, `$`는 모두 `$$`로 써요). 이게 없으면 주소를 여는 사람 모두가
+같은 라이브러리를 써요. 다른 방법: [외부에 열기 전에 로그인 붙이기](#외부에-열기-전에-로그인-붙이기).
+
 Caddy, WARP가 들어 있는 TubeHaus 서버, 라이브용 PO 토큰 제공기, 라이브 자막용 whisper.cpp,
 공식 Invidious + companion + PostgreSQL 이미지가 한 번에 올라와요. 끝나면 도메인을 열면 돼요.
 
@@ -143,12 +147,14 @@ flisk up                          # flisk status / flisk logs --service tubehaus
 한 서버에서는 둘 중 하나만 쓰세요. 포트, 볼륨, 업데이트, 기존 설치 옮기기는 [docs/FLISK.md](docs/FLISK.md)에 있어요.
 Flisk 구성은 @odykyi 님이 만들어 주셨어요 (#40, #42).
 
-**외부에 열기 전에 로그인을 붙이세요.** TubeHaus에는 계정 기능이 없어서, 주소를 아는 사람은 누구나 같은 라이브러리를 봐요.
+### 외부에 열기 전에 로그인 붙이기
+
+TubeHaus에는 계정 기능이 없어서, 주소를 아는 사람은 누구나 같은 라이브러리를 봐요.
 가장 쉬운 방법은 내장 비밀번호예요. `.env`에 `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER`, `TUBEHAUS_PASSWORD_HASH`를 넣으세요.
 해시는 `docker compose run --rm caddy caddy hash-password`로 만들고, `.env`에서는 `$`를 모두 `$$`로 써야 해요.
 Authelia, Authentik, 패스키 게이트 같은 것을 `forward_auth`로 앞에 둬도 돼요.
 
-**잘 돌아가는지 점검:**
+### 잘 돌아가는지 점검
 
 ```sh
 docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
@@ -157,6 +163,7 @@ docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
 WARP, 유튜브 연결, Invidious, 실제 영상 조회, 선택 기능(yt-dlp, ffmpeg, whisper)을 한 줄씩 점검해요.
 문제가 있으면 [문제 해결](docs/TROUBLESHOOTING.md)(영어), 업데이트와 백업은 [업데이트와 백업](docs/UPGRADING.md)(영어)을 보세요.
 
+이미 쓰는 nginx나 Traefik 뒤에 두는 방법은 [docs/reverse-proxy.md](docs/reverse-proxy.md)(영어)에 있어요.
 직접 설치(Docker 없이)와 설정 항목 전체는 [영어 README](README.md#manual-setup)에 있어요.
 
 ## 공개 서버로 열기

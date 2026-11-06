@@ -157,6 +157,11 @@ docker compose pull         # prebuilt images, amd64 and arm64
 docker compose up -d
 ```
 
+**Going on a public domain? Set a login in `.env` first:** `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER` and
+`TUBEHAUS_PASSWORD_HASH` (the hash comes from `docker compose run --rm caddy caddy hash-password`; write every
+`$` as `$$`). Without it, everyone who opens the address shares the same library. Other options:
+[Add a login before you expose it](#add-a-login-before-you-expose-it).
+
 **Or with [Flisk](https://flisk.sh)** (optional; docker compose stays the main way). The same six
 containers are also described for Flisk and read the same `.env`, so if you already use it:
 
@@ -199,13 +204,16 @@ TUBEHAUS_EXTERNAL_PORT=443
 
 Then point your proxy at `http://127.0.0.1:8080` for everything, unbuffered (video and live streams), e.g. in nginx:
 `proxy_pass http://127.0.0.1:8080; proxy_buffering off; proxy_read_timeout 1h; proxy_set_header Host $host;`
+Complete nginx and Traefik examples are in [docs/reverse-proxy.md](docs/reverse-proxy.md).
 
-**Add a login before you expose it.** TubeHaus has no accounts of its own. The simplest option is the built-in
+### Add a login before you expose it
+
+TubeHaus has no accounts of its own: without a login, everyone who opens the address shares the same library. The simplest option is the built-in
 password: set `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER` and `TUBEHAUS_PASSWORD_HASH` in `.env` (the hash comes from
 `docker compose run --rm caddy caddy hash-password`; write every `$` as `$$`). Or put Authelia, Authentik or a
 passkey gate in front with `forward_auth`.
 
-**Check that everything works:**
+### Check that everything works
 
 ```sh
 docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
