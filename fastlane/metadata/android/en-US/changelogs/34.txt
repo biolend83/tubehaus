@@ -1,0 +1,4 @@
+- Three more languages: Spanish, Japanese and German
+- View counts are read right in every language (Korean 4,812만 is 48 million, Spanish 12 mil is 12 thousand)
+- The update button downloads the APK signed with the same key as the installed app
+- iPad: no clock and battery over a fullscreen video, a button to update the YouTube engine, and "...more" no longer closes the app

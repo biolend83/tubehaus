@@ -81,15 +81,35 @@ val NOISE = setOf(
     "playerOverlays", "onResponseReceivedEndpoints_unused",
 )
 
-/** "1.2M views" / "1,234 views" / "12K" -> a number (0 when it is not one). */
+/**
+ * "1.2M views" / "1,234 views" / "12K" -> a number (0 when it is not one). Korean, Japanese and
+ * Chinese counts too: "조회수 4,812만회", "1.3천만", "2억", "12万回", "3.4億".
+ */
 fun countOf(s: String?): Long {
     if (s.isNullOrBlank()) return 0
-    val m = Regex("""([\d.,]+)\s*([KMB])?""", RegexOption.IGNORE_CASE).find(s) ?: return 0
-    val raw = m.groupValues[1]
-    val mult = when (m.groupValues[2].uppercase()) { "K" -> 1e3; "M" -> 1e6; "B" -> 1e9; else -> 1.0 }
-    val n = if (mult == 1.0) raw.replace(",", "").replace(".", "").toDoubleOrNull()
-    else raw.replace(",", ".").toDoubleOrNull()
-    return ((n ?: 0.0) * mult).toLong()
+    // a Latin unit must end its word: "12 mil" (es), "1,2 Mio." (de), but not the M of "12 members"
+    val m = Regex("""(\d[\d.,]*)\s*(?:(mil\s*M|mil|Mrd|Mio|Tsd|[KMB])(?![a-z])|([천만억千万萬億亿]+))?""", RegexOption.IGNORE_CASE).find(s) ?: return 0
+    val raw = m.groupValues[1].trimEnd('.', ',')
+    var mult = when (m.groupValues[2].lowercase().replace(" ", "")) {
+        "milm", "mrd", "b" -> 1e9; "mio", "m" -> 1e6; "mil", "tsd", "k" -> 1e3; else -> 1.0
+    }
+    for (c in m.groupValues[3]) mult *= when (c) {
+        '천', '千' -> 1e3; '만', '万', '萬' -> 1e4; '억', '億', '亿' -> 1e8; else -> 1.0
+    }
+    val n = when {
+        mult == 1.0 -> raw.replace(",", "").replace(".", "").toDoubleOrNull()
+        // both: the later one is the decimal point ("1.234,5" / "1,234.5")
+        ',' in raw && '.' in raw ->
+            if (raw.lastIndexOf(',') > raw.lastIndexOf('.')) raw.replace(".", "").replace(",", ".").toDoubleOrNull()
+            else raw.replace(",", "").toDoubleOrNull()
+        // "4,812만": thousands; "1,2 Mio.": a decimal comma
+        ',' in raw ->
+            if (Regex("""\d{1,3}(,\d{3})+""").matches(raw)) raw.replace(",", "").toDoubleOrNull()
+            else raw.replace(",", ".").toDoubleOrNull()
+        else -> raw.toDoubleOrNull()
+    } ?: return 0
+    // 2.3억 is 230000000, not 229999999.99...
+    return if (mult == 1.0) n.toLong() else kotlin.math.round(n * mult).toLong()
 }
 
 /** "1:02:03" -> 3723 */
