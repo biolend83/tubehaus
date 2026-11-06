@@ -14,7 +14,7 @@
 // collects those with __drain(), answers each with __reply(rid, json), and reads the outcome
 // with __take(id).
 
-var ENGINE_VERSION = 8;
+var ENGINE_VERSION = 9;
 
 // ------------------------------------------------------------------------------ host bridge
 var ENV = { hl: "en", gl: "US", players: null };
@@ -150,14 +150,23 @@ function findFirst(e, key, skip) {
 }
 
 /** "1.2M views" / "1,234 views" → a number; also "조회수 4,812만회", "1.3천만", "2억", "12万回", "3.4億" */
-var UNITS = { k: 1e3, m: 1e6, b: 1e9, mil: 1e3, milm: 1e9, tsd: 1e3, mio: 1e6, mrd: 1e9, "천": 1e3, "千": 1e3, "만": 1e4, "万": 1e4, "萬": 1e4, "억": 1e8, "億": 1e8, "亿": 1e8 };
+var UNITS = { k: 1e3, mil: 1e3, tsd: 1e3, rb: 1e3, "тыс": 1e3, m: 1e6, mio: 1e6, mn: 1e6, mi: 1e6, jt: 1e6, "млн": 1e6, b: 1e9, milm: 1e9, mrd: 1e9, md: 1e9, mr: 1e9, bi: 1e9, "млрд": 1e9,
+  "हज़ार": 1e3, "हज़ार": 1e3, "হাজার": 1e3, "হাটি": 1e3, "হা": 1e3, "लाख": 1e5, "লাখ": 1e5, "লাটি": 1e5, "লা": 1e5, "करोड़": 1e7, "करोड़": 1e7, "क॰": 1e7, "কোটি": 1e7, "কো": 1e7,
+  "천": 1e3, "千": 1e3, "만": 1e4, "万": 1e4, "萬": 1e4, "억": 1e8, "億": 1e8, "亿": 1e8 };
+/** B is a thousand in Turkish (bin), M a billion in Indonesian (miliar) */
+function unitOf(u) {
+  u = u.toLowerCase().replace(/[\s\u00a0\u202f]+/g, "");
+  if (u === "b" && /^tr/.test(ENV.hl)) return 1e3;
+  if (u === "m" && /^id/.test(ENV.hl)) return 1e9;
+  return UNITS[u] || 1;
+}
 function countOf(s) {
   if (!s || !String(s).trim()) return 0;
-  // a Latin unit must end its word: "12 mil" (es), "1,2 Mio." (de), but not the M of "12 members"
-  var m = /(\d[\d.,]*)\s*(?:(mil\s*M|mil|Mrd|Mio|Tsd|[KMB])(?![a-z])|([천만억千万萬億亿]+))?/i.exec(s);
+  // a unit must end its word: "12 mil" (es), "1,2 Mio." (de), "1.6 লাখ" (bn), but not the M of "12 members"
+  var m = /(\d(?:[\d.,]|[ \u00a0\u202f](?=\d{3}(?!\d)))*)[\s\u00a0\u202f]*(?:(mil[\s\u00a0\u202f]*M|mil|mi|bi|Mrd|Mio|Tsd|Md|Mn|Mr|rb|jt|тыс|млрд|млн|[KMB])(?![\p{L}\p{M}])|(हज़ार|हज़ार|लाख|करोड़|करोड़|क॰|হাজার|হাটি|লাখ|লাটি|কোটি|হা|লা|কো)(?![\p{L}\p{M}])|([천만억千万萬億亿]+))?/iu.exec(s);
   if (!m) return 0;
-  var raw = m[1].replace(/[.,]+$/, "");
-  var mult = m[2] ? UNITS[m[2].toLowerCase().replace(/\s+/g, "")] || 1 : 1, u = m[3] || "";
+  var raw = m[1].replace(/[ \u00a0\u202f]/g, "").replace(/[.,]+$/, "");
+  var mult = (m[2] ? unitOf(m[2]) : 1) * (m[3] ? UNITS[m[3]] : 1), u = m[4] || "";
   for (var i = 0; i < u.length; i++) mult *= UNITS[u[i]] || 1;
   var n;
   if (mult === 1) n = parseFloat(raw.replace(/[.,]/g, ""));
@@ -209,8 +218,8 @@ var ITEM_KEYS = {
 };
 var ID = /^[\w-]{11}$/;
 var UC = /^UC[\w-]{22}$/;
-var VIEWS = /\bviews?\b|\bwatching\b|조회수|시청 ?중/i;
-var AGO = /\bago\b|전$|^streamed|스트리밍/i;
+var VIEWS = /\bviews?\b|\bwatching\b|조회수|시청 ?중|vues?\b|visualiza|просмотр|व्यू|ditonton|görüntüleme|ভিউ|观看|回視聴|Aufrufe/i;
+var AGO = /\bago\b|전$|^streamed|스트리밍|^il y a|^há |назад|पहले|yang lalu|önce|আগে|前$|^hace |^vor /i;
 
 function video(o) {
   return {

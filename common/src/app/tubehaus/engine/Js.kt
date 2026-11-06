@@ -87,13 +87,25 @@ val NOISE = setOf(
  */
 fun countOf(s: String?): Long {
     if (s.isNullOrBlank()) return 0
-    // a Latin unit must end its word: "12 mil" (es), "1,2 Mio." (de), but not the M of "12 members"
-    val m = Regex("""(\d[\d.,]*)\s*(?:(mil\s*M|mil|Mrd|Mio|Tsd|[KMB])(?![a-z])|([천만억千万萬億亿]+))?""", RegexOption.IGNORE_CASE).find(s) ?: return 0
-    val raw = m.groupValues[1].trimEnd('.', ',')
-    var mult = when (m.groupValues[2].lowercase().replace(" ", "")) {
-        "milm", "mrd", "b" -> 1e9; "mio", "m" -> 1e6; "mil", "tsd", "k" -> 1e3; else -> 1.0
+    // a unit must end its word: "12 mil" (es), "1,2 Mio." (de), "1.6 লাখ" (bn), but not the M of "12 members".
+    // Two letters mean another number in one language: B is a thousand in Turkish (bin), M a billion in Indonesian (miliar)
+    val m = Regex("""(\d(?:[\d.,]|[ \u00a0\u202f](?=\d{3}(?!\d)))*)[\s\u00a0\u202f]*(?:(mil[\s\u00a0\u202f]*M|mil|mi|bi|Mrd|Mio|Tsd|Md|Mn|Mr|rb|jt|тыс|млрд|млн|[KMB])(?![\p{L}\p{M}])|(हज़ार|हज़ार|लाख|करोड़|करोड़|क॰|হাজার|হাটি|লাখ|লাটি|কোটি|হা|লা|কো)(?![\p{L}\p{M}])|([천만억千万萬億亿]+))?""", RegexOption.IGNORE_CASE).find(s) ?: return 0
+    val raw = m.groupValues[1].replace(Regex("[ \u00a0\u202f]"), "").trimEnd('.', ',')
+    var mult = when (m.groupValues[2].lowercase().replace(Regex("[\\s\u00a0\u202f]"), "")) {
+        "b" -> if (InnerTube.hl.startsWith("tr")) 1e3 else 1e9
+        "m" -> if (InnerTube.hl.startsWith("id")) 1e9 else 1e6
+        "milm", "mrd", "md", "mr", "bi", "млрд" -> 1e9
+        "mio", "mn", "mi", "jt", "млн" -> 1e6
+        "mil", "tsd", "k", "rb", "тыс" -> 1e3
+        else -> 1.0
     }
-    for (c in m.groupValues[3]) mult *= when (c) {
+    mult *= when (m.groupValues[3]) {
+        "हज़ार", "हज़ार", "হাজার", "হাটি", "হা" -> 1e3
+        "लाख", "লাখ", "লাটি", "লা" -> 1e5
+        "करोड़", "करोड़", "क॰", "কোটি", "কো" -> 1e7
+        else -> 1.0
+    }
+    for (c in m.groupValues[4]) mult *= when (c) {
         '천', '千' -> 1e3; '만', '万', '萬' -> 1e4; '억', '億', '亿' -> 1e8; else -> 1.0
     }
     val n = when {
