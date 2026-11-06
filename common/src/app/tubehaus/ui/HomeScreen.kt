@@ -121,6 +121,12 @@ fun HomeScreen(app: AppState) {
 
 fun profileLabel(name: String) = name.ifEmpty { tr("Main") }
 
+/** Imports a profile file; shows what it was added as, or returns null (nothing said) when it isn't one. */
+fun importProfile(app: AppState, text: String): String? =
+    Profiles.import(app.store, text, tr("Imported"))?.also { n ->
+        app.toast(tr("Imported the profile “{p}”").replace("{p}", n))
+    }
+
 /** the home feed is built again next time (after a profile changed elsewhere) */
 fun clearHome() = HomeCache.items.clear()
 

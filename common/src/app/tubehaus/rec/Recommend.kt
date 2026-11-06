@@ -4,6 +4,8 @@ import app.tubehaus.patch.Patchable
 import app.tubehaus.data.Meta
 import app.tubehaus.data.Store
 import app.tubehaus.data.Taste
+import app.tubehaus.data.storeJson
+import kotlinx.serialization.Serializable
 import app.tubehaus.data.meta
 import app.tubehaus.engine.Video
 import app.tubehaus.engine.YouTube
@@ -158,6 +160,41 @@ object Profiles {
         if (name.isEmpty()) return
         if (name == active(store)) switch(store, "")
         store.profiles.update { it - name }
+    }
+
+    @Serializable
+    private class ProfileFile(val tubehaus: String, val version: Int, val name: String, val taste: Taste)
+
+    /**
+     * A profile as a file to keep or give to someone: only the channel and topic scores and the
+     * channel names. No history, no related videos, nothing you hid.
+     */
+    fun export(store: Store, name: String): Pair<String, ByteArray> {
+        val t = if (name == active(store)) store.taste.value else store.profiles.value[name] ?: Taste()
+        val clean = Taste(ch = t.ch, kw = t.kw, names = t.names.filterKeys { it in t.ch })
+        val slug = name.ifEmpty { "main" }.replace(Regex("[^\\p{L}\\p{N}_-]+"), "-").trim('-').ifEmpty { "profile" }
+        val json = storeJson.encodeToString(ProfileFile.serializer(), ProfileFile("profile", 1, name, clean))
+        return "tubehaus-profile-$slug.json" to json.encodeToByteArray()
+    }
+
+    /** Adds the profile in [text] next to the others (not switched to); its name, or null when it isn't a profile file. */
+    fun import(store: Store, text: String, mainName: String): String? {
+        val f = runCatching { storeJson.decodeFromString(ProfileFile.serializer(), text) }.getOrNull() ?: return null
+        if (f.tubehaus != "profile" || f.taste.ch.isEmpty() && f.taste.kw.isEmpty()) return null
+        val base = f.name.trim().take(40).ifEmpty { mainName }
+        val taken = names(store)
+        var n = base
+        var i = 2
+        while (n in taken) n = "$base (${i++})"
+        val t = f.taste
+        store.profiles.update {
+            it + (n to Taste(
+                ch = t.ch.mapValues { (_, v) -> v.coerceIn(-CAP, CAP) },
+                kw = t.kw.entries.take(2000).associate { (k, v) -> k to v.coerceIn(-CAP, CAP) },
+                names = t.names.filterKeys { it in t.ch },
+            ))
+        }
+        return n
     }
 }
 

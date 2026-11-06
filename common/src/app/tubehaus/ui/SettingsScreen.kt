@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -438,13 +439,35 @@ fun LearnedScreen(app: AppState) {
                     if (n == st.profile) Text(tr("In use"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(horizontal = 12.dp))
                     else TextButton(onClick = { Profiles.switch(app.store, n); app.rec.clearCache(); clearHome() }) { Text(tr("Use")) }
-                    if (n.isNotEmpty()) {
-                        TextButton(onClick = { renaming = n }) { Text(tr("Rename")) }
-                        TextButton(onClick = { deleting = n }) { Text(tr("Delete")) }
+                    Box {
+                        var menu by remember { mutableStateOf(false) }
+                        TextButton(onClick = { menu = true }) {
+                            androidx.compose.material3.Icon(Sym.MoreVert.fill, tr("More"), Modifier.size(18.dp))
+                        }
+                        DropdownMenu(menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(text = { Text(tr("Export")) }, onClick = {
+                                menu = false
+                                val (file, bytes) = Profiles.export(app.store, n)
+                                app.platform.saveFile(file, "application/json", bytes) { ok -> if (ok) app.toast(tr("Saved")) }
+                            })
+                            if (n.isNotEmpty()) {
+                                DropdownMenuItem(text = { Text(tr("Rename")) }, onClick = { menu = false; renaming = n })
+                                DropdownMenuItem(text = { Text(tr("Delete")) }, onClick = { menu = false; deleting = n })
+                            }
+                        }
                     }
                 }
             }
-            item { TextButton(onClick = { naming = true }, modifier = Modifier.padding(horizontal = 8.dp)) { Text(tr("New profile")) } }
+            item {
+                Row(Modifier.padding(horizontal = 8.dp)) {
+                    TextButton(onClick = { naming = true }) { Text(tr("New profile")) }
+                    TextButton(onClick = {
+                        app.platform.openTextFile { text ->
+                            if (text != null && importProfile(app, text) == null) app.toast(tr("This file isn't a TubeHaus profile"))
+                        }
+                    }) { Text(tr("Import a profile")) }
+                }
+            }
             if (names.size > 1) item { SectionTitle(tr("Profile: {p}").replace("{p}", profileLabel(st.profile))) }
             item {
                 Column(Modifier.padding(16.dp)) {
