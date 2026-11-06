@@ -122,6 +122,45 @@ object Learn {
     fun reset(store: Store) = store.taste.update { Taste() }
 }
 
+/**
+ * Taste profiles: separate sets of what was learned, say one for machining videos, one for
+ * documentaries and one for music, switched from Home. The one in use is store.taste, so learning
+ * and ranking work unchanged; the others wait in store.profiles. What you hid and the Shorts
+ * already shown count for every profile.
+ */
+object Profiles {
+    fun active(store: Store): String = store.settings.value.profile
+
+    /** the main profile ("") first, then the others by name */
+    fun names(store: Store): List<String> =
+        listOf("") + (store.profiles.value.keys + active(store)).filter { it.isNotEmpty() }.distinct().sortedBy { it.lowercase() }
+
+    fun switch(store: Store, name: String) {
+        val from = active(store)
+        if (name == from) return
+        val cur = store.taste.value
+        val next = store.profiles.value[name] ?: Taste()
+        store.profiles.update { it - name + (from to cur.copy(seen = emptyMap(), hiddenVideos = emptyList(), hiddenChannels = emptyList())) }
+        store.taste.update { next.copy(seen = cur.seen, hiddenVideos = cur.hiddenVideos, hiddenChannels = cur.hiddenChannels) }
+        store.settings.update { it.copy(profile = name) }
+    }
+
+    /** false when the name is taken or empty */
+    fun rename(store: Store, old: String, new: String): Boolean {
+        val n = new.trim()
+        if (old.isEmpty() || n.isEmpty() || n in names(store)) return false
+        if (old == active(store)) store.settings.update { it.copy(profile = n) }
+        else store.profiles.update { m -> m[old]?.let { (m - old) + (n to it) } ?: m }
+        return true
+    }
+
+    fun delete(store: Store, name: String) {
+        if (name.isEmpty()) return
+        if (name == active(store)) switch(store, "")
+        store.profiles.update { it - name }
+    }
+}
+
 /** New uploads of every subscription, from their RSS feeds (fast, no API quota, no account). */
 class Feed(private val store: Store) {
     private val cache = Sys.concurrentMap<String, Pair<Long, List<Video>>>()
@@ -178,7 +217,12 @@ class Recommender(private val store: Store, private val feed: Feed) {
         "Movies", "Podcasts", "Documentaries", "Fitness", "Art", "Nature", "Cars", "Anime", "Education", "DIY", "Finance",
     )
 
-    fun needsTopics(): Boolean = store.taste.value.kw.isEmpty() && store.lib.value.hist.isEmpty() && store.lib.value.subs.isEmpty()
+    fun needsTopics(): Boolean {
+        val t = store.taste.value
+        val lib = store.lib.value
+        // a new profile starts empty, whatever the library holds
+        return t.kw.isEmpty() && (Profiles.active(store).isNotEmpty() && t.ch.isEmpty() || lib.hist.isEmpty() && lib.subs.isEmpty())
+    }
 
     suspend fun home(n: Int = 60, skip: Set<String> = emptySet()): List<Video> = coroutineScope {
         val t = store.taste.value
@@ -197,7 +241,9 @@ class Recommender(private val store: Store, private val feed: Feed) {
         val chPools = likedCh.map { cid -> async { pool("ch:$cid", 3600) { feed.channel(cid, 3600).filter { !it.short }.map { Cand(it, "chan") } } } }
         cands += kwPools.awaitAll().flatten() + chPools.awaitAll().flatten()
         if (cands.size < 30) {
-            val seeds = (liked + topics.shuffled(rnd)).distinct().take(4)
+            // a profile of its own stays on its words; the main one may wander into any topic
+            val any = Profiles.active(store).isEmpty() || liked.isEmpty()
+            val seeds = (liked + (if (any) topics.shuffled(rnd) else emptyList())).distinct().take(4)
             cands += seeds.map { q -> async { pool("seed:$q", 3600) { search(q, "pop", q, false) } } }.awaitAll().flatten()
         }
         rank(cands, n, skip, t, lib.hist.associate { it.id to it }, shorts = false)
@@ -233,7 +279,9 @@ class Recommender(private val store: Store, private val feed: Feed) {
         val lib = store.lib.value
         val hiddenV = t.hiddenVideos.toSet() + lib.dislikes + skip
         val hiddenC = t.hiddenChannels.toSet()
-        val bonus = mapOf("sub" to 0.6, "rel" to 0.5, "chan" to 0.4, "kw" to 0.25, "pop" to 0.0)
+        // in a profile of its own, a subscription counts only as much as the profile likes its channel
+        val subBonus = if (Profiles.active(store).isEmpty()) 0.6 else 0.0
+        val bonus = mapOf("sub" to subBonus, "rel" to 0.5, "chan" to 0.4, "kw" to 0.25, "pop" to 0.0)
         val best = HashMap<String, Pair<Double, Cand>>()
         for (c in items) {
             val v = c.v

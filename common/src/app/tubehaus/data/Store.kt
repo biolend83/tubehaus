@@ -80,6 +80,8 @@ class Store(dir: Path) {
     val lib = JsonFile(dir / "library.json", Library.serializer(), Library(), scope)
     val taste = JsonFile(dir / "taste.json", Taste.serializer(), Taste(), scope)
     val settings = JsonFile(dir / "settings.json", Settings.serializer(), Settings(), scope)
+    /** the taste profiles not in use, by name ("" = the main one); the one in use is [taste] (see rec/Profiles) */
+    val profiles = JsonFile(dir / "profiles.json", MapSerializer(String.serializer(), Taste.serializer()), emptyMap(), scope)
     /** changes for the connected server, kept on disk until it has them */
     val queue = JsonFile(dir / "sync-queue.json", ListSerializer(SyncOp.serializer()), emptyList(), scope)
     /** channel id -> its picture, for cards whose list came without one (see channelAvatar) */
@@ -88,7 +90,7 @@ class Store(dir: Path) {
     var onQueued: (() -> Unit)? = null
 
     fun flush() {
-        lib.flushNow(); taste.flushNow(); settings.flushNow(); queue.flushNow(); avatars.flushNow()
+        lib.flushNow(); taste.flushNow(); settings.flushNow(); profiles.flushNow(); queue.flushNow(); avatars.flushNow()
     }
 
     /** with a server connected: the same change for it (the endpoints the web version uses) */
