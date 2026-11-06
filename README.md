@@ -56,6 +56,25 @@ YouTube. TubeHaus adds its own front end and a small server next to them. All cr
 
 ![TubeHaus home screen](docs/screenshot-home.jpg)
 
+## How is it different from FreeTube and NewPipe?
+
+FreeTube and NewPipe are great, mature projects, and TubeHaus owes a lot to them. The difference is mostly in where it runs and how it looks:
+
+| | **TubeHaus** | **FreeTube** | **NewPipe** |
+|---|---|---|---|
+| **Runs on** | Android phones and Android TV / Google TV, Windows, macOS, Linux, iPad/iPhone (sideloaded), and any browser through the server version | Windows, macOS, Linux | Android phones and tablets |
+| **Looks like** | YouTube itself: same layout, same keyboard shortcuts | Its own design | Its own design |
+| **Google account** | Not needed | Not needed | Not needed |
+| **Home screen** | Recommendations learned on the device from what you watch, like, skip and hide; nothing leaves it | Subscriptions, trending and popular | Subscriptions feed and trending |
+| **One library on several devices** | Optional: connect the apps to your own TubeHaus server | Export and import a file | Export and import a file |
+| **SponsorBlock and DeArrow** | Both built in | Both built in | Not in the official app (the Tubular fork has SponsorBlock) |
+| **On a TV** | Made for the remote: a TV layout with arrow-key navigation | No TV version | Works, but made for phones |
+| **Track record** | Young (2026), beta, one maintainer | Since 2018, large community | Since 2015, large community, on F-Droid |
+
+**When to pick something else:** if you only need a desktop app and want the most proven option, FreeTube is excellent.
+If you only use an Android phone and want a long track record and F-Droid, NewPipe is excellent.
+TubeHaus is for when you want one app that looks like YouTube on the TV, the phone, the PC and the iPad, and optionally one library shared between them.
+
 ## Why the server version
 
 **⚡ Fast**
