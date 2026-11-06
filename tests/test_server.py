@@ -717,6 +717,61 @@ class MostReplayed(unittest.TestCase):
         self.assertEqual(ts.dearrow_thumb({"v": "a/b", "t": "1.5"})[0], 400)
 
 
+class Sidx(unittest.TestCase):
+    @staticmethod
+    def box(version, timescale, first_offset, refs, earliest=0):
+        n = 8 if version else 4
+        body = bytes([version, 0, 0, 0]) + (1).to_bytes(4, "big") + timescale.to_bytes(4, "big")
+        body += earliest.to_bytes(n, "big") + first_offset.to_bytes(n, "big")
+        body += (0).to_bytes(2, "big") + len(refs).to_bytes(2, "big")
+        for size, duration, *flag in refs:
+            body += (size | (flag[0] if flag else 0)).to_bytes(4, "big")
+            body += duration.to_bytes(4, "big") + (0x90000000).to_bytes(4, "big")
+        payload = b"sidx" + body
+        return (len(payload) + 4).to_bytes(4, "big") + payload
+
+    def test_version_0(self):
+        b = self.box(0, 1000, 0, [(1000, 2500), (2000, 4000), (3000, 500)])
+        refs, pos = ts._sidx(b)
+        self.assertEqual([r[0] for r in refs], [1000, 2000, 3000])
+        self.assertEqual([r[1] for r in refs], [2.5, 4.0, 0.5])
+        self.assertEqual(pos, len(b))
+
+    def test_version_1(self):
+        b = self.box(1, 90000, 0, [(500, 180000), (700, 45000)], earliest=2 ** 33)
+        refs, pos = ts._sidx(b)
+        self.assertEqual([r[0] for r in refs], [500, 700])
+        self.assertEqual([r[1] for r in refs], [2.0, 0.5])
+        self.assertEqual(pos, len(b))
+
+    def test_first_offset_moves_the_returned_offset(self):
+        for version in (0, 1):
+            b = self.box(version, 1000, 64, [(100, 1000)])
+            self.assertEqual(ts._sidx(b)[1], len(b) + 64)
+
+    def test_version_1_first_offset_is_64_bit(self):
+        b = self.box(1, 1000, 2 ** 32 + 5, [(100, 1000)])
+        self.assertEqual(ts._sidx(b)[1], len(b) + 2 ** 32 + 5)
+
+    def test_offset_counts_bytes_before_the_box(self):
+        prefix = b"\x00" * 20
+        b = self.box(0, 1000, 8, [(100, 1000)])
+        self.assertEqual(ts._sidx(prefix + b)[1], len(prefix) + len(b) + 8)
+
+    def test_reference_type_bit_is_not_part_of_the_size(self):
+        b = self.box(0, 1000, 0, [(1234, 1000, 0x80000000)])
+        self.assertEqual(ts._sidx(b)[0], [(1234, 1.0)])
+
+    def test_no_references(self):
+        b = self.box(0, 1000, 0, [])
+        self.assertEqual(ts._sidx(b), ([], len(b)))
+
+    def test_without_a_sidx_box(self):
+        for data in (b"", b"\x00\x00\x00\x08ftyp", b"sidx", b"\x00sidx"):
+            with self.assertRaises(ValueError):
+                ts._sidx(data)
+
+
 class Health(unittest.TestCase):
     def test_health(self):
         h = ts.health()
