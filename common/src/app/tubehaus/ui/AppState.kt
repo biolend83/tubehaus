@@ -110,7 +110,14 @@ class AppState(val platform: Platform, val store: Store) {
             val mac = if (Sys.osArch() == "aarch64") "-mac-arm64.dmg" else "-mac-x64.dmg"
             val desktopFile = when { os.startsWith("Windows") -> ".msi"; os.startsWith("Mac") -> mac; else -> null }
             // one release per version (app-v*) carries every platform's file
-            val r = Remote.newerRelease("app-v", VERSION, if (platform.name == "android") ".apk" else desktopFile)
+            // Android: the APK signed with the same key as this one, or the system refuses it
+            // ("App not installed"): TubeHaus-release-*.apk for the release key, TubeHaus-*.apk otherwise
+            val pick: ((String) -> Boolean)? = when {
+                platform.name != "android" -> desktopFile?.let { f -> { n: String -> n.endsWith(f) } }
+                platform.releaseKey -> { n: String -> n.startsWith("TubeHaus-release-") && n.endsWith(".apk") }
+                else -> { n: String -> n.endsWith(".apk") && !n.startsWith("TubeHaus-release-") }
+            }
+            val r = Remote.newerReleaseWhere("app-v", VERSION, pick)
             if (r != null && (now || r.version != store.settings.value.skipVersion)) update = r
             else if (!quiet) toast(tr("TubeHaus is up to date"))
         }

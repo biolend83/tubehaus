@@ -34,11 +34,49 @@ fun ago(epoch: Long): String {
 }
 
 @Patchable
-fun compact(n: Long): String = when {
+fun compact(n: Long): String = when (L.lang) {
+    "ko" -> compactKo(n)
+    "ja" -> compactJa(n)
+    "es" -> compactWith(n, " mil M", " M", " mil")
+    "de" -> compactWith(n, " Mrd.", " Mio.", " Tsd.")
+    else -> compactEn(n)
+}
+
+private fun compactEn(n: Long): String = when {
     n >= 1_000_000_000 -> (oneDecimal(n / 1e9) + "B").replace(".0B", "B")
     n >= 1_000_000 -> (oneDecimal(n / 1e6) + "M").replace(".0M", "M")
     n >= 1_000 -> (oneDecimal(n / 1e3) + "K").replace(".0K", "K")
     else -> n.toString()
+}
+
+/** as YouTube writes it in Korean: 1.2천, 3.4만, 48만, 4812만, 2.3억 */
+private fun compactKo(n: Long): String = when {
+    n >= 1_000_000_000 -> "${n / 100_000_000}억"
+    n >= 100_000_000 -> (oneDecimal(n / 1e8) + "억").replace(".0억", "억")
+    n >= 100_000 -> "${n / 10_000}만"
+    n >= 10_000 -> (oneDecimal(n / 1e4) + "만").replace(".0만", "만")
+    n >= 1_000 -> (oneDecimal(n / 1e3) + "천").replace(".0천", "천")
+    else -> n.toString()
+}
+
+/** as YouTube writes it in Japanese: 1234, 1.2万, 48万, 2.3億 */
+private fun compactJa(n: Long): String = when {
+    n >= 1_000_000_000 -> "${n / 100_000_000}億"
+    n >= 100_000_000 -> (oneDecimal(n / 1e8) + "億").replace(".0億", "億")
+    n >= 100_000 -> "${n / 10_000}万"
+    n >= 10_000 -> (oneDecimal(n / 1e4) + "万").replace(".0万", "万")
+    else -> n.toString()
+}
+
+/** Spanish and German: a decimal comma and the language's own words, "1,2 Mio.", "12 mil" */
+private fun compactWith(n: Long, b: String, m: String, k: String): String {
+    fun f(x: Double, u: String) = oneDecimal(x).removeSuffix(".0").replace('.', ',') + u
+    return when {
+        n >= 1_000_000_000 -> f(n / 1e9, b)
+        n >= 1_000_000 -> f(n / 1e6, m)
+        n >= 1_000 -> f(n / 1e3, k)
+        else -> n.toString()
+    }
 }
 
 /** The small grey line under a title: channel · views · when. Calm mode leaves the numbers out. */

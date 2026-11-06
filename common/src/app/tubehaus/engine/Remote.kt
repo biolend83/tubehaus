@@ -112,7 +112,11 @@ object Remote {
      * looked for "desktop-v" on the desktop); [asset] picks the file to offer (".apk", ".msi",
      * ".dmg"), and without one the release page is offered.
      */
-    suspend fun newerRelease(tag: String, current: String, asset: String?): Release? {
+    suspend fun newerRelease(tag: String, current: String, asset: String?): Release? =
+        newerReleaseWhere(tag, current, asset?.let { a -> { name: String -> name.endsWith(a) } })
+
+    /** the same, with [pick] choosing the file by its name */
+    suspend fun newerReleaseWhere(tag: String, current: String, pick: ((String) -> Boolean)?): Release? {
         val text = runCatching { Net.get(RELEASES_URL, mapOf("Accept" to "application/vnd.github+json")) }.getOrNull() ?: return null
         val best = runCatching { parse(text).arr }.getOrNull().orEmpty()
             .filter { it.at("draft").bool.not() && it.at("tag_name").str?.startsWith(tag) == true }
@@ -120,7 +124,7 @@ object Remote {
             ?: return null
         val v = best.at("tag_name").str!!.removePrefix(tag)
         if (version(v) <= version(current)) return null
-        val file = asset?.let { a -> best.at("assets").arr.firstOrNull { it.at("name").str?.endsWith(a) == true }?.at("browser_download_url").str }
+        val file = pick?.let { p -> best.at("assets").arr.firstOrNull { it.at("name").str?.let(p) == true }?.at("browser_download_url").str }
         return Release(v, best.at("html_url").str ?: "https://github.com/biolend83/tubehaus/releases", file, whatsNew(best.at("body").str ?: ""))
     }
 

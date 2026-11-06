@@ -58,3 +58,12 @@ fun LinkedText(
     Text(s, modifier, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis, onTextLayout = onTextLayout)
 }
 
+/**
+ * Text in a bottom sheet that can be selected and copied. Not on the iPad: there, selection
+ * inside a sheet closes the app (Compose on iOS), so the text is plain.
+ */
+@Composable
+fun SelectableInSheet(app: AppState, content: @Composable () -> Unit) {
+    if (app.platform.name == "ios") content()
+    else androidx.compose.foundation.text.selection.SelectionContainer { content() }
+}
