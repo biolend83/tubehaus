@@ -15,6 +15,9 @@ import app.tubehaus.engine.Video
 import app.tubehaus.engine.YouTube
 import app.tubehaus.engine.YtError
 import app.tubehaus.rec.Learn
+import app.tubehaus.data.SongMeta
+import app.tubehaus.engine.Music
+import app.tubehaus.engine.Song
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -45,7 +48,36 @@ class Playback(private val app: AppState) {
         private set
     /** "Up next" when there is no queue */
     val next: Video?
-        get() = queue.firstOrNull() ?: details?.related?.filterIsInstance<Video>()?.firstOrNull { !it.live && !it.short }
+        get() = if (music) (songs.getOrNull(songAt + 1) ?: songs.firstOrNull()?.takeIf { repeat == 1 })?.video() else queue.firstOrNull() ?: details?.related?.filterIsInstance<Video>()?.firstOrNull { !it.live && !it.short }
+
+    // ------------------------------------------------------------------ music
+    /** what plays came from the music tab: the cover instead of the picture, songs one after another */
+    var music by mutableStateOf(false)
+        private set
+    /** the music queue, the songs already heard included (so Previous works); [songAt] is the one playing */
+    var songs by mutableStateOf<List<Song>>(emptyList())
+        private set
+    var songAt by mutableStateOf(0)
+        private set
+    val song: Song? get() = if (music) songs.getOrNull(songAt) else null
+    /** 0 off, 1 the whole queue, 2 this song */
+    var repeat by mutableStateOf(0)
+    var shuffle by mutableStateOf(false)
+        private set
+    /** the queue comes from a radio and grows by itself near its end */
+    private var radio = false
+    /** "Watch video" in music: this song with its picture */
+    var withVideo by mutableStateOf(false)
+        private set
+
+    /** A-B repeat: the part between [abA] and [abB] (ms) plays over and over; -1 when not set */
+    var abA by mutableStateOf(-1L)
+        private set
+    var abB by mutableStateOf(-1L)
+        private set
+
+    /** the transcript was asked for (the player's menu, the button under the video): the watch page opens it */
+    var transcriptAsked by mutableStateOf(false)
 
     /** "Loop video": this one plays again from the start; off again for the next video */
     var loop by mutableStateOf(false)
@@ -151,7 +183,9 @@ class Playback(private val app: AppState) {
                 if (s.error != null && !refreshed) { refreshed = true; refresh(v, s.positionMs); return@collectLatest }
                 if (s.positionMs > watchedMs) watchedMs = s.positionMs
                 sponsorCheck(s)
+                if (abB > 0 && s.playing && s.positionMs >= abB) player.seekTo(abA.coerceAtLeast(0))
                 val now = Sys.nowMs()
+                countTime(v, s.playing, now)
                 if (s.playing && now - lastSave > 5000) {
                     lastSave = now
                     store.savePosition(v.copy(lengthSec = v.lengthSec.takeIf { it > 0 } ?: (s.durationMs / 1000).toInt()), s.positionMs / 1000, s.durationMs / 1000)
@@ -162,7 +196,15 @@ class Playback(private val app: AppState) {
     }
 
     fun open(v: Video, newQueue: List<Video> = emptyList(), startSec: Long? = null) {
+        openVideo(v, newQueue, startSec, asSong = false)
+    }
+
+    private fun openVideo(v: Video, newQueue: List<Video>, startSec: Long?, asSong: Boolean) {
         finishCurrent()
+        if (!asSong) { music = false; songs = emptyList(); songAt = 0; radio = false }
+        withVideo = false
+        abA = -1L; abB = -1L
+        countedStart = false
         video = v
         queue = newQueue.filter { it.id != v.id }
         stream = null
@@ -209,7 +251,8 @@ class Playback(private val app: AppState) {
                     channelId = s.channelId.ifEmpty { v.channelId }, lengthSec = s.lengthSec.takeIf { it > 0 } ?: v.lengthSec,
                     views = if (s.views > 0) s.views else v.views, live = s.live,
                 )
-                start(s, startSec ?: store.position(v.id))
+                // songs start from the top; a video where you left it
+                start(s, startSec ?: if (asSong) null else store.position(v.id))
             } catch (e: YtError) {
                 errorAge = e.kind == YtError.Kind.AGE
                 error = when (e.kind) {
@@ -242,7 +285,9 @@ class Playback(private val app: AppState) {
                 startMs = (startSec ?: 0) * 1000,
                 maxHeight = if (cap <= 0) Int.MAX_VALUE else cap,
                 autoplay = autoplay,
-                speed = set.speed,
+                speed = if (music) 1f else speedFor(video?.channelId ?: s.channelId),
+                audioOnly = music && set.musicAudioOnly && !withVideo,
+                codec = set.codec,
                 captions = choice?.first?.takeIf { set.captions },
                 captionLang = set.captionLang.ifEmpty { lang() },
                 standbyCaption = choice?.first,
@@ -293,6 +338,18 @@ class Playback(private val app: AppState) {
         learnNow()
         store.savePosition(v, v.lengthSec.toLong(), v.lengthSec.toLong())
         if (sleepAt == END) { sleepAt = 0L; app.toast(tr("Sleep timer: paused")); return }
+        if (music) {
+            app.scope.launch {
+                delay(300)
+                if (video?.id != v.id) return@launch
+                when {
+                    repeat == 2 -> { endHandled = false; player.seekTo(0); player.play() }
+                    songAt + 1 < songs.size -> playSongAt(songAt + 1)
+                    repeat == 1 && songs.isNotEmpty() -> playSongAt(0)
+                }
+            }
+            return
+        }
         if (app.store.settings.value.calm) return       // calm mode: nothing starts by itself
         if (!app.store.settings.value.autoplay && queue.isEmpty()) return
         val n = next ?: return
@@ -332,11 +389,165 @@ class Playback(private val app: AppState) {
         player.stop()
         video = null; stream = null; details = null; error = null; errorAge = false; queue = emptyList()
         segments = emptyList(); skippable = null; justSkipped = null
+        music = false; songs = emptyList(); songAt = 0; radio = false; abA = -1L; abB = -1L
     }
 
     fun skipNext() {
+        if (music) { if (songAt + 1 < songs.size) playSongAt(songAt + 1) else if (repeat == 1 && songs.isNotEmpty()) playSongAt(0); return }
         val n = next ?: return
         open(n, queue.drop(if (queue.firstOrNull()?.id == n.id) 1 else 0))
         if (app.current is Screen.Watch) app.stack[app.stack.size - 1] = Screen.Watch(n.id)
     }
+
+    // ------------------------------------------------------------------ speed per channel
+    /** the speed this channel's videos start at: the one you chose for it, else your usual speed */
+    fun speedFor(channelId: String): Float {
+        val set = store.settings.value
+        return set.channelSpeed[channelId] ?: set.speed
+    }
+
+    /** the speed picked in the player: kept for this channel (or for everything, by Settings) */
+    fun setSpeed(x: Float) {
+        player.setSpeed(x)
+        if (music) return
+        val cid = video?.channelId.orEmpty()
+        store.settings.update { set ->
+            if (set.speedPerChannel && cid.isNotEmpty()) {
+                set.copy(channelSpeed = if (x == set.speed) set.channelSpeed - cid else set.channelSpeed + (cid to x))
+            } else set.copy(speed = x)
+        }
+    }
+
+    // ------------------------------------------------------------------ A-B repeat
+    /** first press: A here; second: B here, and the part repeats; third: off */
+    fun abStep() {
+        val pos = player.state.value.positionMs
+        when {
+            abB > 0 -> { abA = -1L; abB = -1L; app.toast(tr("A-B repeat off")) }
+            abA >= 0 && pos > abA + 500 -> { abB = pos; app.toast(tr("Repeating {a} to {b}").replace("{a}", durationMs(abA)).replace("{b}", durationMs(abB))) }
+            else -> { abA = pos; app.toast(tr("A set at {t}. Choose A-B repeat again where it should end.").replace("{t}", durationMs(pos))) }
+        }
+    }
+
+    fun abOff() { abA = -1L; abB = -1L }
+
+    // ------------------------------------------------------------------ music
+    /** plays [list] from [at] as music; [radio]: when it runs low, songs like the last one are added */
+    fun playSongs(list: List<Song>, at: Int = 0, radio: Boolean = false, shuffled: Boolean = false) {
+        if (list.isEmpty()) return
+        var l = list
+        var i = at.coerceIn(0, list.size - 1)
+        if (shuffled) { val first = l[i]; l = listOf(first) + (l - first).shuffled(); i = 0 }
+        music = true; songs = l; songAt = i; this.radio = radio; shuffle = shuffled
+        playSongAt(i)
+        // a single song: its radio follows it
+        if (radio && l.size < 3) moreRadio()
+    }
+
+    /** one song, then songs like it */
+    fun playRadio(s: Song) = playSongs(listOf(s), 0, radio = true)
+
+    fun playSongAt(i: Int) {
+        val s = songs.getOrNull(i) ?: return
+        songAt = i
+        music = true
+        store.rememberSong(s.meta())
+        openVideo(s.video(), emptyList(), null, asSong = true)
+        if (radio && songs.size - i <= 3) moreRadio()
+    }
+
+    fun previous() {
+        if (!music) { player.seekTo(0); return }
+        // as music players do: a song more than a few seconds in starts over, else the one before
+        if (player.state.value.positionMs > 4000 || songAt == 0) player.seekTo(0) else playSongAt(songAt - 1)
+    }
+
+    fun toggleShuffle() {
+        if (!music) return
+        shuffle = !shuffle
+        if (shuffle) {
+            val head = songs.take(songAt + 1)
+            songs = head + songs.drop(songAt + 1).shuffled()
+        }
+    }
+
+    /** the queue's songs after this one, to reorder or remove (the Up next list) */
+    fun removeSong(i: Int) {
+        if (i == songAt || i !in songs.indices) return
+        songs = songs.toMutableList().also { it.removeAt(i) }
+        if (i < songAt) songAt--
+    }
+
+    /** "Play next" on a song: right after the one playing */
+    fun playNext(s: Song) {
+        if (!music || songs.isEmpty()) { playSongs(listOf(s)); return }
+        val rest = songs.filterIndexed { j, x -> j <= songAt || x.id != s.id }
+        songs = rest.take(songAt + 1) + s + rest.drop(songAt + 1)
+    }
+
+    fun addToQueue(s: Song) {
+        if (!music || songs.isEmpty()) { playSongs(listOf(s)); return }
+        if (songs.drop(songAt + 1).none { it.id == s.id }) songs = songs + s
+    }
+
+    private var radioJob: Job? = null
+    private fun moreRadio() {
+        if (radioJob?.isActive == true) return
+        val seed = songs.lastOrNull() ?: return
+        radioJob = app.scope.launch {
+            val more = runCatching { Music.radio(seed.id) }.getOrDefault(emptyList())
+            val have = songs.map { it.id }.toHashSet()
+            val add = more.filter { it.id !in have }
+            if (add.isNotEmpty() && music) songs = songs + add
+        }
+    }
+
+    /** music: the same song with its picture ("Watch video"), from where it is */
+    fun showVideo() {
+        if (!music || withVideo) return
+        withVideo = true
+        replay(player.state.value.positionMs)
+    }
+
+    // ------------------------------------------------------------------ watch time
+    private var countedStart = false
+    private var lastTick = 0L
+    private var pending = 0L
+    /** time played without a pause longer than 5 minutes, for the break reminder */
+    private var streakMs = 0L
+    private var lastPlaying = 0L
+
+    private fun countTime(v: Video, playing: Boolean, now: Long) {
+        if (!playing) { lastTick = 0L; return }
+        if (!countedStart) { countedStart = true; store.addWatch(v, 0, music, started = true) }
+        if (lastPlaying > 0 && now - lastPlaying > 5 * 60_000L) streakMs = 0
+        lastPlaying = now
+        val step = if (lastTick == 0L) 0L else (now - lastTick).coerceIn(0, 3000)
+        lastTick = now
+        pending += step
+        streakMs += step
+        if (pending >= 30_000) { store.addWatch(v, pending / 1000, music); pending %= 1000; checkReminders() }
+    }
+
+    /** the reminders of Settings → Wellbeing: a break after so long in a row, a daily amount */
+    private fun checkReminders() {
+        val set = store.settings.value
+        if (set.breakMinutes > 0 && streakMs >= set.breakMinutes * 60_000L) {
+            streakMs = 0
+            if (!music) player.pause()
+            app.reminder = tr("You've been watching for {n} minutes. Time for a short break?").replace("{n}", "${set.breakMinutes}")
+        }
+        if (set.dailyMinutes > 0) {
+            val today = Sys.today()
+            val st = store.stats.value
+            val d = st.days[today]
+            if (st.remindedOn != today && d != null && (d.video + d.music) >= set.dailyMinutes * 60L) {
+                store.stats.update { it.copy(remindedOn = today) }
+                app.reminder = tr("You've reached today's {n} minutes.").replace("{n}", "${set.dailyMinutes}")
+            }
+        }
+    }
 }
+
+fun Song.meta() = SongMeta(id, title, artist, artistId, album, albumId, lengthSec, art)
+fun SongMeta.song() = Song(id, title, artist, artistId, album, albumId, len, art)

@@ -95,6 +95,9 @@ fun WatchScreen(app: AppState) {
     // the comments open beside (wide) or under (phone) the video, which keeps playing
     var side by remember(v.id) { mutableStateOf(if (hasRelated && set.sideTab != "comments") "next" else "comments") }
     var commentsOpen by remember(v.id) { mutableStateOf(false) }
+    // the transcript: a tab beside the video (wide) or a panel over the space under it (phone)
+    var transcriptOpen by remember(v.id) { mutableStateOf(false) }
+    val hasCaptions = !pb.stream?.captions.isNullOrEmpty()
     // TV: the video plays on this page, beside what's next; OK on the video fills the screen
     // and Back comes back here (it used to fill the screen by itself, which got in the way)
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -105,6 +108,11 @@ fun WatchScreen(app: AppState) {
         val narrow = maxWidth < 600.dp
         // tablets and TVs: a narrower panel, so the video gets most of the width
         val sideWidth = if (tablet || app.platform.tv) minOf(380.dp, maxWidth * 0.32f) else minOf(420.dp, maxWidth * 0.4f)
+        LaunchedEffect(pb.transcriptAsked) {
+            if (!pb.transcriptAsked) return@LaunchedEffect
+            pb.transcriptAsked = false
+            if (wide) side = "transcript" else { commentsOpen = false; transcriptOpen = true }
+        }
         if (wide) {
             // tablets and the desktop: the video and its details on the left; up next or the comments on the right
             // the iPad lays it out like YouTube on a computer: the details and the comments scroll under
@@ -135,6 +143,7 @@ fun WatchScreen(app: AppState) {
                     if (hasRelated) add("next" to tr("Up next"))
                     if (token != null && !pc) add("comments" to tr("Comments"))
                     if (tablet && !pc && set.underVideo != 2) add("details" to tr("Details"))
+                    if (hasCaptions) add("transcript" to tr("Transcript"))
                 }
                 if (tabs.isNotEmpty()) {
                     val shown = side.takeIf { s -> tabs.any { it.first == s } } ?: tabs.first().first
@@ -147,6 +156,7 @@ fun WatchScreen(app: AppState) {
                         when {
                             shown == "comments" && token != null -> Comments(app, token)
                             shown == "details" -> LazyColumn(Modifier.fillMaxSize()) { item { Info(app, v) } }
+                            shown == "transcript" -> TranscriptPanel(app, null)
                             else -> LazyColumn(Modifier.fillMaxSize()) { related(app, big = false, thumb = if (sideWidth < 340.dp) 128.dp else 200.dp) }
                         }
                     }
@@ -173,6 +183,17 @@ fun WatchScreen(app: AppState) {
                     ) {
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                             if (token != null) CommentsPanel(app, token) { commentsOpen = false }
+                        }
+                    }
+                    androidx.compose.animation.AnimatedVisibility(
+                        transcriptOpen && hasCaptions,
+                        enter = androidx.compose.animation.slideInVertically(tween(Motion.MEDIUM, easing = Motion.emphasizedIn)) { it } +
+                            androidx.compose.animation.fadeIn(tween(Motion.SHORT)),
+                        exit = androidx.compose.animation.slideOutVertically(tween(Motion.SHORT + 50, easing = Motion.emphasizedOut)) { it } +
+                            androidx.compose.animation.fadeOut(tween(Motion.SHORT + 50)),
+                    ) {
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                            TranscriptPanel(app) { transcriptOpen = false }
                         }
                     }
                 }
@@ -476,6 +497,7 @@ private fun Actions(app: AppState, v: Video, has: (String) -> Boolean) {
         if (has("save")) item { Chip(Sym.LibraryAdd.outline, tr("Save")) { pick = true } }
         if (has("share")) item { Chip(Sym.Share.outline, tr("Share")) { app.share(v.title, "https://youtu.be/${v.id}") } }
         if (has("download") && !v.live && app.platform.canDownload) item { DownloadChip(app, v) }
+        if (!pb.stream?.captions.isNullOrEmpty() && !app.platform.tv) item { Chip(Sym.Transcript.outline, tr("Transcript")) { pb.transcriptAsked = true } }
         if (pb.next != null && has("next")) item { Chip(Sym.SkipNext.outline, tr("Next")) { pb.skipNext() } }
     }
     if (pick) PlaylistPicker(v, app) { pick = false }
