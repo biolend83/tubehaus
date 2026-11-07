@@ -1,6 +1,7 @@
 package app.tubehaus.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -89,12 +90,11 @@ fun TopTabs(app: AppState) {
     }
     var more by remember { mutableStateOf(false) }
     val open = screens.indexOfFirst { it.first == root }.coerceAtLeast(0)
-    val c = MaterialTheme.colorScheme
-    PrimaryScrollableTabRow(
-        selectedTabIndex = open, edgePadding = if (LocalCompact.current) 4.dp else 12.dp, modifier = Modifier.fillMaxWidth(),
-        containerColor = c.background,
-        divider = {},
-        indicator = { TabRowDefaults.PrimaryIndicator(Modifier.tabIndicatorOffset(open, matchContentSize = true), width = androidx.compose.ui.unit.Dp.Unspecified, height = 2.5.dp, color = Red) },
+    // pills in a row that scrolls sideways, the open one filled (the web 1.0's tabs)
+    androidx.compose.foundation.layout.Row(
+        Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState())
+            .padding(horizontal = if (LocalCompact.current) 12.dp else 16.dp, vertical = 6.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
     ) {
         screens.forEachIndexed { i, (s, label) -> TopTab(i == open, label) { app.go(s) } }
         if (discover) Box {
@@ -110,13 +110,8 @@ fun TopTabs(app: AppState) {
     }
 }
 
-/** one of the top tabs, as in YouTube's app: a plain word, the open one bold (with a short red line under it, TopTabs) */
+/** one of the top tabs: a pill, the open one filled with the text colour */
 @Composable
 private fun TopTab(selected: Boolean, label: String, onClick: () -> Unit) {
-    val c = MaterialTheme.colorScheme
-    Tab(
-        selected, onClick = onClick, modifier = Modifier.height(42.dp),
-        selectedContentColor = c.onSurface, unselectedContentColor = c.onSurfaceVariant,
-        text = { Text(label, fontSize = 15.sp, maxLines = 1, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) },
-    )
+    Chip(selected, onClick = onClick, label = label, icon = null)
 }

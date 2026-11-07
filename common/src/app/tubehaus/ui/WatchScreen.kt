@@ -126,7 +126,7 @@ fun WatchScreen(app: AppState) {
                     }
                 } else {
                     LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp)) {
-                        item { PlayerBox(app) }
+                        item { Box(Modifier.clip(RoundedCornerShape(20.dp))) { PlayerBox(app) } }
                         under(app, v, flush = true)
                     }
                 }
@@ -324,7 +324,8 @@ private fun Info(app: AppState, v: Video, flush: Boolean = false) {
     val desk = !LocalCompact.current && !app.platform.touch
     Column(Modifier.padding(horizontal = if (flush) 0.dp else 12.dp, vertical = 10.dp)) {
         if (desk) {
-            if (has("title")) Text(titleOf(v, app), fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (has("title")) Text(titleOf(v, app), fontSize = 21.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
         } else {
             // the title and one quiet line under it; either opens the description
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { sheet = true }) {
@@ -354,8 +355,8 @@ private fun Info(app: AppState, v: Video, flush: Boolean = false) {
         }
         Actions(app, v, ::has)
         if (desk && (line.isNotEmpty() || desc.isNotEmpty())) Column(
-            Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant).clickable { sheet = true }.padding(12.dp),
+            Modifier.fillMaxWidth().padding(top = 14.dp).clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainer).clickable { sheet = true }.padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             if (line.isNotEmpty()) Text(line, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, maxLines = 1)
             if (desc.isNotEmpty()) {
@@ -373,7 +374,7 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
     val d = app.playback.details
     val calm = app.store.settings.value.calm
     val desc = app.playback.stream?.description ?: ""
-    ModalBottomSheet(onDismissRequest = onClose, shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)) {
+    ModalBottomSheet(onDismissRequest = onClose, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             item {
                 Text(v.title, style = MaterialTheme.typography.titleLarge)
@@ -401,7 +402,7 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
                 if (desc.isNotEmpty()) SelectableInSheet(app) {
                     LinkedText(desc, app,
                         Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 32.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)).padding(14.dp),
+                            .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(18.dp)).padding(14.dp),
                         onTime = { s -> app.player.seekTo(s * 1000L); onClose() })
                 }
             }
@@ -450,10 +451,10 @@ private fun Actions(app: AppState, v: Video, has: (String) -> Boolean) {
     }
     LazyRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (has("likes")) item {
-          Box(Modifier.clip(RoundedCornerShape(18.dp))) {
-            Row(Modifier.height(36.dp).background(MaterialTheme.colorScheme.surfaceVariant),
+          Box(Modifier.clip(RoundedCornerShape(20.dp))) {
+            Row(Modifier.height(40.dp).background(MaterialTheme.colorScheme.surfaceVariant),
                 verticalAlignment = Alignment.CenterVertically) {
-                Row(Modifier.fillMaxHeight().tvClickable(RoundedCornerShape(18.dp)) {
+                Row(Modifier.fillMaxHeight().tvClickable(RoundedCornerShape(20.dp), sink = 0.94f) {
                     app.store.setInList("likes", v, !liked)
                     if (!liked) { Learn.nudgeChannel(app.store, v.channelId, v.author, 1.0); pop(upPop) }
                 }.padding(start = 12.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -464,7 +465,7 @@ private fun Actions(app: AppState, v: Video, has: (String) -> Boolean) {
                     if (n.isNotEmpty()) Text(n, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 6.dp))
                 }
                 Box(Modifier.width(1.dp).height(20.dp).background(MaterialTheme.colorScheme.outline))
-                Box(Modifier.fillMaxHeight().tvClickable(RoundedCornerShape(18.dp)) {
+                Box(Modifier.fillMaxHeight().tvClickable(RoundedCornerShape(20.dp), sink = 0.94f) {
                     app.store.setInList("dislikes", v, !disliked)
                     if (!disliked) { Learn.nudgeChannel(app.store, v.channelId, v.author, -1.5); pop(downPop) }
                 }.padding(start = 10.dp, end = 12.dp), contentAlignment = Alignment.Center) {
@@ -510,8 +511,8 @@ private fun DownloadChip(app: AppState, v: Video) {
 @Composable
 private fun Chip(icon: ImageVector, label: String, onClick: () -> Unit) {
     Row(
-        Modifier.height(36.dp).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
-            .tvClickable(RoundedCornerShape(18.dp), onClick = onClick).padding(horizontal = 12.dp),
+        Modifier.height(40.dp).tvClickable(RoundedCornerShape(20.dp), sink = 0.94f, onClick = onClick).clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, Modifier.size(20.dp))
@@ -600,8 +601,8 @@ private fun CommentsTeaser(token: String, open: () -> Unit) {
     val pager = rememberPager(token, { YouTube.comments(token) }, { YouTube.comments(it) })
     val first = pager.items.firstOrNull()
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .tvClickable(onClick = open).padding(12.dp),
     ) {
         Text(tr("Comments"), style = MaterialTheme.typography.titleSmall)

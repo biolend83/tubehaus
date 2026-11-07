@@ -1,0 +1,4 @@
+- TubeHaus 1.0: the look of the web app 1.0, with the Pretendard font
+- Softer colours, pill tabs and chips, rounder thumbnails and cards that rise in as they appear
+- A shimmer while things load, and the open tab in a soft teal pill that pops in
+- Settings on one page of cards, with a menu that jumps to each category, new switches and choices

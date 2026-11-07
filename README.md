@@ -13,7 +13,7 @@ devices and the web version (optional).
 
 For Apple Silicon (M1 and later) and Intel Macs.
 
-**[⬇ Apple Silicon](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-mac-arm64.dmg)** · **[⬇ Intel](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-mac-x64.dmg)** (0.5.4, beta; .zip versions on the release page)
+**[⬇ Apple Silicon](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-mac-arm64.dmg)** · **[⬇ Intel](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-mac-x64.dmg)** (0.5.4, beta; .zip versions on the release page)
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · **macOS** · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · [iPad / iPhone](https://github.com/biolend83/tubehaus/tree/ios-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
@@ -83,7 +83,7 @@ ExoPlayer (Media3) on Android, libmpv on Windows, macOS and Linux.
    brew install mpv
    ```
    If mpv is missing, the app tells you when you first play a video.
-2. Download the .dmg for your Mac, [Apple Silicon](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-mac-arm64.dmg) or [Intel](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-mac-x64.dmg),, open it and drag TubeHaus into *Applications*.
+2. Download the .dmg for your Mac, [Apple Silicon](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-mac-arm64.dmg) or [Intel](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-mac-x64.dmg),, open it and drag TubeHaus into *Applications*.
 3. The app isn't signed by Apple yet, so macOS blocks a plain double-click the first time:
    right-click TubeHaus → *Open* → *Open*. After that it opens normally.
 
@@ -104,3 +104,7 @@ The app finds Homebrew's libmpv in `/opt/homebrew/lib` (Apple Silicon) or `/usr/
 ## License
 
 GPL-3.0.
+
+The Pretendard font the apps use (`common/fonts`) is copyright (c) 2021 Kil Hyung-jin
+(https://github.com/orioncactus/pretendard), under the SIL Open Font License 1.1: see
+`common/fonts/Pretendard-OFL.txt`, which also ships inside the apps next to the font.
