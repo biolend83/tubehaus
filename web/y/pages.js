@@ -1,6 +1,6 @@
 // List pages: home, search, channel, playlist, subscriptions, history, you, trending, settings
 import { $, $$, el, esc, icon, api, lib, settings, local, toast, fmtTime, fmtViews, ago, thumb, normVideo, pickThumb, localUrl, safeHtml, linkify, dropCache, PUBLIC, localLibrary, IPHONE } from "./util.js";
-import { state, card, channelCard, playlistCard, norm, remember, known, fillProgress, infinite, avatar, subBtn, isSub, navigate, popup, mi, videoMenu, dialog, loadLib, setList, pageCleanup, renderGuideSubs } from "./core.js";
+import { state, card, metaLine, chAvatar, channelCard, playlistCard, norm, remember, known, fillProgress, infinite, avatar, subBtn, isSub, navigate, popup, mi, videoMenu, dialog, loadLib, setList, pageCleanup, renderGuideSubs } from "./core.js";
 import { SB_CATS } from "./player.js";
 import { $t, LANG, LANGS, LOCALE, REGION, fmtShort, langLabel } from "./i18n.js";
 
@@ -8,6 +8,22 @@ const grid = (cls = "") => `<div class="vgrid ${cls}"></div>`;
 const spinner = `<div class="loading"><div class="spinner"></div></div>`;
 const skel = (n = 12) => `<div class="sk"><i class="skt"></i><i class="skl"></i><i class="skl s"></i></div>`.repeat(n);
 const skelRows = (n = 6) => `<div class="sk row"><i class="skt"></i><div><i class="skl"></i><i class="skl s"></i><i class="skl s"></i></div></div>`.repeat(n);
+// the home page's first pick, big: the cover with its colours blurred behind, a bold title, a play button
+function hero(v) {
+  const href = `/watch?v=${esc(v.id)}`;
+  const hq = thumb(v.id);
+  return `<section class="hero" data-ctx="home" style="--cover:url('${hq}')">
+    <a href="${href}" data-nav class="hero-th"><img src="${thumb(v.id, "maxresdefault")}" alt="" onload="if(this.naturalWidth<=120)this.src='${hq}'" onerror="this.onerror=null;this.src='${hq}'"></a>
+    <div class="hero-tx">
+      <span class="hero-k">${icon("trending", "sm")}${$t("추천")}</span>
+      <a href="${href}" data-nav class="hero-t" title="${esc(v.title)}">${esc(v.title)}</a>
+      <div class="hero-ch">${v.authorId ? `<a href="/channel/${esc(v.authorId)}" data-nav>${avatar(chAvatar(v), "md")}<b>${esc(v.author)}</b></a>` : `<b>${esc(v.author || "")}</b>`}</div>
+      <div class="hero-s">${metaLine(v)}</div>
+      ${v.desc ? `<div class="hero-d">${esc(v.desc.slice(0, 220))}</div>` : ""}
+      <div class="hero-btns"><a href="${href}" data-nav class="pill white">${icon("play")}${$t("재생")}</a>
+        <button class="pill round" data-menu="${esc(v.id)}" aria-label="${$t("작업 메뉴")}">${icon("more")}</button></div>
+    </div></section>`;
+}
 const empty = (ic, msg, extra = "") => `<div class="empty">${icon(ic)}<p>${msg}</p>${extra}</div>`;
 
 function append(box, list, kind, extra) {
@@ -75,6 +91,10 @@ export async function home(page, m, alive) {
       : empty("info", $t("영상이 없어요"));
     return;
   }
+  if (chip === "all" && !settings.calm && !document.documentElement.classList.contains("tv")) {
+    const k = pool.findIndex((v) => !v.upcoming && !v.live && !v.short);
+    if (k >= 0) $(".shorts-shelf", page).insertAdjacentHTML("beforebegin", hero(pool.splice(k, 1)[0]));
+  }
   // render a bit more on every scroll instead of everything at once
   let i = 0;
   const step = () => { const part = pool.slice(i, i + 24); i += 24; append(box, part, "grid", ""); return i < pool.length; };
@@ -83,7 +103,7 @@ export async function home(page, m, alive) {
   if (chip === "all" && !settings.calm) shortsShelf($(".shorts-shelf", page));
 }
 
-async function topicShelves(box, key, alive) {
+export async function topicShelves(box, key, alive) {
   let d;
   try { d = await lib(`topic?key=${key}&region=${REGION}&hl=${LANG}`, { ttl: 900000, quiet: true }); } catch { return false; }
   if (!alive()) return true;
@@ -390,7 +410,7 @@ export async function playlist(page, m, alive) {
   const first = p.videos[0];
   const ctxParam = (v, i) => `&list=${encodeURIComponent(id)}&index=${i + 1}`;
   page.innerHTML = `<div class="plpage" ${p.mine ? `data-pl="${esc(id === "WL" ? "wl" : id === "LL" ? "likes" : id)}" data-ctx="pl"` : ""}>
-    <aside class="pl-hero" style="--bg:url('${first ? thumb(first.id) : ""}')"><div class="pl-hero-in">
+    <aside class="pl-hero" style="--cover:url('${first ? thumb(first.id) : ""}')"><div class="pl-hero-in">
       ${first ? `<a href="/watch?v=${first.id}${ctxParam(first, 0)}" data-nav class="pl-cover"><img src="${thumb(first.id)}" alt=""><span>${$t("{0} 모두 재생", icon("play"))}</span></a>` : ""}
       <h1>${esc(p.title)}</h1>
       <div class="pl-by">${p.authorId ? `<a href="/channel/${esc(p.authorId)}" data-nav>${esc(p.author)}</a>` : esc(p.author || "")}</div>
@@ -583,11 +603,21 @@ export async function you(page, m, alive) {
   if (!alive()) return;
   const L = state.lib;
   const pls = Object.entries(L.playlists).sort((a, b) => (b[1].updated || 0) - (a[1].updated || 0));
+  // a row of the grey box: the icon in a circle, the name, a line under it, an arrow
+  const row = (ic, title, sub, href) => `<a class="grow" href="${href}" data-nav><span class="gic">${icon(ic)}</span><span class="gtx"><b>${title}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>${icon("right")}</a>`;
   const shelf = (title, href, list, kind = "grid") => `<section class="you-sec"><div class="you-h"><h3>${title}</h3>${href ? `<a class="pill ghost" href="${href}" data-nav>${$t("모두 보기")}</a>` : ""}</div>
     <div class="hrow">${list.length ? list.map((v) => card(v, kind)).join("") : `<p class='sub'>${$t("아직 없어요")}</p>`}</div></section>`;
   page.innerHTML = `<div class="youpage">
     <div class="you-top">${avatar("", "xxl")}<div><h1>${$t("나")}</h1><div class="s">${$t("이 집 서버에 저장되어 모든 기기에서 같아요 · 구독 {0} · 재생목록 {1}", Object.keys(L.subs).length, pls.length)}</div></div></div>
     ${shelf($t("기록"), "/feed/history", remember(h.items.map(normVideo)).slice(0, 12))}
+    <div class="rgroup">
+      ${row("history", $t("기록"), "", "/feed/history")}
+      ${row("later", $t("나중에 볼 동영상"), $t("동영상 {0}개{1}{2}", L.wl.length, "", ""), "/playlist?list=WL")}
+      ${row("like", $t("좋아요 표시한 동영상"), $t("동영상 {0}개{1}{2}", L.likes.length, "", ""), "/playlist?list=LL")}
+      ${row("playlists", $t("재생목록"), $t("재생목록 {0}개", pls.length), "/feed/playlists")}
+      ${row("subs", $t("구독 관리"), $t("구독 채널 {0}개", Object.keys(L.subs).length), "/feed/channels")}
+      ${row("gear", $t("설정"), "", "/settings")}
+    </div>
     <section class="you-sec"><div class="you-h"><h3>${$t("재생목록")}</h3><a class="pill ghost" href="/feed/playlists" data-nav>${$t("모두 보기")}</a></div>
       <div class="hrow">${[["WL", $t("나중에 볼 동영상"), L.wl], ["LL", $t("좋아요 표시한 동영상"), L.likes]].map(([id, t, items]) => playlistCard({ id, title: t, count: items.length, first: items[0]?.id, author: $t("비공개") })).join("")}
       ${pls.map(([id, p]) => playlistCard({ id, title: p.title, count: p.count, first: p.first, author: $t("비공개") })).join("")}</div></section>

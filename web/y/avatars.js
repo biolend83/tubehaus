@@ -1,7 +1,7 @@
 // Channel pictures for cards whose list came without one: YouTube leaves them out of many lists, and
 // only subscriptions have one saved. The empty circle asks the channel (the request its page makes,
 // cut down to the pictures) once, a few channels at a time, and the answer is kept in this browser.
-import { api, pickThumb } from "./util.js";
+import { api, pickThumb, icon } from "./util.js";
 
 const KEY = "th-chav";
 let saved = {};
@@ -54,6 +54,49 @@ function fill(ph) {
   });
 }
 
+// A saved picture that no longer loads (the channel changed its picture, YouTube dropped the old address):
+// ask the channel for the one it has now, keep it in this browser, and use it for the rest of the visit.
+const abs = (u) => { try { return new URL(u, location.href).href; } catch { return u; } };
+function toPh(img) {
+  if (!img.isConnected) return;
+  const ph = document.createElement("span");
+  ph.className = img.className + " ph";
+  ph.dataset.chav = "1";
+  ph.innerHTML = icon("account");
+  img.replaceWith(ph);
+}
+// the same picture through this server's own image relay (/api/p/yt/music/img), straight from
+// yt3.googleusercontent.com: Invidious' /ggpht/ turns some newer picture addresses away
+function relayed(src) {
+  const m = /^(?:https?:\/\/[^/]+)?\/ggpht\/(.+)$/.exec(src) || /^https:\/\/yt3\.(?:ggpht|googleusercontent)\.com\/(.+)$/.exec(src);
+  return m ? "/api/p/yt/music/img?u=" + encodeURIComponent("https://yt3.googleusercontent.com/" + m[1]) : "";
+}
+function fixBroken(img) {
+  const step = img.dataset.chfix || "";
+  if (step === "2") return toPh(img);                 // nothing worked
+  const src = img.getAttribute("src") || "";
+  const a = img.closest('a[href^="/channel/UC"], [data-ch^="UC"]');
+  const id = a && (a.dataset.ch || a.getAttribute("href").slice(9).split(/[/?#]/)[0]);
+  const ok = id && /^UC[\w-]{22}$/.test(id);
+  const use = (u) => {
+    if (!u || abs(u) === abs(src)) return toPh(img);
+    if (img.isConnected) img.src = u;
+    if (ok) import("./core.js").then(({ state }) => { const sub = state.lib?.subs?.[id]; if (sub) sub.thumb = u; }).catch(() => { });
+  };
+  if (!step) {
+    img.dataset.chfix = "1";
+    const r = relayed(src);
+    if (r) { if (ok) keep(id, r); return use(r); }
+  }
+  img.dataset.chfix = "2";
+  if (!ok) return toPh(img);
+  const bad = abs(src);
+  if (saved[id] && abs(saved[id]) !== bad) return use(saved[id]);
+  delete saved[id];
+  asking.delete(id);
+  channelAvatar(id).then(use, () => toPh(img));
+}
+
 const SEL = '.card a[href^="/channel/UC"] .av.ph';
 function scan(root) {
   if (root.matches?.(SEL)) fill(root);
@@ -61,6 +104,9 @@ function scan(root) {
 }
 
 export function initAvatars() {
+  document.addEventListener("error", (e) => { const t = e.target; if (t instanceof HTMLImageElement && t.classList.contains("av")) fixBroken(t); }, true);
+  // pictures that already failed before this started
+  document.querySelectorAll("img.av").forEach((i) => { if (i.complete && !i.naturalWidth && i.getAttribute("src")) fixBroken(i); });
   new MutationObserver((ms) => {
     for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) scan(n);
   }).observe(document.body, { childList: true, subtree: true });

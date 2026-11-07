@@ -3,6 +3,7 @@ import { $, $$, esc, icon, api, lib, settings, local, toast, thumb, normVideo, a
 import { dialog } from "./core.js";
 import { player, routes, state, loadLib, navigate, render, renderGuideSubs, popup, mi, keysDialog, initCardHover, markRestore, saveScroll, known, videoMenu, pageCleanup } from "./core.js";
 import * as P from "./pages.js";
+import * as MU from "./music.js";
 import { watch, shorts, initMini, dockMini, stopPlayer } from "./watch.js";
 import { initTV } from "./tv.js";
 import { initDeArrow } from "./dearrow.js";
@@ -53,6 +54,10 @@ routes.push(
   [/^\/feed\/playlists$/, P.playlists, { name: "playlists" }],
   [/^\/feed\/channels$/, P.channelsMgr, { name: "channels" }],
   [/^\/feed\/trending$/, P.trending, { name: "trending" }],
+  [/^\/feed\/music\/?$/, MU.musicHome, { name: "music" }],
+  [/^\/feed\/music\/search$/, MU.musicSearch, { name: "music" }],
+  [/^\/feed\/music\/album\/([\w-]{8,80})$/, MU.musicAlbum, { name: "music" }],
+  [/^\/feed\/music\/artist\/(UC[\w-]{22})$/, MU.musicArtist, { name: "music" }],
   [/^\/hashtag\/([^/]+)$/, P.hashtag, { name: "search" }],
   [/^\/settings$/, P.settingsPage, { name: "settings" }],
 );

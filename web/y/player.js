@@ -78,7 +78,7 @@ async function sponsorSegments(id) {
 
 // The playback engine (785 KB) is loaded once, when a video is first opened. On the first screen a weak TV would freeze for seconds.
 let shakaP = null;
-function loadShaka() {
+export function loadShaka() {
   if (window.shaka) return Promise.resolve();
   return shakaP || (shakaP = new Promise((ok, fail) => {
     const s = document.createElement("script");

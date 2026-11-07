@@ -1866,6 +1866,363 @@ def topic_page(qs):
     return out
 
 
+# ---------- Music: albums and artists from YouTube Music, songs from YouTube, lyrics from LRCLIB ----------
+# The lookups the apps make (engine/Music.kt), for the web page's Music tab. No account and no Premium:
+# where YouTube keeps Music's songs and charts for Premium (Korea among other countries, November 2026),
+# its albums and artists still answer, and so do YouTube's own radio mixes of a song ("RDAMVM" + id),
+# which are mostly the songs' audio tracks. So: albums and artists from music.youtube.com, songs from
+# YouTube's search, the radio from YouTube's watch page. Everything goes through YT_PROXY.
+MUSIC_CLIENT = {"clientName": "WEB_REMIX", "clientVersion": "1.20261104.00.00"}
+M_ARTISTS = "EgWKAQIgAWoQEBAQBRAJEAoQBBAVEA4QEQ=="
+M_ALBUMS = "EgWKAQIYAWoQEBAQBRAJEAoQBBAVEA4QEQ=="
+YT_ONLY_VIDEOS = "EgIQAQ=="
+MUSIC_TTL = 6 * 3600
+music_cache = {}          # (kind, args) -> (time, answer)
+music_lock = threading.Lock()
+LYRICS_UA = "TubeHaus (https://github.com/biolend83/tubehaus)"
+# pictures a music page may show; they come through here so the viewer's browser only talks to this server
+MUSIC_IMG_HOSTS = ("lh3.googleusercontent.com", "yt3.googleusercontent.com", "yt3.ggpht.com", "i.ytimg.com")
+
+
+def yt_call(endpoint, body, music=False, hl="en", region="US", timeout=15):
+    client = dict(MUSIC_CLIENT if music else WEB_CLIENT, hl=hl, gl=region)
+    host = "music.youtube.com" if music else "www.youtube.com"
+    headers = {"Content-Type": "application/json", "User-Agent": BROWSER_UA}
+    if music:
+        headers.update({"Origin": "https://music.youtube.com", "Referer": "https://music.youtube.com/"})
+    data = json.dumps({"context": {"client": client}, **body}).encode()
+    req = urllib.request.Request(f"https://{host}/youtubei/v1/{endpoint}?prettyPrint=false", data=data, headers=headers)
+    return json.loads(YT.open(req, timeout=timeout).read())
+
+
+def _first(o, key):
+    a = _all(o, key)
+    return a[0] if a else None
+
+
+def _best_img(o):
+    """the largest picture anywhere below o"""
+    best, bw = "", -1
+    for arr in _all(o, "thumbnails"):
+        for t in arr if isinstance(arr, list) else []:
+            if isinstance(t, dict) and isinstance(t.get("url"), str) and (t.get("width") or 0) >= bw:
+                best, bw = t["url"], t.get("width") or 0
+    return ("https:" + best) if best.startswith("//") else best
+
+
+def _square(u):
+    """the pictures come small ("=w120-h120-..."); ask for a size that stays sharp on a large cover"""
+    return re.sub(r"=w\d+-h\d+", "=w544-h544", u or "")
+
+
+def _m_kind(b):
+    t = _dig(b, "browseEndpointContextSupportedConfigs", "browseEndpointContextMusicConfig", "pageType") or ""
+    return {"MUSIC_PAGE_TYPE_ARTIST": "artist", "MUSIC_PAGE_TYPE_USER_CHANNEL": "artist", "MUSIC_PAGE_TYPE_ALBUM": "album",
+            "MUSIC_PAGE_TYPE_AUDIOBOOK": "album", "MUSIC_PAGE_TYPE_PLAYLIST": "playlist"}.get(t, "other")
+
+
+def _m_song(vid, title, artist="", artist_id="", length=0, art="", album="", album_id=""):
+    return {"id": vid, "title": title, "artist": artist, "artistId": artist_id, "len": length, "art": art,
+            "album": album, "albumId": album_id}
+
+
+def _m_row(r):
+    """a song in a list (an album's tracks, an artist's top songs)"""
+    vid = _dig(r, "playlistItemData", "videoId") or _dig(_first(r, "watchEndpoint") or {}, "videoId")
+    if not isinstance(vid, str) or not re.fullmatch(r"[\w-]{11}", vid):
+        return None
+    cols = [_dig(c, "musicResponsiveListItemFlexColumnRenderer", "text") for c in (r.get("flexColumns") or [])]
+    title = _txt(cols[0]) if cols else ""
+    if not title:
+        return None
+    by = (_dig(cols[1], "runs") if len(cols) > 1 else None) or []
+    runs = [x for x in by if isinstance(x, dict) and str(_dig(x, "navigationEndpoint", "browseEndpoint", "browseId") or "").startswith("UC")]
+    # "IU • Palette • 3:38" on an artist's top songs; just the artists on an album's (or nothing)
+    artist = ", ".join(x.get("text", "") for x in runs)
+    if not artist and by and isinstance(by[0], dict):
+        t = by[0].get("text", "")
+        artist = t if t.strip() and ":" not in t else ""
+    fixed = [_txt(_dig(c, "musicResponsiveListItemFixedColumnRenderer", "text")) for c in (r.get("fixedColumns") or [])]
+    length = next((_secs(x) for x in fixed if _secs(x)), 0)
+    art = _square(_best_img(r.get("thumbnail") or {}))
+    return _m_song(vid, title, artist, _dig(runs[0], "navigationEndpoint", "browseEndpoint", "browseId") if runs else "",
+                   length, art if "googleusercontent" in art else "")
+
+
+def _m_cards(d):
+    """search results: each row an artist, an album, a playlist... (what its page type says)"""
+    out = []
+    for r in _all(d, "musicResponsiveListItemRenderer"):
+        b = _dig(r, "navigationEndpoint", "browseEndpoint")
+        bid = _dig(b, "browseId")
+        if not isinstance(bid, str):
+            continue
+        cols = [_txt(_dig(c, "musicResponsiveListItemFlexColumnRenderer", "text")) for c in (r.get("flexColumns") or [])]
+        out.append({"id": bid, "title": cols[0] if cols else "", "sub": cols[1] if len(cols) > 1 else "",
+                    "art": _square(_best_img(r.get("thumbnail") or {})), "kind": _m_kind(b)})
+    return out
+
+
+def _m_two_row(t):
+    b = _dig(t, "navigationEndpoint", "browseEndpoint")
+    bid = _dig(b, "browseId")
+    if not isinstance(bid, str):
+        return None
+    return {"id": bid, "title": _txt(t.get("title")), "sub": _txt(t.get("subtitle")),
+            "art": _square(_best_img(t.get("thumbnailRenderer") or {})), "kind": _m_kind(b)}
+
+
+def music_songs_for(q, hl, region):
+    """YouTube's videos for q that look like songs: not live, not Shorts, a song's length"""
+    d = yt_call("search", {"query": q, "params": YT_ONLY_VIDEOS}, hl=hl, region=region)
+    out = []
+    for v in topic_items(_dig(d, "contents") or d):
+        if v.get("type") != "video" or v.get("liveNow") or v.get("isUpcoming") or v.get("short"):
+            continue
+        n = v.get("lengthSeconds") or 0
+        if n and not 60 <= n <= 900:
+            continue
+        out.append(_m_song(v["videoId"], v.get("title") or "", v.get("author") or "", v.get("authorId") or "", n))
+    return out
+
+
+def music_search(q, hl, region):
+    from concurrent.futures import ThreadPoolExecutor
+
+    def safe(f):
+        try:
+            return f()
+        except Exception as ex:
+            log("music", f"search part FAIL {repr(ex)[:100]}")
+            return []
+    with ThreadPoolExecutor(3) as ex:
+        a = ex.submit(safe, lambda: _m_cards(yt_call("search", {"query": q, "params": M_ARTISTS}, music=True, hl=hl, region=region)))
+        b = ex.submit(safe, lambda: _m_cards(yt_call("search", {"query": q, "params": M_ALBUMS}, music=True, hl=hl, region=region)))
+        s = ex.submit(safe, lambda: music_songs_for(q, hl, region))
+        artists, albums, songs = a.result(), b.result(), s.result()
+    return {"artists": [x for x in artists if x["kind"] == "artist"][:6], "albums": [x for x in albums if x["kind"] == "album"][:12],
+            "songs": songs}
+
+
+def music_album(bid, hl, region):
+    d = yt_call("browse", {"browseId": bid}, music=True, hl=hl, region=region)
+    h = _first(d, "musicResponsiveHeaderRenderer") or _first(d, "musicDetailHeaderRenderer") or {}
+    strap = _dig(h, "straplineTextOne", "runs") or []
+    artist = "".join(x.get("text", "") for x in strap if isinstance(x, dict))
+    artist_id = next((i for i in (_dig(x, "navigationEndpoint", "browseEndpoint", "browseId") for x in strap) if isinstance(i, str)), "")
+    art = _square(_best_img(h.get("thumbnail") or {}))
+    title = _txt(h.get("title"))
+    songs = []
+    for r in _all(d, "musicResponsiveListItemRenderer"):
+        s = _m_row(r)
+        if s:
+            s.update(artist=s["artist"] or artist, artistId=s["artistId"] or artist_id, album=title, albumId=bid, art=art)
+            songs.append(s)
+    return {"title": title, "sub": _txt(h.get("subtitle")), "info": _txt(h.get("secondSubtitle")), "artist": artist,
+            "artistId": artist_id, "art": art, "songs": songs}
+
+
+def music_artist(bid, hl, region):
+    d = yt_call("browse", {"browseId": bid}, music=True, hl=hl, region=region)
+    hd = d.get("header") or {}
+    h = _first(hd, "musicImmersiveHeaderRenderer") or _first(hd, "musicVisualHeaderRenderer") or {}
+    name = _txt(h.get("title"))
+    shelves = []
+    for s in _all(d, "musicCarouselShelfRenderer"):
+        t = _txt(_dig(s, "header", "musicCarouselShelfBasicHeaderRenderer", "title"))
+        items = [x for x in (_m_two_row(c.get("musicTwoRowItemRenderer")) for c in (s.get("contents") or [])
+                             if isinstance(c, dict) and isinstance(c.get("musicTwoRowItemRenderer"), dict)) if x]
+        if t and items:
+            shelves.append({"title": t, "items": items})
+    songs = []
+    for sh in _all(d, "musicShelfRenderer"):
+        for r in _all(sh, "musicResponsiveListItemRenderer"):
+            s = _m_row(r)
+            if s:
+                s["artist"] = s["artist"] or name
+                songs.append(s)
+    if not songs and name:
+        # no "Top songs" without Premium in some countries (Korea): YouTube's songs for the name instead
+        try:
+            songs = music_songs_for(name, hl, region)[:12]
+        except Exception:
+            songs = []
+    about = _txt(_dig(_first(d, "musicDescriptionShelfRenderer") or {}, "description")) or _txt(h.get("description"))
+    return {"name": name, "audience": _txt(h.get("monthlyListenerCount")) or _txt(_dig(h, "subscriptionButton", "subscribeButtonRenderer", "subscriberCountText")),
+            "art": _best_img(h.get("thumbnail") or {}), "about": about,
+            "shuffleId": _first(h.get("playButton") or {}, "playlistId"), "radioId": _first(h.get("startRadioButton") or {}, "playlistId"),
+            "songs": songs, "shelves": shelves}
+
+
+def music_mix(list_id, vid, hl, region):
+    """a YouTube mix or playlist (a song's radio, an artist's radio or shuffle) as songs"""
+    body = {"playlistId": list_id}
+    if vid:
+        body["videoId"] = vid
+    d = yt_call("next", body, hl=hl, region=region)
+    out = []
+    for p in _all(_dig(d, "contents", "twoColumnWatchNextResults", "playlist", "playlist", "contents") or [], "playlistPanelVideoRenderer"):
+        v = p.get("videoId")
+        if not isinstance(v, str) or not re.fullmatch(r"[\w-]{11}", v) or not p.get("lengthText"):
+            continue                          # no length: a live stream
+        name, cid = _byline(p.get("shortBylineText") or p.get("longBylineText"))
+        out.append(_m_song(v, _txt(p.get("title")), name, cid, _secs(_txt(p.get("lengthText")))))
+    return out
+
+
+# lyrics: what to search LRCLIB for. YouTube's titles carry extras ("[MV] IU(아이유) _ Blueming(블루밍)",
+# "Palette (feat. G-DRAGON)") and channel names ("이지금 [IU Official]", "IU - Topic"); the lyrics are
+# under the plain title and artist. The same rules as the apps' (engine/Lyrics.kt).
+def _ly_clean(s):
+    return re.sub(r"\s+", " ", re.sub(r"[\"'“”‘’|]", " ", s)).strip()
+
+
+def lyrics_queries(title, channel):
+    t = re.sub(r"[\[【].*?[\]】]", " ", title)
+    artist_t = None
+    m = re.match(r"^(.*?)(?:^|\s)['‘\"“](.+?)['’\"”](?=\s|$)(.*)$", t.strip())
+    if m:
+        if m.group(1).strip():
+            artist_t = m.group(1).strip()
+        t = m.group(2) + " " + m.group(3)
+    if artist_t is None:
+        m = re.match(r"^(.+?)\s+[-_–]\s+(.+)$", t.strip())
+        if m:
+            artist_t, t = m.group(1).strip(), m.group(2)
+    t = re.sub(r"(?i)\b(official|music video|m/?v|lyrics?( video)?|audio|visualizer|performance video|live clip)\b", " ", t)
+    main = _ly_clean(re.sub(r"\(.*?\)+|（.*?）", " ", t))
+    inner = next((x for x in (_ly_clean(g) for g in re.findall(r"\(([^()]+)\)", t))
+                  if x and not re.match(r"(?i)^(feat|ft|prod|with|from|ost)\b", x)), None)
+    ch = re.sub(r"(?i)vevo|official|\bchannel\b", " ", re.sub(r" - Topic$", "", channel))
+    ch_main = _ly_clean(re.sub(r"[\[(（].*?[\])）]", " ", ch))
+    m = re.search(r"[\[(（]([^\])）]+)[\])）]", ch)
+    ch_inner = _ly_clean(m.group(1)) if m else None
+    artists = []
+    for a in (_ly_clean(re.sub(r"\(.*?\)", " ", artist_t)) if artist_t else None, ch_inner, ch_main):
+        if a and a not in artists:
+            artists.append(a)
+    titles = []
+    for x in (main or None, inner):
+        if x and x not in titles:
+            titles.append(x)
+    out = []
+    for a in artists[:2]:
+        for x in titles:
+            out.append(f"{x} {a}")
+    if titles:
+        out.append(titles[0])
+    return list(dict.fromkeys(out))
+
+
+def lyrics_lrc(text):
+    """[[ms, words]] from "[01:02.34] words" lines (a line may carry several times)"""
+    out = []
+    for line in text.splitlines():
+        stamps = list(re.finditer(r"\[(\d+):(\d+(?:\.\d+)?)\]", line))
+        if not stamps:
+            continue
+        words = line[stamps[-1].end():].strip()
+        for s in stamps:
+            out.append([int(s.group(1)) * 60000 + int(float(s.group(2)) * 1000), words])
+    return sorted(out, key=lambda x: x[0])
+
+
+def music_lyrics(title, artist, length):
+    """{synced, lines}: at most three LRCLIB searches a song, made only when the lyrics are opened"""
+    for q in lyrics_queries(title, artist)[:3]:
+        req = urllib.request.Request("https://lrclib.net/api/search?q=" + urllib.parse.quote(q), headers={"User-Agent": LYRICS_UA})
+        with urllib.request.urlopen(req, timeout=12) as r:
+            found = json.loads(r.read(3_000_000))
+        found = [x for x in found if isinstance(x, dict)] if isinstance(found, list) else []
+
+        def fits(x):
+            if x.get("instrumental"):
+                return False
+            d = x.get("duration")
+            return not length if not isinstance(d, (int, float)) else (not length or abs(d - length) <= 5)
+        ok = [x for x in found if fits(x)]
+        # a music video runs longer than the song (an intro, an ending): then the plain words of the
+        # song with the same name, without times that would not fit
+        exact = next((x for x in ok if (x.get("syncedLyrics") or "").strip()), None) or next((x for x in ok if (x.get("plainLyrics") or "").strip()), None)
+        pick = exact or next((x for x in found if not x.get("instrumental") and len(_ly_clean(x.get("trackName") or "")) >= 3
+                              and _ly_clean(x.get("trackName") or "").lower() in q.lower() and (x.get("plainLyrics") or "").strip()), None)
+        if not pick:
+            continue
+        synced = (pick.get("syncedLyrics") or "").strip() if exact else ""
+        lines = lyrics_lrc(synced) if synced else [[0, l.strip()] for l in (pick.get("plainLyrics") or "").splitlines()]
+        if any(l[1] for l in lines):
+            return {"synced": bool(synced), "lines": lines}
+    return {"synced": False, "lines": []}
+
+
+def music_api(p, qs):
+    """(status, answer) for /api/p/yt/music/<what>"""
+    what = p.rsplit("/", 1)[-1]
+    hl = qs.get("hl") or "en"
+    hl = hl if re.fullmatch(r"[a-z]{2}(-[A-Za-z]{2,4})?", hl) else "en"
+    region = (qs.get("region") or "US").upper()
+    region = region if re.fullmatch(r"[A-Z]{2}", region) else "US"
+    if what == "search":
+        q = (qs.get("q") or "").strip()[:200]
+        if not q:
+            return 400, {"error": "no query"}
+        key, fn = ("search", q, hl, region), lambda: music_search(q, hl, region)
+    elif what in ("album", "artist"):
+        bid = qs.get("id") or ""
+        if not re.fullmatch(r"(MPRE|OLAK|UC|VL)[\w-]{8,60}", bid):
+            return 400, {"error": "bad id"}
+        key, fn = (what, bid, hl, region), (lambda: music_album(bid, hl, region)) if what == "album" else (lambda: music_artist(bid, hl, region))
+    elif what == "mix":
+        lid, vid = qs.get("list") or "", qs.get("v") or ""
+        if not re.fullmatch(r"[\w-]{10,80}", lid) or (vid and not re.fullmatch(r"[\w-]{11}", vid)):
+            return 400, {"error": "bad list"}
+        key, fn = ("mix", lid, vid, hl, region), lambda: {"songs": music_mix(lid, vid, hl, region)}
+    elif what == "lyrics":
+        vid, title, artist = qs.get("v") or "", (qs.get("title") or "")[:300], (qs.get("artist") or "")[:200]
+        try:
+            length = max(0, int(qs.get("len") or 0))
+        except ValueError:
+            length = 0
+        if not re.fullmatch(r"[\w-]{11}", vid) or not title:
+            return 400, {"error": "bad song"}
+        key, fn = ("lyrics", vid), lambda: music_lyrics(title, artist, length)
+    else:
+        return 404, {"error": "unknown"}
+    with music_lock:
+        hit = music_cache.get(key)
+    if hit and time.time() - hit[0] < MUSIC_TTL:
+        return 200, hit[1]
+    try:
+        out = fn()
+    except Exception as ex:
+        log("music", f"{what} FAIL {repr(ex)[:120]}")
+        return (200, hit[1]) if hit else (502, {"error": "YouTube didn't answer"})
+    with music_lock:
+        music_cache[key] = (time.time(), out)
+        if len(music_cache) > 2000:
+            for k in sorted(music_cache, key=lambda k: music_cache[k][0])[:400]:
+                music_cache.pop(k, None)
+    return 200, out
+
+
+def music_img(qs):
+    """(status, content type, bytes): an album cover or artist picture, fetched for the browser"""
+    u = qs.get("u") or ""
+    pu = urllib.parse.urlparse(u)
+    if pu.scheme != "https" or pu.hostname not in MUSIC_IMG_HOSTS:
+        return 400, "text/plain", b"bad picture"
+    try:
+        with YT.open(urllib.request.Request(u, headers={"User-Agent": BROWSER_UA}), timeout=15) as r:
+            ctype = r.headers.get("Content-Type") or ""
+            body = r.read(3_000_000)
+            if not ctype.startswith("image/") or not body:
+                return 404, "text/plain", b"no picture"
+            return 200, ctype, body
+    except Exception as ex:
+        log("music", f"img FAIL {repr(ex)[:100]}")
+        return 404, "text/plain", b"no picture"
+
+
 # ---------- "Most replayed": the heat line YouTube draws over its progress bar ----------
 # YouTube's watch page carries, for videos with enough views, a hundred points of how much each part of
 # the video is replayed, and where the peak is. Read from its /next answer (through YT_PROXY), kept
@@ -2937,6 +3294,17 @@ class H(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if "/yt/music/" in p and "/api/p/" in self.path:
+            if p.endswith("/yt/music/img"):
+                code, ctype, body = music_img(self.qs())
+                self.send_response(code)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Cache-Control", "public, max-age=604800" if code == 200 else "public, max-age=600")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            return self.send(*music_api(p, self.qs()))
         if p.endswith("/yt/topic"):
             d = topic_page(self.qs())
             return self.send(404 if d.get("error") == "unknown topic" else 502 if d.get("error") else 200, d)
