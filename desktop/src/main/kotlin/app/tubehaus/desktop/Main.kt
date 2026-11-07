@@ -40,6 +40,16 @@ class DesktopPlatform : Platform {
     override val dataDir: Path = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else "$home/.config", "TubeHaus").toOkioPath()
     override val cacheDir: Path = File(System.getenv("LOCALAPPDATA") ?: if (isMac) "$home/Library/Caches" else "$home/.cache", "TubeHaus").toOkioPath()
     override val touch = false
+    /** Pretendard, one variable font file for every weight (resources: common/fonts) */
+    override val font: androidx.compose.ui.text.font.FontFamily? by lazy {
+        val data = DesktopPlatform::class.java.getResourceAsStream("/PretendardVariable.ttf")?.use { it.readBytes() } ?: return@lazy null
+        runCatching {
+            androidx.compose.ui.text.font.FontFamily(listOf(400, 500, 600, 700, 800).map { w ->
+                androidx.compose.ui.text.platform.Font("Pretendard-$w", data, androidx.compose.ui.text.font.FontWeight(w),
+                    variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(w)))
+            })
+        }.getOrNull()
+    }
     // TUBEHAUS_TV=1: the TV layout on a computer, driven with the arrow keys, Enter and Escape (to try it without a TV)
     override val tv = System.getenv("TUBEHAUS_TV") == "1"
     val mpv = MpvPlayer()

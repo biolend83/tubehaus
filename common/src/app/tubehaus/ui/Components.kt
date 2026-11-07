@@ -14,6 +14,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -41,6 +47,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,6 +57,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -108,11 +116,13 @@ fun Modifier.tvFocus(shape: Shape = RoundedCornerShape(12.dp)): Modifier {
  * it (no ripple), quickly in and slowly out.
  */
 @Composable
-fun Modifier.tvClickable(shape: Shape = RoundedCornerShape(12.dp), onLongClick: (() -> Unit)? = null, onClick: () -> Unit): Modifier {
+fun Modifier.tvClickable(shape: Shape = RoundedCornerShape(12.dp), onLongClick: (() -> Unit)? = null, sink: Float = 0.97f, onClick: () -> Unit): Modifier {
     if (!LocalPlatform.current.tv) {
         val touch = remember { MutableInteractionSource() }
         val pressed by touch.collectIsPressedAsState()
-        val sink by animateFloatAsState(if (pressed) 0.97f else 1f, tween(if (pressed) Motion.SHORT else Motion.MEDIUM, easing = Motion.standard))
+        // let go: a button springs back (the web's buttons), a card settles
+        val sink by animateFloatAsState(if (pressed) sink else 1f,
+            if (pressed) tween(Motion.SHORT, easing = Motion.standard) else if (sink < 0.96f) spring(0.5f, Spring.StiffnessMedium) else tween(Motion.MEDIUM, easing = Motion.standard))
         val shade by animateFloatAsState(if (pressed) 0.1f else 0f, tween(if (pressed) 90 else Motion.LONG, easing = Motion.standard))
         val ink = MaterialTheme.colorScheme.onSurface
         return graphicsLayer { scaleX = sink; scaleY = sink }
@@ -123,24 +133,24 @@ fun Modifier.tvClickable(shape: Shape = RoundedCornerShape(12.dp), onLongClick: 
 }
 
 /**
- * A chip as YouTube draws them: a flat rounded box, the chosen one filled with the text color (white
- * on dark, black on light), the others a quiet grey. Home, Subscriptions' groups, search, comments.
+ * A chip as the web app 1.0 draws them: a pill, the chosen one filled with the text color (white on
+ * dark, black on light), the others a quiet grey. Home, Subscriptions' groups, search, comments.
  */
 @Composable
 fun Chip(selected: Boolean, onClick: () -> Unit, label: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
     val c = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(8.dp)
-    // the colours turn over smoothly when it is chosen, as YouTube's chips do
+    val shape = RoundedCornerShape(50)
+    // the colours turn over smoothly when it is chosen
     val bg by animateColorAsState(if (selected) c.onSurface else c.surfaceVariant, tween(Motion.SHORT))
     val fg by animateColorAsState(if (selected) c.surface else c.onSurface, tween(Motion.SHORT))
     Row(
-        Modifier.height(32.dp).clip(shape).background(bg)
-            .tvClickable(shape, onClick = onClick).padding(horizontal = if (icon != null && label.isEmpty()) 8.dp else 12.dp),
+        Modifier.height(36.dp).tvClickable(shape, sink = 0.94f, onClick = onClick).clip(shape).background(bg)
+            .padding(horizontal = if (icon != null && label.isEmpty()) 10.dp else 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) Icon(icon, null, Modifier.size(18.dp), tint = fg)
         if (icon != null && label.isNotEmpty()) Spacer(Modifier.width(6.dp))
-        if (label.isNotEmpty()) Text(label, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+        if (label.isNotEmpty()) Text(label, color = fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -225,7 +235,7 @@ fun titleOf(v: Video, app: AppState): String = branded(v, app)?.title?.ifEmpty {
 
 /** Thumbnail with the length badge and a red bar for how much you've watched. */
 @Composable
-fun Thumb(v: Video, app: AppState, modifier: Modifier = Modifier, rounded: Int = 12) {
+fun Thumb(v: Video, app: AppState, modifier: Modifier = Modifier, rounded: Int = 16) {
     val pos = app.store.lib.state.value.pos[v.id]
     Box(modifier.aspectRatio(16f / 9f).clip(RoundedCornerShape(rounded.dp))) {
         Img(v.thumb, Modifier.fillMaxSize())
@@ -236,16 +246,16 @@ fun Thumb(v: Video, app: AppState, modifier: Modifier = Modifier, rounded: Int =
         if (label.isNotEmpty()) {
             Text(
                 label,
-                color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(if (rounded >= 12) 8.dp else 4.dp)
-                    .background(if (v.live) Red else Color(0x99000000), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                    .background(if (v.live) Red else Color(0xB3000000), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
             )
         }
         if (pos != null && (pos.getOrNull(1) ?: 0) > 0) {
             val f = (pos[0].toFloat() / pos[1]).coerceIn(0f, 1f)
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color(0x66FFFFFF))) {
-                Box(Modifier.fillMaxWidth(f).height(3.dp).background(Red))
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(Color(0x66FFFFFF))) {
+                Box(Modifier.fillMaxWidth(f).height(4.dp).background(Red))
             }
         }
     }
@@ -296,24 +306,23 @@ fun VideoMenu(v: Video, app: AppState, extra: List<Pair<String, () -> Unit>> = e
 fun VideoCard(v: Video, app: AppState, queue: List<Video> = emptyList()) {
     val calm = app.store.settings.value.calm
     val menu = remember { mutableStateOf(false) }
-    // as YouTube draws them: on a phone the picture runs edge to edge and the text is indented;
-    // on a wide screen the picture is rounded, the avatar lines up with its edge, the type is larger
-    // and the rows stand further apart
+    // as the web app 1.0 draws them: a rounded picture (on a phone inside the page's 12dp margin,
+    // one video per row), the avatar lined up with its edge, a bold title, the rows well apart
     val phone = LocalCompact.current
-    Column(Modifier.fillMaxWidth().tvClickable(onLongClick = { menu.value = true }) { app.watch(v, queue) }.padding(bottom = if (phone) 16.dp else 28.dp)) {
-        if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.fillMaxWidth(), rounded = if (phone) 0 else 12)
-        Row(Modifier.padding(start = if (phone) 12.dp else 0.dp, top = 12.dp, end = if (phone) 4.dp else 0.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = if (phone) 12.dp else 0.dp)
+        .tvClickable(RoundedCornerShape(18.dp), onLongClick = { menu.value = true }) { app.watch(v, queue) }.padding(bottom = if (phone) 22.dp else 32.dp)) {
+        if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.fillMaxWidth(), rounded = 16)
+        Row(Modifier.padding(top = if (phone) 10.dp else 12.dp)) {
             if (v.channelId.isNotEmpty()) {
                 Avatar(channelAvatar(app, v.channelId, v.avatar), 36,
                     Modifier.notOnTv().clickable { app.go(Screen.Channel(v.channelId, v.author)) })
                 Spacer(Modifier.width(12.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text(titleOf(v, app), style = if (phone) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(v.details(app, calm), style = if (phone) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                Text(titleOf(v, app), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(v.details(app, calm), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = if (phone) 2.dp else 4.dp))
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))
             }
             VideoMenu(v, app, openState = menu)
         }
@@ -326,13 +335,13 @@ fun VideoRow(v: Video, app: AppState, queue: List<Video> = emptyList(), extra: L
     val calm = app.store.settings.value.calm
     val menu = remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(8.dp), onLongClick = { menu.value = true }) { if (onClick != null) onClick() else app.watch(v, queue) }.padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(16.dp), onLongClick = { menu.value = true }) { if (onClick != null) onClick() else app.watch(v, queue) }.padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         // big: YouTube's search results on a computer, a large picture and a larger title beside it
-        if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.width(thumbWidth), rounded = if (big) 12 else 8)
+        if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.width(thumbWidth), rounded = if (big) 18 else 12)
         Column(Modifier.weight(1f).padding(start = if (big) 16.dp else 10.dp)) {
             val title = titleOf(v, app)
-            if (big) Text(title, fontSize = 18.sp, lineHeight = 26.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (big) Text(title, fontSize = 18.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             else Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(v.details(app, calm), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
@@ -344,7 +353,7 @@ fun VideoRow(v: Video, app: AppState, queue: List<Video> = emptyList(), extra: L
 @Composable
 fun ChannelRow(c: Channel, app: AppState) {
     Row(
-        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(8.dp)) { app.go(Screen.Channel(c.id, c.name)) }.padding(horizontal = 12.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(16.dp)) { app.go(Screen.Channel(c.id, c.name)) }.padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(168.dp), contentAlignment = Alignment.Center) { Avatar(c.avatar, 88) }
@@ -360,14 +369,14 @@ fun ChannelRow(c: Channel, app: AppState) {
 @Composable
 fun PlaylistRow(p: Playlist, app: AppState) {
     Row(
-        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(8.dp)) { app.go(Screen.Playlist(p.id, p.title)) }.padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(16.dp)) { app.go(Screen.Playlist(p.id, p.title)) }.padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         // with thumbnails off the box stays (it carries the video count) but is left plain
-        Box(Modifier.width(if (app.store.settings.value.hideThumbs) 72.dp else 168.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))) {
+        Box(Modifier.width(if (app.store.settings.value.hideThumbs) 72.dp else 168.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))) {
             if (!app.store.settings.value.hideThumbs) Img(p.thumb, Modifier.fillMaxSize())
             else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
             Row(
-                Modifier.align(Alignment.BottomEnd).padding(6.dp).background(Color(0xCC000000), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp),
+                Modifier.align(Alignment.BottomEnd).padding(6.dp).background(Color(0xB3000000), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 1.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Sym.PlaylistPlay.outline, null, tint = Color.White, modifier = Modifier.size(14.dp))
@@ -390,12 +399,17 @@ fun SubscribeButton(cid: String, name: String, thumb: String, app: AppState) {
     val c = MaterialTheme.colorScheme
     val bg by animateColorAsState(if (subbed) c.surfaceVariant else c.primary, tween(Motion.MEDIUM))
     val fg by animateColorAsState(if (subbed) c.onSurface else c.onPrimary, tween(Motion.MEDIUM))
+    val pop = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
     Button(
-        onClick = { app.store.subscribe(cid, name, thumb, !subbed) },
+        onClick = {
+            app.store.subscribe(cid, name, thumb, !subbed)
+            if (!subbed) scope.launch { pop.snapTo(0.9f); pop.animateTo(1f, spring(0.4f, Spring.StiffnessMedium)) }
+        },
         colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = bg, contentColor = fg),
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        modifier = Modifier.height(36.dp),
-    ) { Text(tr(if (subbed) "Subscribed" else "Subscribe"), fontSize = 14.sp) }
+        contentPadding = PaddingValues(horizontal = 18.dp),
+        modifier = Modifier.height(40.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value },
+    ) { Text(tr(if (subbed) "Subscribed" else "Subscribe"), fontSize = 14.sp, fontWeight = FontWeight.Bold) }
 }
 
 @Composable
@@ -492,6 +506,8 @@ fun ItemGrid(
         if (list.isNotEmpty() && !focused) { delay(150); focused = runCatching { first.requestFocus() }.isSuccess }
     }
     val big = rows && wideRows
+    // the cards already shown: those arrive once, not again each time they scroll back into view
+    val seen = remember { HashSet<Any>() }
     if (list.isEmpty() && loading && header == null) { Skeleton(rows, wideRows); return }
     androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     // the large rows' picture shrinks with the window, so a narrow one still leaves room for the title
@@ -500,12 +516,12 @@ fun ItemGrid(
         columns = if (big) GridCells.Fixed(1) else if (rows) GridCells.Adaptive(560.dp) else if (tv) GridCells.Fixed(4) else GridCells.Adaptive(320.dp),
         state = state,
         modifier = Modifier.let { if (big) it.widthIn(max = 1120.dp) else it }.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(if (LocalCompact.current) 0.dp else if (tv) 22.dp else 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (LocalCompact.current) 0.dp else if (tv) 22.dp else 20.dp),
         contentPadding = PaddingValues(horizontal = if (LocalCompact.current) 0.dp else if (tv) TV_EDGE else 24.dp, vertical = if (tv) 16.dp else 8.dp),
     ) {
         if (header != null) item(span = { GridItemSpan(maxLineSpan) }) { header() }
-        items(list, key = { it.id }, span = { if (it is Video && !rows) GridItemSpan(1) else GridItemSpan(maxLineSpan) }) {
-            Box(if (tv && it.id == list[0].id) Modifier.focusRequester(first) else Modifier) {
+        itemsIndexed(list, key = { _, it -> it.id }, span = { _, it -> if (it is Video && !rows) GridItemSpan(1) else GridItemSpan(maxLineSpan) }) { i, it ->
+            Box((if (tv && it.id == list[0].id) Modifier.focusRequester(first) else Modifier).arrive(it.id, i, seen)) {
                 when (it) {
                     is Video -> if (rows) VideoRow(it, app, thumbWidth = if (big) bigThumb else 168.dp, big = big)
                         // TV: the big-screen card, which grows in a white frame when chosen
@@ -522,18 +538,23 @@ fun ItemGrid(
 }
 
 /**
- * What YouTube shows while a page loads: grey shapes where the pictures and the lines of text will
- * be, gently pulsing, instead of a spinner. rows: the list form (a picture on the left); wide: the
- * one large column of search results on a computer.
+ * What the web app shows while a page loads: soft grey shapes where the pictures and the lines of text
+ * will be, a light sweeping across them, instead of a spinner. rows: the list form (a picture on the
+ * left); wide: the one large column of search results on a computer.
  */
 @Composable
 fun Skeleton(rows: Boolean = false, wide: Boolean = false) {
     val phone = LocalCompact.current
-    val pulse by rememberInfiniteTransition().animateFloat(
-        0.5f, 1f, infiniteRepeatable(tween(800, easing = Motion.standard), RepeatMode.Reverse),
+    val sweep by rememberInfiniteTransition().animateFloat(
+        0f, 1f, infiniteRepeatable(tween(1500, easing = LinearEasing), RepeatMode.Restart),
     )
-    val grey = MaterialTheme.colorScheme.surfaceVariant
-    fun Modifier.bone(shape: Shape = RoundedCornerShape(4.dp)) = this.graphicsLayer { alpha = pulse }.clip(shape).background(grey)
+    val grey = MaterialTheme.colorScheme.surfaceContainer
+    val light = MaterialTheme.colorScheme.surfaceContainerHighest
+    fun Modifier.bone(shape: Shape = RoundedCornerShape(6.dp)) = this.clip(shape).background(grey).drawBehind {
+        val w = size.width
+        val x = -0.5f * w + sweep * 2f * w
+        drawRect(Brush.horizontalGradient(listOf(Color.Transparent, light, Color.Transparent), startX = x - w * 0.3f, endX = x + w * 0.3f))
+    }
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         val big = rows && wide
         val thumb = when { !big -> 168.dp; maxWidth > 900.dp -> 360.dp; maxWidth > 640.dp -> 246.dp; else -> 168.dp }
@@ -541,19 +562,19 @@ fun Skeleton(rows: Boolean = false, wide: Boolean = false) {
             columns = if (big) GridCells.Fixed(1) else if (rows) GridCells.Adaptive(560.dp) else GridCells.Adaptive(320.dp),
             modifier = Modifier.let { if (big) it.widthIn(max = 1120.dp) else it }.fillMaxSize(),
             userScrollEnabled = false,
-            horizontalArrangement = Arrangement.spacedBy(if (phone) 0.dp else 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (phone) 0.dp else 20.dp),
             contentPadding = PaddingValues(horizontal = if (phone) 0.dp else 24.dp, vertical = 8.dp),
         ) {
             items(12) {
                 if (rows) Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                    Box(Modifier.width(thumb).aspectRatio(16f / 9f).bone(RoundedCornerShape(if (big) 12.dp else 8.dp)))
+                    Box(Modifier.width(thumb).aspectRatio(16f / 9f).bone(RoundedCornerShape(if (big) 18.dp else 12.dp)))
                     Column(Modifier.weight(1f).padding(start = 12.dp, top = 2.dp)) {
                         Box(Modifier.fillMaxWidth(0.9f).height(16.dp).bone())
                         Box(Modifier.padding(top = 8.dp).fillMaxWidth(0.5f).height(12.dp).bone())
                     }
-                } else Column(Modifier.padding(bottom = if (phone) 16.dp else 28.dp)) {
-                    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).bone(RoundedCornerShape(if (phone) 0.dp else 12.dp)))
-                    Row(Modifier.padding(start = if (phone) 12.dp else 0.dp, top = 12.dp, end = 12.dp)) {
+                } else Column(Modifier.padding(horizontal = if (phone) 12.dp else 0.dp).padding(bottom = if (phone) 22.dp else 32.dp)) {
+                    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).bone(RoundedCornerShape(16.dp)))
+                    Row(Modifier.padding(top = 12.dp, end = 12.dp)) {
                         Box(Modifier.size(36.dp).bone(CircleShape))
                         Column(Modifier.weight(1f).padding(start = 12.dp, top = 2.dp)) {
                             Box(Modifier.fillMaxWidth(0.9f).height(16.dp).bone())
@@ -569,6 +590,192 @@ fun Skeleton(rows: Boolean = false, wide: Boolean = false) {
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(text, style = MaterialTheme.typography.titleLarge, modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+}
+
+// ---------------------------------------------------------------- rounded, tonal pieces
+// The quieter look of music apps such as Flow: soft grey boxes with big round corners instead of
+// lines and outlines, pill-shaped buttons, icons in circles.
+
+private val PillShape = RoundedCornerShape(50)
+
+/** a pill-shaped button: grey, or [filled] with the text colour (the main action, such as Play all) */
+@Composable
+fun PillButton(
+    label: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, filled: Boolean = false,
+    enabled: Boolean = true, modifier: Modifier = Modifier, height: Dp = 44.dp, onClick: () -> Unit,
+) {
+    val c = MaterialTheme.colorScheme
+    val fg = if (filled) c.surface else c.onSurface
+    Row(
+        modifier.height(height).graphicsLayer { alpha = if (enabled) 1f else 0.4f }.clip(PillShape)
+            .background(if (filled) c.onSurface else c.surfaceVariant)
+            .then(if (enabled) Modifier.tvClickable(PillShape, sink = 0.94f, onClick = onClick) else Modifier)
+            .padding(horizontal = if (label.isEmpty()) 12.dp else 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        if (icon != null) Icon(icon, null, Modifier.size(20.dp), tint = fg)
+        if (icon != null && label.isNotEmpty()) Spacer(Modifier.width(8.dp))
+        if (label.isNotEmpty()) Text(label, color = fg, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+    }
+}
+
+/** a round grey button with an icon; [on] tints it teal (shuffle or repeat switched on) */
+@Composable
+fun RoundIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector, label: String?, size: Dp = 44.dp, on: Boolean = false,
+    tint: Color = Color.Unspecified, modifier: Modifier = Modifier, onClick: () -> Unit,
+) {
+    val c = MaterialTheme.colorScheme
+    Box(
+        modifier.size(size).tvClickable(CircleShape, sink = 0.9f, onClick = onClick).clip(CircleShape).background(if (on) accentSoft else c.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, label, Modifier.size(size * 0.5f), tint = if (on) accent else if (tint != Color.Unspecified) tint else c.onSurface)
+    }
+}
+
+/** a small grey label above a group of rows ("Your content", "Playlists") */
+@Composable
+fun GroupLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 28.dp, end = 16.dp, top = 18.dp, bottom = 4.dp))
+}
+
+/** rows in one rounded grey box */
+@Composable
+fun RowGroup(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Column(
+        modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().clip(RoundedCornerShape(22.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer).padding(vertical = 4.dp),
+        content = content,
+    )
+}
+
+/** a row of a [RowGroup]: the icon in a circle, a title, a line under it, a count, an arrow */
+@Composable
+fun GroupRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, sub: String = "", trailing: String = "",
+    arrow: Boolean = true, onClick: () -> Unit,
+) {
+    val c = MaterialTheme.colorScheme
+    Row(
+        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(16.dp), onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(40.dp).clip(CircleShape).background(c.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+            Icon(icon, null, Modifier.size(22.dp))
+        }
+        Column(Modifier.weight(1f).padding(start = 14.dp, end = 8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (trailing.isNotEmpty()) Text(trailing, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+        if (arrow) Icon(Sym.ChevronRight.outline, null, Modifier.padding(start = 4.dp).size(22.dp), tint = c.onSurfaceVariant)
+    }
+}
+
+/** a shelf's title, with its icon; when it opens a page, the whole line does, with an arrow at the end */
+@Composable
+fun ShelfTitle(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, onMore: (() -> Unit)? = null, end: (@Composable () -> Unit)? = null) {
+    Row(
+        Modifier.fillMaxWidth().then(if (onMore != null) Modifier.tvClickable(RoundedCornerShape(12.dp), onClick = onMore) else Modifier)
+            .padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) Icon(icon, null, Modifier.padding(end = 10.dp).size(22.dp))
+        Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (end != null) end()
+        if (onMore != null) Icon(Sym.ChevronRight.outline, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** a search box as a grey pill, without the outline */
+@Composable
+fun SearchField(
+    value: String, onChange: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier,
+    leading: androidx.compose.ui.graphics.vector.ImageVector = Sym.Search.outline, onSearch: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val c = MaterialTheme.colorScheme
+    androidx.compose.material3.TextField(
+        value, onChange, modifier.fillMaxWidth().heightIn(min = 52.dp), singleLine = true,
+        shape = PillShape,
+        placeholder = { Text(placeholder, maxLines = 1) },
+        leadingIcon = { Icon(leading, null) },
+        trailingIcon = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (value.isNotEmpty()) IconButton(onClick = { onChange("") }) { Icon(Sym.Close.outline, tr("Clear")) }
+                if (trailing != null) trailing()
+            }
+        },
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = if (onSearch != null) androidx.compose.ui.text.input.ImeAction.Search else androidx.compose.ui.text.input.ImeAction.Done),
+        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { onSearch?.invoke() }),
+        colors = androidx.compose.material3.TextFieldDefaults.colors(
+            focusedContainerColor = c.surfaceVariant, unfocusedContainerColor = c.surfaceVariant,
+            focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent,
+        ),
+    )
+}
+
+/**
+ * The top of a list of videos (a playlist, Watch later, liked videos): its picture large and
+ * rounded, the name, a line about it, Play all and Shuffle, and whatever else [more] adds.
+ */
+@Composable
+fun ListHeader(
+    cover: String, title: String, line: String, enabled: Boolean, play: () -> Unit, shuffle: () -> Unit,
+    more: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
+) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().padding(16.dp)) {
+        val wide = maxWidth > 700.dp
+        val pic: @Composable (Modifier) -> Unit = { m ->
+            Box(m.aspectRatio(16f / 9f).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                if (cover.isNotEmpty()) Img(cover, Modifier.fillMaxSize())
+                else Icon(Sym.PlaylistPlay.outline, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        val words: @Composable () -> Unit = {
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (line.isNotEmpty()) Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                PillButton(tr("Play all"), Sym.PlayArrow.fill, filled = true, enabled = enabled, onClick = play)
+                PillButton(tr("Shuffle"), Sym.Shuffle.fill, enabled = enabled, onClick = shuffle)
+            }
+            androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { more() }
+        }
+        if (wide) Row(verticalAlignment = Alignment.CenterVertically) {
+            pic(Modifier.width(360.dp))
+            Column(Modifier.weight(1f).padding(start = 24.dp)) { words() }
+        } else Column {
+            pic(Modifier.fillMaxWidth())
+            Spacer(Modifier.height(16.dp))
+            words()
+        }
+    }
+}
+
+/**
+ * The web's cardIn: a card rises 16dp into place, fades in and grows to its size, the first dozen one
+ * after another (30 ms apart), each card once (seen holds the ones that have arrived). Not on a TV.
+ */
+@Composable
+fun Modifier.arrive(key: Any, order: Int, seen: MutableSet<Any>): Modifier {
+    if (LocalPlatform.current.tv) return this
+    val fresh = remember(key) { seen.add(key) }
+    if (!fresh) return this
+    val a = remember(key) { Animatable(0f) }
+    LaunchedEffect(key) {
+        if (order in 1..11) delay(order * 30L)
+        a.animateTo(1f, tween(500, easing = Motion.out))
+    }
+    return graphicsLayer {
+        alpha = a.value
+        translationY = (1f - a.value) * 16.dp.toPx()
+        val s = 0.985f + 0.015f * a.value
+        scaleX = s; scaleY = s
+    }
 }
 
 @Composable

@@ -22,6 +22,8 @@ android {
 
     // The shared code (engine, library, screens) is compiled into this module as plain sources.
     sourceSets["main"].java.srcDirs("src/main/kotlin", "../common/src", "../common/jvm")
+    // Pretendard, the type face of the web app 1.0 (one copy for every platform: common/fonts)
+    sourceSets["main"].assets.srcDirs("../common/fonts")
 
     signingConfigs {
         // the release key lives outside the repository; without it the APK is signed with the debug key

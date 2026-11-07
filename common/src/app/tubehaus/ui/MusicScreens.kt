@@ -53,6 +53,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.blur
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -120,8 +124,8 @@ fun SongRow(app: AppState, s: Song, number: Int? = null, playing: Boolean = fals
 @Composable
 private fun CardTile(c: MusicCard, onClick: () -> Unit) {
     val round = c.kind == "artist"
-    Column(Modifier.width(148.dp).tvClickable(RoundedCornerShape(10.dp), onClick = onClick).padding(6.dp)) {
-        Img(c.art, Modifier.fillMaxWidth().aspectRatio(1f).clip(if (round) CircleShape else RoundedCornerShape(8.dp)))
+    Column(Modifier.width(160.dp).tvClickable(RoundedCornerShape(18.dp), onClick = onClick).padding(6.dp)) {
+        Img(c.art, Modifier.fillMaxWidth().aspectRatio(1f).clip(if (round) CircleShape else RoundedCornerShape(16.dp)))
         Text(c.title, Modifier.padding(top = 6.dp).fillMaxWidth(), style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
             textAlign = if (round) TextAlign.Center else null)
         if (c.subtitle.isNotEmpty()) Text(c.subtitle, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -133,7 +137,7 @@ private fun CardTile(c: MusicCard, onClick: () -> Unit) {
 private fun CardShelf(app: AppState, title: String, cards: List<MusicCard>) {
     if (cards.isEmpty()) return
     Column {
-        SectionTitle(title)
+        ShelfTitle(title)
         LazyRow(contentPadding = PaddingValues(horizontal = 10.dp)) {
             items(cards, key = { it.id }) { c -> CardTile(c) { openCard(app, c) } }
         }
@@ -186,20 +190,10 @@ fun MusicScreen(app: AppState) {
     }
     Narrow {
         Column(Modifier.fillMaxSize()) {
-            OutlinedTextField(
-                q, { q = it; if (it.isEmpty()) term = "" },
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                singleLine = true, shape = RoundedCornerShape(26.dp),
-                placeholder = { Text(tr("Songs, artists, albums")) },
-                leadingIcon = { Icon(Sym.Music.outline, null) },
-                trailingIcon = {
-                    Row {
-                        if (q.isNotEmpty()) IconButton(onClick = { q = ""; term = "" }) { Icon(Sym.Close.fill, tr("Clear")) }
-                        IconButton(onClick = { submit(q) }) { Icon(Sym.Search.outline, tr("Search")) }
-                    }
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { submit(q) }),
+            SearchField(
+                q, { q = it; if (it.isEmpty()) term = "" }, tr("Songs, artists, albums"),
+                Modifier.padding(horizontal = 16.dp, vertical = 8.dp), leading = Sym.Music.outline, onSearch = { submit(q) },
+                trailing = { IconButton(onClick = { submit(q) }) { Icon(Sym.Search.outline, tr("Search")) } },
             )
             when {
                 term.isEmpty() -> MusicHome(app, md.recent.map { it.song() }, md.opened.map { it.card() }, md.searches) { submit(it) }
@@ -245,26 +239,79 @@ private fun MusicHome(app: AppState, recent: List<Song>, opened: List<MusicCard>
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         if (searches.isNotEmpty()) item {
-            LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(searches.take(12)) { t -> Chip(false, { search(t) }, t, Sym.History.outline) }
             }
         }
-        if (recent.size > 1) item {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { app.playback.playSongs(recent.take(100), 0, shuffled = true) }) {
-                    Icon(Sym.Shuffle.fill, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(tr("Shuffle my songs"))
-                }
-                if (app.playback.music) OutlinedButton(onClick = { app.go(Screen.NowPlaying) }) { Text(tr("Now playing")) }
-            }
+        if (recent.isNotEmpty()) item {
+            ShelfTitle(tr("Jump back in"))
+            SpeedDial(app, recent)
         }
         if (quick.isNotEmpty()) {
-            item { SectionTitle(tr("Quick picks")) }
-            items(quick.take(8), key = { "q" + it.id }) { s -> SongRow(app, s) { app.playback.playSongs(quick, quick.indexOf(s), radio = true) } }
+            item {
+                ShelfTitle(tr("Quick picks"), end = {
+                    PillButton(tr("Play all"), Sym.PlayArrow.fill, height = 36.dp) { app.playback.playSongs(quick, 0, radio = true) }
+                })
+            }
+            item {
+                RowGroup {
+                    quick.take(8).forEachIndexed { i, s ->
+                        SongRow(app, s, playing = app.playback.song?.id == s.id) { app.playback.playSongs(quick, i, radio = true) }
+                    }
+                }
+            }
         }
         if (opened.isNotEmpty()) item { CardShelf(app, tr("Your albums and artists"), opened) }
-        if (recent.isNotEmpty()) {
-            item { SectionTitle(tr("Recently played")) }
+        if (recent.size > 1) {
+            item { ShelfTitle(tr("Recently played")) }
             items(recent.take(30), key = { "r" + it.id }) { s -> SongRow(app, s) { app.playback.playSongs(recent.take(100), recent.indexOf(s)) } }
+        }
+    }
+}
+
+/**
+ * The songs played last as big square tiles, two rows of them, as music apps open with; the first
+ * tile shuffles them all.
+ */
+@Composable
+private fun SpeedDial(app: AppState, recent: List<Song>) {
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        val cols = (maxWidth / 150.dp).toInt().coerceIn(3, 6)
+        val shuffle = recent.size > 1
+        val tiles: List<Song?> = (if (shuffle) listOf<Song?>(null) else emptyList()) + recent.take(cols * 2 - if (shuffle) 1 else 0)
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            for (row in tiles.chunked(cols)) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                for (s in row) Box(Modifier.weight(1f)) { DialTile(app, s, recent) }
+                repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DialTile(app: AppState, s: Song?, recent: List<Song>) {
+    val shape = RoundedCornerShape(18.dp)
+    val list = recent.take(100)
+    Box(
+        Modifier.fillMaxWidth().aspectRatio(1f).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .tvClickable(shape) { if (s == null) app.playback.playSongs(list, 0, shuffled = true) else app.playback.playSongs(list, list.indexOf(s).coerceAtLeast(0)) },
+    ) {
+        if (s == null) Column(
+            Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Teal.copy(alpha = 0.45f), Red.copy(alpha = 0.3f)))).padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Icon(Sym.Shuffle.fill, null, Modifier.size(30.dp))
+            Text(tr("Shuffle my songs"), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        } else {
+            SongCover(s, Modifier.fillMaxSize(), round = 0)
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f))))
+            Column(Modifier.align(Alignment.BottomStart).padding(10.dp)) {
+                Text(s.title, color = Color.White, style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (s.artist.isNotEmpty()) Text(s.artist, color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (app.playback.song?.id == s.id) Icon(Sym.Music.fill, null, Modifier.align(Alignment.TopEnd).padding(8.dp)
+                .size(26.dp).clip(CircleShape).background(Teal).padding(4.dp), tint = Color.Black)
         }
     }
 }
@@ -294,8 +341,8 @@ fun AlbumScreen(app: AppState, id: String, title: String) {
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
                 item {
                     Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Img(p.art, Modifier.widthIn(max = 240.dp).fillMaxWidth(0.6f).aspectRatio(1f).clip(RoundedCornerShape(12.dp)))
-                        Text(p.title.ifEmpty { title }, Modifier.padding(top = 12.dp), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+                        Img(p.art, Modifier.widthIn(max = 260.dp).fillMaxWidth(0.65f).aspectRatio(1f).clip(RoundedCornerShape(24.dp)))
+                        Text(p.title.ifEmpty { title }, Modifier.padding(top = 16.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                         if (p.artist.isNotEmpty()) TextButton(onClick = { if (p.artistId.isNotEmpty()) app.go(Screen.Artist(p.artistId, p.artist)) }) { Text(p.artist) }
                         Text(listOf(p.subtitle, p.info).filter { it.isNotEmpty() }.joinToString(" • "), style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
@@ -313,10 +360,10 @@ fun AlbumScreen(app: AppState, id: String, title: String) {
 
 @Composable
 private fun PlayButtons(enabled: Boolean, play: () -> Unit, shuffle: () -> Unit, radio: (() -> Unit)? = null) {
-    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (radio == null) Button(onClick = play, enabled = enabled) { Icon(Sym.PlayArrow.fill, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(tr("Play")) }
-        OutlinedButton(onClick = shuffle, enabled = enabled) { Icon(Sym.Shuffle.fill, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(tr("Shuffle")) }
-        if (radio != null) OutlinedButton(onClick = radio) { Icon(Sym.Explore.outline, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(tr("Radio")) }
+    Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (radio == null) PillButton(tr("Play"), Sym.PlayArrow.fill, filled = true, enabled = enabled, onClick = play)
+        PillButton(tr("Shuffle"), Sym.Shuffle.fill, filled = radio != null, enabled = enabled, onClick = shuffle)
+        if (radio != null) PillButton(tr("Radio"), Sym.Explore.outline, onClick = radio)
     }
 }
 
@@ -352,7 +399,7 @@ fun ArtistScreen(app: AppState, id: String, name: String) {
                 item {
                     Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Img(p.art, Modifier.size(160.dp).clip(CircleShape))
-                        Text(p.name.ifEmpty { name }, Modifier.padding(top = 12.dp), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+                        Text(p.name.ifEmpty { name }, Modifier.padding(top = 16.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                         if (p.audience.isNotEmpty()) Text(p.audience, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         PlayButtons(
                             enabled = songs.isNotEmpty() || p.shuffleId != null,
@@ -408,6 +455,8 @@ fun NowPlayingScreen(app: AppState) {
         return
     }
     var tab by rememberSaveable { mutableStateOf(0) }
+    Box(Modifier.fillMaxSize()) {
+    CoverGlow(s)
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth > 760.dp
         if (wide) Row(Modifier.fillMaxSize()) {
@@ -427,6 +476,24 @@ fun NowPlayingScreen(app: AppState) {
             }
         }
     }
+    }
+}
+
+/**
+ * The cover, shrunk to a few pixels and blurred, behind the whole screen and fading into the
+ * background: each song tints the page with its own colours.
+ */
+@Composable
+private fun CoverGlow(s: Song) {
+    val url = s.art.ifEmpty { s.cover }
+    if (url.isEmpty()) return
+    val ctx = coil3.compose.LocalPlatformContext.current
+    // its own key, so the tiny picture never stands in for the sharp cover (or the other way round)
+    val req = remember(url) { coil3.request.ImageRequest.Builder(ctx).data(url).size(32, 32).memoryCacheKey("$url#glow").build() }
+    val bg = MaterialTheme.colorScheme.background
+    coil3.compose.AsyncImage(req, null, Modifier.fillMaxSize().graphicsLayer { alpha = 0.85f }.blur(40.dp),
+        contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(bg.copy(alpha = 0.1f), bg.copy(alpha = 0.55f), bg.copy(alpha = 0.92f)))))
 }
 
 @Composable
@@ -464,17 +531,23 @@ private fun SongPanel(app: AppState, s: Song, big: Boolean) {
     }
     // the cover as big as fits with everything under it; on a short window the rest scrolls
     BoxWithConstraints(Modifier.widthIn(max = 520.dp)) {
-    val side = minOf(maxWidth - 48.dp, maxHeight - 300.dp, 380.dp).coerceAtLeast(140.dp)
+    val side = minOf(maxWidth - 48.dp, maxHeight - 340.dp, 400.dp).coerceAtLeast(140.dp)
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         if (pb.withVideo) {
             Box(Modifier.widthIn(max = side * 16f / 9f).fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(androidx.compose.ui.graphics.Color.Black)
                 .tvClickable(RoundedCornerShape(12.dp)) { app.go(Screen.Watch(s.id)) }) {
                 if (st.videoId == s.id) app.player.View(Modifier.fillMaxSize())
             }
-        } else SongCover(s, Modifier.size(side), round = 14)
-        Text(s.title, Modifier.padding(top = 16.dp).fillMaxWidth(), style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-        Text(s.artist, Modifier.fillMaxWidth().tvClickable { if (s.artistId.startsWith("UC")) app.go(Screen.Artist(s.artistId, s.artist)) }, style = MaterialTheme.typography.bodyMedium,
-            color = c.onSurfaceVariant, maxLines = 1, textAlign = TextAlign.Center)
+        } else SongCover(s, Modifier.size(side), round = 24)
+        // the title on the left and the heart on the right, as music apps have it
+        Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(s.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(s.artist, Modifier.tvClickable(RoundedCornerShape(6.dp)) { if (s.artistId.startsWith("UC")) app.go(Screen.Artist(s.artistId, s.artist)) },
+                    style = MaterialTheme.typography.bodyLarge, color = c.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            RoundIcon(if (liked) Sym.Favorite.fill else Sym.Favorite.outline, tr("Like"), 48.dp, tint = if (liked) Red else Color.Unspecified) { like() }
+        }
         // seek bar: dragging moves the thumb; the song jumps when it is let go
         var drag by remember { mutableStateOf<Float?>(null) }
         val dur = st.durationMs.coerceAtLeast(1)
@@ -483,35 +556,49 @@ private fun SongPanel(app: AppState, s: Song, big: Boolean) {
             onValueChange = { drag = it },
             onValueChangeFinished = { drag?.let { app.player.seekTo((it * dur).toLong()) }; drag = null },
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            // white on the dark page (black on the light one), the rest a faint line
+            colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = c.onBackground, activeTrackColor = c.onBackground,
+                inactiveTrackColor = c.onBackground.copy(alpha = 0.18f)),
         )
         Row(Modifier.fillMaxWidth()) {
             Text(durationMs(drag?.let { (it * dur).toLong() } ?: st.positionMs), style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
             Text(if (st.durationMs > 0) durationMs(st.durationMs) else "", style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
         }
-        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { pb.toggleShuffle() }) { Icon(Sym.Shuffle.fill, tr("Shuffle"), tint = if (pb.shuffle) Teal else c.onSurfaceVariant) }
-            IconButton(onClick = { pb.previous() }, Modifier.size(52.dp)) { Icon(Sym.SkipPrevious.fill, tr("Previous"), Modifier.size(34.dp)) }
-            FilledIconButton(onClick = { if (st.playing) app.player.pause() else app.player.play() }, Modifier.size(68.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = c.onBackground, contentColor = c.background)) {
-                if (st.buffering && !st.playing) Busy(Modifier.size(28.dp))
-                else Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"), Modifier.size(38.dp))
+        // the big buttons: round previous and next, a wide pill to play or pause
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically) {
+            RoundIcon(Sym.SkipPrevious.fill, tr("Previous"), 60.dp) { pb.previous() }
+            val pill = RoundedCornerShape(50)
+            Box(Modifier.width(124.dp).height(68.dp).clip(pill).background(c.onBackground)
+                .tvClickable(pill) { if (st.playing) app.player.pause() else app.player.play() }, contentAlignment = Alignment.Center) {
+                if (st.buffering && !st.playing) CircularProgressIndicator(Modifier.size(28.dp), color = c.background, strokeWidth = 3.dp)
+                else Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"), Modifier.size(38.dp), tint = c.background)
             }
-            IconButton(onClick = { pb.skipNext() }, Modifier.size(52.dp)) { Icon(Sym.SkipNext.fill, tr("Next"), Modifier.size(34.dp)) }
-            IconButton(onClick = {
+            RoundIcon(Sym.SkipNext.fill, tr("Next"), 60.dp) { pb.skipNext() }
+        }
+        // the quieter ones under them, each in a grey circle; teal when switched on
+        var more by remember { mutableStateOf(false) }
+        Row(Modifier.padding(top = 20.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            RoundIcon(Sym.Shuffle.fill, tr("Shuffle"), on = pb.shuffle) { pb.toggleShuffle() }
+            RoundIcon(if (pb.repeat == 2) Sym.RepeatOne.fill else Sym.Repeat.fill, tr("Repeat"), on = pb.repeat > 0) {
                 pb.repeat = (pb.repeat + 1) % 3
                 app.toast(tr(when (pb.repeat) { 1 -> "Repeat all"; 2 -> "Repeat this song"; else -> "Repeat off" }))
-            }) {
-                Icon(if (pb.repeat == 2) Sym.RepeatOne.fill else Sym.Repeat.fill, tr("Repeat"), tint = if (pb.repeat > 0) Teal else c.onSurfaceVariant)
             }
-        }
-        Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            IconButton(onClick = { like() }) { Icon(if (liked) Sym.ThumbUp.fill else Sym.ThumbUp.outline, tr("Like")) }
-            if (!pb.withVideo) IconButton(onClick = { pb.showVideo() }) { Icon(Sym.MusicVideo.outline, tr("Watch video")) }
-            else IconButton(onClick = { app.go(Screen.Watch(s.id)) }) { Icon(Sym.Fullscreen.outline, tr("Open the video")) }
-            if (s.albumId.isNotEmpty()) IconButton(onClick = { app.go(Screen.Album(s.albumId, s.album)) }) { Icon(Sym.Album.outline, tr("Go to album")) }
-            if (s.artistId.startsWith("UC")) IconButton(onClick = { app.go(Screen.Artist(s.artistId, s.artist)) }) { Icon(Sym.Person.outline, tr("Go to artist")) }
-            IconButton(onClick = { pb.playRadio(s) }) { Icon(Sym.Explore.outline, tr("Start radio")) }
+            if (!pb.withVideo) RoundIcon(Sym.MusicVideo.outline, tr("Watch video")) { pb.showVideo() }
+            else RoundIcon(Sym.Fullscreen.outline, tr("Open the video")) { app.go(Screen.Watch(s.id)) }
+            RoundIcon(Sym.Explore.outline, tr("Start radio")) { pb.playRadio(s) }
+            Box {
+                RoundIcon(Sym.MoreVert.fill, tr("More")) { more = true }
+                DropdownMenu(more, { more = false }) {
+                    if (s.albumId.isNotEmpty()) DropdownMenuItem(text = { Text(tr("Go to album")) }, leadingIcon = { Icon(Sym.Album.outline, null) },
+                        onClick = { more = false; app.go(Screen.Album(s.albumId, s.album)) })
+                    if (s.artistId.startsWith("UC")) DropdownMenuItem(text = { Text(tr("Go to artist")) }, leadingIcon = { Icon(Sym.Person.outline, null) },
+                        onClick = { more = false; app.go(Screen.Artist(s.artistId, s.artist)) })
+                    DropdownMenuItem(text = { Text(tr("Share")) }, leadingIcon = { Icon(Sym.Share.outline, null) },
+                        onClick = { more = false; app.share(s.title, "https://youtu.be/${s.id}") })
+                }
+            }
         }
     }
     }

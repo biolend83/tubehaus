@@ -58,6 +58,31 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.border
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 
 /** the parts under a video that Settings → Focus can hide one by one */
 val UNDER_PARTS = listOf(
@@ -67,7 +92,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "0.5.19"
+const val VERSION = "1.0.0"
 
 /** Settings' categories, as cards on its first page: key, icon, title, what is inside */
 private class Cat(val key: String, val icon: Symbol, val title: String, val sub: String)
@@ -87,15 +112,30 @@ private fun cats(app: AppState) = listOfNotNull(
 
 fun catTitleOf(key: String) = catTitle(key)
 
+private fun catIcon(key: String): Symbol = when (key) {
+    "display" -> Sym.Palette; "language" -> Sym.Language; "player" -> Sym.PlayCircle; "quality" -> Sym.HighQuality
+    "music" -> Sym.Music; "focus" -> Sym.Feed; "integrations" -> Sym.Extension; "wellbeing" -> Sym.Wellbeing
+    "data" -> Sym.Database; else -> Sym.Info
+}
+
 private fun catTitle(key: String): String = when (key) {
     "display" -> tr("Display & theme"); "language" -> tr("Language & region"); "player" -> tr("Player & playback")
     "quality" -> tr("Quality"); "music" -> tr("Music"); "focus" -> tr("Feeds & focus"); "integrations" -> tr("Integrations")
     "wellbeing" -> tr("Wellbeing"); "data" -> tr("Your data"); "about" -> tr("About"); else -> tr("Settings")
 }
 
-/** Settings' first page: a search box over every setting, and the categories as cards. */
+/**
+ * Settings' first page. Phones, tablets and computers: as the web app 1.0 draws it, every category as
+ * a rounded card on one page and a menu that jumps to them ([SettingsHome]). A TV: a search box over
+ * every setting and the categories as cards, each opening a page of its own.
+ */
 @Composable
 fun SettingsScreen(app: AppState) {
+    if (!app.platform.tv) SettingsHome(app, null) else TvSettingsScreen(app)
+}
+
+@Composable
+private fun TvSettingsScreen(app: AppState) {
     var q by remember { mutableStateOf("") }
     Narrow {
         Column(Modifier.fillMaxSize()) {
@@ -121,14 +161,111 @@ fun SettingsScreen(app: AppState) {
     }
 }
 
-/** One category of Settings on its own page */
+/** One category of Settings: on a TV a page of its own, elsewhere the settings scrolled to it */
 @Composable
 fun SettingsPageScreen(app: AppState, key: String) {
+    if (!app.platform.tv) { SettingsHome(app, key); return }
     Narrow {
         Column(Modifier.fillMaxSize()) {
             if (!app.platform.tv) SectionTitle(catTitle(key))
             SettingsRows(app, key, "")
         }
+    }
+}
+
+/**
+ * The web app 1.0's settings: wide screens have the title, the search box and the categories on the
+ * left and the cards on the right; phones and narrow windows have the title and the search box on
+ * top, then the categories as pills that stay at the top while the cards scroll under them. The
+ * category the list is at is lit; a tap scrolls to its card. [start]: the category to open at.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun SettingsHome(app: AppState, start: String?) {
+    var q by remember { mutableStateOf("") }
+    val list = rememberLazyListState()
+    // where each category's card starts in the list (filled while the list is built)
+    val starts = remember { HashMap<String, Int>() }
+    var jump by remember { mutableStateOf(start) }
+    val all = remember { cats(app) }
+    val scope = rememberCoroutineScope()
+    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        val wide = !LocalCompact.current && maxWidth >= 860.dp
+        val top = if (wide) 0 else 3
+        // the pills cover the top of the list on a phone
+        val navPx = with(LocalDensity.current) { (if (wide) 0.dp else 52.dp).roundToPx() }
+        val at by remember(wide) {
+            derivedStateOf {
+                val here = list.layoutInfo.visibleItemsInfo.firstOrNull { it.index >= top && it.offset + it.size > navPx + 1 }?.index ?: 0
+                all.lastOrNull { (starts[it.key] ?: Int.MAX_VALUE) <= here }?.key ?: all.first().key
+            }
+        }
+        val go: (String) -> Unit = { k ->
+            if (q.isNotEmpty()) { q = ""; jump = k }
+            else starts[k]?.let { i -> scope.launch { list.animateScrollToItem(i, -navPx) } }
+        }
+        LaunchedEffect(jump, q) {
+            val k = jump ?: return@LaunchedEffect
+            if (q.isNotEmpty()) return@LaunchedEffect
+            withFrameNanos { }
+            starts[k]?.let { list.scrollToItem(it, -navPx) }
+            jump = null
+        }
+        if (wide) Row(Modifier.widthIn(max = 1080.dp).fillMaxSize().padding(horizontal = 24.dp)) {
+            Column(Modifier.width(240.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(top = 16.dp, bottom = 24.dp)) {
+                Text(tr("Settings"), fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.8).sp,
+                    modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 14.dp))
+                SearchField(q, { q = it }, tr("Search settings..."), Modifier.padding(bottom = 12.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    for (k in all) NavButton(k, k.key == at && q.isEmpty(), pill = false) { go(k.key) }
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            SettingsRows(app, null, q.trim(), list, starts, Modifier.weight(1f).fillMaxHeight())
+        } else Box(Modifier.widthIn(max = 760.dp).fillMaxSize()) {
+            SettingsRows(app, null, q.trim(), list, starts, Modifier.fillMaxSize(), top = top) {
+                item("title") {
+                    Text(tr("Settings"), fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.6).sp,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp))
+                }
+                item("search") { SearchField(q, { q = it }, tr("Search settings..."), Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) }
+                stickyHeader("nav") { NavPills(all, if (q.isEmpty()) at else "", go) }
+            }
+        }
+    }
+}
+
+/** the categories as pills in a row that scrolls sideways, the lit one kept in view */
+@Composable
+private fun NavPills(all: List<Cat>, at: String, go: (String) -> Unit) {
+    val row = rememberScrollState()
+    val xs = remember { HashMap<String, Int>() }
+    LaunchedEffect(at) { xs[at]?.let { row.animateScrollTo((it - 48).coerceAtLeast(0)) } }
+    Row(
+        Modifier.fillMaxWidth().height(52.dp).background(MaterialTheme.colorScheme.background).horizontalScroll(row).padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
+    ) {
+        for (k in all) Box(Modifier.onPlaced { xs[k.key] = it.positionInParent().x.toInt() }) {
+            NavButton(k, k.key == at, pill = true) { go(k.key) }
+        }
+    }
+}
+
+/** one category in the menu: on the left of a wide screen a full-width row, on a phone a pill */
+@Composable
+private fun NavButton(k: Cat, on: Boolean, pill: Boolean, onClick: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(if (pill) 18.dp else 12.dp)
+    val bg by animateColorAsState(if (on) accentSoft else if (pill) c.surfaceContainer else Color.Transparent, tween(Motion.SHORT))
+    Row(
+        (if (pill) Modifier.height(36.dp) else Modifier.fillMaxWidth().height(44.dp))
+            .tvClickable(shape, sink = 0.96f, onClick = onClick).clip(shape).background(bg)
+            .padding(start = if (pill) 11.dp else 12.dp, end = if (pill) 14.dp else 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(if (on) k.icon.fill else k.icon.outline, null, Modifier.size(if (pill) 17.dp else 20.dp), tint = if (on) accent else c.onSurfaceVariant)
+        Text(tr(k.title), fontSize = if (pill) 13.sp else 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            color = if (on) c.onSurface else c.onSurfaceVariant, modifier = Modifier.padding(start = if (pill) 7.dp else 12.dp))
     }
 }
 
@@ -160,23 +297,81 @@ fun minutesText(min: Long): String =
  * Adds the rows of one category ([cat]) or, while searching ([q]), the rows whose words match it,
  * under the name of their category.
  */
-private class Rows(val scope: LazyListScope, val cat: String?, val q: String) {
+private class Rows(val scope: LazyListScope, val cat: String?, val q: String, val tv: Boolean, private var n: Int, val starts: MutableMap<String, Int>?) {
     private var lastCat: String? = null
     var count = 0
+    /** the card being filled: how many pieces it has (read when they are drawn, after it is complete) */
+    private class Card { var size = 0 }
+    private var card = Card()
+    private var afterHead = false
+    init { starts?.clear() }
+    private fun add(content: @Composable () -> Unit) {
+        val k = card; val i = k.size++
+        val line = i > 0 && !afterHead
+        afterHead = false
+        n++
+        scope.item { Piece(tv, i == 0, i == k.size - 1, line, content) }
+    }
+    private fun head(content: @Composable () -> Unit) { add(content); afterHead = true }
+    /** every category shown (the settings page, or a search): each starts with its name */
+    private fun enter(c: String) {
+        if (cat != null || c == lastCat) return
+        lastCat = c; card = Card(); starts?.put(c, n)
+        val t = catTitle(c)
+        if (tv) head { Group(t) } else { val ic = catIcon(c); head { CatHead(ic, t) } }
+    }
     fun group(c: String, title: String) {
-        if (q.isEmpty() && c == cat) scope.item { Group(title) }
+        if (q.isNotEmpty() || (cat != null && c != cat)) return
+        enter(c)
+        // a part of a category: a card of its own, unless it is the first thing in the category's card
+        if (!tv && !(afterHead && card.size == 1)) card = Card()
+        head { Group(title) }
     }
     fun row(c: String, words: String, content: @Composable () -> Unit) {
-        val show = if (q.isEmpty()) c == cat else q.split(' ').filter { it.isNotBlank() }.all { words.contains(it, ignoreCase = true) }
+        val show = if (q.isEmpty()) cat == null || c == cat else q.split(' ').filter { it.isNotBlank() }.all { words.contains(it, ignoreCase = true) }
         if (!show) return
         count++
-        if (q.isNotEmpty() && c != lastCat) { lastCat = c; val t = catTitle(c); scope.item { Group(t) } }
-        scope.item { content() }
+        enter(c)
+        add(content)
+    }
+}
+
+/**
+ * One piece of a card: the card's colour behind it, the top corners round on the first piece and the
+ * bottom ones on the last, a hairline between rows (as the web's .sx-card and .sx-rows). A TV: the row alone.
+ */
+@Composable
+private fun Piece(tv: Boolean, first: Boolean, last: Boolean, line: Boolean, content: @Composable () -> Unit) {
+    if (tv) { content(); return }
+    val c = MaterialTheme.colorScheme
+    val r = 24.dp
+    val shape = RoundedCornerShape(if (first) r else 0.dp, if (first) r else 0.dp, if (last) r else 0.dp, if (last) r else 0.dp)
+    val phone = LocalCompact.current
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = if (phone) 12.dp else 16.dp).padding(top = if (first) (if (phone) 14.dp else 20.dp) else 0.dp)
+            .clip(shape).background(c.surfaceContainer).padding(horizontal = 6.dp).padding(top = if (first) 6.dp else 0.dp, bottom = if (last) 8.dp else 0.dp),
+    ) {
+        if (line) HorizontalDivider(Modifier.padding(horizontal = 16.dp), thickness = 1.dp, color = c.outline.copy(alpha = 0.8f))
+        content()
+    }
+}
+
+/** a category's name at the top of its card, with its icon in a small rounded square */
+@Composable
+private fun CatHead(icon: Symbol, title: String) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+            Icon(icon.outline, null, Modifier.size(20.dp), tint = accent)
+        }
+        Text(title, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.3).sp, modifier = Modifier.padding(start = 12.dp))
     }
 }
 
 @Composable
-private fun SettingsRows(app: AppState, cat: String?, q: String) {
+private fun SettingsRows(
+    app: AppState, cat: String?, q: String, list: LazyListState = rememberLazyListState(), starts: MutableMap<String, Int>? = null,
+    modifier: Modifier = Modifier.fillMaxSize(), top: Int = 0, head: LazyListScope.() -> Unit = {},
+) {
     val s by app.store.settings.state.collectAsState()
     fun set(f: (Settings) -> Settings) = app.store.settings.update(f)
     var dialog by remember { mutableStateOf<String?>(null) }
@@ -186,22 +381,23 @@ private fun SettingsRows(app: AppState, cat: String?, q: String) {
     val touch = app.platform.touch
     // read once per page, for the sound output row
     val devices = remember { if (app.platform.player.hasVolume) app.platform.player.audioDevices() else emptyList() }
-    LazyColumn(Modifier.fillMaxSize()) {
-        val r = Rows(this, cat, q)
+    LazyColumn(modifier, state = list, contentPadding = PaddingValues(bottom = 24.dp)) {
+        head()
+        val r = Rows(this, cat, q, app.platform.tv, top, starts)
         // ------------------------------------------------------------------ display
         run {
             val themes = listOf("0" to tr("Follow the system"), "1" to tr("Light"), "2" to tr("Dark"), "3" to tr("Black (AMOLED)")) +
                 // Android 12+: Material You, the colours of the wallpaper
                 listOfNotNull(("4" to tr("Wallpaper colours")).takeIf { app.platform.wallpaperColors(false) != null })
-            r.row("display", tr("Theme") + " dark light black") { Choice(tr("Theme"), themes.getOrNull(s.dark)?.second ?: themes[0].second, themes) { c -> set { it.copy(dark = c.toInt()) } } }
+            r.row("display", tr("Theme") + " dark light black") { Seg(tr("Theme"), "${s.dark}", themes) { c -> set { it.copy(dark = c.toInt()) } } }
             val sizes = listOf(1f to tr("Normal"), 1.15f to tr("Large"), 1.3f to tr("Larger"), 1.5f to tr("Largest"))
             r.row("display", tr("Text size") + " font") {
-                Choice(tr("Text size"), sizes.firstOrNull { it.first == s.textScale }?.second ?: tr("Normal"), sizes.map { "${it.first}" to it.second }) { c -> set { it.copy(textScale = c.toFloat()) } }
+                Seg(tr("Text size"), "${sizes.firstOrNull { it.first == s.textScale }?.first ?: 1f}", sizes.map { "${it.first}" to it.second }) { c -> set { it.copy(textScale = c.toFloat()) } }
             }
         }
         if (android) r.row("display", tr("TV mode")) {
             val modes = listOf("0" to tr("Automatic"), "1" to tr("On"), "2" to tr("Off"))
-            Choice(tr("TV mode"), modes.getOrNull(s.tvMode)?.second ?: modes[0].second, modes) { c -> set { it.copy(tvMode = c.toInt()) } }
+            Seg(tr("TV mode"), "${s.tvMode}", modes) { c -> set { it.copy(tvMode = c.toInt()) } }
         }
         if (touch) r.row("display", tr("Hide the tabs while scrolling") + tr("The tabs and the top bar slide away as you scroll down")) {
             Toggle(tr("Hide the tabs while scrolling"), tr("The tabs and the top bar slide away as you scroll down"), s.autoHideNav) { b -> set { it.copy(autoHideNav = b) } }
@@ -449,7 +645,14 @@ private fun SettingsRows(app: AppState, cat: String?, q: String) {
 /** a grey explanation under a setting */
 @Composable
 private fun Note(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+    if (LocalPlatform.current.tv) {
+        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+        return
+    }
+    // the web's .sx-note: a lighter box inside the card
+    Text(text, fontSize = 13.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp).clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 14.dp, vertical = 12.dp))
 }
 
 /** Not connected: one line that opens [ServerDialog]. Connected: where, how the last sync went, sync now, disconnect. */
@@ -542,29 +745,42 @@ private fun PasswordField(app: AppState, value: String, onChange: (String) -> Un
 
 @Composable
 private fun Group(t: String) {
-    Text(t, style = MaterialTheme.typography.titleSmall, color = Blue, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp))
+    if (LocalPlatform.current.tv) Text(t, style = MaterialTheme.typography.titleSmall, color = Blue, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp))
+    else Text(t, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.3).sp, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp))
+}
+
+/** a setting's name in bold and what it does in grey under it (the web's .sx-tx) */
+@Composable
+private fun Words(title: String, sub: String, modifier: Modifier) {
+    Column(modifier) {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        if (sub.isNotEmpty()) Text(sub, fontSize = 13.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 3.dp))
+    }
 }
 
 @Composable
 private fun SItem(title: String, sub: String, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text(title, style = MaterialTheme.typography.bodyMedium)
-        if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Box(Modifier.fillMaxWidth().heightIn(min = 60.dp).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
+        Words(title, sub, Modifier.fillMaxWidth())
     }
 }
 
 @Composable
 private fun Toggle(title: String, sub: String, on: Boolean, enabled: Boolean = true, set: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(enabled = enabled) { set(!on) }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium)
-            if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        // an "off" switch has to read as a switch on dark and black themes too (it nearly vanished)
-        Switch(on, set, enabled = enabled, colors = SwitchDefaults.colors(
+    val tv = LocalPlatform.current.tv
+    Row(Modifier.fillMaxWidth().heightIn(min = if (tv) 0.dp else 60.dp).clickable(enabled = enabled) { set(!on) }.padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Words(title, sub, Modifier.weight(1f).padding(end = 12.dp))
+        // a TV: an "off" switch has to read as a switch on dark and black themes (it nearly vanished);
+        // elsewhere the web's switch, teal when on, a white knob on a grey track when off
+        Switch(on, set, enabled = enabled, colors = if (tv) SwitchDefaults.colors(
             uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
             uncheckedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
             uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+        ) else SwitchDefaults.colors(
+            checkedThumbColor = Color.White, checkedTrackColor = accent, checkedBorderColor = Color.Transparent,
+            uncheckedThumbColor = Color.White, uncheckedTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f),
+            uncheckedBorderColor = Color.Transparent,
         ))
     }
 }
@@ -572,11 +788,77 @@ private fun Toggle(title: String, sub: String, on: Boolean, enabled: Boolean = t
 @Composable
 private fun Choice(title: String, value: String, options: List<Pair<String, String>>, pick: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    Box {
-        SItem(title, value) { open = true }
+    val menu: @Composable () -> Unit = {
         DropdownMenu(open, { open = false }) {
             for ((k, label) in options) DropdownMenuItem(text = { Text(label) }, onClick = { open = false; pick(k) })
         }
+    }
+    if (LocalPlatform.current.tv) {
+        Box { SItem(title, value) { open = true }; menu() }
+        return
+    }
+    // the web's .sx-sel: the name on the left, the value in a box on the right with a small arrow
+    val c = MaterialTheme.colorScheme
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    val phone = LocalCompact.current || maxWidth < 560.dp
+    Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).clickable { open = true }.padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f).padding(end = 12.dp))
+        Box {
+            val box = RoundedCornerShape(12.dp)
+            Row(
+                Modifier.height(40.dp).widthIn(min = if (phone) 0.dp else 180.dp, max = if (phone) 170.dp else 260.dp).clip(box)
+                    .background(c.surfaceContainerHigh).border(1.dp, c.outline, box).padding(start = 14.dp, end = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = !phone))
+                Icon(Sym.KeyboardArrowDown.outline, null, Modifier.padding(start = 6.dp).size(18.dp), tint = c.onSurfaceVariant)
+            }
+            menu()
+        }
+    }
+    }
+}
+
+/**
+ * A choice of a few, as the web's .sx-seg: the options side by side in a grey groove, the chosen
+ * one raised. A phone stacks it under the name, each option sharing the width. A TV: [Choice].
+ */
+@Composable
+private fun Seg(title: String, sel: String, options: List<Pair<String, String>>, pick: (String) -> Unit) {
+    if (LocalPlatform.current.tv) { Choice(title, options.firstOrNull { it.first == sel }?.second ?: options[0].second, options, pick); return }
+    val c = MaterialTheme.colorScheme
+    val dark = c.background.luminance() < 0.5f
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    // stacked under the name when there is little room (a phone, a narrow window)
+    val phone = LocalCompact.current || maxWidth < 560.dp
+    val groove: @Composable (Modifier) -> Unit = { m ->
+        Row(m.height(IntrinsicSize.Min).clip(RoundedCornerShape(14.dp)).background(c.onSurface.copy(alpha = 0.07f)).padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            for ((k, label) in options) {
+                val on = k == sel
+                val seg = RoundedCornerShape(10.dp)
+                val bg by animateColorAsState(if (!on) Color.Transparent else if (dark) Color.White.copy(alpha = 0.13f) else c.surfaceContainerHigh, tween(Motion.SHORT))
+                Box(
+                    (if (phone) Modifier.weight(1f) else Modifier).fillMaxHeight().heightIn(min = 34.dp)
+                        .then(if (on && !dark) Modifier.shadow(2.dp, seg) else Modifier)
+                        .tvClickable(seg, sink = 0.96f) { pick(k) }.clip(seg).background(bg)
+                        .padding(horizontal = if (phone) 4.dp else 14.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(label, fontSize = if (phone) 12.sp else 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis, color = if (on) c.onSurface else c.onSurfaceVariant)
+                }
+            }
+        }
+    }
+    if (phone) Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        groove(Modifier.padding(top = 10.dp).fillMaxWidth())
+    } else Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f).padding(end = 12.dp))
+        groove(Modifier)
+    }
     }
 }
 

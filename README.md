@@ -11,9 +11,9 @@ there too.
 Have a TubeHaus server at home? Connect it in Settings and your library is shared with your other
 devices and the web version (optional).
 
-**[⬇ .deb (Debian, Ubuntu, Mint)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-linux-amd64.deb)** · **[⬇ .rpm (Fedora, openSUSE)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-linux-x86_64.rpm)** · **[⬇ tar.gz (Arch, CachyOS, any distro)](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-linux-x64.tar.gz)** (0.5.4, beta)
+**[⬇ .deb (Debian, Ubuntu, Mint)](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-linux-amd64.deb)** · **[⬇ .rpm (Fedora, openSUSE)](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-linux-x86_64.rpm)** · **[⬇ tar.gz (Arch, CachyOS, any distro)](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-linux-x64.tar.gz)** (0.5.4, beta)
 
-ARM64 (Raspberry Pi 4/5 and others): [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-linux-arm64.deb) · [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-linux-aarch64.rpm) · [tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-linux-arm64.tar.gz)
+ARM64 (Raspberry Pi 4/5 and others): [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-linux-arm64.deb) · [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-linux-aarch64.rpm) · [tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-linux-arm64.tar.gz)
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · **Linux** · [iPad / iPhone](https://github.com/biolend83/tubehaus/tree/ios-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
@@ -113,3 +113,7 @@ JDK 21+ and libmpv (see above).
 ## License
 
 GPL-3.0.
+
+The Pretendard font the apps use (`common/fonts`) is copyright (c) 2021 Kil Hyung-jin
+(https://github.com/orioncactus/pretendard), under the SIL Open Font License 1.1: see
+`common/fonts/Pretendard-OFL.txt`, which also ships inside the apps next to the font.
