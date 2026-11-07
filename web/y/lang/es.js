@@ -532,5 +532,13 @@ export default {
  "더 깔끔한 화면과 부드러운 움직임": "Pantallas más limpias y movimiento más fluido",
  "휴대폰에서도 편하게": "Mejor en el móvil",
  "큰 화면 목록과 아래 메뉴": "Lista de videos grande y menú inferior",
- "음악 열기": "Abrir Música"
+ "음악 열기": "Abrir Música",
+ "영상이 노래보다 {0}초 길어서 가사가 어긋날 수 있어요": "El video dura {0} s más que la canción; la letra puede desfasarse",
+ "가사 타이밍": "Sincronía de la letra",
+ "가사 빨리": "Letra antes",
+ "가사 늦게": "Letra después",
+ "초": " s",
+ "지금 부르는 줄 누르기": "Toca la línea que suena",
+ "지금 부르는 줄을 눌러 주세요": "Ahora toca la línea que suena",
+ "자동": "Automático"
 };

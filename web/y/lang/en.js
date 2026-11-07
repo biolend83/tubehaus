@@ -532,5 +532,13 @@ export default {
  "더 깔끔한 화면과 부드러운 움직임": "Cleaner screens, smoother motion",
  "휴대폰에서도 편하게": "Better on phones",
  "큰 화면 목록과 아래 메뉴": "Big video list and a bottom menu",
- "음악 열기": "Open Music"
+ "음악 열기": "Open Music",
+ "영상이 노래보다 {0}초 길어서 가사가 어긋날 수 있어요": "This video is {0}s longer than the song, so the lyrics may be off",
+ "가사 타이밍": "Lyrics timing",
+ "가사 빨리": "Lyrics earlier",
+ "가사 늦게": "Lyrics later",
+ "초": "s",
+ "지금 부르는 줄 누르기": "Tap the line being sung",
+ "지금 부르는 줄을 눌러 주세요": "Now tap the line being sung",
+ "자동": "Auto"
 };

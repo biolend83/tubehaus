@@ -532,5 +532,13 @@ export default {
  "더 깔끔한 화면과 부드러운 움직임": "Tampilan lebih rapi, gerakan lebih halus",
  "휴대폰에서도 편하게": "Lebih nyaman di ponsel",
  "큰 화면 목록과 아래 메뉴": "Daftar video besar dan menu bawah",
- "음악 열기": "Buka Musik"
+ "음악 열기": "Buka Musik",
+ "영상이 노래보다 {0}초 길어서 가사가 어긋날 수 있어요": "Video {0} dtk lebih panjang dari lagunya, lirik bisa meleset",
+ "가사 타이밍": "Waktu lirik",
+ "가사 빨리": "Lirik lebih awal",
+ "가사 늦게": "Lirik lebih lambat",
+ "초": " dtk",
+ "지금 부르는 줄 누르기": "Ketuk baris yang sedang dinyanyikan",
+ "지금 부르는 줄을 눌러 주세요": "Sekarang ketuk baris yang dinyanyikan",
+ "자동": "Otomatis"
 };

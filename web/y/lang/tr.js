@@ -532,5 +532,13 @@ export default {
  "더 깔끔한 화면과 부드러운 움직임": "Daha sade ekranlar, daha akıcı hareket",
  "휴대폰에서도 편하게": "Telefonda daha rahat",
  "큰 화면 목록과 아래 메뉴": "Büyük video listesi ve alt menü",
- "음악 열기": "Müziği aç"
+ "음악 열기": "Müziği aç",
+ "영상이 노래보다 {0}초 길어서 가사가 어긋날 수 있어요": "Video şarkıdan {0} sn uzun, sözler kayabilir",
+ "가사 타이밍": "Söz zamanlaması",
+ "가사 빨리": "Sözler daha erken",
+ "가사 늦게": "Sözler daha geç",
+ "초": " sn",
+ "지금 부르는 줄 누르기": "Söylenen satıra dokunun",
+ "지금 부르는 줄을 눌러 주세요": "Şimdi söylenen satıra dokunun",
+ "자동": "Otomatik"
 };

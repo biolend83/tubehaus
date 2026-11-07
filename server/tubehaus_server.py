@@ -2127,31 +2127,52 @@ def lyrics_lrc(text):
     return sorted(out, key=lambda x: x[0])
 
 
+def _ly_key(lines):
+    """the same timed words, however they were spaced"""
+    return tuple((ms // 100, re.sub(r"\W", "", w.lower())) for ms, w in lines[:10])
+
+
 def music_lyrics(title, artist, length):
-    """{synced, lines}: at most three LRCLIB searches a song, made only when the lyrics are opened"""
+    """{synced, lines, len}: at most three LRCLIB searches a song, made only when the lyrics are opened.
+    len is the length of the recording the times were made for, so the page can tell a music video
+    (an intro, an ending) from the song itself"""
     for q in lyrics_queries(title, artist)[:3]:
         req = urllib.request.Request("https://lrclib.net/api/search?q=" + urllib.parse.quote(q), headers={"User-Agent": LYRICS_UA})
         with urllib.request.urlopen(req, timeout=12) as r:
             found = json.loads(r.read(3_000_000))
-        found = [x for x in found if isinstance(x, dict)] if isinstance(found, list) else []
-
-        def fits(x):
-            if x.get("instrumental"):
-                return False
-            d = x.get("duration")
-            return not length if not isinstance(d, (int, float)) else (not length or abs(d - length) <= 5)
-        ok = [x for x in found if fits(x)]
-        # a music video runs longer than the song (an intro, an ending): then the plain words of the
-        # song with the same name, without times that would not fit
-        exact = next((x for x in ok if (x.get("syncedLyrics") or "").strip()), None) or next((x for x in ok if (x.get("plainLyrics") or "").strip()), None)
-        pick = exact or next((x for x in found if not x.get("instrumental") and len(_ly_clean(x.get("trackName") or "")) >= 3
-                              and _ly_clean(x.get("trackName") or "").lower() in q.lower() and (x.get("plainLyrics") or "").strip()), None)
-        if not pick:
-            continue
-        synced = (pick.get("syncedLyrics") or "").strip() if exact else ""
-        lines = lyrics_lrc(synced) if synced else [[0, l.strip()] for l in (pick.get("plainLyrics") or "").splitlines()]
-        if any(l[1] for l in lines):
-            return {"synced": bool(synced), "lines": lines}
+        found = [x for x in found if isinstance(x, dict) and not x.get("instrumental")] if isinstance(found, list) else []
+        named = lambda x: len(_ly_clean(x.get("trackName") or "")) >= 3 and _ly_clean(x.get("trackName") or "").lower() in q.lower()
+        # LRCLIB keeps copies: the song's timed words uploaded again under a music video's length (or
+        # any other). The same words under many lengths belong to the length most of them give
+        groups = {}
+        for x in found:
+            lines = lyrics_lrc((x.get("syncedLyrics") or "").strip())
+            if not any(w for _, w in lines) or not isinstance(x.get("duration"), (int, float)):
+                continue
+            g = groups.setdefault(_ly_key(lines), {"lines": lines, "lens": [], "named": False})
+            g["lens"].append(round(x["duration"]))
+            g["named"] = g["named"] or named(x)
+        for g in groups.values():
+            ls = sorted(g["lens"])
+            g["len"] = max(set(ls), key=lambda d: (ls.count(d), -abs(d - ls[len(ls) // 2])))
+        pick = None
+        if groups:
+            # first the timing made for this very recording, then words whose copies only say so
+            near = [g for g in groups.values() if length and abs(g["len"] - length) <= 2]
+            copy = [g for g in groups.values() if length and any(abs(d - length) <= 5 for d in g["lens"])]
+            # a music video a little longer than the song (up to 90 s): the song's timing, the page nudges it
+            mv = [g for g in groups.values() if g["named"] and length and 0 < length - g["len"] <= 90]
+            pool = near or copy or mv or ([g for g in groups.values()] if not length else [])
+            if pool:
+                pick = max(pool, key=lambda g: (len(g["lens"]), g["named"]))
+        if pick:
+            return {"synced": True, "lines": pick["lines"], "len": pick["len"]}
+        plain = next((x for x in found if (x.get("plainLyrics") or "").strip()
+                      and (named(x) or (length and isinstance(x.get("duration"), (int, float)) and abs(x["duration"] - length) <= 5))), None)
+        if plain:
+            lines = [[0, l.strip()] for l in plain["plainLyrics"].splitlines()]
+            if any(l[1] for l in lines):
+                return {"synced": False, "lines": lines}
     return {"synced": False, "lines": []}
 
 

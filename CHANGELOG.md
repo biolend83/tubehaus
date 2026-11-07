@@ -9,9 +9,11 @@ The biggest update so far: a Music tab, a new look with motion throughout, and a
 - `GET /api/p/yt/music/{search,album,artist,mix,lyrics,img}` on the server: YouTube Music's own answers through `YT_PROXY`, kept 6 hours; lyrics from LRCLIB (at most 3 lookups a song); `img` passes pictures only from YouTube's own picture hosts. Stateless, so open on public instances too
 - **Motion**: pages rise in, cards arrive one after another, pictures fade in once loaded, menus and dialogs grow from where they open, buttons give under the finger, like and subscribe pop, loading placeholders shimmer. TVs get none of it, and neither does a device set to reduce motion
 - Home: a "TubeHaus 1.0" card that says what's new, until it's closed
+- Lyrics timing: nudge the lyrics half a second earlier or later, or tap the line being sung to line them up; kept per song in the browser. A music video longer than the song says so above the lyrics
 
 ### Changed
 - New look: the Pretendard font (bundled, no outside requests), new icons, rounder cards and buttons
+- Settings: grouped cards with a list of sections (a strip on phones), side-by-side choices for the theme, TV mode and caption size, new switches, and tiles for your data
 - Phones: one video per row, like the YouTube app (two narrow columns left three-word titles), and the bottom menu shows again (a later style rule had hidden it)
 
 ### Fixed

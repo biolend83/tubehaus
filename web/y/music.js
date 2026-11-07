@@ -305,7 +305,10 @@ function build() {
     const q = e.target.closest(".mf-queue .m-row");
     if (q && !e.target.closest("[data-mmore]")) { const k = +q.dataset.k; if (k === MP.i) toggle(); else start(k); return; }
     const ly = e.target.closest(".ly-line[data-ms]");
-    if (ly && MP.lyrics?.synced) { audio.currentTime = +ly.dataset.ms / 1000 + 0.01; if (audio.paused) toggle(); return; }
+    if (ly && MP.lyrics?.synced && MP.lySync) { setLyOff(Math.round(audio.currentTime * 1000) - +ly.dataset.ms, true); return; }
+    if (ly && MP.lyrics?.synced) { audio.currentTime = Math.max(0, (+ly.dataset.ms + lyOff()) / 1000 + 0.01); if (audio.paused) toggle(); return; }
+    const lo = e.target.closest("[data-lyoff]");
+    if (lo) { const v = lo.dataset.lyoff; if (v === "sync") { MP.lySync = !MP.lySync; paintLySync(); } else setLyOff(v === "0" ? 0 : lyOff() + +v); return; }
     const al = e.target.closest(".mf-a[href]");
     if (al) { e.preventDefault(); e.stopPropagation(); const h = al.getAttribute("href"); closeFull(() => navigate(h)); return; }
     const b = e.target.closest("[data-mf]");
@@ -493,6 +496,7 @@ async function loadLyrics() {
   if (MP.lyricsFor === s.id) return;
   MP.lyricsFor = s.id;
   MP.lyrics = null;
+  MP.lySync = false;
   box.innerHTML = `<div class="ly-wait"><span class="spin"></span>${$t("가사를 찾는 중")}</div>`;
   try {
     const d = await get("lyrics", { v: s.id, title: s.title, artist: s.artist, len: s.len || Math.round(audio.duration) || 0 }, 3600000);
@@ -502,10 +506,17 @@ async function loadLyrics() {
       box.innerHTML = `<div class="ly-none">${icon("lyrics")}<p>${$t("이 곡의 가사를 찾지 못했어요")}</p></div>`;
       return;
     }
-    box.innerHTML = `<div class="ly ${d.synced ? "synced" : ""}">${d.synced ? '<div class="ly-pad"></div>' : ""}${d.lines.map(([ms, w]) =>
+    // a music video longer than the song the times were made for: they may run early or late
+    const vlen = s.len || Math.round(audio.duration) || 0;
+    const off = d.synced && d.len && vlen && Math.abs(vlen - d.len) > 2;
+    box.innerHTML = `${d.synced ? `<div class="ly-sync${off ? " warn" : ""}">
+        <span class="ly-sync-t">${off ? $t("영상이 노래보다 {0}초 길어서 가사가 어긋날 수 있어요", Math.abs(vlen - d.len)) : $t("가사 타이밍")}</span>
+        <div class="ly-sync-b"><button data-lyoff="-500" aria-label="${$t("가사 빨리")}">−0.5${$t("초")}</button><output></output><button data-lyoff="500" aria-label="${$t("가사 늦게")}">+0.5${$t("초")}</button>
+        <button class="ly-sync-tap" data-lyoff="sync">${$t("지금 부르는 줄 누르기")}</button></div></div>` : ""}<div class="ly ${d.synced ? "synced" : ""}">${d.synced ? '<div class="ly-pad"></div>' : ""}${d.lines.map(([ms, w]) =>
       w ? `<p class="ly-line"${d.synced ? ` data-ms="${ms}"` : ""}>${esc(w)}</p>` : `<p class="ly-gap">${d.synced ? "♪" : ""}</p>`).join("")}${d.synced ? '<div class="ly-pad"></div>' : ""}
       <div class="ly-src">${$t("가사 제공: {0}", "LRCLIB")}</div></div>`;
     MP.lyLine = -1;
+    paintLySync();
     followLyrics(audio.currentTime, true);
   } catch {
     if (cur() !== s) return;
@@ -514,10 +525,36 @@ async function loadLyrics() {
     box.addEventListener("retry", loadLyrics, { once: true });
   }
 }
+// the listener's nudge for a song's lyrics (ms; more = later), kept in this browser for the next time
+const lyOffs = () => { const o = local.get("music.lyoff", {}); return o && typeof o === "object" ? o : {}; };
+function lyOff() { const s = cur(); return (s && lyOffs()[s.id]) || 0; }
+function setLyOff(v, done) {
+  const s = cur();
+  if (!s) return;
+  const o = lyOffs();
+  v = Math.max(-120000, Math.min(120000, Math.round(v / 50) * 50));
+  delete o[s.id];
+  if (v) o[s.id] = v;
+  const ks = Object.keys(o);
+  if (ks.length > 400) for (const k of ks.slice(0, ks.length - 400)) delete o[k];
+  local.set("music.lyoff", o);
+  if (done) MP.lySync = false;
+  paintLySync();
+  followLyrics(audio.currentTime, true);
+}
+function paintLySync() {
+  const bar = $("#mfull .ly-sync");
+  if (!bar) return;
+  const v = lyOff();
+  $("output", bar).textContent = v ? (v > 0 ? "+" : "−") + (Math.abs(v) / 1000).toFixed(1) + $t("초") : "0";
+  bar.classList.toggle("tap", !!MP.lySync);
+  $(".mf-lyrics", $("#mfull"))?.classList.toggle("ly-tapping", !!MP.lySync);
+  $(".ly-sync-tap", bar).textContent = MP.lySync ? $t("지금 부르는 줄을 눌러 주세요") : $t("지금 부르는 줄 누르기");
+}
 function followLyrics(t, jump = false) {
   const d = MP.lyrics;
   if (!d?.synced) return;
-  const ms = t * 1000 + 250;
+  const ms = t * 1000 + 100 - lyOff();
   let k = -1;
   for (let j = 0; j < d.lines.length; j++) { if (d.lines[j][0] <= ms) k = j; else break; }
   if (k === MP.lyLine && !jump) return;

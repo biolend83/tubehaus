@@ -9,22 +9,6 @@ const grid = (cls = "") => `<div class="vgrid ${cls}"></div>`;
 const spinner = `<div class="loading"><div class="spinner"></div></div>`;
 const skel = (n = 12) => `<div class="sk"><i class="skt"></i><i class="skl"></i><i class="skl s"></i></div>`.repeat(n);
 const skelRows = (n = 6) => `<div class="sk row"><i class="skt"></i><div><i class="skl"></i><i class="skl s"></i><i class="skl s"></i></div></div>`.repeat(n);
-// the home page's first pick, big: the cover with its colours blurred behind, a bold title, a play button
-function hero(v) {
-  const href = `/watch?v=${esc(v.id)}`;
-  const hq = thumb(v.id);
-  return `<section class="hero" data-ctx="home" style="--cover:url('${hq}')">
-    <a href="${href}" data-nav class="hero-th"><img src="${thumb(v.id, "maxresdefault")}" alt="" onload="if(this.naturalWidth<=120)this.src='${hq}'" onerror="this.onerror=null;this.src='${hq}'"></a>
-    <div class="hero-tx">
-      <span class="hero-k">${icon("trending", "sm")}${$t("추천")}</span>
-      <a href="${href}" data-nav class="hero-t" title="${esc(v.title)}">${esc(v.title)}</a>
-      <div class="hero-ch">${v.authorId ? `<a href="/channel/${esc(v.authorId)}" data-nav>${avatar(chAvatar(v), "md")}<b>${esc(v.author)}</b></a>` : `<b>${esc(v.author || "")}</b>`}</div>
-      <div class="hero-s">${metaLine(v)}</div>
-      ${v.desc ? `<div class="hero-d">${esc(v.desc.slice(0, 220))}</div>` : ""}
-      <div class="hero-btns"><a href="${href}" data-nav class="pill white">${icon("play")}${$t("재생")}</a>
-        <button class="pill round" data-menu="${esc(v.id)}" aria-label="${$t("작업 메뉴")}">${icon("more")}</button></div>
-    </div></section>`;
-}
 const empty = (ic, msg, extra = "") => `<div class="empty">${icon(ic)}<p>${msg}</p>${extra}</div>`;
 
 function append(box, list, kind, extra) {
@@ -110,10 +94,6 @@ export async function home(page, m, alive) {
       ? empty("subs", $t("구독한 채널이 없어서 보여줄 영상이 아직 없어요. 검색해서 마음에 드는 채널을 구독해 보세요."), `<a class="pill" href="/feed/channels" data-nav>${$t("구독 가져오기")}</a>`)
       : empty("info", $t("영상이 없어요"));
     return;
-  }
-  if (chip === "all" && !settings.calm && !document.documentElement.classList.contains("tv")) {
-    const k = pool.findIndex((v) => !v.upcoming && !v.live && !v.short);
-    if (k >= 0) $(".shorts-shelf", page).insertAdjacentHTML("beforebegin", hero(pool.splice(k, 1)[0]));
   }
   // render a bit more on every scroll instead of everything at once
   let i = 0;
@@ -686,49 +666,95 @@ export function hashtag(page, m) {
 // ---------------------------------------------------------------- settings
 export function settingsPage(page) {
   const S = settings;
-  const sel = (k, opts) => `<select data-k="${k}">${opts.map(([v, l]) => `<option value="${v}" ${String(S[k]) === String(v) ? "selected" : ""}>${l}</option>`).join("")}</select>`;
-  const tog = (k, label, sub = "") => `<label class="set-row"><span><b>${label}</b>${sub ? `<small>${sub}</small>` : ""}</span><input type="checkbox" class="sw" data-k="${k}" ${S[k] ? "checked" : ""}></label>`;
-  const row = (label, ctl, sub = "") => `<div class="set-row"><span><b>${label}</b>${sub ? `<small>${sub}</small>` : ""}</span>${ctl}</div>`;
-  page.innerHTML = `<div class="narrow-page settings">
-    <h2>${$t("설정")}</h2>
-    <h3>${$t("모양")}</h3>
-    ${row(langLabel(), sel("lang", [["auto", $t("자동 (브라우저 언어)")], ...LANGS]))}
-    ${row($t("테마"), sel("theme", [["system", $t("기기 테마 사용")], ["dark", $t("어두운 테마")], ["light", $t("밝은 테마")]]))}
-    ${tog("ambient", $t("앰비언트 모드"), $t("영상 색이 플레이어 뒤로 은은하게 번져요 (어두운 테마)"))}
-    ${row($t("TV 모드"), sel("tv", [["auto", $t("자동 (안드로이드 TV 에서 켜짐)")], ["on", $t("켜기")], ["off", $t("끄기")]]), $t("리모컨 방향키로 이동 · 큰 글씨 · 바꾸면 새로고침"))}
-    <h3>${$t("재생")}</h3>
-    ${tog("calm", $t("차분 모드"), $t("홈은 구독 채널의 새 영상만, 쇼츠·인기·추천 영상은 숨기고, 자동재생은 끄고, 댓글은 눌러야 보여요"))}
-    ${tog("autoplay", $t("자동재생"), $t("영상이 끝나면 다음 영상을 재생해요"))}
-    ${tog("rememberSpeed", $t("재생 속도 기억"), $t("다음에 와도 고른 재생 속도를 그대로 써요"))}
-    ${row($t("선호 화질"), sel("quality", [["auto", $t("최고 화질 (기본)")], ["2160", "4K (2160p)"], ["1440", "1440p"], ["1080", "1080p"], ["720", "720p"], ["480", "480p"], ["360", "360p"]]), $t("화질을 알아서 낮추지 않고 이 화질로 고정해요 (영상에 없으면 그 아래 최고)"))}
-    ${tog("dataSaver", $t("데이터 절약"), $t("480p 이하, 미리 받는 양을 줄여요"))}
-    ${IPHONE ? tog("nativeIphone", $t("iPhone 기본 플레이어"), $t("Safari 자체 플레이어로 재생해요. 다른 앱 위 PIP 와 AirPlay 가 되고, 화질은 자동으로 정해져요 (다음 영상부터 적용)")) : ""}
-    ${tog("resume", $t("이어서 보기"), $t("보던 곳부터 재생 (모든 기기 공유)"))}
-    ${tog("miniplayer", $t("미니 플레이어"), $t("다른 페이지로 가도 작은 화면으로 계속 재생"))}
-    ${tog("heatmap", $t("가장 많이 다시 본 장면"), $t("재생바 위에 사람들이 많이 다시 본 구간을 물결 모양으로 보여줘요"))}
-    ${PUBLIC ? "" : `<h3>${$t("TV로 보내기")}</h3>
-    ${tog("castReceive", $t("이 기기에서 받기"), $t("다른 기기가 'TV로 보내기'로 이 화면에 영상을 보낼 수 있어요 (TV 모드면 늘 켜짐)"))}
-    ${row($t("이 기기 이름"), `<input data-k="deviceName" maxlength="40" placeholder="${$t("예: 거실 TV")}" value="${esc(S.deviceName || "")}" style="height:36px;padding:0 10px;border:1px solid var(--input-line);background:var(--input);min-width:160px">`, $t("보낼 때 목록에 이렇게 보여요"))}`}
-    <h3>${$t("자막")}</h3>
-    ${tog("captions", $t("자막 항상 표시"))}
-    ${row($t("자막 언어"), sel("capLang", LANGS))}
-    ${tog("autoTranslate", $t("자동 번역 자막"), $t("내 언어 자막이 없으면 서버가 번역한 자막을 써요"))}
-    ${row($t("자막 크기"), sel("capSize", [[50, "50%"], [75, "75%"], [100, "100%"], [150, "150%"], [200, "200%"]]))}
-    <h3>${$t("SponsorBlock · 싫어요 수")}</h3>
-    ${tog("sponsor", "SponsorBlock", $t("영상 속 협찬·광고 구간을 건너뛰어요 (sponsor.ajay.app, 영상 ID 앞 4글자만 보내요)"))}
-    <div class="sbcats">${Object.entries(SB_CATS).map(([k, [l, c]]) => `<label class="chk"><input type="checkbox" data-cat="${k}" ${S.sponsorCats.includes(k) ? "checked" : ""}><i style="background:${c}"></i>${$t("{0} 자동 건너뛰기", l)}</label>`).join("")}</div>
-    ${tog("dislikes", $t("싫어요 수 보기"), $t("Return YouTube Dislike 의 추정치"))}
-    ${tog("dearrow", "DeArrow", $t("낚시성 제목과 썸네일을 사람들이 고친 것으로 바꿔요 (dearrow.ajay.app, 영상 ID 앞 4글자만 보내요)"))}
-    ${tog("dearrowThumbs", $t("DeArrow 썸네일"), $t("사람들이 고른 장면을 썸네일로 써요 (이 서버를 거쳐 받아요)"))}
-    <h3>${$t("내 데이터")}</h3>
-    ${PUBLIC ? `<p class="sub pub-note">${$t("공개 서버예요. 구독과 기록은 이 브라우저에만 저장되고 서버에는 남지 않아요. 브라우저 데이터를 지우면 사라지니 가끔 내보내기로 백업해 두세요.")}</p>` : ""}
-    <div class="set-btns"><a class="pill ghost" href="/feed/channels" data-nav>${$t("구독 관리 · 가져오기")}</a>
-    <button class="pill ghost simp">${$t("{0} 파일에서 가져오기", icon("upload"))}</button><input type="file" class="simpfile" hidden accept=".json,.csv,.opml,.xml,.db,.txt">
-    <button class="pill ghost sexp">${$t("{0} 내보내기", icon("download"))}</button><button class="pill ghost unhide">${$t("'관심 없음' {0}개 되돌리기", state.hidden.size)}</button>
-    <button class="pill ghost keys">${$t("단축키")}</button></div>
-    <h3>${$t("면책 조항")}</h3>
-    <p class="sub">${esc($t("TubeHaus는 개인이 만든 무료 오픈소스 소프트웨어이고, 유튜브나 구글과 관계가 없어요. 영상을 저장하거나 배포하지 않고, 어떤 보증도 하지 않아요. 내려받은 영상은 본인이 보는 용도로만 쓰세요. 공유하거나 다시 올리는 건 그렇게 한 사람의 책임이에요. 사는 곳의 법과 연결하는 서비스의 약관에 맞게 써 주세요."))} <a href="https://github.com/biolend83/tubehaus#disclaimer" target="_blank" rel="noopener">${$t("전체 면책 조항 보기")}</a></p>
+  const sub = (t) => (t ? `<small>${t}</small>` : "");
+  const sel = (k, opts) => `<span class="sx-sel"><select data-k="${k}">${opts.map(([v, l]) => `<option value="${v}" ${String(S[k]) === String(v) ? "selected" : ""}>${l}</option>`).join("")}</select>${icon("down", "sm")}</span>`;
+  // a short list of choices, side by side
+  const seg = (k, opts) => `<div class="sx-seg" role="radiogroup">${opts.map(([v, l, ic]) => `<label><input type="radio" name="sx-${k}" data-k="${k}" value="${v}" ${String(S[k]) === String(v) ? "checked" : ""}><span>${ic ? icon(ic, "sm") : ""}${l}</span></label>`).join("")}</div>`;
+  const tog = (k, label, s = "") => `<label class="sx-row"><span class="sx-tx"><b>${label}</b>${sub(s)}</span><input type="checkbox" class="sw" data-k="${k}" ${S[k] ? "checked" : ""}></label>`;
+  const row = (label, ctl, s = "", cls = "") => `<div class="sx-row ${cls}"><span class="sx-tx"><b>${label}</b>${sub(s)}</span>${ctl}</div>`;
+  const card = (id, ic, title, body) => `<section class="sx-card" id="sx-${id}" data-sx="${id}"><h3><span class="sx-ic">${icon(ic)}</span>${title}</h3><div class="sx-rows">${body}</div></section>`;
+  const tile = (cls, ic, label, href = "") => href
+    ? `<a class="sx-tile ${cls}" href="${href}" data-nav><span class="sx-ic">${icon(ic)}</span><b>${label}</b></a>`
+    : `<button class="sx-tile ${cls}"><span class="sx-ic">${icon(ic)}</span><b>${label}</b></button>`;
+  const plain = (t) => t.replace(/<svg[\s\S]*?<\/svg>/g, "").trim();
+  const sections = [
+    ["look", "dark", $t("모양"), `
+      ${row(langLabel(), sel("lang", [["auto", $t("자동 (브라우저 언어)")], ...LANGS]))}
+      ${row($t("테마"), seg("theme", [["system", $t("기기 테마 사용"), "tune"], ["light", $t("밝은 테마"), "sun"], ["dark", $t("어두운 테마"), "dark"]]), "", "wide")}
+      ${tog("ambient", $t("앰비언트 모드"), $t("영상 색이 플레이어 뒤로 은은하게 번져요 (어두운 테마)"))}
+      ${row($t("TV 모드"), seg("tv", [["auto", $t("자동")], ["on", $t("켜기")], ["off", $t("끄기")]]), $t("리모컨 방향키로 이동 · 큰 글씨 · 바꾸면 새로고침"), "wide")}`],
+    ["play", "play", $t("재생"), `
+      ${tog("calm", $t("차분 모드"), $t("홈은 구독 채널의 새 영상만, 쇼츠·인기·추천 영상은 숨기고, 자동재생은 끄고, 댓글은 눌러야 보여요"))}
+      ${tog("autoplay", $t("자동재생"), $t("영상이 끝나면 다음 영상을 재생해요"))}
+      ${tog("rememberSpeed", $t("재생 속도 기억"), $t("다음에 와도 고른 재생 속도를 그대로 써요"))}
+      ${row($t("선호 화질"), sel("quality", [["auto", $t("최고 화질 (기본)")], ["2160", "4K (2160p)"], ["1440", "1440p"], ["1080", "1080p"], ["720", "720p"], ["480", "480p"], ["360", "360p"]]), $t("화질을 알아서 낮추지 않고 이 화질로 고정해요 (영상에 없으면 그 아래 최고)"))}
+      ${tog("dataSaver", $t("데이터 절약"), $t("480p 이하, 미리 받는 양을 줄여요"))}
+      ${IPHONE ? tog("nativeIphone", $t("iPhone 기본 플레이어"), $t("Safari 자체 플레이어로 재생해요. 다른 앱 위 PIP 와 AirPlay 가 되고, 화질은 자동으로 정해져요 (다음 영상부터 적용)")) : ""}
+      ${tog("resume", $t("이어서 보기"), $t("보던 곳부터 재생 (모든 기기 공유)"))}
+      ${tog("miniplayer", $t("미니 플레이어"), $t("다른 페이지로 가도 작은 화면으로 계속 재생"))}
+      ${tog("heatmap", $t("가장 많이 다시 본 장면"), $t("재생바 위에 사람들이 많이 다시 본 구간을 물결 모양으로 보여줘요"))}`],
+    ...(PUBLIC ? [] : [["cast", "tv", $t("TV로 보내기"), `
+      ${tog("castReceive", $t("이 기기에서 받기"), $t("다른 기기가 'TV로 보내기'로 이 화면에 영상을 보낼 수 있어요 (TV 모드면 늘 켜짐)"))}
+      ${row($t("이 기기 이름"), `<input class="sx-in" data-k="deviceName" maxlength="40" placeholder="${$t("예: 거실 TV")}" value="${esc(S.deviceName || "")}">`, $t("보낼 때 목록에 이렇게 보여요"))}`]]),
+    ["cc", "cc", $t("자막"), `
+      ${tog("captions", $t("자막 항상 표시"))}
+      ${row($t("자막 언어"), sel("capLang", LANGS))}
+      ${tog("autoTranslate", $t("자동 번역 자막"), $t("내 언어 자막이 없으면 서버가 번역한 자막을 써요"))}
+      ${row($t("자막 크기"), seg("capSize", [[50, "50%"], [75, "75%"], [100, "100%"], [150, "150%"], [200, "200%"]]), "", "wide")}`],
+    ["sb", "skip", $t("SponsorBlock · 싫어요 수"), `
+      ${tog("sponsor", "SponsorBlock", $t("영상 속 협찬·광고 구간을 건너뛰어요 (sponsor.ajay.app, 영상 ID 앞 4글자만 보내요)"))}
+      <div class="sx-cats${S.sponsor ? "" : " off"}">${Object.entries(SB_CATS).map(([k, [l, c]]) => `<label class="sx-cat"><input type="checkbox" data-cat="${k}" ${S.sponsorCats.includes(k) ? "checked" : ""}><i style="--c:${c}">${icon("check", "sm")}</i><span>${$t("{0} 자동 건너뛰기", l)}</span></label>`).join("")}</div>
+      ${tog("dislikes", $t("싫어요 수 보기"), $t("Return YouTube Dislike 의 추정치"))}
+      ${tog("dearrow", "DeArrow", $t("낚시성 제목과 썸네일을 사람들이 고친 것으로 바꿔요 (dearrow.ajay.app, 영상 ID 앞 4글자만 보내요)"))}
+      ${tog("dearrowThumbs", $t("DeArrow 썸네일"), $t("사람들이 고른 장면을 썸네일로 써요 (이 서버를 거쳐 받아요)"))}`],
+    ["data", "libr", $t("내 데이터"), `
+      ${PUBLIC ? `<p class="sx-note">${$t("공개 서버예요. 구독과 기록은 이 브라우저에만 저장되고 서버에는 남지 않아요. 브라우저 데이터를 지우면 사라지니 가끔 내보내기로 백업해 두세요.")}</p>` : ""}
+      <div class="sx-tiles">
+        ${tile("", "subs", $t("구독 관리 · 가져오기"), "/feed/channels")}
+        ${tile("simp", "upload", plain($t("{0} 파일에서 가져오기", "")))}
+        ${tile("sexp", "download", plain($t("{0} 내보내기", "")))}
+        ${tile("unhide", "replay", $t("'관심 없음' {0}개 되돌리기", state.hidden.size))}
+        ${tile("keys", "keyboard", $t("단축키"))}
+      </div><input type="file" class="simpfile" hidden accept=".json,.csv,.opml,.xml,.db,.txt">`],
+    ["about", "info", $t("면책 조항"), `
+      <p class="sx-about">${esc($t("TubeHaus는 개인이 만든 무료 오픈소스 소프트웨어이고, 유튜브나 구글과 관계가 없어요. 영상을 저장하거나 배포하지 않고, 어떤 보증도 하지 않아요. 내려받은 영상은 본인이 보는 용도로만 쓰세요. 공유하거나 다시 올리는 건 그렇게 한 사람의 책임이에요. 사는 곳의 법과 연결하는 서비스의 약관에 맞게 써 주세요."))}
+      <a href="https://github.com/biolend83/tubehaus#disclaimer" target="_blank" rel="noopener">${$t("전체 면책 조항 보기")}</a></p>`],
+  ];
+  page.innerHTML = `<div class="settings sx">
+    <aside class="sx-nav"><h2>${$t("설정")}</h2><nav>${sections.map(([id, ic, t]) => `<button data-go="${id}">${icon(ic)}<span>${t}</span></button>`).join("")}</nav></aside>
+    <div class="sx-main">${sections.map(([id, ic, t, body]) => card(id, ic, t, body)).join("")}</div>
   </div>`;
+  let cur = "", raf = 0, held = 0;
+  const nav = $(".sx-nav nav", page);
+  const mark = (id) => {
+    for (const b of nav.children) b.classList.toggle("on", b.dataset.go === id);
+    const on = nav.querySelector(".on");
+    if (on && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: on.offsetLeft - 16, behavior: "smooth" });
+  };
+  nav.onclick = (e) => {
+    const b = e.target.closest("[data-go]");
+    if (!b) return;
+    const c = $(`#sx-${b.dataset.go}`, page);
+    c.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    mark(b.dataset.go);
+    cur = b.dataset.go;
+    held = Date.now();
+    c.classList.remove("flash"); void c.offsetWidth; c.classList.add("flash");
+  };
+  // the section being read lights up in the list: the last one whose top has passed a third of the screen
+  const cards = [...page.querySelectorAll(".sx-card")];
+  const spy = () => {
+    raf = 0;
+    if (Date.now() - held < 900) return;
+    if (!cards[0].isConnected) return removeEventListener("scroll", onScroll);
+    let id = cards[0].dataset.sx;
+    for (const c of cards) if (c.getBoundingClientRect().top < innerHeight * 0.34) id = c.dataset.sx;
+    if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4) id = cards[cards.length - 1].dataset.sx;
+    if (id !== cur) { cur = id; mark(id); }
+  };
+  const onScroll = () => { raf ||= requestAnimationFrame(spy); };
+  addEventListener("scroll", onScroll, { passive: true });
+  spy();
   page.addEventListener("change", (e) => {
     const t = e.target;
     if (t.dataset.cat) {
@@ -741,16 +767,22 @@ export function settingsPage(page) {
     if (!k) return;
     S[k] = t.type === "checkbox" ? t.checked : /^\d+$/.test(t.value) && k !== "quality" ? +t.value : t.value;
     if (k === "rememberSpeed" && S.rememberSpeed) S.speed = +sessionStorage.getItem("yt.speed") || 1;
+    if (k === "sponsor") $(".sx-cats", page).classList.toggle("off", !t.checked);
     if (k === "lang" || k === "calm") return location.reload();     // the whole interface changes
     toast($t("저장됨"));
   });
-  $(".unhide", page).onclick = () => { state.hidden.clear(); local.set("hidden", []); toast($t("되돌렸어요")); };
+  $(".unhide", page).onclick = () => {
+    state.hidden.clear();
+    local.set("hidden", []);
+    $(".unhide b", page).textContent = $t("'관심 없음' {0}개 되돌리기", 0);
+    toast($t("되돌렸어요"));
+  };
   // signed-in account on an instance that requires one
   api("/api/p/auth/me", { quiet: true }).then((d) => {
     if (!d?.accounts || !d.user) return;
-    const row = el(`<div class="set-btns"><span class="sub">${esc($t("{0} 으로 로그인했어요", d.user))}</span><button class="pill ghost logout">${$t("로그아웃")}</button></div>`);
-    $(".set-btns", page).after(row);
-    $(".logout", row).onclick = async () => {
+    const r = el(`<div class="sx-row sx-acct"><span class="sx-tx"><b>${esc($t("{0} 으로 로그인했어요", d.user))}</b></span><button class="pill ghost logout">${$t("로그아웃")}</button></div>`);
+    $("#sx-data .sx-rows", page).prepend(r);
+    $(".logout", r).onclick = async () => {
       await api("/api/p/auth/logout", { method: "POST", body: {} }).catch(() => { });
       location.href = "/login";
     };
