@@ -272,6 +272,8 @@ export default {
  "예정": "Em breve",
  "오늘": "Hoje",
  "오디오 트랙": "Faixa de áudio",
+ "원본": "original",
+ "음성 해설": "audiodescrição",
  "오프라인 저장": "Salvar offline",
  "오프라인 저장 (다운로드)": "Salvar offline (baixar)",
  "올해": "Este ano",

@@ -1,7 +1,7 @@
 // YouTube-style player: controls, captions, storyboards, chapters and SponsorBlock drawn on top of Shaka (DASH/HLS).
 // Built once and reused (moving between pages continues seamlessly in the mini player).
 import { $, $$, el, esc, icon, fmtTime, settings, toast, copy, localUrl, parseT, toGate, SERVER_MAX_H, PUBLIC, IPHONE, IPAD, siteName } from "./util.js";
-import { $t, LANG, LANGS } from "./i18n.js";
+import { $t, LANG, LANGS, LOCALE } from "./i18n.js";
 
 const isTouch = matchMedia("(pointer: coarse)").matches;
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
@@ -100,6 +100,18 @@ export const TV_DEVICE = /TubeHausTV|HomeTubeTV|Android TV|GoogleTV|Google TV|AF
 setTimeout(() => (window.requestIdleCallback || ((f) => f()))(() => loadShaka().catch(() => { }), { timeout: 8000 }), TV_DEVICE ? 6000 : 0);
 
 // ---------------------------------------------------------------- player
+// an audio track's identity: its language and role (main = the original, dub, description)
+const audioKey = (t) => `${t.language || ""}|${(t.audioRoles || t.roles || []).filter((r) => r !== "alternate").sort().join(",")}`;
+let langNames;
+try { langNames = new Intl.DisplayNames([LOCALE, "en"], { type: "language" }); } catch { }
+/** "Korean", "English (original)", "English (audio description)" in the interface language */
+function audioName(o) {
+  let n = o.lang;
+  try { n = langNames?.of(o.lang) || o.lang; } catch { }
+  n = n.charAt(0).toLocaleUpperCase(LOCALE) + n.slice(1);
+  return o.orig ? `${n} (${$t("원본")})` : o.desc ? `${n} (${$t("음성 해설")})` : n;
+}
+
 export class Player {
   constructor() {
     this.on = {};            // ended, next, prev, mini, theater, progress, error, title
@@ -278,6 +290,7 @@ export class Player {
     }
     this.video.playbackRate = settings.rememberSpeed ? (+settings.speed || 1) : (+sessionStorage.getItem("yt.speed") || 1);
     if (!native) {
+      this.startAudio();
       await this.rateTracks();
       this.applyDefaultQuality();
     }
@@ -379,8 +392,8 @@ export class Player {
     if (!this.sp) return [];
     const all = this.sp.getVariantTracks();
     const a = all.find((t) => t.active);
-    // only tracks in the language of the current audio
-    return all.filter((t) => !a || !a.language || t.language === a.language);
+    // only tracks with the current audio (language and role: the original, a dub, audio description)
+    return all.filter((t) => !a || audioKey(t) === audioKey(a));
   }
   heights() {
     const m = new Map();
@@ -992,14 +1005,14 @@ export class Player {
     if (page === "main") {
       const t = this.curTrack();
       const caps = this.captionList();
-      const auds = this.audioLangs();
+      const auds = this.audioOpts();
       const sleepTxt = this.sleepAt === -1 ? $t("동영상 끝날 때") : this.sleepAt ? $t("{0}분", Math.ceil((this.sleepAt - Date.now()) / 60000)) : $t("사용 안함");
       return [
         tog("ambient", "ambient", $t("앰비언트 모드"), settings.ambient),
         caps.length ? row("go:cc", "cc", `${$t("자막 ({0})", caps.length)}`, this.capTrack ? esc(this.capTrack.label) : $t("사용 안함")) : "",
         row("go:speed", "speed", $t("재생 속도"), v.playbackRate === 1 ? $t("표준") : v.playbackRate + ""),
         this.native || (this.live && !this.tracks().length) ? "" : row("go:quality", "tune", $t("화질"), this.qLabel(t)),
-        auds.length > 1 ? row("go:audio", "audio", $t("오디오 트랙"), esc(this.curAudio() || "")) : "",
+        auds.length > 1 ? row("go:audio", "audio", $t("오디오 트랙"), esc(this.curAudio()?.label || "")) : "",
         row("go:sleep", "timer", $t("수면 타이머"), sleepTxt),
         tog("loop", "loop", $t("반복 재생"), v.loop),
         tog("stats", "info", $t("전문가용 통계"), this.statsOn),
@@ -1026,8 +1039,8 @@ export class Player {
         [0, 50, 75, 100].map((s) => opt("capbg", s, `${$t("배경 불투명도 {0}%", s)}`, settings.capBg === s)).join("");
     }
     if (page === "audio") {
-      const cur = this.curAudio();
-      return head($t("오디오 트랙")) + this.audioLangs().map((l) => opt("audio", l, esc(l), l === cur)).join("");
+      const cur = this.curAudio()?.key;
+      return head($t("오디오 트랙")) + this.audioOpts().map((o) => opt("audio", esc(o.key), esc(o.label), o.key === cur)).join("");
     }
     if (page === "sleep") {
       return head($t("수면 타이머")) + opt("sleep", 0, $t("사용 안함"), !this.sleepAt) +
@@ -1053,7 +1066,12 @@ export class Player {
     }
     if (a === "capsize") { settings.capSize = +val; this.renderCaption(true); return this.openMenu("capstyle"); }
     if (a === "capbg") { settings.capBg = +val; this.renderCaption(true); return this.openMenu("capstyle"); }
-    if (a === "audio") { this.sp.selectAudioLanguage(val); return this.closeMenu(); }
+    if (a === "audio") {
+      const o = this.audioOpts().find((x) => x.key === val);
+      if (o) settings.audioLang = o.orig ? "" : o.lang;   // remembered for the next videos; the original = no preference
+      this.pickAudio(val);
+      return this.closeMenu();
+    }
     if (a === "sleep") {
       const m = +val;
       this.sleepAt = m === -1 ? -1 : m ? Date.now() + m * 60000 : 0;
@@ -1061,11 +1079,46 @@ export class Player {
       return this.closeMenu();
     }
   }
-  audioLangs() {
+  /** the audio tracks: one per language and role, the original first, then by name */
+  audioOpts() {
     if (!this.sp) return [];
-    return [...new Set(this.sp.getVariantTracks().map((t) => t.language).filter(Boolean))];
+    const m = new Map();
+    for (const t of this.sp.getVariantTracks()) {
+      const k = audioKey(t);
+      if (!m.has(k) && t.language && t.language !== "und") {
+        const roles = t.audioRoles || t.roles || [];
+        m.set(k, { key: k, lang: t.language, orig: roles.includes("main"), desc: roles.includes("description") });
+      }
+    }
+    const opts = [...m.values()].map((o) => ({ ...o, label: audioName(o) }));
+    return opts.sort((a, b) => b.orig - a.orig || a.desc - b.desc || a.label.localeCompare(b.label, LOCALE));
   }
-  curAudio() { return this.curTrack()?.language; }
+  curAudio() {
+    const t = this.curTrack();
+    return t ? this.audioOpts().find((o) => o.key === audioKey(t)) : null;
+  }
+  /** switch the audio, keeping the picture at the same height */
+  pickAudio(key) {
+    const cur = this.curTrack();
+    const h = this.lockH || cur?.height || 0;
+    const fps = (t) => Math.round(t.frameRate || 0);
+    const ts = this.sp.getVariantTracks().filter((t) => audioKey(t) === key);
+    if (!ts.length) return;
+    // the same height, then the same video codec, then the highest frame rate and bitrate
+    const best = ts.sort((a, b) => (Math.abs((a.height || 0) - h) - Math.abs((b.height || 0) - h)) ||
+      ((b.videoCodec === cur?.videoCodec) - (a.videoCodec === cur?.videoCodec)) || fps(b) - fps(a) || b.bandwidth - a.bandwidth)[0];
+    if (cur && best.id === cur.id) return;
+    this.sp.selectVariantTrack(best, true, 4);
+    this.syncQualityLabel?.();
+  }
+  /** on load: the language picked last time if this video has it, else the original */
+  startAudio() {
+    const opts = this.audioOpts();
+    if (opts.length < 2) return;
+    const want = (settings.audioLang && opts.find((o) => o.lang.split("-")[0] === settings.audioLang.split("-")[0] && !o.desc && !o.orig)) ||
+      opts.find((o) => o.orig);
+    if (want && this.curAudio()?.key !== want.key) this.pickAudio(want.key);
+  }
 
   // ------------------------------------------------------------ context menu
   openCtx(e) {

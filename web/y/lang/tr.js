@@ -272,6 +272,8 @@ export default {
  "예정": "Yakında",
  "오늘": "Bugün",
  "오디오 트랙": "Ses parçası",
+ "원본": "orijinal",
+ "음성 해설": "sesli betimleme",
  "오프라인 저장": "Çevrimdışı kaydet",
  "오프라인 저장 (다운로드)": "Çevrimdışı kaydet (indir)",
  "올해": "Bu yıl",

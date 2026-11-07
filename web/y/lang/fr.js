@@ -272,6 +272,8 @@ export default {
  "예정": "À venir",
  "오늘": "Aujourd'hui",
  "오디오 트랙": "Piste audio",
+ "원본": "original",
+ "음성 해설": "audiodescription",
  "오프라인 저장": "Enregistrer hors ligne",
  "오프라인 저장 (다운로드)": "Enregistrer hors ligne (télécharger)",
  "올해": "Cette année",

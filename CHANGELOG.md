@@ -8,6 +8,7 @@
 - Settings → Buffer ahead: a slider from Auto to 5 minutes. The player buffers that far ahead, still within the browser's memory limit at high quality
 - `HT_NAME` and `HT_LINKS` (`TUBEHAUS_NAME`, `TUBEHAUS_LINKS` in `.env`): your instance's own name in the page title and menu, and extra side-menu links (a home page, an app to download). Any of the names can be one per language, `{"ko": "홈튜브", "en": "HomeTube"}`, and visitors see theirs (else English)
 - `GET /api/p/hls/<id>.m3u8?h=1080`: only the best quality up to that height
+- Audio tracks (dubs and audio description) in the web player's menu, named in your language with the original marked; the language you pick is remembered for the next videos that have it. iPhone and iPad's own player lists them too
 
 ### Changed
 - iPad plays with the device's own player too, like iPhone (Shaka on iPadOS Chrome showed a black picture), and on both the quality stays at the preferred one instead of the player stepping down on its own. The setting is now "Device's own player"
@@ -16,6 +17,7 @@
 - TVs play at the best quality by default too, instead of 720p (a cap in Settings or data saver still limits it)
 
 ### Fixed
+- Videos with dubbed audio could play a dub (often YouTube's automatic English one) instead of the original: the companion doesn't say which language each audio is, so it is now read from the stream itself
 - Transcript: `&amp;` and the like showed as written instead of `&`; cue text is now read by the browser's own HTML parser instead of a pattern (also what CodeQL asked for)
 
 ## v1.0.0 — 2026-11-07

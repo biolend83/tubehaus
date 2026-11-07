@@ -272,6 +272,8 @@ export default {
  "예정": "Geplant",
  "오늘": "Heute",
  "오디오 트랙": "Audiospur",
+ "원본": "Original",
+ "음성 해설": "Audiodeskription",
  "오프라인 저장": "Offline speichern",
  "오프라인 저장 (다운로드)": "Offline speichern (Download)",
  "올해": "Dieses Jahr",

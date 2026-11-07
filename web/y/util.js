@@ -66,6 +66,7 @@ const DEFAULTS = {
   calm: false,            // calm mode: subscriptions only, no Shorts, trending or recommendations, no autoplay
   quality: "auto",        // auto | 4320 | 2160 | 1440 | 1080 | 720 | 480 | 360
   dataSaver: false,
+  audioLang: "",           // the dubbed language picked last (e.g. "ko"); "" = the original
   buffer: 0,              // seconds to buffer ahead; 0 = automatic
   nativeIphone: true,     // iPhone and iPad: play with the device's own player (Picture-in-Picture over other apps, AirPlay)
   captions: false,        // captions always on

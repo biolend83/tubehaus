@@ -304,13 +304,35 @@ def _companion_url(url):
     return "/companion/videoplayback?%s&host=%s" % (u.query, u.netloc)
 
 
+def _atrack(f):
+    """an audio format's track: {"id", "lang", "kind" (original, dubbed, dubbed-auto, descriptive), "orig", "drc", "name"}.
+    From audioTrack when the companion gives it, else from the stream's xtags (acont=dubbed:lang=ko, drc=1 = stable volume)."""
+    q = urllib.parse.parse_qs(urllib.parse.urlsplit(f.get("url") or "").query)
+    x = dict(p.split("=", 1) for p in (q.get("xtags") or [""])[0].split(":") if "=" in p)
+    t = f.get("audioTrack") or {}
+    lang = x.get("lang") or (t.get("id") or "").split(".")[0]
+    kind = x.get("acont") or ("original" if t.get("isDefault") else "dubbed" if t else "")
+    return {"id": t.get("id") or ("%s.%s" % (lang, kind) if lang else ""), "lang": lang, "kind": kind,
+            "orig": kind == "original" or bool(t.get("isDefault")) or not lang, "drc": x.get("drc") == "1",
+            "name": t.get("displayName") or ""}
+
+
 def _hls_formats(d):
-    """(video formats, the audio one) Apple's player can take: H.264 and AAC in MP4"""
+    """(video formats, [the best AAC audio per language, the original first]) Apple's player can take: H.264 and AAC in MP4"""
     fs = [f for f in d.get("adaptiveFormats") or [] if f.get("url") and f.get("init") and f.get("index")]
     video = [f for f in fs if (f.get("type") or "").startswith("video/mp4") and 'codecs="avc1' in f["type"]]
-    audio = [f for f in fs if (f.get("type") or "").startswith("audio/mp4")]
-    main = [f for f in audio if (f.get("audioTrack") or {}).get("isDefault")] or audio
-    return video, max(main, key=lambda f: int(f.get("bitrate") or 0), default=None)
+    best = {}
+    for f in fs:
+        if not (f.get("type") or "").startswith("audio/mp4"):
+            continue
+        t = _atrack(f)
+        if t["drc"]:
+            continue
+        k = (t["lang"], t["kind"])
+        if k not in best or int(f.get("bitrate") or 0) > int(best[k].get("bitrate") or 0):
+            best[k] = f
+    audio = sorted(best.values(), key=lambda f: not _atrack(f)["orig"])
+    return video, audio
 
 
 def _codecs(f):
@@ -321,17 +343,34 @@ def _codecs(f):
 def hls_master(vid, h=0):
     """all qualities, or with h only the best one up to h high (so the player can't step down on its own)"""
     d = _video_json(vid)
-    video, audio = _hls_formats(d)
-    if not video or not audio:
+    video, audios = _hls_formats(d)
+    if not video or not audios:
         raise ValueError("no H.264/AAC streams")
+    audio = audios[0]
     if h:
         def height(f):
             m = re.search(r"x(\d+)", f.get("size") or "")
             return int(m.group(1)) if m else 0
         fit = [f for f in video if height(f) <= h] or [min(video, key=height)]
         video = [max(fit, key=lambda f: (height(f), int(f.get("fps") or 0), int(f.get("bitrate") or 0)))]
-    out = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-INDEPENDENT-SEGMENTS",
-           '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="a",NAME="Audio",DEFAULT=YES,AUTOSELECT=YES,URI="%s/%s.m3u8"' % (vid, audio["itag"])]
+    out = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-INDEPENDENT-SEGMENTS"]
+    # one audio per language, the original as the default; the device's own player lists them in its audio menu
+    names = set()
+    for a in audios:
+        t = _atrack(a)
+        if len(audios) == 1 or not t["lang"]:
+            name, ref, lang = "Audio", a["itag"], ""
+        else:
+            name = t["name"] or t["lang"] + {"original": " (original)", "descriptive": " (audio description)"}.get(t["kind"], "")
+            ref, lang = "%s-%s" % (a["itag"], t["lang"]), ',LANGUAGE="%s"' % t["lang"]
+            if t["kind"] == "descriptive":
+                ref += "-ad"
+        if name in names:
+            continue
+        names.add(name)
+        out.append('#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="a",NAME="%s"%s,DEFAULT=%s,AUTOSELECT=YES%s,URI="%s/%s.m3u8"' % (
+            name.replace('"', "'"), lang, "YES" if a is audio else "NO",
+            ',CHARACTERISTICS="public.accessibility.describes-video"' if t["kind"] == "descriptive" else "", vid, ref))
     for f in sorted(video, key=lambda f: int(f.get("bitrate") or 0)):
         bw = int(f.get("bitrate") or 0) + int(audio.get("bitrate") or 0)
         attrs = 'BANDWIDTH=%d,CODECS="%s,%s",AUDIO="a"' % (bw, _codecs(f), _codecs(audio))
@@ -388,9 +427,11 @@ def dash_mpd(vid):
             continue
         if kind == "video" and hdr(f) and f.get("size") in sdr_h:   # HDR stays only where it's the sole one (often 8K)
             continue
-        tr = (f.get("audioTrack") or {}) if kind == "audio" else {}
+        tr = _atrack(f) if kind == "audio" else {}
+        if tr.get("drc"):                      # YouTube's "stable volume" copy
+            continue
         key = (str(f.get("itag")), tr.get("id") or "")
-        if key in seen:                        # the second copy of an audio itag is YouTube's "stable volume"
+        if key in seen:                        # (when the copy isn't marked: the second one of an itag)
             continue
         seen.add(key)
         sets.setdefault((kind, mime, tr.get("id") or ""), []).append(f)
@@ -398,13 +439,15 @@ def dash_mpd(vid):
            '<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" minBufferTime="PT1.500S" profiles="urn:mpeg:dash:profile:isoff-main:2011" '
            'type="static" mediaPresentationDuration="PT%dS"><Period>' % int(d.get("lengthSeconds") or 0)]
     for n, ((kind, mime, tid), group) in enumerate(sorted(sets.items(), key=lambda x: x[0][0])):
-        tr = group[0].get("audioTrack") or {}
-        lang = ' lang="%s"' % esc(tid.split(".")[0]) if tid else ""
+        tr = _atrack(group[0]) if kind == "audio" else {}
+        lang = ' lang="%s"' % esc(tr["lang"]) if tr.get("lang") else ""
         out.append('<AdaptationSet id="%d" mimeType="%s" contentType="%s" startWithSAP="1" subsegmentAlignment="true"%s>' % (n, mime, kind, lang))
         if kind == "audio":
-            out.append('<Role schemeIdUri="urn:mpeg:dash:role:2011" value="%s"/>' % ("main" if tr.get("isDefault") or not tid else "alternate"))
-            if tr.get("displayName"):
-                out.append("<Label>%s</Label>" % esc(tr["displayName"]))
+            # the original is "main" (the player starts with it); dubs are "dub", audio description "description"
+            role = "main" if tr["orig"] else "description" if tr["kind"] == "descriptive" else "dub"
+            out.append('<Role schemeIdUri="urn:mpeg:dash:role:2011" value="%s"/>' % role)
+            if tr.get("name"):
+                out.append("<Label>%s</Label>" % esc(tr["name"]))
         for f in group:
             attrs = 'id="%s" bandwidth="%d" codecs="%s"' % (esc(f.get("itag")), int(f.get("bitrate") or 0), esc(_codecs(f)))
             if kind == "video":
@@ -426,12 +469,24 @@ def dash_mpd(vid):
 
 
 def hls_media(vid, itag):
+    """one format's list; itag is "140", or "140-ko" / "140-en-ad" for one language of a dubbed audio format"""
     with hls_lk:
         hit = hls_cache.get((vid, itag))
     if hit and time.time() - hit[0] < VID_FRESH:
         return hit[1]
     d = _video_json(vid)
-    f = next((f for f in d.get("adaptiveFormats") or [] if str(f.get("itag")) == itag and f.get("index")), None)
+    num, _, lang = itag.partition("-")
+    ad = lang.endswith("-ad")
+    lang = lang[:-3] if ad else lang
+    cands = [f for f in d.get("adaptiveFormats") or [] if str(f.get("itag")) == num and f.get("index") and f.get("url")]
+    if cands and (cands[0].get("type") or "").startswith("audio/"):
+        tr = lambda f: _atrack(f)
+        cands = [f for f in cands if not tr(f)["drc"]] or cands
+        if lang:
+            cands = [f for f in cands if tr(f)["lang"] == lang and (tr(f)["kind"] == "descriptive") == ad] or cands
+        else:
+            cands.sort(key=lambda f: not tr(f)["orig"])
+    f = cands[0] if cands else None
     if not f:
         raise ValueError("no such format")
     url = _companion_url(f["url"])
@@ -3870,7 +3925,7 @@ class H(BaseHTTPRequestHandler):
 
     def hls(self, p):
         # /api/p/hls/<id>.m3u8 (the list of qualities), /api/p/hls/<id>/<itag>.m3u8 (one of them)
-        m = re.search(r"/hls/([\w-]{11})(?:/(\d+))?\.m3u8$", p)
+        m = re.search(r"/hls/([\w-]{11})(?:/(\d+(?:-[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*)?))?\.m3u8$", p)
         if not m:
             return self.send(404, {"error": "not found"})
         t0 = time.time()

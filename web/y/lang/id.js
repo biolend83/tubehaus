@@ -272,6 +272,8 @@ export default {
  "예정": "Segera",
  "오늘": "Hari ini",
  "오디오 트랙": "Trek audio",
+ "원본": "asli",
+ "음성 해설": "deskripsi audio",
  "오프라인 저장": "Simpan offline",
  "오프라인 저장 (다운로드)": "Simpan offline (unduh)",
  "올해": "Tahun ini",

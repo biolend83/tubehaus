@@ -272,6 +272,8 @@ export default {
  "예정": "Próximo",
  "오늘": "Hoy",
  "오디오 트랙": "Pista de audio",
+ "원본": "original",
+ "음성 해설": "audiodescripción",
  "오프라인 저장": "Guardar sin conexión",
  "오프라인 저장 (다운로드)": "Guardar sin conexión (descargar)",
  "올해": "Este año",
