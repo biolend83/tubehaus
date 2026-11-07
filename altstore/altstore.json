@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "0.5.19",
+          "buildVersion": "36",
+          "date": "2026-11-07T06:57:40+00:00",
+          "localizedDescription": "Shared with the 0.5.19 release: a Music tab (songs, albums, artists, lyrics, radio and a queue), searchable transcripts, A-B repeat, speed remembered for each channel, watch time with break reminders, and Settings with search and categories.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-ipad.ipa",
+          "size": 17721122,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "0.5.18",
           "buildVersion": "35",
           "date": "2026-11-07T00:12:48+00:00",
@@ -122,11 +131,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "0.5.18",
-      "versionDate": "2026-11-07T00:12:48+00:00",
-      "versionDescription": "Shared with the 0.5.18 release: AirPlay from the player, taste profiles (separate recommendations for separate moods, export and import), and eight more languages: Chinese, Portuguese, French, Russian, Hindi, Indonesian, Turkish and Bengali.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.18/TubeHaus-0.5.18-ipad.ipa",
-      "size": 17035464
+      "version": "0.5.19",
+      "versionDate": "2026-11-07T06:57:40+00:00",
+      "versionDescription": "Shared with the 0.5.19 release: a Music tab (songs, albums, artists, lyrics, radio and a queue), searchable transcripts, A-B repeat, speed remembered for each channel, watch time with break reminders, and Settings with search and categories.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-ipad.ipa",
+      "size": 17721122
     }
   ],
   "news": [],
