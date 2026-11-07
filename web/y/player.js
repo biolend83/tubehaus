@@ -431,12 +431,9 @@ export class Player {
     return Math.min(SERVER_MAX_H, this.userCap());
   }
   userCap() {
-    // Default: always the best quality. A cap chosen in settings limits it; data saver means 480p or less.
-    // TVs: up to the screen resolution (more is invisible and only makes the start slower)
+    // Default: always the best quality, on TVs too. A cap chosen in settings limits it; data saver means 480p or less.
     if (settings.dataSaver) return 480;
     if (settings.quality !== "auto" && settings.quality !== "max") return +settings.quality;
-    // TVs default to 720p (starts fast). Choosing higher in the menu plays that video at that quality
-    if (TV_DEVICE) return 720;
     return Infinity;
   }
   applyDefaultQuality() {

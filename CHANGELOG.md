@@ -9,6 +9,7 @@
 ### Changed
 - iPad plays with the device's own player too, like iPhone (Shaka on iPadOS Chrome showed a black picture), and on both the quality stays at the preferred one instead of the player stepping down on its own. The setting is now "Device's own player"
 - The 홈튜브 TV app (user agent `HomeTubeTV`) is treated as a TV
+- TVs play at the best quality by default too, instead of 720p (a cap in Settings or data saver still limits it)
 
 ### Fixed
 - Transcript: `&amp;` and the like showed as written instead of `&`; cue text is now read by the browser's own HTML parser instead of a pattern (also what CodeQL asked for)
