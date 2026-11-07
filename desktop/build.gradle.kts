@@ -23,6 +23,9 @@ kotlin {
     sourceSets["main"].kotlin.srcDirs("src/main/kotlin", "../common/src", "../common/jvm")
 }
 
+// Pretendard, the type face of the web app 1.0 (one copy for every platform: common/fonts)
+sourceSets["main"].resources.srcDir("../common/fonts")
+
 dependencies {
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)

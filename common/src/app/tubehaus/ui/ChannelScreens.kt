@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.horizontalScroll
 import app.tubehaus.data.meta
 import app.tubehaus.engine.Channel
 import app.tubehaus.engine.ChannelAbout
@@ -120,8 +121,12 @@ fun ChannelScreen(app: AppState, id: String, name: String) {
             )
         } else if (tabs.isNotEmpty()) Row(verticalAlignment = Alignment.CenterVertically) {
             val open = if (tab == null) 0 else tabs.indexOfFirst { it.params == tab }.coerceAtLeast(0)
-            PrimaryScrollableTabRow(selectedTabIndex = open, edgePadding = 8.dp, modifier = Modifier.weight(1f)) {
-                tabs.forEachIndexed { i, t -> Tab(i == open, onClick = { pick(t) }, text = { Text(t.title) }) }
+            // pills, the open one filled (the web 1.0's channel tabs)
+            Row(
+                Modifier.weight(1f).horizontalScroll(androidx.compose.foundation.rememberScrollState()).padding(start = 12.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                tabs.forEachIndexed { i, t -> Chip(i == open, onClick = { pick(t) }, label = t.title) }
             }
             if (head?.searchable == true) IconButton(onClick = { searching = true }) { Icon(Sym.Search.outline, tr("Search this channel")) }
         }
@@ -157,11 +162,17 @@ private fun channelLink(id: String, handle: String) = "https://www.youtube.com/"
 private fun ChannelHeader(app: AppState, id: String, name: String, h: ChannelPage?, onAbout: () -> Unit) {
     val calm = app.store.settings.value.calm
     Column {
-        if (h != null && h.banner.isNotEmpty()) Img(h.banner, Modifier.fillMaxWidth().aspectRatio(6.2f))
+        // the banner rounded inside the page's margin, as on the web 1.0
+        if (h != null && h.banner.isNotEmpty()) {
+            val phone = LocalCompact.current
+            Img(h.banner, Modifier.padding(start = if (phone) 12.dp else 24.dp, end = if (phone) 12.dp else 24.dp, top = if (phone) 8.dp else 16.dp)
+                .fillMaxWidth().aspectRatio(6.2f).clip(RoundedCornerShape(if (phone) 18.dp else 24.dp)))
+        }
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Avatar(h?.avatar ?: "", 72)
             Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
-                Text(h?.name ?: name, style = MaterialTheme.typography.titleLarge)
+                Text(h?.name ?: name, fontSize = if (LocalCompact.current) 24.sp else 30.sp, lineHeight = if (LocalCompact.current) 30.sp else 36.sp,
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.6).sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 val line = listOf(h?.handle ?: "", if (calm) "" else h?.subsText ?: "", h?.videoCountText ?: "").filter { it.isNotEmpty() }
                 Text(line.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -241,10 +252,10 @@ private fun FeaturedVideo(app: AppState, v: Video, text: String) {
         }
     }
     if (LocalCompact.current) Column(Modifier.fillMaxWidth().tvClickable { app.watch(v) }.padding(bottom = 8.dp)) {
-        if (thumbs) Thumb(v, app, Modifier.fillMaxWidth().padding(horizontal = 12.dp), rounded = 12)
+        if (thumbs) Thumb(v, app, Modifier.fillMaxWidth().padding(horizontal = 12.dp), rounded = 16)
         info(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
     } else Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).tvClickable { app.watch(v) }) {
-        if (thumbs) Thumb(v, app, Modifier.width(420.dp), rounded = 12)
+        if (thumbs) Thumb(v, app, Modifier.width(420.dp), rounded = 16)
         info(Modifier.weight(1f).padding(horizontal = 16.dp))
     }
 }
@@ -257,7 +268,7 @@ private fun ShelfRow(app: AppState, s: Shelf, openTab: (String) -> Unit) {
     val tp = s.tabParams
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp).height(40.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(s.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            Text(s.title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).then(if (pid != null) Modifier.clickable { app.go(Screen.Playlist(pid, s.title)) } else Modifier))
             when {
                 pid != null && videos.isNotEmpty() -> TextButton(onClick = { app.watch(videos[0], videos.drop(1)) }) {
@@ -279,23 +290,23 @@ private fun Tile(app: AppState, item: Item, queue: List<Video>) {
     val calm = app.store.settings.value.calm
     val thumbs = !app.store.settings.value.hideThumbs
     when (item) {
-        is Video -> if (item.short) Column(Modifier.width(150.dp).tvClickable(RoundedCornerShape(8.dp)) { app.watch(item) }) {
-            Box(Modifier.fillMaxWidth().aspectRatio(9f / 16f).clip(RoundedCornerShape(8.dp))) {
+        is Video -> if (item.short) Column(Modifier.width(150.dp).tvClickable(RoundedCornerShape(12.dp)) { app.watch(item) }) {
+            Box(Modifier.fillMaxWidth().aspectRatio(9f / 16f).clip(RoundedCornerShape(12.dp))) {
                 if (thumbs) Img(item.thumb, Modifier.fillMaxSize())
                 else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
             }
             Text(item.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
             if (!calm && item.viewsText.isNotEmpty()) Text(item.viewsText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else Column(Modifier.width(220.dp).tvClickable(RoundedCornerShape(8.dp)) { app.watch(item, queue.dropWhile { it.id != item.id }.drop(1)) }) {
-            if (thumbs) Thumb(item, app, Modifier.fillMaxWidth(), rounded = 8)
+        } else Column(Modifier.width(220.dp).tvClickable(RoundedCornerShape(12.dp)) { app.watch(item, queue.dropWhile { it.id != item.id }.drop(1)) }) {
+            if (thumbs) Thumb(item, app, Modifier.fillMaxWidth(), rounded = 12)
             Text(item.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
             Text(item.subline(calm, withAuthor = false), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
-        is Playlist -> Column(Modifier.width(220.dp).tvClickable(RoundedCornerShape(8.dp)) { app.go(Screen.Playlist(item.id, item.title)) }) {
-            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))) {
+        is Playlist -> Column(Modifier.width(220.dp).tvClickable(RoundedCornerShape(12.dp)) { app.go(Screen.Playlist(item.id, item.title)) }) {
+            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))) {
                 if (thumbs) Img(item.thumb, Modifier.fillMaxSize()) else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
                 if (item.countText.isNotEmpty()) Row(
-                    Modifier.align(Alignment.BottomEnd).padding(6.dp).background(Color(0xCC000000), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp),
+                    Modifier.align(Alignment.BottomEnd).padding(6.dp).background(Color(0xB3000000), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(Sym.PlaylistPlay.outline, null, tint = Color.White, modifier = Modifier.size(14.dp))
@@ -304,7 +315,7 @@ private fun Tile(app: AppState, item: Item, queue: List<Video>) {
             }
             Text(item.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
         }
-        is Channel -> Column(Modifier.width(110.dp).tvClickable(RoundedCornerShape(8.dp)) { app.go(Screen.Channel(item.id, item.name)) },
+        is Channel -> Column(Modifier.width(110.dp).tvClickable(RoundedCornerShape(12.dp)) { app.go(Screen.Channel(item.id, item.name)) },
             horizontalAlignment = Alignment.CenterHorizontally) {
             Avatar(item.avatar, 88)
             Text(item.name, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
@@ -359,7 +370,7 @@ private fun PostCard(app: AppState, p: Post) {
         if (p.poll.isNotEmpty()) Column(Modifier.padding(horizontal = 14.dp).padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (p.pollVotes.isNotEmpty()) Text(p.pollVotes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             for (c in p.poll) Text(c, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.fillMaxWidth()
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 10.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 10.dp))
         }
         Row(Modifier.padding(horizontal = 6.dp).padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             if (!calm && p.likes.isNotEmpty()) {
@@ -466,14 +477,15 @@ fun PlaylistScreen(app: AppState, id: String, title: String) {
     ItemGrid(
         pager.items, app, loading = pager.loading, onEnd = { pager.loadMore() }, rows = true,
         header = {
-            Column(Modifier.padding(16.dp)) {
-                Text(head?.title ?: title, style = MaterialTheme.typography.titleLarge)
-                Text(listOf(head?.author ?: "", head?.countText ?: "").filter { it.isNotEmpty() }.joinToString(" · "),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = { videos.firstOrNull()?.let { app.watch(it, videos.drop(1)) } }, enabled = videos.isNotEmpty()) { Text(tr("Play all")) }
-                    OutlinedButton(onClick = { val s = videos.shuffled(); app.watch(s[0], s.drop(1)) }, enabled = videos.isNotEmpty()) { Text(tr("Shuffle")) }
-                    OutlinedButton(onClick = {
+            ListHeader(
+                cover = if (app.store.settings.value.hideThumbs) "" else videos.firstOrNull()?.thumb ?: "",
+                title = head?.title ?: title,
+                line = listOf(head?.author ?: "", head?.countText ?: "").filter { it.isNotEmpty() }.joinToString(" · "),
+                enabled = videos.isNotEmpty(),
+                play = { videos.firstOrNull()?.let { app.watch(it, videos.drop(1)) } },
+                shuffle = { val s = videos.shuffled(); app.watch(s[0], s.drop(1)) },
+            ) {
+                    PillButton(tr("Save to library"), Sym.LibraryAdd.outline, height = 36.dp, enabled = videos.isNotEmpty()) {
                         // keep a copy on this device (the playlist on YouTube may change or vanish)
                         val pid = app.store.newPlaylist(head?.title ?: title, null)
                         app.store.lib.update { l ->
@@ -481,9 +493,8 @@ fun PlaylistScreen(app: AppState, id: String, title: String) {
                             l.copy(playlists = l.playlists + (pid to pl.copy(items = videos.map { it.meta() })))
                         }
                         app.toast(tr("Saved to your playlists"))
-                    }, enabled = videos.isNotEmpty()) { Text(tr("Save to library")) }
-                    IconButton(onClick = { app.share(head?.title ?: title, "https://www.youtube.com/playlist?list=$id") }) { Icon(Sym.Share.outline, tr("Share")) }
-                }
+                    }
+                    PillButton(tr("Share"), Sym.Share.outline, height = 36.dp) { app.share(head?.title ?: title, "https://www.youtube.com/playlist?list=$id") }
             }
         },
     )
