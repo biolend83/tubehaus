@@ -351,8 +351,8 @@ def _sidx(b):
 def dash_mpd(vid):
     """the DASH list of qualities for the web player, with every SDR video format: H.264 and AV1 (MP4)
     and VP9 (WebM). The companion's own list has only the MP4 ones, so videos whose 1440p and 4K
-    exist only as VP9 stopped at 1080p. HDR (VP9.2, BT.2020) is left out: it looks washed out on SDR
-    screens and every HDR height also exists in SDR."""
+    exist only as VP9 stopped at 1080p. HDR (VP9.2, BT.2020) is left out where the same size exists
+    in SDR (HDR looks washed out on SDR screens); where it is the only one, as 8K often is, it stays."""
     d = _video_json(vid)
     fs = [f for f in d.get("adaptiveFormats") or [] if f.get("url") and f.get("init") and f.get("index")]
     if not fs:
@@ -360,12 +360,14 @@ def dash_mpd(vid):
     esc = lambda s: str(s).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
     sets = {}                                  # (kind, mime, track) -> [formats], in YouTube's order
     seen = set()
+    hdr = lambda f: "vp9.2" in (f.get("type") or "") or "BT2020" in str(f.get("colorInfo") or "")
+    sdr_h = {f.get("size") for f in fs if (f.get("type") or "").startswith("video/") and not hdr(f)}
     for f in fs:
         mime = (f.get("type") or "").split(";")[0].strip()
         kind = mime.split("/")[0]
         if kind not in ("audio", "video"):
             continue
-        if kind == "video" and ("vp9.2" in (f.get("type") or "") or "BT2020" in str(f.get("colorInfo") or "")):
+        if kind == "video" and hdr(f) and f.get("size") in sdr_h:   # HDR stays only where it's the sole one (often 8K)
             continue
         tr = (f.get("audioTrack") or {}) if kind == "audio" else {}
         key = (str(f.get("itag")), tr.get("id") or "")

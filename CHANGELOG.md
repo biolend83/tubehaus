@@ -3,7 +3,8 @@
 ## Unreleased
 
 ### Added
-- `GET /api/p/dash/<id>.mpd`: the server's own DASH list of qualities for the web player, with VP9 (WebM) as well as H.264 and AV1
+- `GET /api/p/dash/<id>.mpd`: the server's own DASH list of qualities for the web player, with VP9 (WebM) as well as H.264 and AV1, and 8K (YouTube often has it only in HDR, which is kept where there is no SDR copy)
+- Settings → Preferred quality: 8K (4320p)
 - `HT_NAME` and `HT_LINKS` (`TUBEHAUS_NAME`, `TUBEHAUS_LINKS` in `.env`): your instance's own name in the page title and menu, and extra side-menu links (a home page, an app to download)
 - `GET /api/p/hls/<id>.m3u8?h=1080`: only the best quality up to that height
 
