@@ -34,6 +34,8 @@ fun MainViewController(hideBars: (Boolean) -> Unit): UIViewController {
     val platform = IosPlatform()
     platform.hideBars = hideBars
     val state = AppState(platform, Store(platform.dataDir))
+    // Control Center and the lock screen: what plays and its buttons
+    MediaControls(state).start()
     val center = NSNotificationCenter.defaultCenter
     // written to disk before iOS may end the app; synced when it comes back
     center.addObserverForName(UIApplicationDidEnterBackgroundNotification, null, NSOperationQueue.mainQueue) { _ -> state.store.flush() }
