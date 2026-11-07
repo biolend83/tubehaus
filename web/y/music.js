@@ -79,8 +79,36 @@ async function dropEngine() {
   MP.loaded = "";
   if (sp) try { await sp.destroy(); } catch { }
 }
+// ---------------------------------------------------------------- a music video -> the song's own recording
+// Lyrics are timed for the song; a music video adds an intro, a scene, an ending, so they would run early.
+// Like YouTube Music, a music video plays as the song (its album track), found once and kept here.
+const VIDEOISH = /\b(M\/?V|music video|official (video|audio)|lyrics?( video)?|visuali[sz]er|audio)\b|뮤직비디오|뮤비|[‘’'"“”\[\]|]/i;
+const songOfs = () => { const o = local.get("music.songof", {}); return o && typeof o === "object" ? o : {}; };
+const asked = new Map();
+function songOf(s) {
+  if (!s || s.albumId || s.mv || / - Topic$/.test(s.artist) || !VIDEOISH.test(s.title)) return Promise.resolve(null);
+  const known = songOfs()[s.id];
+  if (known !== undefined) return Promise.resolve(known || null);
+  if (!asked.has(s.id)) {
+    asked.set(s.id, get("song", { v: s.id, title: s.title, artist: s.artist, len: s.len || 0 }, 21600000)
+      .then((d) => {
+        const r = d?.song?.id ? slim(d.song) : null;
+        const o = songOfs();
+        o[s.id] = r || 0;
+        const ks = Object.keys(o);
+        if (ks.length > 600) for (const k of ks.slice(0, ks.length - 600)) delete o[k];
+        local.set("music.songof", o);
+        return r;
+      }, () => null));        // not now (YouTube didn't answer): the video, and ask again next time
+  }
+  return asked.get(s.id);
+}
+const within = (p, ms) => Promise.race([p, new Promise((ok) => setTimeout(() => ok(null), ms))]);
+// the same sound already (a few seconds of rounding): keep what was chosen
+const swapTo = (s, r) => r && r.id !== s.id && !(s.len && r.len && Math.abs(s.len - r.len) <= 2);
+
 async function start(i, { at = 0 } = {}) {
-  const s = MP.queue[i];
+  let s = MP.queue[i];
   if (!s) return;
   MP.i = i;
   MP.direct = "";
@@ -90,6 +118,17 @@ async function start(i, { at = 0 } = {}) {
   show();
   paint();
   session();
+  const r = await within(songOf(s), 4000);
+  if (my !== seq) return;
+  if (swapTo(s, r)) {
+    s = MP.queue[i] = { ...r, mv: s.id, auto: s.auto };
+    if (MP.orig) MP.orig = MP.orig.map((x) => (x.id === s.mv ? s : x));
+    at = 0;
+    paint();
+    paintQueue();
+  }
+  // the next one, while this one plays
+  setTimeout(() => songOf(MP.queue[MP.i + 1]), 3000);
   store.push("recent", slim(s), 80);
   if (MP.tab === "lyrics" && MP.open) loadLyrics();
   const plain = IPHONE || !(window.MediaSource || window.ManagedMediaSource);

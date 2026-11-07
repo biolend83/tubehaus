@@ -2077,7 +2077,8 @@ def _ly_clean(s):
     return re.sub(r"\s+", " ", re.sub(r"[\"'“”‘’|]", " ", s)).strip()
 
 
-def lyrics_queries(title, channel):
+def _song_parts(title, channel):
+    """([titles], [artists]) a video's title and channel name stand for"""
     t = re.sub(r"[\[【].*?[\]】]", " ", title)
     artist_t = None
     m = re.match(r"^(.*?)(?:^|\s)['‘\"“](.+?)['’\"”](?=\s|$)(.*)$", t.strip())
@@ -2105,6 +2106,11 @@ def lyrics_queries(title, channel):
     for x in (main or None, inner):
         if x and x not in titles:
             titles.append(x)
+    return titles, artists
+
+
+def lyrics_queries(title, channel):
+    titles, artists = _song_parts(title, channel)
     out = []
     for a in artists[:2]:
         for x in titles:
@@ -2176,6 +2182,64 @@ def music_lyrics(title, artist, length):
     return {"synced": False, "lines": []}
 
 
+# A music video's sound is the song with more around it (an intro, a scene, an ending), so lyrics timed
+# for the song run early on it. YouTube Music plays such a video as the song's own recording: the same
+# title on an album or single of the same artist. Found the same way here: one album search, at most
+# three albums opened (kept like any album). Versions are left alone: a live stage, a cover, a remix
+# is what the listener chose.
+SONG_KEEP = re.compile(r"(?i)live|cover|remix|acoustic|\bver\b|ver\.|version|perform|stage|practice|dance|sped|slowed|\binst|karaoke|"
+                       r"piano|concert|fancam|teaser|relay|mashup|nightcore|medley|full album|playlist|커버|라이브|무대|직캠|교차|리믹스|연습")
+
+
+def _norm_t(s):
+    return re.sub(r"\W", "", re.sub(r"\(.*?\)|\[.*?\]|（.*?）", " ", s or "").lower())
+
+
+def _album_cached(bid, hl, region):
+    key = ("album", bid, hl, region)
+    with music_lock:
+        hit = music_cache.get(key)
+    if hit and time.time() - hit[0] < MUSIC_TTL:
+        return hit[1]
+    out = music_album(bid, hl, region)
+    with music_lock:
+        music_cache[key] = (time.time(), out)
+    return out
+
+
+def music_song_of(title, channel, length, hl, region):
+    """{song}: the recording on YouTube Music a music video is of, or {} (not found, or a version)"""
+    if SONG_KEEP.search(title):
+        return {}
+    titles, artists = _song_parts(title, channel)
+    want = {_norm_t(t) for t in titles} - {""}
+    # the names in brackets too: "IU(아이유)", "RESCENE (리센느)" (YouTube Music shows either, by language)
+    extra = re.findall(r"[(（]([^()（）]+)[)）]", title + " " + channel)
+    arts = [a for a in dict.fromkeys(_norm_t(x) for x in artists + extra) if a and not re.match(r"(?i)^(feat|ft|prod|official|mv|part)", a)]
+    if not want or not arts:
+        return {}
+
+    def same_artist(x):
+        x = _norm_t(x)
+        return bool(x) and any(x == a or (min(len(x), len(a)) >= 4 and (x in a or a in x)) for a in arts)
+    d = yt_call("search", {"query": f"{titles[0]} {artists[0]}", "params": M_ALBUMS}, music=True, hl=hl, region=region)
+    opened = 0
+    for a in [x for x in _m_cards(d) if x["kind"] == "album"][:8]:
+        parts = [p.strip() for p in (a.get("sub") or "").split("•")]
+        # "EP • RESCENE • 2024": the artists are between the kind and the year
+        if not any(same_artist(p) for p in parts[1:-1] or parts):
+            continue
+        al = _album_cached(a["id"], hl, region)
+        opened += 1
+        for s in al.get("songs") or []:
+            # the song can't be longer than its video (a few seconds of rounding aside)
+            if s.get("len") and _norm_t(s["title"]) in want and (not length or s["len"] <= length + 3):
+                return {"song": s}
+        if opened >= 3:
+            break
+    return {}
+
+
 def music_api(p, qs):
     """(status, answer) for /api/p/yt/music/<what>"""
     what = p.rsplit("/", 1)[-1]
@@ -2207,6 +2271,15 @@ def music_api(p, qs):
         if not re.fullmatch(r"[\w-]{11}", vid) or not title:
             return 400, {"error": "bad song"}
         key, fn = ("lyrics", vid), lambda: music_lyrics(title, artist, length)
+    elif what == "song":
+        vid, title, artist = qs.get("v") or "", (qs.get("title") or "")[:300], (qs.get("artist") or "")[:200]
+        try:
+            length = max(0, int(qs.get("len") or 0))
+        except ValueError:
+            length = 0
+        if not re.fullmatch(r"[\w-]{11}", vid) or not title:
+            return 400, {"error": "bad song"}
+        key, fn = ("song", vid, hl, region), lambda: music_song_of(title, artist, length, hl, region)
     else:
         return 404, {"error": "unknown"}
     with music_lock:

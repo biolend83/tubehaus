@@ -27,7 +27,11 @@ function parseVtt(txt) {
     const [a, b] = lines[i].split("-->");
     const s = vttTime(a), e = vttTime(b.trim().split(/\s+/)[0]);
     // tags (<c>, <i>, timestamps) and entities (&amp;) off; DOMParser never runs scripts
-    const text = new DOMParser().parseFromString(lines.slice(i + 1).join("\n"), "text/html").body.textContent.trim();
+    // karaoke times ("word<00:01:02.346> word") are no tags to an HTML parser (they start with a digit), and a
+    // translated file may carry them escaped: both out, before and after
+    const TS = /<\/?\d{1,2}:\d{2}(?::\d{2})?[.,]\d{1,3}>/g;
+    const text = new DOMParser().parseFromString(lines.slice(i + 1).join("\n").replace(TS, ""), "text/html").body.textContent
+      .replace(TS, "").replace(/[ \t]{2,}/g, " ").trim();
     if (!text || e - s < 0.05) continue;
     cues.push({ s, e, text });
   }

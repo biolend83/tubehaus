@@ -444,7 +444,7 @@ async function openPanel(kind) {
           const ls = b.split("\n"), i = ls.findIndex((l) => l.includes("-->"));
           if (i < 0) continue;
           const t = ls[i].split("-->")[0].trim().split(":").reduce((a, x) => a * 60 + parseFloat(x), 0);
-          const text = ls.slice(i + 1).join(" ").replace(/<[^>]+>/g, "").trim();
+          const text = ls.slice(i + 1).join(" ").replace(/&lt;\/?\d{1,2}:\d{2}(?::\d{2})?[.,]\d{1,3}&gt;/g, "").replace(/<[^>]+>/g, "").replace(/\s{2,}/g, " ").trim();
           if (text && (!cues.length || cues[cues.length - 1].text !== text)) cues.push({ t, text });
         }
         L.innerHTML = `<div class="tr-lang">${esc(pick.label)}</div>` + cues.map((c) => `<button class="pn-it tr-it" data-seek="${c.t}"><em>${fmtTime(c.t)}</em><span>${esc(c.text)}</span></button>`).join("");
