@@ -123,6 +123,10 @@ data class PlayOptions(
     val standbyTranslate: String? = null,
     val loop: Boolean = false,
     val volume: Float = 1f,
+    /** music: only the sound is downloaded and played (the picture is a cover drawn by the app) */
+    val audioOnly: Boolean = false,
+    /** the video codec to prefer where there is a choice: "" automatic, "h264", "vp9", "av1" */
+    val codec: String = "",
     /** for the system media controls */
     val title: String = "",
     val artist: String = "",

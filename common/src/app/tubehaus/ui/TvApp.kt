@@ -93,7 +93,7 @@ private fun tvTabs(app: AppState): List<TvTab> {
         add(TvTab(Screen.Subs, tr("Subscriptions"), Sym.Subscriptions))
         add(TvTab(Screen.Library, tr("Library"), Sym.VideoLibrary))
         if (!calm) {
-            add(TvTab(Screen.Topic("Music"), tr("Music"), Sym.Music))
+            add(TvTab(Screen.Music, tr("Music"), Sym.Music))
             add(TvTab(Screen.Topic("Live"), tr("Live"), Sym.LiveTv))
             add(TvTab(Screen.Topic("Gaming"), tr("Gaming"), Sym.Gaming))
             add(TvTab(Screen.Topic("News"), tr("News"), Sym.News))
@@ -186,6 +186,12 @@ fun TvApp(app: AppState) {
                         Screen.Downloads -> TvPage(tr("Downloads")) { DownloadsScreen(app) }
                         is Screen.Topic -> TopicScreen(app, cur.key)
                         is Screen.Watch -> {}
+                        Screen.Music -> TvPage(tr("Music")) { MusicScreen(app) }
+                        Screen.NowPlaying -> TvPage(null) { NowPlayingScreen(app) }
+                        is Screen.Album -> TvPage(null) { AlbumScreen(app, cur.id, cur.title) }
+                        is Screen.Artist -> TvPage(null) { ArtistScreen(app, cur.id, cur.name) }
+                        is Screen.SettingsPage -> TvPage(catTitleOf(cur.key)) { SettingsPageScreen(app, cur.key) }
+                        Screen.Stats -> TvPage(tr("Watch time")) { StatsScreen(app) }
                     }
                 }
                 TvRail(app, root, rail, inRail, onFocus = { inRail = it }, toContent = { enterPending = true; enter++; runCatching { content.requestFocus() } })

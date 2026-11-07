@@ -31,6 +31,8 @@ data class Client(
     val id: Int,
     val userAgent: String,
     val extra: Map<String, Any> = emptyMap(),
+    /** the site it belongs to: YouTube Music answers on its own (music.youtube.com) */
+    val host: String = "www.youtube.com",
 )
 
 object Clients {
@@ -47,6 +49,12 @@ object Clients {
         "ANDROID_VR", "1.65.10", 28,
         "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
         mapOf("deviceMake" to "Oculus", "deviceModel" to "Quest 3", "androidSdkVersion" to 32, "osName" to "Android", "osVersion" to "12L"),
+    )
+    /** YouTube Music's web site: albums and artists (its songs and charts are Premium-only in some countries) */
+    val MUSIC = Client(
+        "WEB_REMIX", "1.20261104.00.00", 67,
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+        host = "music.youtube.com",
     )
     /** in the order the player tries them; replaced by the list on GitHub when there is a newer one (Remote) */
     @Volatile var PLAYERS = listOf(VISIONOS, ANDROID_VR)
@@ -112,8 +120,8 @@ object InnerTube {
         put("X-YouTube-Client-Name", c.id.toString())
         put("X-YouTube-Client-Version", c.version)
         put("X-Goog-Api-Format-Version", "1")
-        put("Origin", "https://www.youtube.com")
-        put("Referer", "https://www.youtube.com/")
+        put("Origin", "https://${c.host}")
+        put("Referer", "https://${c.host}/")
         put("Accept-Language", hl)
         if (visitor != null) put("X-Goog-Visitor-Id", visitor)
     }
@@ -147,7 +155,7 @@ object InnerTube {
         }
         val headers = headers(client, visitor)
         val text = try {
-            Net.post("https://www.youtube.com/youtubei/v1/$endpoint?prettyPrint=false", payload.toString(), headers)
+            Net.post("https://${client.host}/youtubei/v1/$endpoint?prettyPrint=false", payload.toString(), headers)
         } catch (e: HttpError) {
             throw YtError("YouTube answered ${e.code}", YtError.Kind.NETWORK)
         } catch (e: okio.IOException) {

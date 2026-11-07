@@ -86,11 +86,16 @@ class Store(dir: Path) {
     val queue = JsonFile(dir / "sync-queue.json", ListSerializer(SyncOp.serializer()), emptyList(), scope)
     /** channel id -> its picture, for cards whose list came without one (see channelAvatar) */
     val avatars = JsonFile(dir / "avatars.json", MapSerializer(String.serializer(), String.serializer()), emptyMap(), scope)
+    /** watch time by day (Wellbeing, the recap) */
+    val stats = JsonFile(dir / "stats.json", WatchStats.serializer(), WatchStats(), scope)
+    /** the music tab's recent songs, searches and pages */
+    val music = JsonFile(dir / "music.json", MusicData.serializer(), MusicData(), scope)
     /** set by ServerSync: something was queued */
     var onQueued: (() -> Unit)? = null
 
     fun flush() {
         lib.flushNow(); taste.flushNow(); settings.flushNow(); profiles.flushNow(); queue.flushNow(); avatars.flushNow()
+        stats.flushNow(); music.flushNow()
     }
 
     /** with a server connected: the same change for it (the endpoints the web version uses) */
@@ -102,6 +107,44 @@ class Store(dir: Path) {
     }
 
     private fun JsonObjectBuilder.video(m: Meta) = put("video", storeJson.encodeToJsonElement(Meta.serializer(), m))
+
+    // ---------------------------------------------------------- watch time
+    /** [sec] more seconds of [v] played today; music counts by artist, videos by channel */
+    fun addWatch(v: Video, sec: Long, music: Boolean, started: Boolean = false) {
+        if (settings.value.historyOff || (sec <= 0 && !started)) return
+        val day = Sys.today()
+        stats.update { s ->
+            val d = s.days[day] ?: DayStats()
+            val nd = if (music) d.copy(music = d.music + sec, art = if (v.author.isEmpty()) d.art else d.art + (v.author to (d.art[v.author] ?: 0) + sec))
+            else d.copy(video = d.video + sec, ch = if (v.channelId.isEmpty()) d.ch else d.ch + (v.channelId to (d.ch[v.channelId] ?: 0) + sec))
+            var days = s.days + (day to nd.copy(n = nd.n + if (started) 1 else 0))
+            // a year and a bit, so last year's month can still be compared
+            if (days.size > 400) days = days.entries.sortedByDescending { it.key }.take(400).associate { it.key to it.value }
+            val names = if (!music && v.channelId.isNotEmpty() && v.author.isNotEmpty() && s.names[v.channelId] != v.author) s.names + (v.channelId to v.author) else s.names
+            s.copy(days = days, names = names)
+        }
+    }
+
+    // ---------------------------------------------------------- music
+    fun rememberSong(m: SongMeta) {
+        if (settings.value.historyOff) return
+        music.update { it.copy(recent = (listOf(m) + it.recent.filter { r -> r.id != m.id }).take(200)) }
+    }
+
+    fun rememberMusicSearch(q: String) {
+        val t = q.trim()
+        if (t.isEmpty() || settings.value.historyOff) return
+        music.update { it.copy(searches = (listOf(t) + it.searches.filter { s -> !s.equals(t, true) }).take(20)) }
+    }
+
+    fun rememberCard(c: CardMeta) {
+        if (settings.value.historyOff) return
+        music.update { it.copy(opened = (listOf(c) + it.opened.filter { o -> o.id != c.id }).take(40)) }
+    }
+
+    fun likeSong(m: SongMeta, on: Boolean) {
+        music.update { it.copy(liked = (if (on) listOf(m) else emptyList()) + it.liked.filter { l -> l.id != m.id }) }
+    }
 
     // ---------------------------------------------------------- subscriptions
     fun isSubbed(cid: String) = cid in lib.value.subs
@@ -180,6 +223,9 @@ class Store(dir: Path) {
     fun clearHistory() {
         lib.update { it.copy(hist = emptyList(), pos = emptyMap()) }
         push("/yt/hist/del") { put("all", true) }
+        // what was watched when goes too, and the music tab's recent songs
+        stats.update { WatchStats() }
+        music.update { it.copy(recent = emptyList(), searches = emptyList()) }
     }
 
     // ---------------------------------------------------------- lists
