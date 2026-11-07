@@ -129,7 +129,7 @@ fun App(app: AppState) {
             .build()
     }
     key(lang, settings.tvMode) {
-        TubeTheme(settings.dark, app.platform::wallpaperColors) {
+        TubeTheme(settings.dark, app.platform::wallpaperColors, app.platform.font) {
             val bg = MaterialTheme.colorScheme.background
             LaunchedEffect(bg) { app.platform.titleBar(bg) }
             val tv = app.platform.tv
@@ -284,15 +284,13 @@ private fun Shell(app: AppState) {
                         NavigationRailItem(
                             selected = sel, onClick = { app.go(t.screen) },
                             icon = { Icon(if (sel) t.on else t.off, null) },
-                            // YouTube's narrow menu: small plain labels, the filled icon alone marks the open page
-                            label = { Text(t.label, fontSize = if (app.platform.tv) 11.sp else 10.sp, maxLines = 1,
-                                fontWeight = if (sel && app.platform.tv) FontWeight.SemiBold else FontWeight.Normal) },
-                            // as on YouTube: the filled icon says which page is open, no pill behind it
-                            // (a TV keeps the pill, it is easier to see from the sofa)
-                            colors = if (app.platform.tv) NavigationRailItemDefaults.colors() else NavigationRailItemDefaults.colors(
-                                indicatorColor = Color.Transparent,
+                            // as on the web: small labels, the open page bold, its filled icon in a soft teal pill
+                            label = { Text(t.label, fontSize = 11.sp, maxLines = 1,
+                                fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium) },
+                            colors = NavigationRailItemDefaults.colors(
+                                indicatorColor = accentSoft,
                                 selectedIconColor = MaterialTheme.colorScheme.onSurface, selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurface, unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant, unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             ),
                         )
                     }
@@ -319,14 +317,15 @@ private fun Shell(app: AppState) {
                   // surface shouldn't be see-through or moving while it starts)
                   val move = remember { app.lastMove }
                   val shown = remember { Animatable(if (cur is Screen.Watch || cur is Screen.Shorts) 1f else 0f) }
-                  LaunchedEffect(Unit) { shown.animateTo(1f, tween(if (move == 0) Motion.SHORT + 50 else Motion.MEDIUM, easing = Motion.emphasizedIn)) }
+                  LaunchedEffect(Unit) { shown.animateTo(1f, if (move == 0) tween(400, easing = Motion.out) else tween(Motion.MEDIUM, easing = Motion.emphasizedIn)) }
                   Box(Modifier.fillMaxSize().graphicsLayer {
                       val rest = 1f - shown.value
                       alpha = shown.value
                       when (move) {
                           1 -> translationX = rest * 40.dp.toPx()
                           -1 -> translationX = -rest * 24.dp.toPx()
-                          else -> { scaleX = 1f - rest * 0.03f; scaleY = scaleX }
+                          // a tab: the page rises in a little, as on the web
+                          else -> translationY = rest * 10.dp.toPx()
                       }
                   }) {
                     when (cur) {
@@ -375,15 +374,16 @@ private fun Screen.lit(root: Screen?): Boolean = when {
 }
 
 /**
- * The phone's bottom bar as YouTube draws it: a hairline on top, the icons and small labels close
- * together, the open one filled; no pill. Subscriptions lights Home, as it is one of Home's top tabs here.
+ * The phone's bottom bar as the web app 1.0 draws it: no line on top, the icons and small labels close
+ * together, the open one filled in a soft teal pill that pops in. Subscriptions lights Home, as it is one
+ * of Home's top tabs here.
  */
 @Composable
 private fun PhoneBar(app: AppState, root: Screen?) {
     val c = MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth().background(c.background).windowInsetsPadding(NavigationBarDefaults.windowInsets)) {
-        HorizontalDivider(thickness = 0.5.dp, color = c.outline.copy(alpha = 0.6f))
-        Row(Modifier.fillMaxWidth().height(54.dp), verticalAlignment = Alignment.CenterVertically) {
+        val soft = accentSoft
+        Row(Modifier.fillMaxWidth().height(58.dp), verticalAlignment = Alignment.CenterVertically) {
             for (t in tabs(app, phone = true)) {
                 val sel = t.screen.lit(root) || (t.screen == Screen.Home && root == Screen.Subs)
                 // pressed as in YouTube's app: a grey circle swells behind the icon, which dips and
@@ -394,15 +394,31 @@ private fun PhoneBar(app: AppState, root: Screen?) {
                     if (pressed) tween(Motion.SHORT) else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
                 val shade by animateFloatAsState(if (pressed) 0.12f else 0f, tween(if (pressed) 90 else Motion.LONG))
                 val ink = c.onSurface
+                // the pill behind the open tab grows in with a little spring (the web's navPop)
+                val pill by animateFloatAsState(if (sel) 1f else 0f,
+                    if (sel) spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow) else tween(Motion.SHORT))
                 Column(
                     Modifier.weight(1f).fillMaxHeight()
-                        .drawBehind { if (shade > 0f) drawCircle(ink.copy(alpha = shade), radius = 26.dp.toPx() * (0.7f + 0.3f * (shade / 0.12f))) }
                         .selectable(sel, interactionSource = touch, indication = null, role = Role.Tab, onClick = { app.go(t.screen) }),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
                 ) {
-                    Icon(if (sel) t.on else t.off, null, Modifier.size(24.dp).graphicsLayer { scaleX = dip; scaleY = dip }, tint = c.onSurface)
-                    Text(t.label, fontSize = 10.sp, maxLines = 1, color = c.onSurface,
-                        fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.padding(top = 3.dp))
+                    Box(
+                        Modifier.size(width = 56.dp, height = 30.dp).drawBehind {
+                            if (shade > 0f) drawRoundRect(ink.copy(alpha = shade), cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2))
+                            if (pill > 0.01f) {
+                                val p = pill.coerceAtMost(1.15f)
+                                val w = size.width * (0.6f + 0.4f * p); val h = size.height * (0.82f + 0.18f * p)
+                                drawRoundRect(soft.copy(alpha = soft.alpha * pill.coerceIn(0f, 1f)), topLeft = Offset((size.width - w) / 2, (size.height - h) / 2),
+                                    size = androidx.compose.ui.geometry.Size(w, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2))
+                            }
+                        },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(if (sel) t.on else t.off, null, Modifier.size(24.dp).graphicsLayer { scaleX = dip; scaleY = dip },
+                            tint = if (sel) c.onSurface else c.onSurfaceVariant)
+                    }
+                    Text(t.label, fontSize = 11.sp, maxLines = 1, color = if (sel) c.onSurface else c.onSurfaceVariant,
+                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.padding(top = 3.dp))
                 }
             }
         }
@@ -470,7 +486,7 @@ fun Logo(modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         HouseMark(Modifier.size(width = 26.dp, height = 22.dp))
         Spacer(Modifier.width(6.dp))
-        Text("TubeHaus", fontWeight = FontWeight.Bold, fontSize = 19.sp, letterSpacing = (-0.5).sp)
+        Text("TubeHaus", fontWeight = FontWeight.ExtraBold, fontSize = 19.sp, letterSpacing = (-0.6).sp)
     }
 }
 
@@ -489,7 +505,6 @@ private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null) {
         }
         // every device: Home, Subscriptions, Music, Live and More under the logo, on those pages themselves
         if (app.stack.size == 1 && app.current.underHome()) TopTabs(app)
-        if (!LocalCompact.current) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
     }
 }
 

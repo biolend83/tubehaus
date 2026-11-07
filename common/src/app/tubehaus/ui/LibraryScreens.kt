@@ -117,21 +117,11 @@ fun SubsScreen(app: AppState) {
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f).padding(start = 4.dp, end = 8.dp),
                     ) else Spacer(Modifier.weight(1f))
-                    OutlinedButton(onClick = { app.go(Screen.ManageSubs) }, contentPadding = PaddingValues(horizontal = 14.dp)) {
-                        Icon(Sym.Settings.outline, null, Modifier.size(18.dp)); Text(tr("Manage"), Modifier.padding(start = 6.dp))
-                    }
-                    OutlinedButton(onClick = { scope.launch { load(true) } }, contentPadding = PaddingValues(horizontal = 14.dp), modifier = Modifier.padding(start = 8.dp)) {
-                        Icon(Sym.Replay.outline, null, Modifier.size(18.dp)); Text(tr("Refresh"), Modifier.padding(start = 6.dp))
-                    }
+                    PillButton(tr("Manage"), Sym.Settings.outline, height = 36.dp) { app.go(Screen.ManageSubs) }
+                    PillButton(tr("Refresh"), Sym.Replay.outline, height = 36.dp, modifier = Modifier.padding(start = 8.dp)) { scope.launch { load(true) } }
                 }
-                OutlinedTextField(
-                    query, { query = it }, singleLine = true,
-                    placeholder = { Text(tr("Search this feed")) },
-                    leadingIcon = { Icon(Sym.Search.outline, null) },
-                    trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Sym.Close.outline, tr("Clear")) } },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                )
-                LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                SearchField(query, { query = it }, tr("Search this feed"), Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                LazyRow(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(lib.subs.entries.filter { it.key in shown }.sortedByDescending { it.value.at }.toList(), key = { it.key }) { (cid, s) ->
                         Column(Modifier.width(64.dp).tvClickable { app.go(Screen.Channel(cid, s.name)) }, horizontalAlignment = Alignment.CenterHorizontally) {
                             Avatar(s.thumb, 56)
@@ -224,13 +214,7 @@ fun ManageSubsScreen(app: AppState) {
             }
         }
         if (all.size > 5) item {
-            OutlinedTextField(
-                query, { query = it }, singleLine = true,
-                placeholder = { Text(tr("Search your subscriptions")) },
-                leadingIcon = { Icon(Sym.Search.outline, null) },
-                trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Sym.Close.outline, tr("Clear")) } },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-            )
+            SearchField(query, { query = it }, tr("Search your subscriptions"), Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
         }
         if (subs.isEmpty()) item {
             Text(tr(if (all.isEmpty()) "No subscriptions" else "Nothing here"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
@@ -282,37 +266,52 @@ fun ManageSubsScreen(app: AppState) {
 fun LibraryScreen(app: AppState) {
     val lib by app.store.lib.state.collectAsState()
     var newPl by remember { mutableStateOf(false) }
-    LazyColumn(Modifier.fillMaxSize()) {
+    val saved by app.offline.saved.collectAsState()
+    val busy = app.offline.progress.size
+    fun videos(n: Int) = tr("{n} videos").replace("{n}", "$n")
+    // as music apps lay it out: the recap first, then what you watched, then rounded boxes of lists
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item { RecapCard(app) }
         item {
-            SectionTitle(tr("History"), Modifier.clickable { app.go(Screen.History) })
-            LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ShelfTitle(tr("History"), Sym.History.outline, onMore = { app.go(Screen.History) })
+            if (lib.hist.isEmpty()) Text(tr("Videos you watch show up here"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
+            else LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(lib.hist.take(20), key = { it.id }) { m ->
                     val v = m.video()
-                    Column(Modifier.width(160.dp).tvClickable { app.watch(v) }) {
-                        if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.fillMaxWidth(), rounded = 8)
-                        Text(v.title, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                    Column(Modifier.width(196.dp).tvClickable { app.watch(v) }) {
+                        if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.fillMaxWidth(), rounded = 16)
+                        Text(v.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                        if (v.author.isNotEmpty()) Text(v.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
-            if (lib.hist.isEmpty()) Text(tr("Videos you watch show up here"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
         }
-        item { LibRow(Sym.History.outline, tr("History"), "${lib.hist.size}") { app.go(Screen.History) } }
-        item { LibRow(Sym.WatchLater.outline, tr("Watch later"), "${lib.wl.size}") { app.go(Screen.Local("wl")) } }
-        item { LibRow(Sym.ThumbUp.outline, tr("Liked videos"), "${lib.likes.size}") { app.go(Screen.Local("likes")) } }
+        item { GroupLabel(tr("Your content")) }
         item {
-            val saved by app.offline.saved.collectAsState()
-            val busy = app.offline.progress.size
-            if (app.platform.canDownload) LibRow(Sym.DownloadForOffline.outline, tr("Downloads"), "${saved.items.size}" + if (busy > 0) " (+$busy)" else "") { app.go(Screen.Downloads) }
+            RowGroup {
+                GroupRow(Sym.History.outline, tr("History"), videos(lib.hist.size)) { app.go(Screen.History) }
+                GroupRow(Sym.WatchLater.outline, tr("Watch later"), videos(lib.wl.size)) { app.go(Screen.Local("wl")) }
+                GroupRow(Sym.ThumbUp.outline, tr("Liked videos"), videos(lib.likes.size)) { app.go(Screen.Local("likes")) }
+                if (app.platform.canDownload) GroupRow(Sym.DownloadForOffline.outline, tr("Downloads"),
+                    videos(saved.items.size) + if (busy > 0) " (+$busy)" else "") { app.go(Screen.Downloads) }
+            }
         }
-        item { SectionTitle(tr("Playlists")) }
-        items(lib.playlists.entries.sortedByDescending { it.value.updated }.toList(), key = { it.key }) { (id, p) ->
-            LibRow(Sym.PlaylistPlay.outline, p.title, "${p.items.size}") { app.go(Screen.Local(id)) }
+        item { GroupLabel(tr("Playlists")) }
+        item {
+            RowGroup {
+                for ((id, p) in lib.playlists.entries.sortedByDescending { it.value.updated }) {
+                    GroupRow(Sym.PlaylistPlay.outline, p.title, videos(p.items.size)) { app.go(Screen.Local(id)) }
+                }
+                GroupRow(Sym.Add.outline, tr("New playlist"), arrow = false) { newPl = true }
+            }
         }
-        item { LibRow(Sym.Add.outline, tr("New playlist"), "") { newPl = true } }
-        item { SectionTitle(tr("Your data")) }
-        item { RecapCard(app) }
-        item { LibRow(Sym.Psychology.outline, tr("What TubeHaus learned about you"), "") { app.go(Screen.Learned) } }
-        item { LibRow(Sym.SwapVert.outline, tr("Import and export"), "") { app.go(Screen.SettingsPage("data")) } }
+        item { GroupLabel(tr("Your data")) }
+        item {
+            RowGroup {
+                GroupRow(Sym.Psychology.outline, tr("What TubeHaus learned about you")) { app.go(Screen.Learned) }
+                GroupRow(Sym.SwapVert.outline, tr("Import and export")) { app.go(Screen.SettingsPage("data")) }
+            }
+        }
     }
     if (newPl) NameDialog(tr("New playlist"), "", { newPl = false }) { app.store.newPlaylist(it, null) }
 }
@@ -323,23 +322,28 @@ private fun RecapCard(app: AppState) {
     val st by app.store.stats.state.collectAsState()
     val m = monthSums(st).firstOrNull { it.month == Sys.today().take(7) }
     val c = MaterialTheme.colorScheme
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
     Row(
-        Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth()
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-            .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Red.copy(alpha = 0.22f), Teal.copy(alpha = 0.22f))))
-            .clickable { app.go(Screen.Stats) }.padding(16.dp),
+        Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp).fillMaxWidth().clip(shape)
+            .background(c.surfaceContainer)
+            .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Red.copy(alpha = 0.16f), Teal.copy(alpha = 0.16f))))
+            .tvClickable(shape) { app.go(Screen.Stats) }.padding(18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Sym.Insights.outline, null, Modifier.size(32.dp))
+        Box(Modifier.size(52.dp).clip(androidx.compose.foundation.shape.CircleShape)
+            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Red, Teal))), contentAlignment = Alignment.Center) {
+            Icon(Sym.Insights.outline, null, Modifier.size(28.dp), tint = androidx.compose.ui.graphics.Color.White)
+        }
         Column(Modifier.weight(1f).padding(start = 16.dp)) {
-            Text(tr("Recap") + " · " + monthName(Sys.today().take(7)), style = MaterialTheme.typography.titleSmall)
+            Text(tr("Recap") + " · " + monthName(Sys.today().take(7)), style = MaterialTheme.typography.titleMedium)
             Text(
                 if (m == null || m.video + m.music < 60) tr("What you watched and listened to, month by month")
                 else tr("{t} in all · {v} videos, {m} music").replace("{t}", minutesText((m.video + m.music) / 60))
                     .replace("{v}", minutesText(m.video / 60)).replace("{m}", minutesText(m.music / 60)),
-                style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp),
             )
         }
+        Icon(Sym.ChevronRight.outline, null, tint = c.onSurfaceVariant)
     }
 }
 
@@ -360,8 +364,8 @@ fun HistoryScreen(app: AppState) {
     val list = lib.hist.filter { q.isBlank() || (it.title + " " + it.author).contains(q, ignoreCase = true) }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(q, { q = it }, Modifier.weight(1f), placeholder = { Text(tr("Search your history")) }, singleLine = true)
-            TextButton(onClick = { confirm = true }) { Text(tr("Clear all")) }
+            SearchField(q, { q = it }, tr("Search your history"), Modifier.weight(1f).padding(vertical = 6.dp))
+            PillButton(tr("Clear all"), height = 40.dp, modifier = Modifier.padding(start = 8.dp)) { confirm = true }
         }
         if (list.isEmpty()) Empty(tr("Nothing here")) else LazyColumn(Modifier.fillMaxSize()) {
             items(list, key = { it.id }) { m ->
@@ -393,16 +397,15 @@ fun LocalListScreen(app: AppState, key: String) {
     val videos = items.map { it.video() }
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            Column(Modifier.padding(16.dp)) {
-                Text(title, style = MaterialTheme.typography.titleLarge)
-                Text(tr("{n} videos").replace("{n}", "${items.size}"), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { videos.firstOrNull()?.let { app.watch(it, videos.drop(1)) } }, enabled = videos.isNotEmpty()) { Text(tr("Play all")) }
-                    OutlinedButton(onClick = { videos.shuffled().let { s -> s.firstOrNull()?.let { app.watch(it, s.drop(1)) } } }, enabled = videos.isNotEmpty()) { Text(tr("Shuffle")) }
-                    if (pl != null) {
-                        TextButton(onClick = { rename = true }) { Text(tr("Rename")) }
-                        TextButton(onClick = { delete = true }) { Text(tr("Delete")) }
-                    }
+            ListHeader(
+                cover = if (app.store.settings.value.hideThumbs) "" else videos.firstOrNull()?.thumb ?: "",
+                title = title, line = tr("{n} videos").replace("{n}", "${items.size}"), enabled = videos.isNotEmpty(),
+                play = { videos.firstOrNull()?.let { app.watch(it, videos.drop(1)) } },
+                shuffle = { videos.shuffled().let { s -> s.firstOrNull()?.let { app.watch(it, s.drop(1)) } } },
+            ) {
+                if (pl != null) {
+                    PillButton(tr("Rename"), height = 36.dp) { rename = true }
+                    PillButton(tr("Delete"), height = 36.dp) { delete = true }
                 }
             }
         }

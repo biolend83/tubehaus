@@ -196,6 +196,16 @@ class AndroidPlatform(private val app: Application) : Platform {
         return true
     }
 
+    /** Pretendard, one variable font file for every weight (assets: common/fonts) */
+    override val font: androidx.compose.ui.text.font.FontFamily? by lazy {
+        runCatching {
+            androidx.compose.ui.text.font.FontFamily(listOf(400, 500, 600, 700, 800).map { w ->
+                androidx.compose.ui.text.font.Font("PretendardVariable.ttf", app.assets, androidx.compose.ui.text.font.FontWeight(w),
+                    variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(w)))
+            })
+        }.getOrNull()
+    }
+
     override fun wallpaperColors(dark: Boolean): ColorScheme? =
         if (Build.VERSION.SDK_INT < 31) null else if (dark) dynamicDarkColorScheme(app) else dynamicLightColorScheme(app)
 
