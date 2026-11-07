@@ -123,6 +123,8 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
     /** the subtitle track inside the media item (shown or not): toggling it never reloads the video */
     private var loadedCaption: Caption? = null
     private var loadedTranslate: String? = null
+    /** a car is connected (Android Auto): no picture is loaded */
+    private var car = false
     /** the view on screen, for [frame] */
     private var view: PlayerView? = null
     /** the captions, drawn by a view of ours over the video in place of the PlayerView's own (see [youTubeLook]) */
@@ -249,6 +251,7 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             .setPreferredAudioLanguage(audioLang)      // null: the original track (the manifest's "main" one)
             .setPreferredTextLanguage(caption?.lang)
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, caption == null)
+            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, car || o.audioOnly)
             .build()
         exo.setMediaItem(item(s), o.startMs)
         exo.repeatMode = if (o.loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
@@ -266,9 +269,11 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         if (s.live || s.video.isEmpty()) {
             b.setUri(s.hls).setMimeType(MimeTypes.APPLICATION_M3U8)
         } else {
-            val mpd = if (!tv) Dash.manifest(s, codecs) else {
+            // the codec chosen in Settings first, then the best this phone decodes
+            val order = if (opts.codec.isNotEmpty()) listOf(opts.codec) + codecs else codecs
+            val mpd = if (!tv) Dash.manifest(s, order) else {
                 // on a TV the codec that reaches the highest quality there first (say VP9 at 4K over AV1 that stops at 1080p)
-                val best = codecs.sortedByDescending { c -> s.video.filter { it.codecFamily == c && it.indexRange != null && decodes(it) }.maxOfOrNull { it.height } ?: 0 }
+                val best = if (opts.codec.isNotEmpty()) order else codecs.sortedByDescending { c -> s.video.filter { it.codecFamily == c && it.indexRange != null && decodes(it) }.maxOfOrNull { it.height } ?: 0 }
                 Dash.manifest(s, best, plays = ::decodes)
             }
             b.setUri("data:application/dash+xml;base64," + Base64.encodeToString(mpd.toByteArray(), Base64.NO_WRAP))
@@ -323,7 +328,8 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
 
     /** Android Auto: only the sound is loaded while a car is connected, as nothing shows the picture there */
     fun audioOnly(on: Boolean) {
-        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, on).build()
+        car = on
+        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, on || opts.audioOnly).build()
     }
 
     override fun setAudioTrack(lang: String) {

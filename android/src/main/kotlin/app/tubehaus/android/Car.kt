@@ -218,10 +218,15 @@ class CarPlayer(private val ctx: Context, exo: Player, private val lib: CarLibra
     override fun seekToNext() = app.playback.skipNext()
     override fun seekToNextMediaItem() = app.playback.skipNext()
     override fun hasNextMediaItem(): Boolean = app.playback.next != null
+    // music: Previous goes to the song before (or the start of this one)
+    override fun seekToPrevious() { if (app.playback.music) app.playback.previous() else super.seekToPrevious() }
+    override fun seekToPreviousMediaItem() { if (app.playback.music) app.playback.previous() else super.seekToPreviousMediaItem() }
+    override fun hasPreviousMediaItem(): Boolean = app.playback.music || super.hasPreviousMediaItem()
 
     private fun withNext(c: Player.Commands): Player.Commands =
         if (wrappedPlayer.mediaItemCount == 0) c
-        else c.buildUpon().addAll(Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM).build()
+        else c.buildUpon().addAll(Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+            .let { if (app.playback.music) it.addAll(Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM) else it }.build()
 
     override fun getAvailableCommands(): Player.Commands = withNext(super.getAvailableCommands())
     override fun isCommandAvailable(command: Int): Boolean = withNext(super.getAvailableCommands()).contains(command)

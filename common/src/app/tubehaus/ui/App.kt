@@ -176,6 +176,7 @@ fun App(app: AppState) {
                     app.update?.let { UpdateDialog(app, it) }
                     if (app.casting.picking) CastDialog(app)
                     app.whatsNew?.let { WhatsNewDialog(app, it) }
+                    app.reminder?.let { ReminderDialog(app, it) }
                     app.offline.asking?.let { OfflineDialog(app, it) }
                 }
             }
@@ -207,6 +208,7 @@ private fun tabs(app: AppState, phone: Boolean): List<Tab> {
         Tab(Screen.Home, tr("Home"), Sym.Home.fill, Sym.Home.outline),
         if (app.noShorts) null else Tab(Screen.Shorts, tr("Shorts"), Sym.Bolt.fill, Sym.Bolt.outline),
         if (phone) null else Tab(Screen.Subs, tr("Subscriptions"), Sym.Subscriptions.fill, Sym.Subscriptions.outline),
+        Tab(Screen.Music, tr("Music"), Sym.Music.fill, Sym.Music.outline),
         Tab(Screen.Library, tr("Library"), Sym.VideoLibrary.fill, Sym.VideoLibrary.outline),
     )
 }
@@ -255,7 +257,7 @@ private fun Shell(app: AppState) {
                 // the mini player rises from the bottom edge and sinks back into it (phones, tablets, TVs;
                 // the desktop has a floating one with the picture, below)
                 AnimatedVisibility(
-                    app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts && !floating,
+                    app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts && cur !is Screen.NowPlaying && !floating,
                     enter = slideInVertically(tween(Motion.MEDIUM, easing = Motion.emphasizedIn)) { it } + fadeIn(tween(Motion.SHORT)),
                     exit = slideOutVertically(tween(Motion.SHORT, easing = Motion.emphasizedOut)) { it } + fadeOut(tween(Motion.SHORT)),
                 ) { MiniPlayer(app) }
@@ -343,12 +345,18 @@ private fun Shell(app: AppState) {
                         is Screen.Local -> LocalListScreen(app, cur.key)
                         Screen.Downloads -> DownloadsScreen(app)
                         is Screen.Topic -> TopicScreen(app, cur.key)
+                        Screen.Music -> MusicScreen(app)
+                        Screen.NowPlaying -> NowPlayingScreen(app)
+                        is Screen.Album -> AlbumScreen(app, cur.id, cur.title)
+                        is Screen.Artist -> ArtistScreen(app, cur.id, cur.name)
+                        is Screen.SettingsPage -> SettingsPageScreen(app, cur.key)
+                        Screen.Stats -> StatsScreen(app)
                     }
                   }
                 }
                 // the plain one: inside a Box that sits in a Column, the Column version would be picked
                 androidx.compose.animation.AnimatedVisibility(
-                    floating && app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts,
+                    floating && app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts && cur !is Screen.NowPlaying,
                     modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).offset { IntOffset(floatAt.x.roundToInt(), floatAt.y.roundToInt()) },
                     enter = fadeIn(tween(Motion.MEDIUM)) + scaleIn(tween(Motion.MEDIUM, easing = Motion.emphasizedIn), initialScale = 0.9f),
                     exit = fadeOut(tween(Motion.SHORT)) + scaleOut(tween(Motion.SHORT), targetScale = 0.9f),
@@ -542,30 +550,51 @@ private fun FloatingPlayer(app: AppState, move: (Offset, IntSize) -> Unit) {
         color = MaterialTheme.colorScheme.surfaceContainer, shadowElevation = 8.dp,
     ) {
         Column {
-            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black).clickable { app.go(Screen.Watch(v.id)) }) {
-                if (st.videoId == v.id) app.player.View(Modifier.fillMaxSize())
+            val song = app.playback.song
+            val open = { if (song != null) app.go(Screen.NowPlaying) else app.go(Screen.Watch(v.id)) }
+            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black).clickable { open() }) {
+                if (song != null && !app.playback.withVideo) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    SongCover(song, Modifier.fillMaxHeight(), round = 0)
+                }
+                else if (st.videoId == v.id) app.player.View(Modifier.fillMaxSize())
                 else if (!app.store.settings.value.hideThumbs) Img(v.thumb, Modifier.fillMaxSize())
                 if (st.durationMs > 0) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color(0x55FFFFFF))) {
                     Box(Modifier.fillMaxWidth((st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f)).height(3.dp).background(Red))
                 }
             }
             Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f).padding(vertical = 8.dp).clickable { app.go(Screen.Watch(v.id)) }) {
+                Column(Modifier.weight(1f).padding(vertical = 8.dp).clickable { open() }) {
                     Text(v.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(v.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
+                if (song != null) IconButton(onClick = { app.playback.previous() }) { Icon(Sym.SkipPrevious.fill, tr("Previous")) }
                 IconButton(onClick = { if (st.playing) app.player.pause() else app.player.play() }) {
                     Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"))
                 }
+                if (song != null) IconButton(onClick = { app.playback.skipNext() }) { Icon(Sym.SkipNext.fill, tr("Next")) }
                 IconButton(onClick = { app.playback.close() }) { Icon(Sym.Close.fill, tr("Close")) }
             }
         }
     }
 }
 
+/** Settings → Wellbeing: time for a break, or today's amount reached */
+@Composable
+private fun ReminderDialog(app: AppState, msg: String) {
+    AlertDialog(
+        onDismissRequest = { app.reminder = null },
+        icon = { Icon(Sym.Wellbeing.outline, null) },
+        title = { Text(tr("Wellbeing")) },
+        text = { Text(msg) },
+        confirmButton = { TextButton(onClick = { app.reminder = null }) { Text(tr("OK")) } },
+        dismissButton = { TextButton(onClick = { app.reminder = null; app.go(Screen.Stats) }) { Text(tr("Watch time")) } },
+    )
+}
+
 @Composable
 private fun MiniPlayer(app: AppState) {
     val v = app.playback.video ?: return
+    val song = app.playback.song
     val st by app.player.state.collectAsState()
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)) {
         if (st.durationMs > 0) {
@@ -574,10 +603,11 @@ private fun MiniPlayer(app: AppState) {
             }
         }
         Row(
-            Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(0.dp)) { app.go(Screen.Watch(v.id)) }.padding(end = 4.dp),
+            Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(0.dp)) { if (song != null) app.go(Screen.NowPlaying) else app.go(Screen.Watch(v.id)) }.padding(end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (!app.store.settings.value.hideThumbs) Img(v.thumb, Modifier.width(96.dp).aspectRatio(16f / 9f))
+            if (song != null) SongCover(song, Modifier.padding(6.dp).size(44.dp))
+            else if (!app.store.settings.value.hideThumbs) Img(v.thumb, Modifier.width(96.dp).aspectRatio(16f / 9f))
             else Spacer(Modifier.width(4.dp))
             Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                 Text(v.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -586,6 +616,7 @@ private fun MiniPlayer(app: AppState) {
             IconButton(onClick = { if (st.playing) app.player.pause() else app.player.play() }) {
                 Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"))
             }
+            if (song != null) IconButton(onClick = { app.playback.skipNext() }) { Icon(Sym.SkipNext.fill, tr("Next")) }
             IconButton(onClick = { app.playback.close() }) { Icon(Sym.Close.fill, tr("Close")) }
         }
     }

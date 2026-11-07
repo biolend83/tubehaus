@@ -840,8 +840,12 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
     var page by (pageState ?: own)
     when (page) {
         "" -> {
-            SheetRow(Sym.HighQuality.outline, tr("Quality"), if (st.height > 0) "${st.height}p" else tr("Auto")) { page = "q" }
-            SheetRow(Sym.Speed.outline, tr("Speed"), if (st.speed == 1f) tr("Normal") else "${st.speed}x") { page = "s" }
+            val pb = app.playback
+            val codec = app.store.settings.state.collectAsState().value.codec
+            val families = pb.stream?.video?.map { it.codecFamily }?.distinct().orEmpty()
+            SheetHeader(tr("Video"))
+            SheetRow(Sym.HighQuality.outline, tr("Quality"), (if (st.height > 0) "${st.height}p" else tr("Auto")) + codecName(codec).let { if (it.isEmpty()) "" else " · $it" }) { page = "q" }
+            if (families.size > 1) SheetRow(Sym.Tune.outline, tr("Video codec"), codecName(codec).ifEmpty { tr("Auto") }) { page = "k" }
             if (st.audioTracks.size > 1) {
                 SheetRow(Sym.VolumeUp.outline, tr("Audio track"), st.audioTracks.firstOrNull { it.first == st.audioTrack }?.second ?: "") { page = "a" }
             }
@@ -853,15 +857,29 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
             }
             if (!app.playback.stream?.captions.isNullOrEmpty()) {
                 SheetRow(Sym.ClosedCaption.fill, tr("Captions"), st.captions?.let { c -> st.captionsTranslated?.let { l -> tr("Auto-translate") + " (" + (LANGS.firstOrNull { it.first == l }?.second ?: l) + ")" } ?: c.name } ?: tr("Off")) { page = "c" }
+                if (!pb.music && !app.platform.tv) SheetRow(Sym.Transcript.outline, tr("Transcript"), "") { pb.transcriptAsked = true; dismiss() }
             }
-            val pb = app.playback
+            SheetHeader(tr("Playback"))
+            SheetRow(Sym.Speed.outline, tr("Speed"), if (st.speed == 1f) tr("Normal") else "${st.speed}x") { page = "s" }
             SheetRow(Sym.Replay.outline, tr("Loop video"), tr(if (pb.loop) "On" else "Off")) { pb.loopVideo(!pb.loop); dismiss() }
+            SheetRow(Sym.SwapVert.outline, tr("A-B repeat"), when {
+                pb.abB > 0 -> durationMs(pb.abA) + "–" + durationMs(pb.abB)
+                pb.abA >= 0 -> "A " + durationMs(pb.abA)
+                else -> tr("Off")
+            }) { pb.abStep(); dismiss() }
             SheetRow(Sym.WatchLater.outline, tr("Sleep timer"), when {
                 pb.sleepAt == Playback.END -> tr("End of video")
                 pb.sleepAt > 0 -> tr("{n} min left").replace("{n}", "${((pb.sleepAt - Sys.nowMs()) / 60_000 + 1)}")
                 else -> tr("Off")
             }) { page = "t" }
+            SheetHeader(tr("More"))
             SheetRow(Sym.Bolt.outline, tr("Stats for nerds"), "") { page = "n" }
+        }
+        "k" -> {
+            val now = app.store.settings.value.codec
+            val families = app.playback.stream?.video?.map { it.codecFamily }?.distinct().orEmpty()
+            Pick(tr("Auto"), now.isEmpty()) { setCodec(app, ""); dismiss() }
+            for (f in listOf("h264", "vp9", "av1")) if (f in families) Pick(codecName(f), now == f) { setCodec(app, f); dismiss() }
         }
         "t" -> {
             val pb = app.playback
@@ -901,7 +919,7 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
         }
         "s" -> for (x in listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)) {
             Pick(if (x == 1f) tr("Normal") else "${x}x", st.speed == x) {
-                player.setSpeed(x); app.store.settings.update { it.copy(speed = x) }; dismiss()
+                app.playback.setSpeed(x); dismiss()
             }
         }
         "c" -> {
@@ -920,6 +938,21 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
             }
         }
     }
+}
+
+private fun codecName(c: String) = when (c) { "h264" -> "H.264"; "vp9" -> "VP9"; "av1" -> "AV1"; else -> "" }
+
+/** the codec picked here is kept (Settings → Quality) and the video reloads where it is */
+private fun setCodec(app: AppState, c: String) {
+    if (app.store.settings.value.codec == c) return
+    app.store.settings.update { it.copy(codec = c) }
+    app.playback.replay(app.player.state.value.positionMs)
+}
+
+/** a small grey heading between the groups of the sheet */
+@Composable
+private fun SheetHeader(t: String) {
+    Text(t, Modifier.padding(start = 20.dp, top = 10.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 /** a row of the settings sheet; with a remote or keyboard the focused one turns solid, so you can see where you are */

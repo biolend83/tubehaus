@@ -1,0 +1,5 @@
+- Music: search songs, albums and artists, album and artist pages, a now-playing screen with lyrics, radio and a queue; plays the sound only
+- Transcript: a video's captions as text you can search; tap a line to jump there
+- A-B repeat, a video codec choice, and the speed remembered for each channel
+- Watch time: the last two weeks, top channels and artists, a monthly recap, and break reminders
+- Settings with search and categories, and a tidier player menu
