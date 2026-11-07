@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.0.0",
+          "buildVersion": "37",
+          "date": "2026-11-07T12:01:56+00:00",
+          "localizedDescription": "Shared with the 1.0.0 release: the look of the web app 1.0, with the Pretendard font, softer colours, pill tabs, rounder cards, and Settings on one page of cards with a menu that jumps to each category.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-ipad.ipa",
+          "size": 20833435,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "0.5.19",
           "buildVersion": "36",
           "date": "2026-11-07T06:57:40+00:00",
@@ -131,11 +140,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "0.5.19",
-      "versionDate": "2026-11-07T06:57:40+00:00",
-      "versionDescription": "Shared with the 0.5.19 release: a Music tab (songs, albums, artists, lyrics, radio and a queue), searchable transcripts, A-B repeat, speed remembered for each channel, watch time with break reminders, and Settings with search and categories.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v0.5.19/TubeHaus-0.5.19-ipad.ipa",
-      "size": 17721122
+      "version": "1.0.0",
+      "versionDate": "2026-11-07T12:01:56+00:00",
+      "versionDescription": "Shared with the 1.0.0 release: the look of the web app 1.0, with the Pretendard font, softer colours, pill tabs, rounder cards, and Settings on one page of cards with a menu that jumps to each category.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-ipad.ipa",
+      "size": 20833435
     }
   ],
   "news": [],
