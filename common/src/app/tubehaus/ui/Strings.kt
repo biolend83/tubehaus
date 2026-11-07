@@ -592,6 +592,8 @@ private val KO by lazy { mapOf(
     "The queue starts again after the last song" to "마지막 곡이 끝나면 처음부터 다시 재생해요",
     "Songs like these are added near the end" to "끝 무렵에 비슷한 노래가 더해져요",
     "Coming up" to "다음 곡",
+    "Your content" to "내 콘텐츠",
+    "Jump back in" to "다시 듣기",
 ) }
 
 // Español. Machine-made, not yet read by a native speaker: corrections welcome
@@ -1185,6 +1187,8 @@ private val ES by lazy { mapOf(
     "The queue starts again after the last song" to "La cola vuelve a empezar tras la última canción",
     "Songs like these are added near the end" to "Cerca del final se añaden canciones parecidas",
     "Coming up" to "A continuación",
+    "Your content" to "Tu contenido",
+    "Jump back in" to "Vuelve a escuchar",
 ) }
 
 // 日本語. Machine-made, not yet read by a native speaker: corrections welcome
@@ -1778,6 +1782,8 @@ private val JA by lazy { mapOf(
     "The queue starts again after the last song" to "最後の曲のあと、キューの最初に戻ります",
     "Songs like these are added near the end" to "終わりが近づくと似た曲が追加されます",
     "Coming up" to "次の曲",
+    "Your content" to "あなたのコンテンツ",
+    "Jump back in" to "もう一度聴く",
 ) }
 
 // Deutsch. Machine-made, not yet read by a native speaker: corrections welcome
@@ -2371,6 +2377,8 @@ private val DE by lazy { mapOf(
     "The queue starts again after the last song" to "Nach dem letzten Song beginnt die Warteschlange von vorn",
     "Songs like these are added near the end" to "Gegen Ende kommen ähnliche Songs dazu",
     "Coming up" to "Als Nächstes",
+    "Your content" to "Deine Inhalte",
+    "Jump back in" to "Nochmal hören",
 ) }
 
 // 简体中文 (Simplified Chinese). Machine-made, not yet read by a native speaker: corrections welcome
@@ -2964,6 +2972,8 @@ private val ZH by lazy { mapOf(
     "The queue starts again after the last song" to "最后一首后队列会从头开始",
     "Songs like these are added near the end" to "快结束时会加入相似歌曲",
     "Coming up" to "接下来播放",
+    "Your content" to "你的内容",
+    "Jump back in" to "再听一遍",
 ) }
 
 // Português (Portuguese). Machine-made, not yet read by a native speaker: corrections welcome
@@ -3557,6 +3567,8 @@ private val PT by lazy { mapOf(
     "The queue starts again after the last song" to "A fila recomeça depois da última música",
     "Songs like these are added near the end" to "Músicas parecidas são adicionadas perto do fim",
     "Coming up" to "A seguir",
+    "Your content" to "Seu conteúdo",
+    "Jump back in" to "Ouça de novo",
 ) }
 
 // Français (French). Machine-made, not yet read by a native speaker: corrections welcome
@@ -4150,6 +4162,8 @@ private val FR by lazy { mapOf(
     "The queue starts again after the last song" to "La file reprend après le dernier titre",
     "Songs like these are added near the end" to "Des titres similaires sont ajoutés vers la fin",
     "Coming up" to "À suivre",
+    "Your content" to "Votre contenu",
+    "Jump back in" to "À réécouter",
 ) }
 
 // Русский (Russian). Machine-made, not yet read by a native speaker: corrections welcome
@@ -4743,6 +4757,8 @@ private val RU by lazy { mapOf(
     "The queue starts again after the last song" to "После последней песни очередь начнётся снова",
     "Songs like these are added near the end" to "Ближе к концу добавляются похожие песни",
     "Coming up" to "Далее",
+    "Your content" to "Ваш контент",
+    "Jump back in" to "Слушать снова",
 ) }
 
 // हिन्दी (Hindi). Machine-made, not yet read by a native speaker: corrections welcome
@@ -5336,6 +5352,8 @@ private val HI by lazy { mapOf(
     "The queue starts again after the last song" to "आखिरी गाने के बाद कतार फिर शुरू होती है",
     "Songs like these are added near the end" to "अंत के पास ऐसे ही गाने जोड़े जाते हैं",
     "Coming up" to "आगे के गाने",
+    "Your content" to "आपकी सामग्री",
+    "Jump back in" to "फिर से सुनें",
 ) }
 
 // Bahasa Indonesia (Indonesian). Machine-made, not yet read by a native speaker: corrections welcome
@@ -5929,6 +5947,8 @@ private val ID by lazy { mapOf(
     "The queue starts again after the last song" to "Antrean mulai lagi setelah lagu terakhir",
     "Songs like these are added near the end" to "Lagu serupa ditambahkan menjelang akhir",
     "Coming up" to "Berikutnya",
+    "Your content" to "Konten Anda",
+    "Jump back in" to "Dengarkan lagi",
 ) }
 
 // Türkçe (Turkish). Machine-made, not yet read by a native speaker: corrections welcome
@@ -6522,6 +6542,8 @@ private val TR by lazy { mapOf(
     "The queue starts again after the last song" to "Son şarkıdan sonra sıra baştan başlar",
     "Songs like these are added near the end" to "Sona doğru benzer şarkılar eklenir",
     "Coming up" to "Sıradakiler",
+    "Your content" to "İçeriğin",
+    "Jump back in" to "Yeniden dinle",
 ) }
 
 // বাংলা (Bengali). Machine-made, not yet read by a native speaker: corrections welcome
@@ -7115,4 +7137,6 @@ private val BN by lazy { mapOf(
     "The queue starts again after the last song" to "শেষ গানের পর সারি আবার শুরু হয়",
     "Songs like these are added near the end" to "শেষের দিকে এরকম গান যোগ হয়",
     "Coming up" to "পরের গান",
+    "Your content" to "আপনার কনটেন্ট",
+    "Jump back in" to "আবার শুনুন",
 ) }

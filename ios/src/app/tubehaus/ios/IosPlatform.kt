@@ -35,6 +35,20 @@ class IosPlatform : Platform {
     override val dataDir: Path = folder(NSApplicationSupportDirectory) / "tubehaus"
     override val cacheDir: Path = folder(NSCachesDirectory)
     override val touch = true
+    /** Pretendard, the web app 1.0's typeface, from the app bundle (one variable file, its weight axis set for each weight) */
+    override val font by lazy {
+        val path = platform.Foundation.NSBundle.mainBundle.pathForResource("PretendardVariable", "ttf") ?: return@lazy null
+        val d = NSData.create(contentsOfFile = path) ?: return@lazy null
+        val data = ByteArray(d.length.toInt())
+        if (data.isEmpty()) return@lazy null
+        data.usePinned { platform.posix.memcpy(it.addressOf(0), d.bytes, d.length) }
+        runCatching {
+            androidx.compose.ui.text.font.FontFamily(listOf(400, 500, 600, 700, 800).map { w ->
+                androidx.compose.ui.text.platform.Font("Pretendard-$w", data, androidx.compose.ui.text.font.FontWeight(w),
+                    variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(w)))
+            })
+        }.getOrNull()
+    }
     override val player = IosPlayer()
     /** AirPlay instead of Google Cast: the system's button and list of TVs */
     override val airplay: (@androidx.compose.runtime.Composable (androidx.compose.ui.Modifier) -> Unit)? = { m -> AirPlayButton(m) }

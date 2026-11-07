@@ -62,6 +62,8 @@ interface Platform {
     fun deviceRegion(): String = Sys.deviceRegion().ifEmpty { "US" }
     /** Android 12+: colours taken from the wallpaper (Material You); null where there are none */
     fun wallpaperColors(dark: Boolean): androidx.compose.material3.ColorScheme? = null
+    /** the app's type face, Pretendard (built in, as on the web 1.0); null: the system's */
+    val font: androidx.compose.ui.text.font.FontFamily? get() = null
     /**
      * Hands a video link to a downloader app (YTDLnis, Seal, ...): false when there is none
      * installed, or the platform has no such thing
