@@ -1535,3 +1535,5 @@ html.tv .hi10 { display: none; }
 @media (max-width: 792px) { .trend-head + .ctabs { margin: 0 -12px 16px; } }
 /* phones: playlist results stack like video results (the picture took the whole width and pushed the text off) */
 @media (max-width: 792px) { .row-pl .card.pl { flex-direction: column; gap: 8px; margin-bottom: 24px; } .row-pl .card.pl .meta { min-width: 0; } }
+/* the like count stays on one line ("39.9만" broke after "39.") */
+.seg-btn button, .w-actions > * { white-space: nowrap; flex: none; }   /* the row scrolls sideways instead of squeezing */

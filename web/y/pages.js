@@ -3,6 +3,7 @@ import { $, $$, el, esc, icon, api, lib, settings, local, toast, fmtTime, fmtVie
 import { state, card, metaLine, chAvatar, channelCard, playlistCard, norm, remember, known, fillProgress, infinite, avatar, subBtn, isSub, navigate, popup, mi, videoMenu, dialog, loadLib, setList, pageCleanup, renderGuideSubs } from "./core.js";
 import { SB_CATS } from "./player.js";
 import { $t, LANG, LANGS, LOCALE, REGION, fmtShort, langLabel } from "./i18n.js";
+import { bgFallback } from "./avatars.js";
 
 const grid = (cls = "") => `<div class="vgrid ${cls}"></div>`;
 const spinner = `<div class="loading"><div class="spinner"></div></div>`;
@@ -317,6 +318,7 @@ export async function channel(page, m, alive) {
     </div>`;
   $(".more-about", page)?.addEventListener("click", () => dialog(`<div class="dh"><b>${esc(c.author)}</b><button data-close>${icon("close")}</button></div>
     <div class="about">${linkify(c.description || "")}<hr><p>${c.joined ? $t("가입일: ") + new Date(c.joined * 1000).toLocaleDateString(LOCALE) : ""}</p><p>${c.totalViews ? fmtViews(c.totalViews) : ""}</p><p>youtube.com/channel/${esc(ucid)}</p></div>`));
+  if (banner) bgFallback($(".banner", page), banner);
   const sf = $(".ch-search", page);
   sf.onsubmit = (e) => { e.preventDefault(); const v = sf.querySelector("input").value.trim(); if (v) navigate(`${base}/search?query=${encodeURIComponent(v)}`); };
   sf.querySelector("button").onclick = () => sf.classList.add("open") || sf.querySelector("input").focus();

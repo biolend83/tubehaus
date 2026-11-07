@@ -75,6 +75,13 @@ function relayed(src) {
   const m = /^(?:https?:\/\/[^/]+)?\/ggpht\/(.+)$/.exec(src) || /^https:\/\/yt3\.(?:ggpht|googleusercontent)\.com\/(.+)$/.exec(src);
   return m ? "/api/p/yt/music/img?u=" + encodeURIComponent("https://yt3.googleusercontent.com/" + m[1]) : "";
 }
+/** a background picture (channel banners): if it doesn't load, the same detour */
+export function bgFallback(node, src) {
+  if (!node || !src) return;
+  const probe = new Image();
+  probe.onerror = () => { const r = relayed(src); if (r && node.isConnected) node.style.backgroundImage = `url('${r}')`; };
+  probe.src = src;
+}
 function fixBroken(img) {
   const step = img.dataset.chfix || "";
   if (step === "2") return toPh(img);                 // nothing worked
