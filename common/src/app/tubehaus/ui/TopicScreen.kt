@@ -44,7 +44,7 @@ val TOPICS = linkedMapOf(
 )
 
 /** the topics that are tabs at the top on a phone; the rest are under "More" */
-val TOP_TOPICS = listOf("Music", "Live")
+val TOP_TOPICS = listOf("Live")
 
 /** the screens the phone's top tabs switch between, all under Home in the bottom bar */
 fun Screen.underHome(): Boolean = this == Screen.Home || this == Screen.Subs || (this is Screen.Topic && key in TOP_TOPICS)

@@ -155,4 +155,66 @@ data class Settings(
     val skipVersion: String = "",
     /** the version last opened: when the app opens on a newer one, it shows what's new */
     val seenVersion: String = "",
+    /** the speed you chose for a channel (id -> speed): its videos start at it */
+    val channelSpeed: Map<String, Float> = emptyMap(),
+    /** a speed changed while watching is kept for that channel (else it becomes the speed of every video) */
+    val speedPerChannel: Boolean = true,
+    /** the video codec the player prefers: "" automatic, "h264", "vp9" or "av1" */
+    val codec: String = "",
+    /** music: only the sound is downloaded (less data), the picture comes back with "Watch video" */
+    val musicAudioOnly: Boolean = true,
+    /** wellbeing: a reminder after this many minutes of watching in a row; 0 off */
+    val breakMinutes: Int = 0,
+    /** wellbeing: a reminder once a day past this many minutes; 0 off */
+    val dailyMinutes: Int = 0,
+)
+
+/** One day of watching, kept on this device only: seconds of video and music, per channel and artist. */
+@Serializable
+data class DayStats(
+    val video: Long = 0,
+    val music: Long = 0,
+    /** channel id -> seconds (videos) */
+    val ch: Map<String, Long> = emptyMap(),
+    /** artist -> seconds (music) */
+    val art: Map<String, Long> = emptyMap(),
+    /** how many videos and songs were started */
+    val n: Int = 0,
+)
+
+/** Watch time by day ("2026-11-07"), for Settings → Wellbeing and the monthly recap; a year is kept. */
+@Serializable
+data class WatchStats(
+    val days: Map<String, DayStats> = emptyMap(),
+    /** channel id -> its name, for the lists */
+    val names: Map<String, String> = emptyMap(),
+    /** the day the daily reminder was last shown */
+    val remindedOn: String = "",
+)
+
+/** a song as the music tab remembers it */
+@Serializable
+data class SongMeta(
+    val id: String,
+    val title: String = "",
+    val artist: String = "",
+    val artistId: String = "",
+    val album: String = "",
+    val albumId: String = "",
+    val len: Int = 0,
+    val art: String = "",
+)
+
+/** an album or an artist as the music tab remembers it */
+@Serializable
+data class CardMeta(val id: String, val title: String = "", val subtitle: String = "", val art: String = "", val kind: String = "")
+
+/** The music tab's memory, on this device: songs played, searches, albums and artists opened, newest first. */
+@Serializable
+data class MusicData(
+    val recent: List<SongMeta> = emptyList(),
+    val searches: List<String> = emptyList(),
+    val opened: List<CardMeta> = emptyList(),
+    /** songs liked in the music player (also in Liked videos) */
+    val liked: List<SongMeta> = emptyList(),
 )

@@ -40,10 +40,20 @@ sealed interface Screen {
     data object Downloads : Screen
     /** one of YouTube's topic pages (TOPICS): Music, Live, News... */
     data class Topic(val key: String) : Screen
+    /** the music tab: search, recent songs, albums and artists */
+    data object Music : Screen
+    /** what is playing as music: the cover, the lyrics, the queue */
+    data object NowPlaying : Screen
+    data class Album(val id: String, val title: String = "") : Screen
+    data class Artist(val id: String, val name: String = "") : Screen
+    /** one category of Settings ("display", "player"...); a search through all of them when [query] is set */
+    data class SettingsPage(val key: String) : Screen
+    /** Settings → Wellbeing: watch time by day, channel and month */
+    data object Stats : Screen
 }
 
 /** the screens a tab opens: going to one starts over from it (Music and Live are tabs at the top on phones) */
-val TABS = listOf(Screen.Home, Screen.Shorts, Screen.Subs, Screen.Library) + TOP_TOPICS.map { Screen.Topic(it) }
+val TABS = listOf(Screen.Home, Screen.Shorts, Screen.Subs, Screen.Library, Screen.Music) + TOP_TOPICS.map { Screen.Topic(it) }
 
 class AppState(val platform: Platform, val store: Store) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -122,6 +132,9 @@ class AppState(val platform: Platform, val store: Store) {
             else if (!quiet) toast(tr("TubeHaus is up to date"))
         }
     }
+
+    /** a Wellbeing reminder on screen (a break, today's amount) */
+    var reminder by mutableStateOf<String?>(null)
 
     /** the release notes on screen (WhatsNewDialog); empty while they load */
     var whatsNew by mutableStateOf<List<Remote.Notes>?>(null)
