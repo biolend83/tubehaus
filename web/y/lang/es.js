@@ -145,6 +145,8 @@ export default {
  "댓글이 사용 중지되었습니다.": "Los comentarios están desactivados.",
  "더보기": "...más",
  "데이터 절약": "Ahorro de datos",
+ "미리 받아 둘 시간": "Precarga",
+ "끌어서 정해요. 길게 받아 두면 인터넷이 잠깐 끊겨도 멈추지 않아요. 화질이 높으면 브라우저 메모리가 허락하는 만큼만 받아요 (다음 영상부터)": "Arrastra para elegir. Una precarga más larga sigue reproduciendo si la red se corta un momento. En alta calidad, solo lo que permite la memoria del navegador (desde el siguiente vídeo)",
  "동영상": "Vídeos",
  "동영상 (소리 포함)": "Vídeo (con sonido)",
  "동영상 ID": "ID del vídeo",

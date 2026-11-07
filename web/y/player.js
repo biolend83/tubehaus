@@ -193,7 +193,7 @@ export class Player {
     await this.sp.attach(this.video);
     this.sp.configure({
       streaming: {
-        bufferingGoal: settings.dataSaver ? 30 : 120,
+        bufferingGoal: +settings.buffer || (settings.dataSaver ? 30 : 120),
         rebufferingGoal: 1,
         segmentPrefetchLimit: 6,
         maxDisabledTime: 0,
@@ -255,7 +255,7 @@ export class Player {
     }
     if (!native) {
       this.releaseNative();
-      this.sp.configure("streaming.bufferingGoal", TV_DEVICE ? 20 : settings.dataSaver ? 30 : this.live ? 30 : 120);
+      this.sp.configure("streaming.bufferingGoal", this.live ? 30 : +settings.buffer || (TV_DEVICE ? 20 : settings.dataSaver ? 30 : 120));
       // the cap applies from the first segment (so a TV does not start with 4K/8K and switch late)
       this.sp.configure("abr.restrictions.maxHeight", this.live ? Infinity : this.capHeight());
       if (TV_DEVICE) this.sp.configure({ streaming: { segmentPrefetchLimit: 2, bufferBehind: 10 } });
@@ -431,7 +431,8 @@ export class Player {
     if (this.live || !t) return;
     const secs = (120e6 * 8) / (t.bandwidth || 5e6);
     // TVs only: 20 s ahead, 10 s behind (YouTube buffers about 15-20 s too; weak devices get busy appending)
-    const goal = Math.max(8, Math.min(TV_DEVICE ? 20 : settings.dataSaver ? 30 : 120, Math.floor(secs * 0.8)));
+    // the time chosen in Settings (Buffer ahead) wins over the automatic one, still within the memory limit
+    const goal = Math.max(8, Math.min(+settings.buffer || (TV_DEVICE ? 20 : settings.dataSaver ? 30 : 120), Math.floor(secs * 0.8)));
     const behind = Math.max(3, Math.min(TV_DEVICE ? 10 : 30, Math.floor(secs * 0.2)));
     this.sp.configure({ streaming: { bufferingGoal: goal, bufferBehind: behind } });
   }

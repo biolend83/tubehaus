@@ -145,6 +145,8 @@ export default {
  "댓글이 사용 중지되었습니다.": "Kommentare sind deaktiviert.",
  "더보기": "...mehr",
  "데이터 절약": "Datensparmodus",
+ "미리 받아 둘 시간": "Vorpuffern",
+ "끌어서 정해요. 길게 받아 두면 인터넷이 잠깐 끊겨도 멈추지 않아요. 화질이 높으면 브라우저 메모리가 허락하는 만큼만 받아요 (다음 영상부터)": "Zum Einstellen ziehen. Ein längerer Puffer spielt bei kurzen Netzaussetzern weiter. Bei hoher Qualität nur so viel, wie der Browserspeicher erlaubt (ab dem nächsten Video)",
  "동영상": "Videos",
  "동영상 (소리 포함)": "Video (mit Ton)",
  "동영상 ID": "Video-ID",

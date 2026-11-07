@@ -64,12 +64,31 @@ MAX_HEIGHT = env_int("HT_MAX_HEIGHT", 0)                 # highest quality offer
 # The reverse proxy asks GET /api/p/auth/check before letting anyone in (see deploy/Caddyfile.public).
 ACCOUNTS = env("HT_ACCOUNTS", "0") == "1"
 MAX_ACCOUNTS = env_int("HT_MAX_ACCOUNTS", 1000)
+def _names(v, n):
+    """a name, or one per language as {"ko": "홈튜브", "en": "HomeTube"} (the page picks the visitor's language)"""
+    if isinstance(v, dict):
+        d = {str(k).strip()[:8]: str(s).strip()[:n] for k, s in v.items() if str(s or "").strip()}
+        return d or None
+    return str(v or "").strip()[:n] or None
+
+
+def _name(raw):
+    raw = raw.strip()
+    if raw.startswith("{"):
+        try:
+            return _names(json.loads(raw), 40)
+        except ValueError:
+            print("HT_NAME looks like JSON but is not, used as it is", flush=True)
+    return raw[:40] or None
+
+
 # The instance's own name in the page title and menu (empty = TubeHaus, in the visitor's language)
-NAME = env("HT_NAME", "").strip()[:40]
+NAME = _name(env("HT_NAME", ""))
 
 
 def _links(raw):
-    """HT_LINKS: extra menu links, as JSON [{"name": "Home hub", "url": "https://..."}] (or /path on this site)"""
+    """HT_LINKS: extra menu links, as JSON [{"name": "Home hub", "url": "https://..."}] (or /path on this site);
+    a name may be one per language, {"ko": "우리집 허브", "en": "Home hub"}"""
     try:
         items = json.loads(raw) if raw.strip() else []
     except ValueError:
@@ -79,7 +98,7 @@ def _links(raw):
     for x in items if isinstance(items, list) else []:
         if not isinstance(x, dict):
             continue
-        name, url = str(x.get("name") or "").strip()[:60], str(x.get("url") or "").strip()[:500]
+        name, url = _names(x.get("name"), 60), str(x.get("url") or "").strip()[:500]
         if name and re.match(r"(?i)^(https?://|/(?!/))", url):
             out.append({"name": name, "url": url})
     return out[:12]

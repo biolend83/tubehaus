@@ -145,6 +145,8 @@ export default {
  "댓글이 사용 중지되었습니다.": "Os comentários estão desativados.",
  "더보기": "...mais",
  "데이터 절약": "Economia de dados",
+ "미리 받아 둘 시간": "Pré-carregamento",
+ "끌어서 정해요. 길게 받아 두면 인터넷이 잠깐 끊겨도 멈추지 않아요. 화질이 높으면 브라우저 메모리가 허락하는 만큼만 받아요 (다음 영상부터)": "Arraste para escolher. Um pré-carregamento maior continua tocando em quedas curtas da rede. Em alta qualidade, só o que a memória do navegador permite (a partir do próximo vídeo)",
  "동영상": "Vídeos",
  "동영상 (소리 포함)": "Vídeo (com som)",
  "동영상 ID": "ID do vídeo",

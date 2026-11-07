@@ -1,5 +1,5 @@
 // Entry point: header (search, notifications, account), side menu, routes, global shortcuts
-import { $, $$, esc, icon, api, lib, settings, local, toast, thumb, normVideo, ago, modeReady, siteName, LINKS } from "./util.js";
+import { $, $$, esc, icon, api, lib, settings, local, toast, thumb, normVideo, ago, modeReady, siteName, pickName, LINKS } from "./util.js";
 import { dialog } from "./core.js";
 import { player, routes, state, loadLib, navigate, render, renderGuideSubs, popup, mi, keysDialog, initCardHover, markRestore, saveScroll, known, videoMenu, pageCleanup } from "./core.js";
 import * as P from "./pages.js";
@@ -23,7 +23,7 @@ modeReady.then(() => {
   if (!LINKS.length) return;
   const sec = document.createElement("div");
   sec.className = "g-sec g-links";
-  sec.innerHTML = LINKS.map((l) => `<a href="${esc(l.url)}" class="gi"${/\.apk$/i.test(l.url) ? " download" : ""}>${icon(/\.apk$/i.test(l.url) ? "download" : "open", "duo")}<span>${esc(l.name)}</span></a>`).join("");
+  sec.innerHTML = LINKS.map((l) => `<a href="${esc(l.url)}" class="gi"${/\.apk$/i.test(l.url) ? " download" : ""}>${icon(/\.apk$/i.test(l.url) ? "download" : "open", "duo")}<span>${esc(pickName(l.name))}</span></a>`).join("");
   const set = document.querySelector('#guide [data-r="settings"]')?.closest(".g-sec");
   if (set) set.before(sec);
 });

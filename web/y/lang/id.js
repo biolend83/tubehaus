@@ -145,6 +145,8 @@ export default {
  "댓글이 사용 중지되었습니다.": "Komentar dinonaktifkan.",
  "더보기": "...lainnya",
  "데이터 절약": "Penghemat data",
+ "미리 받아 둘 시간": "Buffer di depan",
+ "끌어서 정해요. 길게 받아 두면 인터넷이 잠깐 끊겨도 멈추지 않아요. 화질이 높으면 브라우저 메모리가 허락하는 만큼만 받아요 (다음 영상부터)": "Geser untuk memilih. Buffer lebih panjang tetap memutar saat jaringan putus sebentar. Pada kualitas tinggi hanya sebanyak yang diizinkan memori browser (mulai video berikutnya)",
  "동영상": "Video",
  "동영상 (소리 포함)": "Video (dengan suara)",
  "동영상 ID": "ID video",

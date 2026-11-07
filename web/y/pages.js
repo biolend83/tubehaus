@@ -669,6 +669,9 @@ export function settingsPage(page) {
   const sub = (t) => (t ? `<small>${t}</small>` : "");
   const sel = (k, opts) => `<span class="sx-sel"><select data-k="${k}">${opts.map(([v, l]) => `<option value="${v}" ${String(S[k]) === String(v) ? "selected" : ""}>${l}</option>`).join("")}</select>${icon("down", "sm")}</span>`;
   // a short list of choices, side by side
+  // the buffer slider's stops (seconds; 0 = automatic) and their labels
+  const BUF_STOPS = [0, 10, 20, 30, 60, 90, 120, 180, 300];
+  const bufLabel = (s) => !s ? $t("자동") : s < 60 ? $t("{0}초", s) : $t("{0}분", s / 60);
   const seg = (k, opts) => `<div class="sx-seg" role="radiogroup">${opts.map(([v, l, ic]) => `<label><input type="radio" name="sx-${k}" data-k="${k}" value="${v}" ${String(S[k]) === String(v) ? "checked" : ""}><span>${ic ? icon(ic, "sm") : ""}${l}</span></label>`).join("")}</div>`;
   const tog = (k, label, s = "") => `<label class="sx-row"><span class="sx-tx"><b>${label}</b>${sub(s)}</span><input type="checkbox" class="sw" data-k="${k}" ${S[k] ? "checked" : ""}></label>`;
   const row = (label, ctl, s = "", cls = "") => `<div class="sx-row ${cls}"><span class="sx-tx"><b>${label}</b>${sub(s)}</span>${ctl}</div>`;
@@ -689,6 +692,7 @@ export function settingsPage(page) {
       ${tog("rememberSpeed", $t("재생 속도 기억"), $t("다음에 와도 고른 재생 속도를 그대로 써요"))}
       ${row($t("선호 화질"), sel("quality", [["auto", $t("최고 화질 (기본)")], ["4320", "8K (4320p)"], ["2160", "4K (2160p)"], ["1440", "1440p"], ["1080", "1080p"], ["720", "720p"], ["480", "480p"], ["360", "360p"]]), $t("화질을 알아서 낮추지 않고 이 화질로 고정해요 (영상에 없으면 그 아래 최고)"))}
       ${tog("dataSaver", $t("데이터 절약"), $t("480p 이하, 미리 받는 양을 줄여요"))}
+      ${row($t("미리 받아 둘 시간"), `<span class="sx-range"><input type="range" min="0" max="${BUF_STOPS.length - 1}" step="1" data-buf value="${Math.max(0, BUF_STOPS.indexOf(+S.buffer || 0))}" aria-label="${$t("미리 받아 둘 시간")}"><output>${bufLabel(+S.buffer || 0)}</output></span>`, $t("끌어서 정해요. 길게 받아 두면 인터넷이 잠깐 끊겨도 멈추지 않아요. 화질이 높으면 브라우저 메모리가 허락하는 만큼만 받아요 (다음 영상부터)"))}
       ${IPHONE || IPAD ? tog("nativeIphone", $t("기기 기본 플레이어"), $t("iPhone·iPad 자체 플레이어로 재생해요. 다른 앱 위 PIP 와 AirPlay 가 되고, 화질은 선호 화질 하나로 정해져요 (다음 영상부터 적용)")) : ""}
       ${tog("resume", $t("이어서 보기"), $t("보던 곳부터 재생 (모든 기기 공유)"))}
       ${tog("miniplayer", $t("미니 플레이어"), $t("다른 페이지로 가도 작은 화면으로 계속 재생"))}
@@ -755,8 +759,16 @@ export function settingsPage(page) {
   const onScroll = () => { raf ||= requestAnimationFrame(spy); };
   addEventListener("scroll", onScroll, { passive: true });
   spy();
+  page.addEventListener("input", (e) => {
+    if (e.target.dataset.buf != null) e.target.nextElementSibling.textContent = bufLabel(BUF_STOPS[+e.target.value] || 0);
+  });
   page.addEventListener("change", (e) => {
     const t = e.target;
+    if (t.dataset.buf != null) {
+      S.buffer = BUF_STOPS[+t.value] || 0;
+      toast($t("저장됨"));
+      return;
+    }
     if (t.dataset.cat) {
       const s = new Set(S.sponsorCats);
       t.checked ? s.add(t.dataset.cat) : s.delete(t.dataset.cat);

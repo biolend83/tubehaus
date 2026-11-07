@@ -66,6 +66,7 @@ const DEFAULTS = {
   calm: false,            // calm mode: subscriptions only, no Shorts, trending or recommendations, no autoplay
   quality: "auto",        // auto | 4320 | 2160 | 1440 | 1080 | 720 | 480 | 360
   dataSaver: false,
+  buffer: 0,              // seconds to buffer ahead; 0 = automatic
   nativeIphone: true,     // iPhone and iPad: play with the device's own player (Picture-in-Picture over other apps, AirPlay)
   captions: false,        // captions always on
   capLang: LANG,
@@ -153,12 +154,14 @@ export let SERVER_MAX_H = Infinity;     // the operator's quality cap (HT_MAX_HE
 // the instance's own name (HT_NAME) and extra menu links (HT_LINKS)
 let NAME = "";
 export let LINKS = [];
-export const siteName = () => NAME || $t("튜브하우스");
+// a name may come in several languages, {"ko": "홈튜브", "en": "HomeTube"}: the interface language, else English, else the first
+export const pickName = (v) => !v || typeof v === "string" ? v || "" : String(v[LANG] ?? v.en ?? Object.values(v)[0] ?? "");
+export const siteName = () => pickName(NAME) || $t("튜브하우스");
 export const modeReady = fetch("/api/p/health", { credentials: "same-origin" })
   .then((r) => (r.ok ? r.json() : {})).then((h) => {
     PUBLIC = !!h.public;
     SERVER_MAX_H = +h.max_height || Infinity;
-    NAME = typeof h.name === "string" ? h.name : "";
+    NAME = typeof h.name === "string" || (h.name && typeof h.name === "object") ? h.name : "";
     LINKS = Array.isArray(h.links) ? h.links : [];
     if (h.accounts && !window.TUBEHAUS_LOGIN_URL) window.TUBEHAUS_LOGIN_URL = "/login?r=";   // sign-up required
     document.documentElement.classList.toggle("public", PUBLIC);
