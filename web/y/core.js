@@ -452,6 +452,9 @@ export async function render() {
     document.body.dataset.route = state.route;
     $$("#guide .gi, #mguide a, #bnav a").forEach((a) => a.classList.toggle("act", a.dataset.r === state.route));
     page.innerHTML = "";
+    page.classList.remove("enter");         // restart the "rise in" of the new page (app.css: Motion)
+    void page.offsetWidth;
+    page.classList.add("enter");
     const restoring = _restore;
     _restore = false;
     if (!restoring) scrollTo(0, 0);

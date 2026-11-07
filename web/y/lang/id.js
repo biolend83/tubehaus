@@ -525,5 +525,12 @@ export default {
  "아티스트": "Artis",
  "라디오": "Radio",
  "인기 곡": "Lagu teratas",
- "소개": "Tentang"
+ "소개": "Tentang",
+ "가장 큰 업데이트예요": "Pembaruan terbesar kami",
+ "노래·앨범·아티스트, 가사까지": "Lagu, album, artis, dan lirik",
+ "새 디자인": "Desain baru",
+ "더 깔끔한 화면과 부드러운 움직임": "Tampilan lebih rapi, gerakan lebih halus",
+ "휴대폰에서도 편하게": "Lebih nyaman di ponsel",
+ "큰 화면 목록과 아래 메뉴": "Daftar video besar dan menu bawah",
+ "음악 열기": "Buka Musik"
 };

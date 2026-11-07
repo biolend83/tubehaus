@@ -525,5 +525,12 @@ export default {
  "아티스트": "Sanatçı",
  "라디오": "Radyo",
  "인기 곡": "Popüler şarkılar",
- "소개": "Hakkında"
+ "소개": "Hakkında",
+ "가장 큰 업데이트예요": "Şimdiye kadarki en büyük güncelleme",
+ "노래·앨범·아티스트, 가사까지": "Şarkılar, albümler, sanatçılar ve sözler",
+ "새 디자인": "Yeni tasarım",
+ "더 깔끔한 화면과 부드러운 움직임": "Daha sade ekranlar, daha akıcı hareket",
+ "휴대폰에서도 편하게": "Telefonda daha rahat",
+ "큰 화면 목록과 아래 메뉴": "Büyük video listesi ve alt menü",
+ "음악 열기": "Müziği aç"
 };

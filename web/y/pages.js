@@ -53,11 +53,30 @@ const CHIP_SEARCH = {
   fashion: { q: $t("패션·뷰티"), date: "week", sort: "views" },
 };
 
+// 1.0: a card at the top of Home saying what is new, until it is closed (or Music is opened from it)
+function hello10(page) {
+  const it = (ic, t, s) => `<div class="hi10-it"><span class="hi10-ic">${icon(ic)}</span><div><b>${t}</b><small>${s}</small></div></div>`;
+  const card = el(`<section class="hi10" role="note">
+    <button class="hi10-x" aria-label="${$t("닫기")}">${icon("close")}</button>
+    <div class="hi10-top"><span class="hi10-v">1.0</span><div><h2>${$t("튜브하우스")} 1.0</h2><p>${$t("가장 큰 업데이트예요")}</p></div></div>
+    <div class="hi10-its">${it("music", $t("음악"), $t("노래·앨범·아티스트, 가사까지"))}${it("sparkle", $t("새 디자인"), $t("더 깔끔한 화면과 부드러운 움직임"))}${it("phone", $t("휴대폰에서도 편하게"), $t("큰 화면 목록과 아래 메뉴"))}</div>
+    <a class="pill white" href="/feed/music" data-nav>${icon("music")}${$t("음악 열기")}</a>
+  </section>`);
+  const bye = () => {
+    local.set("hi10", true);
+    card.classList.add("bye");
+    setTimeout(() => card.remove(), 320);
+  };
+  card.querySelector(".hi10-x").onclick = bye;
+  card.querySelector("a").addEventListener("click", () => local.set("hi10", true));
+  page.querySelector(".chips").after(card);
+}
 export async function home(page, m, alive) {
   // calm mode: the home screen is just your subscriptions, newest first
   const chip = settings.calm ? "recent" : new URLSearchParams(location.search).get("chip") || "all";
   page.innerHTML = `<div class="chips">${CHIPS.map(([k, l]) => `<a class="chip ${k === chip ? "on" : ""}" href="/?chip=${k}" data-nav>${l}</a>`).join("")}</div>
     <div class="shorts-shelf" hidden></div><div data-ctx="home">${grid("home")}</div>`;
+  if (chip === "all" && !settings.calm && !local.get("hi10", false)) hello10(page);
   const box = $(".vgrid", page);
   box.innerHTML = skel();
   await state.libReady;

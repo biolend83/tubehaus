@@ -32,7 +32,11 @@ function channelAvatar(id) {
   if (saved[id]) return Promise.resolve(saved[id]);
   if (!asking.has(id)) {
     asking.set(id, limited(() => api(`/api/v1/channels/${id}?fields=authorThumbnails`, { ttl: 86400000, quiet: true })
-      .then((c) => { const u = pickThumb(c && c.authorThumbnails, 88); if (u) keep(id, u); return u; })));
+      .then((c) => pickThumb(c && c.authorThumbnails, 88), () => "")
+      // Invidious can't open YouTube's "- Topic" (auto-generated artist) channels; YouTube Music has them as artists
+      .then((u) => u || api(`/api/p/yt/music/artist?id=${id}`, { ttl: 86400000, quiet: true })
+        .then((a) => (a && a.art ? "/api/p/yt/music/img?u=" + encodeURIComponent(a.art) : ""), () => ""))
+      .then((u) => { if (u) keep(id, u); return u; })));
   }
   return asking.get(id);
 }
@@ -104,7 +108,15 @@ function scan(root) {
 }
 
 export function initAvatars() {
-  document.addEventListener("error", (e) => { const t = e.target; if (t instanceof HTMLImageElement && t.classList.contains("av")) fixBroken(t); }, true);
+  document.addEventListener("error", (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLImageElement)) return;
+    if (t.classList.contains("av")) return fixBroken(t);
+    // other pictures from the same host (community posts, banners): the same detour, once
+    if (t.dataset.chfix) return;
+    const r = relayed(t.getAttribute("src") || "");
+    if (r) { t.dataset.chfix = "1"; t.src = r; }
+  }, true);
   // pictures that already failed before this started
   document.querySelectorAll("img.av").forEach((i) => { if (i.complete && !i.naturalWidth && i.getAttribute("src")) fixBroken(i); });
   new MutationObserver((ms) => {

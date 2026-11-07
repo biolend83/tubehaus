@@ -525,5 +525,12 @@ export default {
  "아티스트": "Artist",
  "라디오": "Radio",
  "인기 곡": "Top songs",
- "소개": "About"
+ "소개": "About",
+ "가장 큰 업데이트예요": "Our biggest update yet",
+ "노래·앨범·아티스트, 가사까지": "Songs, albums, artists and lyrics",
+ "새 디자인": "New design",
+ "더 깔끔한 화면과 부드러운 움직임": "Cleaner screens, smoother motion",
+ "휴대폰에서도 편하게": "Better on phones",
+ "큰 화면 목록과 아래 메뉴": "Big video list and a bottom menu",
+ "음악 열기": "Open Music"
 };

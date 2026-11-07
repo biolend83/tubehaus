@@ -288,6 +288,14 @@ step("hover", initCardHover);
 step("tv", initTV);
 step("dearrow", initDeArrow);
 step("avatars", initAvatars);
+// pictures fade in once loaded (app.css: Motion): mark each picture when it is there, or when it failed
+step("imgfx", () => {
+  const done = (e) => { if (e.target instanceof HTMLImageElement) e.target.classList.add("ld"); };
+  document.addEventListener("load", done, true);
+  document.addEventListener("error", done, true);
+  document.querySelectorAll("img").forEach((i) => { if (i.complete) i.classList.add("ld"); });
+  document.documentElement.classList.add("imgfx");
+});
 step("cast", () => modeReady.then((pub) => { if (!pub) startReceiver(); }));   // no send-to-TV on public instances
 addEventListener("settings", (e) => { if (e.detail === "castReceive") startReceiver(); });
 loadLib().then(async (L) => {

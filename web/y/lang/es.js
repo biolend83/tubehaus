@@ -525,5 +525,12 @@ export default {
  "아티스트": "Artista",
  "라디오": "Radio",
  "인기 곡": "Canciones populares",
- "소개": "Información"
+ "소개": "Información",
+ "가장 큰 업데이트예요": "Nuestra mayor actualización",
+ "노래·앨범·아티스트, 가사까지": "Canciones, álbumes, artistas y letras",
+ "새 디자인": "Nuevo diseño",
+ "더 깔끔한 화면과 부드러운 움직임": "Pantallas más limpias y movimiento más fluido",
+ "휴대폰에서도 편하게": "Mejor en el móvil",
+ "큰 화면 목록과 아래 메뉴": "Lista de videos grande y menú inferior",
+ "음악 열기": "Abrir Música"
 };

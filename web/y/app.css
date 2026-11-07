@@ -1402,3 +1402,136 @@ html.mfull-open, html.mfull-open body { overflow: hidden; }
   body.has-mbar #mini { bottom: calc(56px + 76px + env(safe-area-inset-bottom, 0px)); }
   body.has-mbar #toast { bottom: calc(56px + 80px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ---------------------------------------------------------------- Motion (1.0)
+   Every page rises in, cards arrive one after another, pictures fade in once they have loaded,
+   menus and dialogs grow from where they open, buttons give under the finger. Weak TVs and
+   "reduce motion" get none of it. */
+:root { --e-out: cubic-bezier(.2, .8, .2, 1); --e-spring: cubic-bezier(.34, 1.56, .64, 1); }
+
+@keyframes pageIn { from { opacity: 0; transform: translateY(10px); } }
+@keyframes cardIn { from { opacity: 0; transform: translateY(16px) scale(.985); } }
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes popIn { from { opacity: 0; transform: scale(.94) translateY(-6px); } }
+@keyframes dlgIn { from { opacity: 0; transform: translateY(18px) scale(.96); } }
+@keyframes navPop { 0% { transform: scale(.82); } 100% { transform: none; } }
+@keyframes likePop { 0% { transform: none; } 35% { transform: scale(1.38) rotate(-14deg); } 70% { transform: scale(.92); } 100% { transform: none; } }
+@keyframes subPulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--fg) 30%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
+@keyframes rise { from { opacity: 0; transform: translateY(100%); } }
+@keyframes shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+
+/* a new page: its first layer rises in (the watch page and Shorts keep the player still) */
+#page.enter > * { animation: pageIn .4s var(--e-out) backwards; }
+body[data-route="watch"] #page.enter > *, body[data-route="shorts"] #page.enter > * { animation: fadeIn .25s ease backwards; }
+
+/* cards arrive one after another, row by row; more cards from scrolling just fade up */
+.vgrid > .card:not(.sk), .m-hrow > *, .m-list > .m-row, .chan-row > * { animation: cardIn .5s var(--e-out) backwards; }
+.vgrid > .card:nth-child(2), .m-hrow > :nth-child(2), .m-list > .m-row:nth-child(2) { animation-delay: 30ms; }
+.vgrid > .card:nth-child(3), .m-hrow > :nth-child(3), .m-list > .m-row:nth-child(3) { animation-delay: 60ms; }
+.vgrid > .card:nth-child(4), .m-hrow > :nth-child(4), .m-list > .m-row:nth-child(4) { animation-delay: 90ms; }
+.vgrid > .card:nth-child(5), .m-hrow > :nth-child(5), .m-list > .m-row:nth-child(5) { animation-delay: 120ms; }
+.vgrid > .card:nth-child(6), .m-hrow > :nth-child(6), .m-list > .m-row:nth-child(6) { animation-delay: 150ms; }
+.vgrid > .card:nth-child(7), .m-hrow > :nth-child(7), .m-list > .m-row:nth-child(7) { animation-delay: 180ms; }
+.vgrid > .card:nth-child(8), .m-hrow > :nth-child(8), .m-list > .m-row:nth-child(8) { animation-delay: 210ms; }
+.vgrid > .card:nth-child(9), .m-list > .m-row:nth-child(9) { animation-delay: 240ms; }
+.vgrid > .card:nth-child(10), .m-list > .m-row:nth-child(10) { animation-delay: 270ms; }
+.vgrid > .card:nth-child(11) { animation-delay: 300ms; }
+.vgrid > .card:nth-child(12) { animation-delay: 330ms; }
+
+/* pictures fade in once they are there, instead of popping in line by line */
+html.imgfx .th img:not(.ld), html.imgfx .m-cv img:not(.ld), html.imgfx img.av:not(.ld), html.imgfx .hero-th img:not(.ld) { opacity: 0; }
+html.imgfx .th img, html.imgfx .hero-th img { transition: opacity .4s ease, transform .5s cubic-bezier(.2, .7, .2, 1); }
+html.imgfx .m-cv img { transition: opacity .4s ease, transform .5s cubic-bezier(.2, .7, .2, 1); }
+html.imgfx img.av { transition: opacity .3s ease; }
+
+/* skeletons: a soft light sweeping across instead of blinking */
+.sk .skt, .sk .skl, .sk-title {
+  background: linear-gradient(100deg, var(--box) 30%, var(--chip-h) 50%, var(--box) 70%) 0 0 / 200% 100% var(--box);
+  animation: shimmer 1.5s linear infinite; }
+
+/* menus grow from their button, dialogs rise, the message slides up with a little bounce */
+#popup.show { animation: popIn .17s var(--e-out); transform-origin: top right; }
+#modal.show { animation: fadeIn .2s ease; }
+#modal.show .dlg { animation: dlgIn .32s var(--e-spring); }
+#toast { transition: transform .38s var(--e-spring), visibility .38s; }
+
+/* buttons give a little under the finger */
+:is(.pill, .chip, .subbtn, .seg-btn button, .sa, #bnav a, #mguide a, .m-cplay, .mb-ctl button, .mf-ctl button, .mf-tabs button, #mbar .mb-x, .ib, .icon-btn) {
+  transition: transform .16s var(--e-out), background-color .15s, color .15s, opacity .15s, box-shadow .2s; }
+:is(.pill, .chip, .subbtn, .seg-btn button, .sa, .m-cplay, .mb-ctl button, .mf-ctl button, .mf-tabs button, .ib, .icon-btn):active { transform: scale(.94); }
+:is(#bnav a, #mguide a):active .ic { transform: scale(.88); }
+#bnav a .ic, html:not(.tv) #mguide a .ic { transition: background-color .25s, transform .2s var(--e-out); }
+#bnav a.act .ic, #mguide a.act .ic { animation: navPop .38s var(--e-spring); }
+
+/* like, subscribe */
+.seg-btn .like.on .ic, .sa.like.on .ic, .mb-like.on .ic, .mf-like.on .ic, .m-like.on .ic { animation: likePop .5s var(--e-spring); }
+.subbtn.on { animation: subPulse .6s ease-out; }
+
+/* the music bar comes up from the bottom the first time */
+#mbar:not([hidden]) { animation: rise .45s var(--e-spring) backwards; }
+
+/* hover: cards lift a little on computers */
+@media (hover: hover) {
+  .card .th { transition: box-shadow .3s, transform .3s var(--e-out); }
+  .card:hover .th { box-shadow: 0 10px 28px -12px rgba(0, 0, 0, .45); }
+  .m-cv { transition: box-shadow .3s; }
+  .m-card:hover .m-cv { box-shadow: 0 12px 30px -12px rgba(0, 0, 0, .5); }
+}
+
+/* weak TVs: no motion work; people who asked their device for less motion: none either */
+html.tv #page.enter > *, html.tv .vgrid > .card, html.tv .m-hrow > *, html.tv .m-list > .m-row { animation: none; }
+html.tv.imgfx img { opacity: 1 !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* ---------------------------------------------------------------- Phones (1.0): one video per row, like the YouTube app
+   (two columns of 170px left titles of three words and pushed the menu button off the screen) */
+.card.grid .meta { grid-template-columns: 46px minmax(0, 1fr) 24px; }
+@media (max-width: 560px) {
+  .vgrid { grid-template-columns: minmax(0, 1fr); row-gap: 22px; }
+  .card.grid .meta { grid-template-columns: 44px minmax(0, 1fr) 24px; margin-top: 10px; }
+  .card.grid .t { font-size: 15px; line-height: 21px; max-height: 42px; }
+}
+
+/* ---------------------------------------------------------------- 1.0 welcome card on Home */
+.hi10 { position: relative; margin: 4px 0 28px; padding: 22px 24px; border-radius: 24px; overflow: hidden;
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--acc) 26%, transparent), transparent 60%),
+    radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, #7c4dff 18%, transparent), transparent 60%), var(--box);
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18px 28px;
+  animation: hiIn .6s var(--e-spring) .15s backwards; }
+@keyframes hiIn { from { opacity: 0; transform: translateY(-10px) scale(.98); } }
+.hi10.bye { animation: hiOut .32s var(--e-out) forwards; }
+@keyframes hiOut { to { opacity: 0; transform: scale(.97); margin-bottom: 0; max-height: 0; padding-top: 0; padding-bottom: 0; } }
+.hi10-top { display: flex; align-items: center; gap: 14px; }
+.hi10-v { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; flex: none; font-weight: 800; font-size: 18px; letter-spacing: -.5px;
+  background: var(--fg); color: var(--bg2); box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--acc) 80%, transparent); animation: hiV 2.8s ease-in-out 1s infinite; }
+@keyframes hiV { 0%, 100% { transform: none; } 50% { transform: translateY(-3px) rotate(-4deg); } }
+.hi10 h2 { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -.4px; }
+.hi10 p { margin: 2px 0 0; color: var(--fg2); font-size: 13px; }
+.hi10-its { display: flex; gap: 22px; min-width: 0; }
+.hi10-it { display: flex; gap: 10px; align-items: center; min-width: 0; animation: cardIn .5s var(--e-out) backwards; }
+.hi10-it:nth-child(1) { animation-delay: .3s; } .hi10-it:nth-child(2) { animation-delay: .38s; } .hi10-it:nth-child(3) { animation-delay: .46s; }
+.hi10-ic { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--bg2) 70%, transparent); }
+.hi10-ic .ic { width: 20px; height: 20px; }
+.hi10-it b { display: block; font-size: 14px; }
+.hi10-it small { display: block; color: var(--fg2); font-size: 12px; line-height: 16px; }
+.hi10-x { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--fg2); background: none; border: 0; cursor: pointer; }
+.hi10-x:hover { background: var(--hover); color: var(--fg); }
+.hi10-x .ic { width: 20px; height: 20px; }
+.hi10 > .pill { margin-right: 28px; }
+@media (max-width: 1100px) { .hi10 { grid-template-columns: 1fr auto; } .hi10-its { grid-column: 1 / -1; grid-row: 2; } }
+@media (max-width: 640px) {
+  .hi10 { grid-template-columns: 1fr; padding: 18px; gap: 14px; margin-bottom: 20px; }
+  .hi10-its { flex-direction: column; gap: 12px; grid-row: auto; }
+  .hi10 > .pill { margin: 0; justify-self: start; }
+}
+html.tv .hi10 { display: none; }
+
+/* a card's text column may shrink below its longest word (playlist cards in search pushed the page sideways) */
+.card .tx { min-width: 0; }
+.card.grid.pl .meta { grid-template-columns: minmax(0, 1fr) 24px; }
+/* phones: the page's side padding is 12px, so the trending tabs reach out 12px, not 24 */
+@media (max-width: 792px) { .trend-head + .ctabs { margin: 0 -12px 16px; } }
+/* phones: playlist results stack like video results (the picture took the whole width and pushed the text off) */
+@media (max-width: 792px) { .row-pl .card.pl { flex-direction: column; gap: 8px; margin-bottom: 24px; } .row-pl .card.pl .meta { min-width: 0; } }

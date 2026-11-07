@@ -1,5 +1,5 @@
 // Watch page, Shorts, mini player
-import { $, $$, el, esc, icon, api, lib, settings, toast, fmtTime, fmtViews, fmtCount, ago, epoch, exactTime, thumb, normVideo, metaOf, pickThumb, safeHtml, linkify, parseT, copy, PUBLIC } from "./util.js";
+import { $, $$, el, esc, icon, api, lib, settings, toast, fmtTime, fmtViews, fmtCount, ago, epoch, exactTime, thumb, normVideo, metaOf, pickThumb, fmtSubs, safeHtml, linkify, parseT, copy, PUBLIC } from "./util.js";
 import { videoInfo, prefetch, player, state, card, norm, remember, known, fillProgress, avatar, subBtn, navigate, videoMenu, shareDialog, saveDialog, downloadDialog, keysDialog, setList, inList, queue, setPosCache, getPos, pageCleanup, popup, mi } from "./core.js";
 import { loadPlaylist } from "./pages.js";
 import { $t, LANG, LOCALE, REGION } from "./i18n.js";
@@ -274,6 +274,25 @@ export async function watch(page, m, alive) {
   pageCleanup.push(() => removeEventListener("keydown", onKey));
 }
 
+// Invidious sometimes loses a video's channel picture and subscriber count (YouTube's newer page layout
+// for some channels); the channel itself still has both
+async function fillOwner(box, info) {
+  if (!/^UC[\w-]{22}$/.test(info.authorId || "")) return;
+  let c;
+  try { c = await api(`/api/v1/channels/${info.authorId}?fields=subCount,authorThumbnails`, { ttl: 3600000, quiet: true }); } catch { return; }
+  const own = box.isConnected && $(".w-owner", box);
+  if (!own || !c) return;
+  const u = pickThumb(c.authorThumbnails, 88);
+  const ph = $("a > .av.ph", own);
+  if (u && ph) {
+    ph.outerHTML = avatar(u, "md");
+    const sb = $("[data-subbtn]", own);
+    if (sb && !sb.dataset.thumb) sb.dataset.thumb = u;
+    if (W.info === info && !W.v.authorThumb) W.v.authorThumb = u;
+  }
+  const s = $(".w-ch .s", own);
+  if (s && !s.textContent.trim() && c.subCount != null) s.textContent = fmtSubs(+c.subCount);
+}
 function renderInfo(page, info) {
   const box = $(".w-info", page);
   const v = W.v;
@@ -287,7 +306,7 @@ function renderInfo(page, info) {
     <div class="w-row">
       <div class="w-owner">
         <a href="/channel/${esc(info.authorId)}" data-nav>${avatar(av, "md")}</a>
-        <div class="w-ch"><a href="/channel/${esc(info.authorId)}" data-nav class="nm">${esc(info.author)}${info.authorVerified ? icon("verified", "vf") : ""}</a><div class="s">${esc(info.subCountText ? $t("구독자 {0}명", info.subCountText.replace(/subscribers?/i, "").trim()) : "")}</div></div>
+        <div class="w-ch"><a href="/channel/${esc(info.authorId)}" data-nav class="nm">${esc(info.author)}${info.authorVerified ? icon("verified", "vf") : ""}</a><div class="s">${esc(info.subCountText && info.subCountText !== "-" ? $t("구독자 {0}명", info.subCountText.replace(/subscribers?/i, "").trim()) : "")}</div></div>
         ${subBtn(info.authorId, info.author, av)}
       </div>
       <div class="w-actions">
@@ -307,6 +326,7 @@ function renderInfo(page, info) {
       <div class="w-dbtns"><button class="pill ghost transcript">${$t("{0} 스크립트 표시", icon("notes"))}</button></div>
       <button class="w-dmore">${$t("더보기")}</button><button class="w-dless">${$t("간략히")}</button>
     </div>`;
+  if (!av || !info.subCountText || info.subCountText === "-") fillOwner(box, info);
   const desc = $(".w-desc", box);
   desc.addEventListener("click", (e) => {
     const s = e.target.closest("[data-seek]");
