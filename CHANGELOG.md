@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.0.0 — 2026-11-08
+
+The biggest update so far: a Music tab, a new look with motion throughout, and a much better phone layout.
+
+### Added
+- **Music** (`/feed/music`): a YouTube Music–style home (quick picks, listen again, liked songs, recently opened albums and artists, YouTube's music shelves), search with a top result, songs, albums and artists, album and artist pages, a player bar at the bottom and a full player with the queue, shuffle, repeat, radio ("similar songs" keep playing) and **synced lyrics** from [LRCLIB](https://lrclib.net) (tap a line to jump there). Songs play as audio only, keep playing while you browse, and show on the lock screen (Media Session). Liked songs and history stay in the browser
+- `GET /api/p/yt/music/{search,album,artist,mix,lyrics,img}` on the server: YouTube Music's own answers through `YT_PROXY`, kept 6 hours; lyrics from LRCLIB (at most 3 lookups a song); `img` passes pictures only from YouTube's own picture hosts. Stateless, so open on public instances too
+- **Motion**: pages rise in, cards arrive one after another, pictures fade in once loaded, menus and dialogs grow from where they open, buttons give under the finger, like and subscribe pop, loading placeholders shimmer. TVs get none of it, and neither does a device set to reduce motion
+- Home: a "TubeHaus 1.0" card that says what's new, until it's closed
+
+### Changed
+- New look: the Pretendard font (bundled, no outside requests), new icons, rounder cards and buttons
+- Phones: one video per row, like the YouTube app (two narrow columns left three-word titles), and the bottom menu shows again (a later style rule had hidden it)
+
+### Fixed
+- Channel pictures that never loaded (some newer picture addresses are refused by Invidious' `/ggpht/` relay): they now come straight from YouTube's picture host through the server, then from the channel, and only then fall back to an icon. The same for community post pictures and channel banners
+- Commenters' pictures: newer Invidious sends one `authorThumbnail` address instead of the `authorThumbnails` list, so every comment showed the empty icon
+- The watch page showed "- subscribers" and no channel picture for some channels (Invidious loses both for them); they now come from the channel
+- "- Topic" (auto-generated artist) channels get their picture from YouTube Music, since Invidious can't open them
+- Playlist results in search, playlist cards and the trending tabs no longer push the page sideways on phones; like and dislike counts are no longer cut off
+- A failed request no longer leaves an "Uncaught (in promise)" error in the console
+- An album or artist that doesn't exist says so instead of showing an empty page
+
 ## v0.7.19 — 2026-11-05
 
 ### Added
