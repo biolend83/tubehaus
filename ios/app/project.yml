@@ -21,6 +21,8 @@ targets:
       # Pretendard, the typeface of the web app 1.0 (SIL Open Font License, common/fonts)
       - path: ../../common/fonts/PretendardVariable.ttf
         buildPhase: resources
+      - path: ../../common/fonts/Pretendard-OFL.txt
+        buildPhase: resources
     dependencies:
       - framework: ../build/kit/TubeHausKit.framework
         embed: false

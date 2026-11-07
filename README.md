@@ -96,3 +96,7 @@ Most of the code is written with Claude Code.
 ## License
 
 GPL-3.0.
+
+The Pretendard font the apps use (`common/fonts`) is copyright (c) 2021 Kil Hyung-jin
+(https://github.com/orioncactus/pretendard), under the SIL Open Font License 1.1: see
+`common/fonts/Pretendard-OFL.txt`, which also ships inside the apps next to the font.
