@@ -259,13 +259,21 @@ export class Player {
       // the cap applies from the first segment (so a TV does not start with 4K/8K and switch late)
       this.sp.configure("abr.restrictions.maxHeight", this.live ? Infinity : this.capHeight());
       if (TV_DEVICE) this.sp.configure({ streaming: { segmentPrefetchLimit: 2, bufferBehind: 10 } });
-      const src = this.live ? info.hlsUrl.replace(/^https?:\/\/[^/]+/, "") : `/api/manifest/dash/id/${info.videoId}?local=true`;
+      // VOD: the server's own list (every quality, VP9 too); the companion's list (MP4 only, so up to 1080p
+      // on many videos) only if that fails, e.g. on an older server
+      const src = this.live ? info.hlsUrl.replace(/^https?:\/\/[^/]+/, "") : `/api/p/dash/${info.videoId}.mpd`;
       try {
         await this.sp.load(src, this.live ? null : start || 0);
       } catch (e) {
         if (e && e.code === 7000) return;   // interrupted by switching to another video
-        this.onError(e);
-        return;
+        if (this.live || this.info !== info) { this.onError(e); return; }
+        try {
+          await this.sp.load(`/api/manifest/dash/id/${info.videoId}?local=true`, start || 0);
+        } catch (e2) {
+          if (e2 && e2.code === 7000) return;
+          this.onError(e2);
+          return;
+        }
       }
     }
     this.video.playbackRate = settings.rememberSpeed ? (+settings.speed || 1) : (+sessionStorage.getItem("yt.speed") || 1);

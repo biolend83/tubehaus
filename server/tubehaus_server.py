@@ -348,6 +348,62 @@ def _sidx(b):
     return refs, box_end + first
 
 
+def dash_mpd(vid):
+    """the DASH list of qualities for the web player, with every SDR video format: H.264 and AV1 (MP4)
+    and VP9 (WebM). The companion's own list has only the MP4 ones, so videos whose 1440p and 4K
+    exist only as VP9 stopped at 1080p. HDR (VP9.2, BT.2020) is left out: it looks washed out on SDR
+    screens and every HDR height also exists in SDR."""
+    d = _video_json(vid)
+    fs = [f for f in d.get("adaptiveFormats") or [] if f.get("url") and f.get("init") and f.get("index")]
+    if not fs:
+        raise ValueError("no streams")
+    esc = lambda s: str(s).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
+    sets = {}                                  # (kind, mime, track) -> [formats], in YouTube's order
+    seen = set()
+    for f in fs:
+        mime = (f.get("type") or "").split(";")[0].strip()
+        kind = mime.split("/")[0]
+        if kind not in ("audio", "video"):
+            continue
+        if kind == "video" and ("vp9.2" in (f.get("type") or "") or "BT2020" in str(f.get("colorInfo") or "")):
+            continue
+        tr = (f.get("audioTrack") or {}) if kind == "audio" else {}
+        key = (str(f.get("itag")), tr.get("id") or "")
+        if key in seen:                        # the second copy of an audio itag is YouTube's "stable volume"
+            continue
+        seen.add(key)
+        sets.setdefault((kind, mime, tr.get("id") or ""), []).append(f)
+    out = ['<?xml version="1.0" encoding="utf-8"?>',
+           '<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" minBufferTime="PT1.500S" profiles="urn:mpeg:dash:profile:isoff-main:2011" '
+           'type="static" mediaPresentationDuration="PT%dS"><Period>' % int(d.get("lengthSeconds") or 0)]
+    for n, ((kind, mime, tid), group) in enumerate(sorted(sets.items(), key=lambda x: x[0][0])):
+        tr = group[0].get("audioTrack") or {}
+        lang = ' lang="%s"' % esc(tid.split(".")[0]) if tid else ""
+        out.append('<AdaptationSet id="%d" mimeType="%s" contentType="%s" startWithSAP="1" subsegmentAlignment="true"%s>' % (n, mime, kind, lang))
+        if kind == "audio":
+            out.append('<Role schemeIdUri="urn:mpeg:dash:role:2011" value="%s"/>' % ("main" if tr.get("isDefault") or not tid else "alternate"))
+            if tr.get("displayName"):
+                out.append("<Label>%s</Label>" % esc(tr["displayName"]))
+        for f in group:
+            attrs = 'id="%s" bandwidth="%d" codecs="%s"' % (esc(f.get("itag")), int(f.get("bitrate") or 0), esc(_codecs(f)))
+            if kind == "video":
+                m = re.match(r"(\d+)x(\d+)", f.get("size") or "")
+                if m:
+                    attrs += ' width="%s" height="%s"' % m.groups()
+                if f.get("fps"):
+                    attrs += ' frameRate="%d"' % int(f["fps"])
+            else:
+                attrs += ' audioSamplingRate="%d"' % int(f.get("audioSampleRate") or 48000)
+            out.append("<Representation %s>" % attrs)
+            if kind == "audio":
+                out.append('<AudioChannelConfiguration schemeIdUri="urn:mpeg:dash:23003:3:audio_channel_configuration:2011" value="%d"/>' % int(f.get("audioChannels") or 2))
+            out.append("<BaseURL>%s</BaseURL>" % esc(_companion_url(f["url"])))
+            out.append('<SegmentBase indexRange="%s"><Initialization range="%s"/></SegmentBase></Representation>' % (esc(f["index"]), esc(f["init"])))
+        out.append("</AdaptationSet>")
+    out.append("</Period></MPD>")
+    return "\n".join(out) + "\n"
+
+
 def hls_media(vid, itag):
     with hls_lk:
         hit = hls_cache.get((vid, itag))
@@ -3438,6 +3494,8 @@ class H(BaseHTTPRequestHandler):
             return self.send(404 if d.get("error") else 200, d)
         if "/hls/" in p:
             return self.hls(p)
+        if "/dash/" in p:
+            return self.dash(p)
         if "/live/" in p:
             if p.endswith("/cc.json") and not (WHISPER_BIN and WHISPER_MODEL):
                 return self.send(200, {"status": "off", "lag": None, "cues": {}})
@@ -3769,6 +3827,25 @@ class H(BaseHTTPRequestHandler):
             log("download", f"stream {vid}/{itag} FAIL at {pos}/{size} {repr(ex)[:120]}", t0, every=0)
         if pos < size:
             self.close_connection = True   # short body: the socket must not be reused
+
+    def dash(self, p):
+        # /api/p/dash/<id>.mpd: every quality for the web player (dash_mpd)
+        m = re.search(r"/dash/([\w-]{11})\.mpd$", p)
+        if not m:
+            return self.send(404, {"error": "not found"})
+        t0 = time.time()
+        try:
+            text = dash_mpd(m.group(1))
+        except Exception as ex:
+            log("dash", "%s FAIL %s" % (m.group(1), repr(ex)[:120]), t0)
+            return self.send(502, {"error": "Couldn't make the stream list: %s" % ex})
+        b = text.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/dash+xml")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(b)))
+        self.end_headers()
+        self.wfile.write(b)
 
     def hls(self, p):
         # /api/p/hls/<id>.m3u8 (the list of qualities), /api/p/hls/<id>/<itag>.m3u8 (one of them)

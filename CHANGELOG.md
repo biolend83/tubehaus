@@ -3,12 +3,14 @@
 ## Unreleased
 
 ### Added
+- `GET /api/p/dash/<id>.mpd`: the server's own DASH list of qualities for the web player, with VP9 (WebM) as well as H.264 and AV1
 - `HT_NAME` and `HT_LINKS` (`TUBEHAUS_NAME`, `TUBEHAUS_LINKS` in `.env`): your instance's own name in the page title and menu, and extra side-menu links (a home page, an app to download)
 - `GET /api/p/hls/<id>.m3u8?h=1080`: only the best quality up to that height
 
 ### Changed
 - iPad plays with the device's own player too, like iPhone (Shaka on iPadOS Chrome showed a black picture), and on both the quality stays at the preferred one instead of the player stepping down on its own. The setting is now "Device's own player"
 - The 홈튜브 TV app (user agent `HomeTubeTV`) is treated as a TV
+- The web player uses that list: videos whose 1440p and 4K exist only as VP9 played at most 1080p, because the companion's list has only the MP4 formats. The companion's list is still used if the server's fails
 - TVs play at the best quality by default too, instead of 720p (a cap in Settings or data saver still limits it)
 
 ### Fixed
