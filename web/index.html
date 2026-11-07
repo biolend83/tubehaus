@@ -125,7 +125,7 @@
         fetch("/api/p/plog?" + q, { credentials: "same-origin", keepalive: true }).catch(function () { }); } catch (e) { }
     }
     window.__beacon = beacon;
-    var isTvUa = /TubeHausTV|Android TV|GoogleTV|Google TV|AFT[A-Z]|BRAVIA|SMART-TV|SmartTV|HbbTV|Tizen|Web0S|webOS|TV Bro|Puffin.*TV|CrKey|AndroidTV|; wv\)/i.test(navigator.userAgent);
+    var isTvUa = /TubeHausTV|HomeTubeTV|Android TV|GoogleTV|Google TV|AFT[A-Z]|BRAVIA|SMART-TV|SmartTV|HbbTV|Tizen|Web0S|webOS|TV Bro|Puffin.*TV|CrKey|AndroidTV|; wv\)/i.test(navigator.userAgent);
     window.__isTvUa = isTvUa;
     if (isTvUa) beacon({ ev: "boot" });
     addEventListener("error", function (e) { beacon({ ev: "error", msg: e.message, src: (e.filename || "") + ":" + e.lineno }); });

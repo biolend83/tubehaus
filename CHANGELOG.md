@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `HT_NAME` and `HT_LINKS` (`TUBEHAUS_NAME`, `TUBEHAUS_LINKS` in `.env`): your instance's own name in the page title and menu, and extra side-menu links (a home page, an app to download)
+- `GET /api/p/hls/<id>.m3u8?h=1080`: only the best quality up to that height
+
+### Changed
+- iPad plays with the device's own player too, like iPhone (Shaka on iPadOS Chrome showed a black picture), and on both the quality stays at the preferred one instead of the player stepping down on its own. The setting is now "Device's own player"
+- The 홈튜브 TV app (user agent `HomeTubeTV`) is treated as a TV
+
 ## v1.0.0 — 2026-11-07
 
 The biggest update so far: a Music tab, a new look with motion throughout, and a much better phone layout.
@@ -8,6 +18,7 @@ The biggest update so far: a Music tab, a new look with motion throughout, and a
 - **Music** (`/feed/music`): a YouTube Music–style home (quick picks, listen again, liked songs, recently opened albums and artists, YouTube's music shelves), search with a top result, songs, albums and artists, album and artist pages, a player bar at the bottom and a full player with the queue, shuffle, repeat, radio ("similar songs" keep playing) and **synced lyrics** from [LRCLIB](https://lrclib.net) (tap a line to jump there). Songs play as audio only, keep playing while you browse, and show on the lock screen (Media Session). Liked songs and history stay in the browser
 - `GET /api/p/yt/music/{search,album,artist,mix,lyrics,song,img}` on the server: YouTube Music's own answers through `YT_PROXY`, kept 6 hours; lyrics from LRCLIB (at most 3 lookups a song); `img` passes pictures only from YouTube's own picture hosts. Stateless, so open on public instances too
 - **Motion**: pages rise in, cards arrive one after another, pictures fade in once loaded, menus and dialogs grow from where they open, buttons give under the finger, like and subscribe pop, loading placeholders shimmer. TVs get none of it, and neither does a device set to reduce motion
+- Home: a "TubeHaus 1.0" card that says what's new, until it's closed
 - Lyrics in time from the first second: a music video played in Music plays as the song's own recording (its album track on YouTube Music, the one the lyrics are timed for), as YouTube Music itself does. Live stages, covers, remixes and other versions stay as chosen. `GET /api/p/yt/music/song?v=…&title=…&artist=…&len=…` finds it (one album search, at most three albums opened); the browser remembers the answer
 - Lyrics timing: nudge the lyrics half a second earlier or later, or tap the line being sung to line them up; kept per song in the browser. A music video longer than the song says so above the lyrics
 

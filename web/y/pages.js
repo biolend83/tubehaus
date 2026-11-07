@@ -1,5 +1,5 @@
 // List pages: home, search, channel, playlist, subscriptions, history, you, trending, settings
-import { $, $$, el, esc, icon, api, lib, settings, local, toast, fmtTime, fmtViews, ago, thumb, normVideo, pickThumb, localUrl, safeHtml, linkify, dropCache, PUBLIC, localLibrary, IPHONE } from "./util.js";
+import { $, $$, el, esc, icon, api, lib, settings, local, toast, fmtTime, fmtViews, ago, thumb, normVideo, pickThumb, localUrl, safeHtml, linkify, dropCache, PUBLIC, localLibrary, IPHONE, IPAD, siteName } from "./util.js";
 import { state, card, metaLine, chAvatar, channelCard, playlistCard, norm, remember, known, fillProgress, infinite, avatar, subBtn, isSub, navigate, popup, mi, videoMenu, dialog, loadLib, setList, pageCleanup, renderGuideSubs } from "./core.js";
 import { SB_CATS } from "./player.js";
 import { $t, LANG, LANGS, LOCALE, REGION, fmtShort, langLabel } from "./i18n.js";
@@ -43,7 +43,7 @@ function hello10(page) {
   const it = (ic, t, s) => `<div class="hi10-it"><span class="hi10-ic">${icon(ic)}</span><div><b>${t}</b><small>${s}</small></div></div>`;
   const card = el(`<section class="hi10" role="note">
     <button class="hi10-x" aria-label="${$t("닫기")}">${icon("close")}</button>
-    <div class="hi10-top"><span class="hi10-v">1.0</span><div><h2>${$t("튜브하우스")} 1.0</h2><p>${$t("가장 큰 업데이트예요")}</p></div></div>
+    <div class="hi10-top"><span class="hi10-v">1.0</span><div><h2>${esc(siteName())} 1.0</h2><p>${$t("가장 큰 업데이트예요")}</p></div></div>
     <div class="hi10-its">${it("music", $t("음악"), $t("노래·앨범·아티스트, 가사까지"))}${it("sparkle", $t("새 디자인"), $t("더 깔끔한 화면과 부드러운 움직임"))}${it("phone", $t("휴대폰에서도 편하게"), $t("큰 화면 목록과 아래 메뉴"))}</div>
     <a class="pill white" href="/feed/music" data-nav>${icon("music")}${$t("음악 열기")}</a>
   </section>`);
@@ -689,7 +689,7 @@ export function settingsPage(page) {
       ${tog("rememberSpeed", $t("재생 속도 기억"), $t("다음에 와도 고른 재생 속도를 그대로 써요"))}
       ${row($t("선호 화질"), sel("quality", [["auto", $t("최고 화질 (기본)")], ["2160", "4K (2160p)"], ["1440", "1440p"], ["1080", "1080p"], ["720", "720p"], ["480", "480p"], ["360", "360p"]]), $t("화질을 알아서 낮추지 않고 이 화질로 고정해요 (영상에 없으면 그 아래 최고)"))}
       ${tog("dataSaver", $t("데이터 절약"), $t("480p 이하, 미리 받는 양을 줄여요"))}
-      ${IPHONE ? tog("nativeIphone", $t("iPhone 기본 플레이어"), $t("Safari 자체 플레이어로 재생해요. 다른 앱 위 PIP 와 AirPlay 가 되고, 화질은 자동으로 정해져요 (다음 영상부터 적용)")) : ""}
+      ${IPHONE || IPAD ? tog("nativeIphone", $t("기기 기본 플레이어"), $t("iPhone·iPad 자체 플레이어로 재생해요. 다른 앱 위 PIP 와 AirPlay 가 되고, 화질은 선호 화질 하나로 정해져요 (다음 영상부터 적용)")) : ""}
       ${tog("resume", $t("이어서 보기"), $t("보던 곳부터 재생 (모든 기기 공유)"))}
       ${tog("miniplayer", $t("미니 플레이어"), $t("다른 페이지로 가도 작은 화면으로 계속 재생"))}
       ${tog("heatmap", $t("가장 많이 다시 본 장면"), $t("재생바 위에 사람들이 많이 다시 본 구간을 물결 모양으로 보여줘요"))}`],

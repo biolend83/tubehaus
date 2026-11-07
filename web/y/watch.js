@@ -1,5 +1,5 @@
 // Watch page, Shorts, mini player
-import { $, $$, el, esc, icon, api, lib, settings, toast, fmtTime, fmtViews, fmtCount, ago, epoch, exactTime, thumb, normVideo, metaOf, pickThumb, fmtSubs, safeHtml, linkify, parseT, copy, PUBLIC } from "./util.js";
+import { $, $$, el, esc, icon, api, lib, settings, toast, fmtTime, fmtViews, fmtCount, ago, epoch, exactTime, thumb, normVideo, metaOf, pickThumb, fmtSubs, safeHtml, linkify, parseT, copy, PUBLIC, siteName } from "./util.js";
 import { videoInfo, prefetch, player, state, card, norm, remember, known, fillProgress, avatar, subBtn, navigate, videoMenu, shareDialog, saveDialog, downloadDialog, keysDialog, setList, inList, queue, setPosCache, getPos, pageCleanup, popup, mi } from "./core.js";
 import { loadPlaylist } from "./pages.js";
 import { $t, LANG, LOCALE, REGION } from "./i18n.js";
@@ -221,7 +221,7 @@ export async function watch(page, m, alive) {
   W.v = remember([normVideo(info)])[0];
   W.v.authorThumb = pickThumb(info.authorThumbnails, 88);
   W.related = norm(info.recommendedVideos || []);
-  document.title = info.title + $t(" - 튜브하우스");
+  document.title = info.title + " - " + siteName();
 
   // playlist context
   W.pl = null;

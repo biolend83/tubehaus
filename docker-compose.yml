@@ -42,6 +42,8 @@ services:
       HT_MAX_VIEWERS: ${TUBEHAUS_MAX_VIEWERS:-0}
       HT_MAX_HEIGHT: ${TUBEHAUS_MAX_HEIGHT:-0}
       HT_RATE_PER_MIN: ${TUBEHAUS_RATE_PER_MIN:-}
+      HT_NAME: ${TUBEHAUS_NAME:-}
+      HT_LINKS: ${TUBEHAUS_LINKS:-}
     volumes:
       - tubehaus-data:/data
       - warp-data:/var/lib/cloudflare-warp

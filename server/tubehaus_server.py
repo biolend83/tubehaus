@@ -64,6 +64,28 @@ MAX_HEIGHT = env_int("HT_MAX_HEIGHT", 0)                 # highest quality offer
 # The reverse proxy asks GET /api/p/auth/check before letting anyone in (see deploy/Caddyfile.public).
 ACCOUNTS = env("HT_ACCOUNTS", "0") == "1"
 MAX_ACCOUNTS = env_int("HT_MAX_ACCOUNTS", 1000)
+# The instance's own name in the page title and menu (empty = TubeHaus, in the visitor's language)
+NAME = env("HT_NAME", "").strip()[:40]
+
+
+def _links(raw):
+    """HT_LINKS: extra menu links, as JSON [{"name": "Home hub", "url": "https://..."}] (or /path on this site)"""
+    try:
+        items = json.loads(raw) if raw.strip() else []
+    except ValueError:
+        print("HT_LINKS is not JSON, ignored", flush=True)
+        return []
+    out = []
+    for x in items if isinstance(items, list) else []:
+        if not isinstance(x, dict):
+            continue
+        name, url = str(x.get("name") or "").strip()[:60], str(x.get("url") or "").strip()[:500]
+        if name and re.match(r"(?i)^(https?://|/(?!/))", url):
+            out.append({"name": name, "url": url})
+    return out[:12]
+
+
+LINKS = _links(env("HT_LINKS", ""))
 
 lock = threading.Lock()
 LIVE_CACHE = {}
@@ -277,11 +299,18 @@ def _codecs(f):
     return m.group(1) if m else ""
 
 
-def hls_master(vid):
+def hls_master(vid, h=0):
+    """all qualities, or with h only the best one up to h high (so the player can't step down on its own)"""
     d = _video_json(vid)
     video, audio = _hls_formats(d)
     if not video or not audio:
         raise ValueError("no H.264/AAC streams")
+    if h:
+        def height(f):
+            m = re.search(r"x(\d+)", f.get("size") or "")
+            return int(m.group(1)) if m else 0
+        fit = [f for f in video if height(f) <= h] or [min(video, key=height)]
+        video = [max(fit, key=lambda f: (height(f), int(f.get("fps") or 0), int(f.get("bitrate") or 0)))]
     out = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-INDEPENDENT-SEGMENTS",
            '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="a",NAME="Audio",DEFAULT=YES,AUTOSELECT=YES,URI="%s/%s.m3u8"' % (vid, audio["itag"])]
     for f in sorted(video, key=lambda f: int(f.get("bitrate") or 0)):
@@ -3147,7 +3176,7 @@ def health():
             "warp_rotations_30min": len([t for t in rot_hist if now - t < 1800]),
             "live_captions": bool(WHISPER_BIN and WHISPER_MODEL), "public": PUBLIC_MODE,
             "max_height": MAX_HEIGHT or None, "viewers": len([1 for t in list(viewers.values()) if now - t < 180]),
-            "max_viewers": MAX_VIEWERS or None, "accounts": ACCOUNTS}
+            "max_viewers": MAX_VIEWERS or None, "accounts": ACCOUNTS, "name": NAME or None, "links": LINKS}
 
 
 viewers, rate, load_lk = {}, {}, threading.Lock()   # ip -> last seen / (tokens, time)
@@ -3748,7 +3777,11 @@ class H(BaseHTTPRequestHandler):
             return self.send(404, {"error": "not found"})
         t0 = time.time()
         try:
-            text = hls_media(m.group(1), m.group(2)) if m.group(2) else hls_master(m.group(1))
+            try:
+                h = max(0, min(4320, int(self.qs().get("h") or 0)))
+            except ValueError:
+                h = 0
+            text = hls_media(m.group(1), m.group(2)) if m.group(2) else hls_master(m.group(1), h)
         except Exception as ex:
             log("hls", "%s FAIL %s" % (p.rsplit("/hls/", 1)[-1][:24], repr(ex)[:120]), t0)
             return self.send(502, {"error": "Couldn't make the stream list: %s" % ex})

@@ -56,6 +56,8 @@ export function parseT(t) {
 // ---------------------------------------------------------------- settings (per device)
 // iPhone only (an iPad reports itself as a Mac): these play with Safari's own player, see player.js load()
 export const IPHONE = /iPhone|iPod/.test(navigator.userAgent);
+// iPad (newer ones report themselves as a Mac with a touch screen): the device's own player too, see player.js load()
+export const IPAD = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 
 const DEFAULTS = {
   lang: "auto",           // interface language: auto = the browser's
@@ -64,7 +66,7 @@ const DEFAULTS = {
   calm: false,            // calm mode: subscriptions only, no Shorts, trending or recommendations, no autoplay
   quality: "auto",        // auto | 2160 | 1440 | 1080 | 720 | 480 | 360
   dataSaver: false,
-  nativeIphone: true,     // iPhone: play with Safari's own player (Picture-in-Picture over other apps, AirPlay)
+  nativeIphone: true,     // iPhone and iPad: play with the device's own player (Picture-in-Picture over other apps, AirPlay)
   captions: false,        // captions always on
   capLang: LANG,
   capSize: 100,           // %
@@ -148,10 +150,16 @@ export async function api(path, { method = "GET", body, ttl = 0, signal, quiet =
 // browser (locallib.js); the server only fetches feeds and parses imports for them.
 export let PUBLIC = false;
 export let SERVER_MAX_H = Infinity;     // the operator's quality cap (HT_MAX_HEIGHT), to save bandwidth
+// the instance's own name (HT_NAME) and extra menu links (HT_LINKS)
+let NAME = "";
+export let LINKS = [];
+export const siteName = () => NAME || $t("튜브하우스");
 export const modeReady = fetch("/api/p/health", { credentials: "same-origin" })
   .then((r) => (r.ok ? r.json() : {})).then((h) => {
     PUBLIC = !!h.public;
     SERVER_MAX_H = +h.max_height || Infinity;
+    NAME = typeof h.name === "string" ? h.name : "";
+    LINKS = Array.isArray(h.links) ? h.links : [];
     if (h.accounts && !window.TUBEHAUS_LOGIN_URL) window.TUBEHAUS_LOGIN_URL = "/login?r=";   // sign-up required
     document.documentElement.classList.toggle("public", PUBLIC);
     return PUBLIC;

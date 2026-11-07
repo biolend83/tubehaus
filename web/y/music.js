@@ -1,7 +1,7 @@
 // Music: the apps' Music tab on the web. Albums and artists from YouTube Music, songs from YouTube,
 // lyrics from LRCLIB, all through this server (/api/p/yt/music/*). Sound only: an <audio> element with
 // Shaka leaving the video streams out, so a song plays like in a music app and keeps going on a locked phone.
-import { $, $$, esc, icon, api, local, toast, thumb, fmtTime, el, IPHONE } from "./util.js";
+import { $, $$, esc, icon, api, local, toast, thumb, fmtTime, el, IPHONE, siteName } from "./util.js";
 import { player, navigate, popup, mi } from "./core.js";
 import { loadShaka } from "./player.js";
 import { $t, LANG, REGION } from "./i18n.js";
@@ -745,7 +745,7 @@ function bindPlayAll(page, lists) {
 const marked = (page) => { paint(); return page; };
 
 export async function musicHome(page, m, alive) {
-  document.title = $t("음악") + " - " + $t("튜브하우스");
+  document.title = $t("음악") + " - " + siteName();
   const recent = store.get("recent"), likes = store.get("likes"), opened = store.get("opened"), searches = store.get("searches");
   const hour = new Date().getHours();
   const hello = hour < 5 ? $t("늦은 밤의 음악") : hour < 12 ? $t("좋은 아침이에요") : hour < 18 ? $t("오후의 음악") : $t("오늘 저녁의 음악");

@@ -779,5 +779,42 @@ class Health(unittest.TestCase):
         self.assertFalse(h["warp_proxy"])
 
 
+class InstanceLinks(unittest.TestCase):
+    def test_links_are_checked(self):
+        raw = json.dumps([{"name": "Hub", "url": "https://home.example/"}, {"name": "TV app", "url": "/y/tv.apk"},
+                          {"name": "bad", "url": "javascript:alert(1)"}, {"name": "", "url": "https://x/"},
+                          {"name": "other site", "url": "//evil.example/"}, "junk"])
+        self.assertEqual(ts._links(raw), [{"name": "Hub", "url": "https://home.example/"}, {"name": "TV app", "url": "/y/tv.apk"}])
+        self.assertEqual(ts._links(""), [])
+        self.assertEqual(ts._links("not json"), [])
+        self.assertEqual(ts._links('{"name": "x"}'), [])
+
+
+class HlsOneQuality(unittest.TestCase):
+    def setUp(self):
+        fmt = lambda itag, size, fps, br: {"itag": itag, "url": "u", "init": "0-1", "index": "2-3", "size": size, "fps": fps,
+                                           "bitrate": br, "type": 'video/mp4; codecs="avc1.64002a"'}
+        self.d = {"adaptiveFormats": [fmt("137", "1920x1080", 30, 4000000), fmt("299", "1920x1080", 60, 6000000),
+                                      fmt("136", "1280x720", 30, 2000000), fmt("160", "256x144", 30, 100000),
+                                      {"itag": "140", "url": "u", "init": "0-1", "index": "2-3", "bitrate": 128000,
+                                       "type": 'audio/mp4; codecs="mp4a.40.2"'}]}
+        self._vj = ts._video_json
+        ts._video_json = lambda vid: self.d
+
+    def tearDown(self):
+        ts._video_json = self._vj
+
+    def variants(self, h):
+        return re.findall(r"\n(\w{11}/\d+)\.m3u8", ts.hls_master("aaaaaaaaaaa", h))
+
+    def test_all_qualities_without_a_cap(self):
+        self.assertEqual(self.variants(0), ["aaaaaaaaaaa/160", "aaaaaaaaaaa/136", "aaaaaaaaaaa/137", "aaaaaaaaaaa/299"])
+
+    def test_best_one_up_to_the_cap(self):
+        self.assertEqual(self.variants(4320), ["aaaaaaaaaaa/299"])     # 1080p60 over 1080p30
+        self.assertEqual(self.variants(720), ["aaaaaaaaaaa/136"])
+        self.assertEqual(self.variants(100), ["aaaaaaaaaaa/160"])      # nothing that small: the smallest
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,6 @@
 // YouTube-style player: controls, captions, storyboards, chapters and SponsorBlock drawn on top of Shaka (DASH/HLS).
 // Built once and reused (moving between pages continues seamlessly in the mini player).
-import { $, $$, el, esc, icon, fmtTime, settings, toast, copy, localUrl, parseT, toGate, SERVER_MAX_H, PUBLIC, IPHONE } from "./util.js";
+import { $, $$, el, esc, icon, fmtTime, settings, toast, copy, localUrl, parseT, toGate, SERVER_MAX_H, PUBLIC, IPHONE, IPAD, siteName } from "./util.js";
 import { $t, LANG, LANGS } from "./i18n.js";
 
 const isTouch = matchMedia("(pointer: coarse)").matches;
@@ -95,7 +95,7 @@ export function loadShaka() {
 }
 // prefetch it in idle time after the home page is up (so a click starts at once)
 // (weak devices like TVs do not prefetch right away: the page freezes while it loads)
-export const TV_DEVICE = /TubeHausTV|Android TV|GoogleTV|Google TV|AFT[A-Z]|BRAVIA|SMART-TV|SmartTV|HbbTV|Tizen|Web0S|webOS|TV Bro|Puffin.*TV|CrKey|AndroidTV/i.test(navigator.userAgent);
+export const TV_DEVICE = /TubeHausTV|HomeTubeTV|Android TV|GoogleTV|Google TV|AFT[A-Z]|BRAVIA|SMART-TV|SmartTV|HbbTV|Tizen|Web0S|webOS|TV Bro|Puffin.*TV|CrKey|AndroidTV/i.test(navigator.userAgent);
 // (TVs wait 6 s after the home page, so the first click does not wait either)
 setTimeout(() => (window.requestIdleCallback || ((f) => f()))(() => loadShaka().catch(() => { }), { timeout: 8000 }), TV_DEVICE ? 6000 : 0);
 
@@ -216,9 +216,9 @@ export class Player {
 
   // ------------------------------------------------------------ load
   async load(info, { start = 0, autoplay = true } = {}) {
-    // iPhone: Safari's own player (HLS) instead of Shaka. Shaka runs on ManagedMediaSource there, which starts with a
-    // black picture, has no Picture-in-Picture over other apps and no AirPlay
-    let native = this.native = IPHONE && settings.nativeIphone && !(info.liveNow && !info.hlsUrl);
+    // iPhone and iPad: the device's own player (HLS) instead of Shaka. Shaka runs on ManagedMediaSource there, which starts
+    // with a black picture (on iPadOS Chrome it stays black), has no Picture-in-Picture over other apps and no AirPlay
+    let native = this.native = (IPHONE || IPAD) && settings.nativeIphone && !(info.liveNow && !info.hlsUrl);
     if (!native) await this.init();
     this.info = info;
     this.live = !!(info.liveNow && info.hlsUrl);
@@ -294,7 +294,9 @@ export class Player {
     v.disableRemotePlayback = false;
     this.nativeSrc = true;
     this.nativeOk = false;
-    v.src = this.live ? info.hlsUrl.replace(/^https?:\/\/[^/]+/, "") : `/api/p/hls/${info.videoId}.m3u8`;
+    // one quality (the best up to the cap): the device's player would otherwise step down on its own
+    const h = this.capHeight();
+    v.src = this.live ? info.hlsUrl.replace(/^https?:\/\/[^/]+/, "") : `/api/p/hls/${info.videoId}.m3u8?h=${Number.isFinite(h) ? h : 4320}`;
     try {
       await new Promise((ok, no) => {
         const ac = new AbortController();
@@ -1268,7 +1270,7 @@ export class Player {
         { src: `${location.origin}/vi/${i.videoId}/mqdefault.jpg`, sizes: "320x180", type: "image/jpeg" },
         { src: `${location.origin}/vi/${i.videoId}/maxres.jpg`, sizes: "1280x720", type: "image/jpeg" },
       ],
-      album: i.liveNow ? $t("실시간") : $t("튜브하우스"),
+      album: i.liveNow ? $t("실시간") : siteName(),
     });
     const ms = navigator.mediaSession;
     const set = (a, f) => { try { ms.setActionHandler(a, f); } catch { } };

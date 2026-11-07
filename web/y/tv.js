@@ -10,7 +10,7 @@ export function isTV() {
   const s = settings.tv || "auto";
   if (s === "on") return true;
   if (s === "off") return false;
-  if (/TubeHausTV|Android TV|GoogleTV|Google TV|AFT[A-Z]|BRAVIA|SMART-TV|SmartTV|HbbTV|Tizen|Web0S|webOS|TV Bro|Puffin.*TV|CrKey|AndroidTV/i.test(UA)) return true;
+  if (/TubeHausTV|HomeTubeTV|Android TV|GoogleTV|Google TV|AFT[A-Z]|BRAVIA|SMART-TV|SmartTV|HbbTV|Tizen|Web0S|webOS|TV Bro|Puffin.*TV|CrKey|AndroidTV/i.test(UA)) return true;
   // a large-screen Android with neither touch nor mouse = a TV
   return /Android/i.test(UA) && !/Mobile/i.test(UA) && matchMedia("(pointer: none)").matches && screen.width >= 960;
 }

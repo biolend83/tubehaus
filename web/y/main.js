@@ -1,5 +1,5 @@
 // Entry point: header (search, notifications, account), side menu, routes, global shortcuts
-import { $, $$, esc, icon, api, lib, settings, local, toast, thumb, normVideo, ago, modeReady } from "./util.js";
+import { $, $$, esc, icon, api, lib, settings, local, toast, thumb, normVideo, ago, modeReady, siteName, LINKS } from "./util.js";
 import { dialog } from "./core.js";
 import { player, routes, state, loadLib, navigate, render, renderGuideSubs, popup, mi, keysDialog, initCardHover, markRestore, saveScroll, known, videoMenu, pageCleanup } from "./core.js";
 import * as P from "./pages.js";
@@ -16,6 +16,17 @@ translateDom(document.body);
 const regionBadge = document.getElementById("region");
 if (regionBadge) regionBadge.textContent = REGION;
 document.title = $t("튜브하우스");
+// the instance's own name and menu links (HT_NAME, HT_LINKS), once the server has said them
+modeReady.then(() => {
+  if (document.title === $t("튜브하우스")) document.title = siteName();
+  for (const a of document.querySelectorAll(".logo[aria-label]")) a.setAttribute("aria-label", siteName());
+  if (!LINKS.length) return;
+  const sec = document.createElement("div");
+  sec.className = "g-sec g-links";
+  sec.innerHTML = LINKS.map((l) => `<a href="${esc(l.url)}" class="gi"${/\.apk$/i.test(l.url) ? " download" : ""}>${icon(/\.apk$/i.test(l.url) ? "download" : "open", "duo")}<span>${esc(l.name)}</span></a>`).join("");
+  const set = document.querySelector('#guide [data-r="settings"]')?.closest(".g-sec");
+  if (set) set.before(sec);
+});
 
 // ---------------------------------------------------------------- routes (same URLs as YouTube)
 routes.push(
@@ -233,7 +244,7 @@ setInterval(bell, 10 * 60000);
 // ---------------------------------------------------------------- account menu
 $("#acct").onclick = (e) => {
   const th = { system: $t("기기 테마 사용"), dark: $t("어두운 테마"), light: $t("밝은 테마") };
-  popup(e.currentTarget, `<div class="acct-h">${icon("account")}<div><b>TubeHaus</b><span>${$t("내 라이브러리")}</span></div></div><hr>` +
+  popup(e.currentTarget, `<div class="acct-h">${icon("account")}<div><b>${esc(siteName())}</b><span>${$t("내 라이브러리")}</span></div></div><hr>` +
     mi("you", "libr", $t("내 페이지")) + mi("history", "history", $t("시청 기록")) + mi("subs", "subs", $t("구독 관리")) + "<hr>" +
     mi("theme", "dark", $t("디자인: ") + th[settings.theme]) + mi("lang", "globe", langLabel() + ": " + LANGS.find(([c]) => c === LANG)[1]) +
     mi("settings", "gear", $t("설정")) + mi("keys", "keyboard", $t("단축키")),
