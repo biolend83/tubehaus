@@ -517,7 +517,8 @@ async function renderComments(page, info, sortBy = "top", target) {
   requestAnimationFrame(() => $$(".cm-text", box).forEach((t) => { if (t.scrollHeight > t.clientHeight + 4) t.insertAdjacentHTML("afterend", `<button class="cm-more">${$t("자세히 보기")}</button>`); }));
 }
 function commentHtml(c, reply = false) {
-  const av = pickThumb(c.authorThumbnails, 48);
+  // newer Invidious sends one "authorThumbnail" address instead of the "authorThumbnails" list
+  const av = pickThumb(c.authorThumbnails, 48) || pickThumb(c.authorThumbnail ? [{ url: c.authorThumbnail, width: 48 }] : [], 48);
   const owner = c.authorIsChannelOwner;
   return `<div class="cm ${reply ? "reply" : ""}">
     <a href="/channel/${esc(c.authorId)}" data-nav>${avatar(av, reply ? "xs" : "sm")}</a>
