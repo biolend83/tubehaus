@@ -340,6 +340,8 @@ class MpvPlayer : VideoPlayer {
         val ok = s.video.filter { it.height <= cap }.ifEmpty { s.video.sortedBy { it.height }.take(1) }
         val best = ok.maxOfOrNull { it.height } ?: return null
         val at = ok.filter { it.height == best }
+        // the codec chosen in Settings, where this height has it
+        opts.codec.takeIf { it.isNotEmpty() }?.let { c -> at.firstOrNull { it.codecFamily == c }?.let { return it } }
         return at.firstOrNull { it.codecFamily == "vp9" } ?: at.firstOrNull { it.codecFamily == "h264" } ?: at.first()
     }
 
@@ -369,6 +371,9 @@ class MpvPlayer : VideoPlayer {
         soundBad = 0
         if (s.live || s.video.isEmpty()) {
             url = s.hls ?: return
+        } else if (opts.audioOnly && s.audio.isNotEmpty()) {
+            // music: the sound alone (the app shows the cover)
+            url = source((pickAudio(s) ?: return).url)
         } else {
             val cap = if (pinned > 0) pinned else opts.maxHeight
             val v = pickVideo(s, cap) ?: return

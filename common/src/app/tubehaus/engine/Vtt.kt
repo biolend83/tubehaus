@@ -55,6 +55,25 @@ object Vtt {
         }
     }
 
+    /** one line of a transcript: when it is said, and what */
+    data class Line(val startMs: Long, val endMs: Long, val text: String)
+
+    /** the captions as a transcript: each line once, in order (see [clean]) */
+    fun lines(src: String): List<Line> {
+        val rows = clean(src).split('\n')
+        val out = ArrayList<Line>()
+        var i = 0
+        while (i < rows.size) {
+            if ("-->" !in rows[i]) { i++; continue }
+            val (a, b) = rows[i].split("-->").let { it[0].trim() to it[1].trim() }
+            i++
+            val text = StringBuilder()
+            while (i < rows.size && rows[i].isNotBlank()) { if (text.isNotEmpty()) text.append(' '); text.append(rows[i].trim()); i++ }
+            if (text.isNotEmpty()) out += Line(ms(a), ms(b), text.toString())
+        }
+        return out
+    }
+
     /** a timedtext address (subtitles), the only responses this rewrites */
     fun isCaption(url: String) = "/api/timedtext" in url && "fmt=vtt" in url
 }

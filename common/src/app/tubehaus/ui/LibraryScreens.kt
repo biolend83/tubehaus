@@ -44,6 +44,8 @@ import app.tubehaus.data.SubGroup
 import androidx.compose.material3.HorizontalDivider
 import app.tubehaus.engine.Video
 import app.tubehaus.engine.Sys
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import kotlinx.coroutines.launch
 
 // ---------------------------------------------------------------- subscriptions
@@ -308,10 +310,37 @@ fun LibraryScreen(app: AppState) {
         }
         item { LibRow(Sym.Add.outline, tr("New playlist"), "") { newPl = true } }
         item { SectionTitle(tr("Your data")) }
+        item { RecapCard(app) }
         item { LibRow(Sym.Psychology.outline, tr("What TubeHaus learned about you"), "") { app.go(Screen.Learned) } }
-        item { LibRow(Sym.SwapVert.outline, tr("Import and export"), "") { app.go(Screen.Settings) } }
+        item { LibRow(Sym.SwapVert.outline, tr("Import and export"), "") { app.go(Screen.SettingsPage("data")) } }
     }
     if (newPl) NameDialog(tr("New playlist"), "", { newPl = false }) { app.store.newPlaylist(it, null) }
+}
+
+/** this month's watch time and who it went to; opens the whole recap */
+@Composable
+private fun RecapCard(app: AppState) {
+    val st by app.store.stats.state.collectAsState()
+    val m = monthSums(st).firstOrNull { it.month == Sys.today().take(7) }
+    val c = MaterialTheme.colorScheme
+    Row(
+        Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth()
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+            .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Red.copy(alpha = 0.22f), Teal.copy(alpha = 0.22f))))
+            .clickable { app.go(Screen.Stats) }.padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Sym.Insights.outline, null, Modifier.size(32.dp))
+        Column(Modifier.weight(1f).padding(start = 16.dp)) {
+            Text(tr("Recap") + " · " + monthName(Sys.today().take(7)), style = MaterialTheme.typography.titleSmall)
+            Text(
+                if (m == null || m.video + m.music < 60) tr("What you watched and listened to, month by month")
+                else tr("{t} in all · {v} videos, {m} music").replace("{t}", minutesText((m.video + m.music) / 60))
+                    .replace("{v}", minutesText(m.video / 60)).replace("{m}", minutesText(m.music / 60)),
+                style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 @Composable
