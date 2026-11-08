@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.0.2",
+          "buildVersion": "39",
+          "date": "2026-11-08T08:43:37+00:00",
+          "localizedDescription": "1.0.2: the transcript in any caption language, saved as text, SRT or WebVTT; search by fewest views, oldest first and a view count range.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.2/TubeHaus-1.0.2-ipad.ipa",
+          "size": 20930222,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.0.1",
           "buildVersion": "38",
           "date": "2026-11-08T00:58:20+00:00",
@@ -149,11 +158,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.0.1",
-      "versionDate": "2026-11-08T00:58:20+00:00",
-      "versionDescription": "1.0.1: what plays shows in Control Center and on the lock screen, with its buttons; a save that the system refuses for a moment is tried again and never closes the app.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.1/TubeHaus-1.0.1-ipad.ipa",
-      "size": 20850037
+      "version": "1.0.2",
+      "versionDate": "2026-11-08T08:43:37+00:00",
+      "versionDescription": "1.0.2: the transcript in any caption language, saved as text, SRT or WebVTT; search by fewest views, oldest first and a view count range.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.2/TubeHaus-1.0.2-ipad.ipa",
+      "size": 20930222
     }
   ],
   "news": [],
