@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v1.0.2 — 2026-11-08
+
+Choose the audio track and captions when you save a video, transcripts in any language and as files, and more search filters. The apps 1.0.2 have the same.
 
 ### Added
 - Save offline: choose the audio track (original, a dubbed language or audio description) for the video or for the sound alone, and put a caption track into the saved video as a subtitle stream (MP4 or WebM, language tagged). If the captions can't be fetched, the video is saved without them and you're told
