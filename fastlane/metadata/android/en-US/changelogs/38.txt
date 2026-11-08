@@ -1,0 +1,2 @@
+- Casting a video you saved works again when the saved copy is 4K: the TV gets it from YouTube instead
+- Windows: the app no longer closes when another program holds one of its files open for a moment
