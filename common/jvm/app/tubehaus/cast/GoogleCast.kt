@@ -227,14 +227,37 @@ internal class CastPlayer(override val device: CastDevice, private val scope: Co
         return ok.filter { it.codecFamily == family }
     }
 
+    /**
+     * A saved copy the TV can't take (VP9 above 1080p, Opus sound: what a 4K download is) goes as
+     * the same video from YouTube instead; the copy keeps playing on this device as before.
+     */
+    private suspend fun forTv(s: Stream): Stream {
+        val saved = (s.video + s.audio).any { it.url.startsWith("file:") }
+        if (!saved || s.live) return s
+        val cap = if (height > 0) Int.MAX_VALUE else minOf(opts.maxHeight, 1080)
+        val picture = castable(s.video).any { it.height <= cap }
+        val sound = s.audio.any { it.indexRange != null && it.codecFamily == "aac" }
+        if (picture && sound) return s
+        val online = YouTube.stream(s.id)
+        if (stream?.id != s.id) return online
+        stream = online
+        st.value = st.value.copy(
+            heights = castable(online.video).map { it.height }.filter { it > 0 }.distinct().sortedDescending(),
+            audioTracks = online.audio.mapNotNull { f -> f.audioLang?.let { it to (f.audioTrackName ?: it) } }.distinctBy { it.first },
+            audioTrack = audioLang ?: online.audio.firstOrNull { it.audioDefault }?.audioLang,
+        )
+        return online
+    }
+
     /** (re)loads the current video on the TV at [startMs] */
     private fun send(startMs: Long, autoplay: Boolean) {
-        val s = stream ?: return
+        val s0 = stream ?: return
         val t = transport ?: return
         loadJob?.cancel()
         loading = true
         loadJob = scope.launch(Dispatchers.IO) {
             try {
+                val s = forTv(s0)
                 val base = CastServer.base(device.host)
                 val info = mediaInfo(s, base)
                 val showCaption = caption != null && sentCaption != null
