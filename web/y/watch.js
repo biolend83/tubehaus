@@ -418,12 +418,55 @@ function renderPlaylistPanel(page) {
 }
 
 // ---------------------------------------------------------------- side panel: transcript / chapters
+// (the transcript's language picker and download came from Vildor Pierre's fork, micronlogivdev/tubehaus)
+const vttSec = (s) => s.split(":").reduce((a, x) => a * 60 + parseFloat(x.replace(",", ".")), 0);
+// a caption file -> transcript lines [{s, e, text}]. Automatic captions roll: each cue repeats the line before it,
+// and between two cues comes a 10 ms one with the same words; both are kept once.
+function transcriptCues(txt) {
+  const out = [];
+  let last = "";
+  for (const b of txt.replace(/\r/g, "").split(/\n{2,}/)) {
+    const ls = b.split("\n"), i = ls.findIndex((l) => l.includes("-->"));
+    if (i < 0) continue;
+    const [s, e] = ls[i].split("-->").map((x) => vttSec(x.trim().split(/\s+/)[0]));
+    if (!(e - s >= 0.05)) continue;
+    // the cue's text as the browser reads it (tags gone, &amp; and the like decoded), then without the
+    // word timings <00:01:01.809> of automatic captions, which aren't tags to the browser
+    const lines = new DOMParser().parseFromString(ls.slice(i + 1).join("\n"), "text/html").body.textContent.split("\n")
+      .map((l) => l.replace(/<\/?\d{1,2}:\d{2}(?::\d{2})?[.,]\d{1,3}>/g, "").replace(/\s{2,}/g, " ").trim()).filter(Boolean);
+    while (lines.length && lines[0] === last) lines.shift();
+    if (!lines.length) continue;
+    last = lines[lines.length - 1];
+    out.push({ s, e, text: lines.join(" ") });
+  }
+  return out;
+}
+const stamp = (t, sep) => {
+  const ms = Math.max(0, Math.round(t * 1000));
+  return [ms / 3600000, (ms / 60000) % 60, (ms / 1000) % 60].map((x) => String(Math.floor(x)).padStart(2, "0")).join(":") + sep + String(ms % 1000).padStart(3, "0");
+};
+// fmt: txt = the words only, tt = the words with [m:ss] in front, srt / vtt = subtitle files
+function saveTranscript(cues, fmt, title, lang) {
+  const body = fmt === "txt" ? cues.map((c) => c.text).join("\n")
+    : fmt === "tt" ? cues.map((c) => `[${fmtTime(c.s)}] ${c.text}`).join("\n")
+    : fmt === "srt" ? cues.map((c, i) => `${i + 1}\n${stamp(c.s, ",")} --> ${stamp(c.e, ",")}\n${c.text}\n`).join("\n")
+    : "WEBVTT\n\n" + cues.map((c) => `${stamp(c.s, ".")} --> ${stamp(c.e, ".")}\n${c.text}\n`).join("\n");
+  const name = String(title || "transcript").replace(/[\\/:*?"<>|\x00-\x1f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120) || "transcript";
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([body.trimEnd() + "\n"], { type: "text/plain;charset=utf-8" }));
+  a.download = `${name} [${lang}]${fmt === "tt" ? " (timestamps)" : ""}.${fmt === "tt" ? "txt" : fmt}`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
 async function openPanel(kind) {
   const box = $(".w-panel");
   if (!box) return;
   if (box.dataset.kind === kind) { box.dataset.kind = ""; box.innerHTML = ""; return; }
   box.dataset.kind = kind;
-  const head = (t) => `<div class="pn-h"><b>${t}</b><button class="x">${icon("close")}</button></div>`;
+  const head = (t, extra = "") => `<div class="pn-h"><b>${t}</b><span class="pn-act">${extra}<button class="x">${icon("close")}</button></span></div>`;
   if (kind === "chapters") {
     box.innerHTML = `<div class="pn">${head($t("챕터"))}<div class="pn-list">${player.chapters.map((c) => {
       const f = player.sbFrame(c.start + 1);
@@ -431,28 +474,31 @@ async function openPanel(kind) {
       return `<button class="pn-it" data-seek="${c.start}">${img}<span><b>${esc(c.title)}</b><em>${fmtTime(c.start)}</em></span></button>`;
     }).join("")}</div></div>`;
   } else {
-    box.innerHTML = `<div class="pn">${head($t("스크립트"))}<div class="pn-list tr"><div class="spinner"></div></div></div>`;
-    const list = player.captionList();
-    const pick = player.capTrack || list.find((c) => c.lang.startsWith(LANG) && !/auto/i.test(c.label)) || list.find((c) => c.lang.startsWith(LANG)) || list[0];
-    const L = box.querySelector(".pn-list");
-    if (!pick) { L.innerHTML = `<p class='sub'>${$t("이 영상에는 자막이 없어요")}</p>`; }
-    else {
+    const dlLabel = esc($t("스크립트 다운로드"));
+    box.innerHTML = `<div class="pn">${head($t("스크립트"), `<button class="tr-dl" title="${dlLabel}" aria-label="${dlLabel}" hidden>${icon("download")}</button>`)}<div class="pn-list tr"><div class="spinner"></div></div></div>`;
+    const list = player.captionList().filter((c) => !c.liveCc);
+    const L = box.querySelector(".pn-list"), dl = box.querySelector(".tr-dl");
+    let pick = (player.capTrack && list.find((c) => c.url === player.capTrack.url)) || list.find((c) => c.lang.startsWith(LANG) && !/auto/i.test(c.label)) || list.find((c) => c.lang.startsWith(LANG)) || list[0];
+    let cues = [], iv;
+    const load = async (c) => {
+      clearInterval(iv);
+      pick = c;
+      cues = [];
+      dl.hidden = true;
+      L.innerHTML = `<div class="spinner"></div>`;
       try {
-        const txt = await (await fetch(pick.url, { credentials: "same-origin" })).text();
-        const cues = [];
-        for (const b of txt.replace(/\r/g, "").split(/\n{2,}/)) {
-          const ls = b.split("\n"), i = ls.findIndex((l) => l.includes("-->"));
-          if (i < 0) continue;
-          const t = ls[i].split("-->")[0].trim().split(":").reduce((a, x) => a * 60 + parseFloat(x), 0);
-          // the cue's text as the browser reads it (tags gone, &amp; and the like decoded), then without the
-          // word timings <00:01:01.809> of automatic captions, which aren't tags to the browser
-          const text = new DOMParser().parseFromString(ls.slice(i + 1).join(" "), "text/html").body.textContent
-            .replace(/<\/?\d{1,2}:\d{2}(?::\d{2})?[.,]\d{1,3}>/g, "").replace(/\s{2,}/g, " ").trim();
-          if (text && (!cues.length || cues[cues.length - 1].text !== text)) cues.push({ t, text });
-        }
-        L.innerHTML = `<div class="tr-lang">${esc(pick.label)}</div>` + cues.map((c) => `<button class="pn-it tr-it" data-seek="${c.t}"><em>${fmtTime(c.t)}</em><span>${esc(c.text)}</span></button>`).join("");
+        const r = await fetch(c.url, { credentials: "same-origin" });
+        if (!r.ok) throw new Error(r.status);
+        const got = transcriptCues(await r.text());
+        if (pick !== c || !L.isConnected) return;      // another language was picked meanwhile
+        cues = got;
+        const langRow = list.length > 1
+          ? `<label class="tr-lang">${$t("자막 언어")} <select class="tr-sel">${list.map((x, i) => `<option value="${i}"${x === c ? " selected" : ""}>${esc(x.label)}</option>`).join("")}</select></label>`
+          : `<div class="tr-lang">${esc(c.label)}</div>`;
+        L.innerHTML = langRow + cues.map((x) => `<button class="pn-it tr-it" data-seek="${x.s}"><em>${fmtTime(x.s)}</em><span>${esc(x.text)}</span></button>`).join("");
+        dl.hidden = !cues.length;
         const items = $$(".tr-it", L);
-        const iv = setInterval(() => {
+        iv = setInterval(() => {
           if (!L.isConnected) return clearInterval(iv);
           const t = player.video.currentTime;
           let cur = null;
@@ -460,8 +506,13 @@ async function openPanel(kind) {
           items.forEach((x) => x.classList.toggle("cur", x === cur));
           if (cur && !L.matches(":hover")) L.scrollTop = cur.offsetTop - L.offsetTop - L.clientHeight / 3;
         }, 500);
-      } catch { L.innerHTML = `<p class='sub'>${$t("스크립트를 불러오지 못했어요")}</p>`; }
-    }
+      } catch { if (pick === c) L.innerHTML = `<p class='sub'>${$t("스크립트를 불러오지 못했어요")}</p>`; }
+    };
+    L.addEventListener("change", (e) => { if (e.target.matches(".tr-sel")) load(list[+e.target.value]); });
+    dl.onclick = () => popup(dl, mi("txt", "notes", $t("텍스트 (.txt)")) + mi("tt", "notes", $t("타임스탬프 포함 텍스트 (.txt)")) +
+      mi("srt", "download", "SubRip (.srt)") + mi("vtt", "download", "WebVTT (.vtt)"), (fmt) => { if (cues.length) saveTranscript(cues, fmt, W.info?.title || W.id, pick.lang); });
+    if (!pick) L.innerHTML = `<p class='sub'>${$t("이 영상에는 자막이 없어요")}</p>`;
+    else load(pick);
   }
   box.querySelector(".x").onclick = () => { box.dataset.kind = ""; box.innerHTML = ""; };
   box.addEventListener("click", (e) => { const s = e.target.closest("[data-seek]"); if (s) player.seek(+s.dataset.seek); });

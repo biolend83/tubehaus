@@ -29,6 +29,9 @@ jobs:
       - name: Translations complete
         run: node scripts/i18n-check.mjs --strict
 
+      - name: Search filter tests
+        run: node tests/test_search_filters.mjs
+
       - name: Python syntax
         run: python3 -m py_compile server/tubehaus_server.py
 

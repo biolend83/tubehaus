@@ -4,6 +4,7 @@ import { state, card, metaLine, chAvatar, channelCard, playlistCard, norm, remem
 import { SB_CATS } from "./player.js";
 import { $t, LANG, LANGS, LOCALE, REGION, fmtShort, langLabel } from "./i18n.js";
 import { bgFallback } from "./avatars.js";
+import { LOCAL_SORTS, viewLimit, refineSearch, searchSourceSort } from "./search-filters.js";
 
 const grid = (cls = "") => `<div class="vgrid ${cls}"></div>`;
 const spinner = `<div class="loading"><div class="spinner"></div></div>`;
@@ -200,33 +201,62 @@ const FILTERS = {
   type: [$t("구분"), [["all", $t("전체")], ["video", $t("동영상")], ["channel", $t("채널")], ["playlist", $t("재생목록")], ["movie", $t("영화")]]],
   duration: [$t("길이"), [["", $t("전체")], ["short", $t("4분 미만")], ["medium", $t("4~20분")], ["long", $t("20분 초과")]]],
   features: [$t("기능별"), [["live", $t("실시간")], ["4k", "4K"], ["hd", "HD"], ["subtitles", $t("자막")], ["creative_commons", $t("크리에이티브 커먼즈")], ["360", "360°"], ["vr180", "VR180"], ["3d", "3D"], ["hdr", "HDR"], ["location", $t("위치")], ["purchased", $t("구매함")]]],
-  sort: [$t("정렬기준"), [["relevance", $t("관련성")], ["date", $t("업로드 날짜")], ["views", $t("조회수")], ["rating", $t("평점")]]],
+  sort: [$t("정렬기준"), [["relevance", $t("관련성")], ["date", $t("업로드 날짜")], ["views", $t("조회수")], ["views_asc", $t("조회수 낮은순")], ["date_asc", $t("오래된 업로드순")], ["rating", $t("평점")]]],
 };
 export async function search(page, m, alive) {
   const sp = new URLSearchParams(location.search);
   const q = sp.get("search_query") || sp.get("q") || "";
   $("#q").value = q;
   if (!q) { page.innerHTML = empty("search", $t("검색어를 입력하세요")); return; }
-  const f = { date: sp.get("date") || "", type: sp.get("type") || "all", duration: sp.get("duration") || "", features: (sp.get("features") || "").split(",").filter(Boolean), sort: sp.get("sort") || "relevance" };
-  const active = (f.date ? 1 : 0) + (f.type !== "all" ? 1 : 0) + (f.duration ? 1 : 0) + f.features.length + (f.sort !== "relevance" ? 1 : 0);
-  page.innerHTML = `<div class="search-page"><div class="sp-top"><button class="pill ghost filt">${$t("{0} 필터{1}", icon("tune"), active ? ` (${active})` : "")}</button></div>
-    <div class="filters" hidden></div><div class="results"></div></div>`;
+  const f = { date: sp.get("date") || "", type: sp.get("type") || "all", duration: sp.get("duration") || "", features: (sp.get("features") || "").split(",").filter(Boolean), sort: sp.get("sort") || "relevance", min_views: viewLimit(sp.get("min_views")), max_views: viewLimit(sp.get("max_views")) };
+  if (!FILTERS.sort[1].some(([v]) => v === f.sort)) f.sort = "relevance";
+  const ranged = f.min_views !== "" || f.max_views !== "";
+  // fewest views / oldest first and the view range are worked out here over the loaded results: videos only
+  const localMode = ranged || LOCAL_SORTS.has(f.sort);
+  if (localMode) f.type = "video";
+  const query = (nf) => {
+    const u = new URLSearchParams({ search_query: q });
+    for (const [k, v] of Object.entries(nf)) { const s = Array.isArray(v) ? v.join(",") : v; if (s !== "" && !(k === "type" && s === "all") && !(k === "sort" && s === "relevance")) u.set(k, s); }
+    u.set("filters", "1");                           // the filter panel stays open after a pick
+    return "/results?" + u;
+  };
+  const open = sp.get("filters") === "1";
+  const active = (f.date ? 1 : 0) + (f.type !== "all" ? 1 : 0) + (f.duration ? 1 : 0) + f.features.length + (f.sort !== "relevance" ? 1 : 0) + (ranged ? 1 : 0);
+  page.innerHTML = `<div class="search-page"><div class="sp-top"><button class="pill ghost filt" aria-expanded="${open}">${$t("{0} 필터{1}", icon("tune"), active ? ` (${active})` : "")}</button></div>
+    <div class="filters"${open ? "" : " hidden"}></div><p class="search-note" role="status" hidden></p><div class="results"></div><button class="pill search-more" hidden>${$t("결과 더 불러오기")}</button></div>`;
   const filt = $(".filters", page);
   filt.innerHTML = Object.entries(FILTERS).map(([k, [title, opts]]) => `<div class="fcol"><h4>${title}</h4>${opts.map(([v, l]) => {
     const on = k === "features" ? f.features.includes(v) : f[k] === v;
     const nf = { ...f, features: [...f.features] };
     if (k === "features") nf.features = on ? nf.features.filter((x) => x !== v) : [...nf.features, v];
-    else nf[k] = on && v ? "" : v;
-    const u = new URLSearchParams({ search_query: q });
-    for (const [kk, vv] of Object.entries(nf)) { const s = Array.isArray(vv) ? vv.join(",") : vv; if (s && !(kk === "type" && s === "all") && !(kk === "sort" && s === "relevance")) u.set(kk, s); }
-    return `<a href="/results?${u}" data-nav class="${on ? "on" : ""}">${l}${on && k !== "type" && k !== "sort" ? " " + icon("close") : ""}</a>`;
-  }).join("")}</div>`).join("");
-  $(".filt", page).onclick = () => (filt.hidden = !filt.hidden);
-  const box = $(".results", page);
+    else nf[k] = on && v && k !== "type" && k !== "sort" ? "" : v;
+    if (k === "type" && !["all", "video"].includes(v)) {          // channels and playlists have no view counts
+      nf.min_views = nf.max_views = "";
+      if (LOCAL_SORTS.has(nf.sort)) nf.sort = "relevance";
+    }
+    if (LOCAL_SORTS.has(nf.sort) || nf.min_views !== "" || nf.max_views !== "") nf.type = "video";
+    return `<a href="${esc(query(nf))}" data-nav class="${on ? "on" : ""}">${l}${on && v && k !== "type" && k !== "sort" ? " " + icon("close") : ""}</a>`;
+  }).join("")}</div>`).join("") + `<form class="view-range fcol"><h4>${$t("조회수 범위")}</h4>
+    <label>${$t("최소 조회수")}<input name="min_views" type="number" min="0" step="1" inputmode="numeric" value="${f.min_views}" placeholder="0"></label>
+    <label>${$t("최대 조회수")}<input name="max_views" type="number" min="0" step="1" inputmode="numeric" value="${f.max_views}" placeholder="${esc($t("제한 없음"))}"></label>
+    <div class="vr-act"><button class="pill" type="submit">${$t("적용")}</button>${ranged ? `<a class="pill ghost" href="${esc(query({ ...f, min_views: "", max_views: "" }))}" data-nav>${$t("범위 지우기")}</a>` : ""}</div></form>`;
+  const rf = $(".view-range", filt), minI = $("[name=min_views]", rf), maxI = $("[name=max_views]", rf);
+  const check = () => maxI.setCustomValidity(minI.value !== "" && maxI.value !== "" && +minI.value > +maxI.value ? $t("최대 조회수는 최소 조회수 이상이어야 해요") : "");
+  minI.oninput = maxI.oninput = check;
+  rf.onsubmit = (e) => {
+    e.preventDefault();
+    check();
+    if (!rf.reportValidity()) return;
+    const nf = { ...f, min_views: viewLimit(minI.value), max_views: viewLimit(maxI.value) };
+    if (nf.min_views !== "" || nf.max_views !== "") nf.type = "video";
+    navigate(query(nf));
+  };
+  $(".filt", page).onclick = (e) => { filt.hidden = !filt.hidden; e.currentTarget.setAttribute("aria-expanded", String(!filt.hidden)); };
+  const box = $(".results", page), note = $(".search-note", page), more = $(".search-more", page);
   box.innerHTML = skelRows();
   let pg = 1;
   const url = (n) => {
-    const u = new URLSearchParams({ q, page: n, region: REGION, type: f.type, sort: f.sort });
+    const u = new URLSearchParams({ q, page: n, region: REGION, type: f.type, sort: searchSourceSort(f.sort) });
     if (f.date) u.set("date", f.date);
     if (f.duration) u.set("duration", f.duration);
     if (f.features.length) u.set("features", f.features.join(","));
@@ -246,9 +276,36 @@ export async function search(page, m, alive) {
   const first = await api(url(1), { ttl: 120000 });
   if (!alive()) return;
   box.innerHTML = "";
-  if (!first.length) { box.innerHTML = empty("search", $t("검색결과가 없습니다"), `<p class='sub'>${$t("다른 검색어를 시도하거나 필터를 지워 보세요")}</p>`); return; }
-  draw(first);
-  infinite(box, async () => { const r = await api(url(++pg), { ttl: 120000 }); draw(r); return r.length > 0; });
+  if (localMode) {
+    // the order changes as more results come in, so the list is drawn again each time and grows by a button
+    const loaded = [], seen = new Set();
+    const render = (items) => {
+      for (const x of items) if (x.videoId && !seen.has(x.videoId)) { seen.add(x.videoId); loaded.push(x); }
+      const done = !items.length;                     // an empty page ends the search; no matches doesn't
+      const hits = refineSearch(loaded, f);
+      box.innerHTML = "";
+      if (hits.length) draw(hits);
+      else box.innerHTML = empty("search", $t("불러온 결과에 맞는 동영상이 없어요"));
+      note.hidden = false;
+      note.textContent = $t("불러온 동영상 {0}개 중 {1}개가 맞아요. 이 정렬과 조회수 범위는 불러온 결과 안에서만 적용돼요.", loaded.length, hits.length) + (done ? " " + $t("더 불러올 결과가 없어요") : "");
+      more.hidden = done;
+    };
+    render(first);
+    more.onclick = async () => {
+      more.disabled = true;
+      try {
+        const next = await api(url(pg + 1), { ttl: 120000 });
+        if (!alive()) return;
+        pg++;
+        render(next);
+      } catch (e) { if (alive()) toast(e.message); }
+      finally { more.disabled = false; }
+    };
+  } else {
+    if (!first.length) { box.innerHTML = empty("search", $t("검색결과가 없습니다"), `<p class='sub'>${$t("다른 검색어를 시도하거나 필터를 지워 보세요")}</p>`); return; }
+    draw(first);
+    infinite(box, async () => { const r = await api(url(++pg), { ttl: 120000 }); if (!alive()) return false; draw(r); return r.length > 0; });
+  }
   // search history (this device)
   const h = local.get("sh", []).filter((x) => x !== q);
   h.unshift(q);

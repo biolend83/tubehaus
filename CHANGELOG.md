@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+From Vildor Pierre's fork ([micronlogivdev/tubehaus](https://github.com/micronlogivdev/tubehaus)), written into this code:
+
+### Added
+- Transcript: pick any caption language in the panel, and download the transcript as text, text with timestamps, SRT or WebVTT. Automatic captions no longer repeat each line
+- Search filters: "Fewest views" and "Oldest first", and a view count range (minimum, maximum). They sort and filter the results loaded so far, with a button to load more; the filter panel stays open after a pick
+
+### Fixed
+- The web player's video is made in the page itself: one made in a template could play sound with a black picture on Apple WebKit
+- Shorts cards without a vertical thumbnail are zoomed past the 4:3 thumbnail's black bars
+
 ## v1.0.1 — 2026-11-08
 
 Every quality up to 8K in the web player, audio tracks with the original first, a buffer slider, and your instance's own name.

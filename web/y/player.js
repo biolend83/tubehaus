@@ -134,8 +134,12 @@ export class Player {
   }
 
   build() {
-    const r = (this.root = el(`
-<div class="ytp paused ctl" tabindex="-1">
+    // made in the page's own document, not in el()'s <template>: a <video> born in a template can play sound
+    // with a black picture on Apple WebKit (found in Vildor Pierre's fork, micronlogivdev/tubehaus)
+    const r = (this.root = document.createElement("div"));
+    r.className = "ytp paused ctl";
+    r.tabIndex = -1;
+    r.innerHTML = `
   <video playsinline preload="auto"></video>
   <div class="ytp-poster"></div>
   <div class="ytp-scrubimg"></div>
@@ -181,8 +185,7 @@ export class Player {
     </div>
   </div>
   <div class="ytp-menu"></div>
-  <div class="ytp-ctx"></div>
-</div>`));
+  <div class="ytp-ctx"></div>`;
     this.video = $("video", r);
     const v = this.video;
     v.volume = settings.volume >= 0.05 ? settings.volume : 1;
