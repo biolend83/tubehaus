@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.0.1",
+          "buildVersion": "38",
+          "date": "2026-11-08T00:58:20+00:00",
+          "localizedDescription": "1.0.1: what plays shows in Control Center and on the lock screen, with its buttons; a save that the system refuses for a moment is tried again and never closes the app.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.1/TubeHaus-1.0.1-ipad.ipa",
+          "size": 20850037,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.0.0",
           "buildVersion": "37",
           "date": "2026-11-07T12:01:56+00:00",
@@ -140,11 +149,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.0.0",
-      "versionDate": "2026-11-07T12:01:56+00:00",
-      "versionDescription": "Shared with the 1.0.0 release: the look of the web app 1.0, with the Pretendard font, softer colours, pill tabs, rounder cards, and Settings on one page of cards with a menu that jumps to each category.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.0/TubeHaus-1.0.0-ipad.ipa",
-      "size": 20833435
+      "version": "1.0.1",
+      "versionDate": "2026-11-08T00:58:20+00:00",
+      "versionDescription": "1.0.1: what plays shows in Control Center and on the lock screen, with its buttons; a save that the system refuses for a moment is tried again and never closes the app.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.1/TubeHaus-1.0.1-ipad.ipa",
+      "size": 20850037
     }
   ],
   "news": [],
