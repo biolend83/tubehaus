@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v1.0.1 — 2026-11-08
+
+Every quality up to 8K in the web player, audio tracks with the original first, a buffer slider, and your instance's own name.
 
 ### Added
 - `GET /api/p/dash/<id>.mpd`: the server's own DASH list of qualities for the web player, with VP9 (WebM) as well as H.264 and AV1, and 8K (YouTube often has it only in HDR, which is kept where there is no SDR copy)
