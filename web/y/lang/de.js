@@ -1,5 +1,9 @@
 // TubeHaus interface text: de. Key = the Korean original.
 export default {
+ "오디오": "Audio",
+ "넣지 않음": "Keine",
+ "자동 더빙": "automatisch synchronisiert",
+ "자막을 넣지 못해서 자막 없이 저장했어요": "Untertitel konnten nicht hinzugefügt werden, das Video wurde ohne sie gespeichert",
  "스크립트 다운로드": "Transkript herunterladen",
  "텍스트 (.txt)": "Text (.txt)",
  "타임스탬프 포함 텍스트 (.txt)": "Text mit Zeitstempeln (.txt)",

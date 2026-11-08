@@ -105,7 +105,7 @@ const audioKey = (t) => `${t.language || ""}|${(t.audioRoles || t.roles || []).f
 let langNames;
 try { langNames = new Intl.DisplayNames([LOCALE, "en"], { type: "language" }); } catch { }
 /** "Korean", "English (original)", "English (audio description)" in the interface language */
-function audioName(o) {
+export function audioName(o) {
   let n = o.lang;
   try { n = langNames?.of(o.lang) || o.lang; } catch { }
   n = n.charAt(0).toLocaleUpperCase(LOCALE) + n.slice(1);

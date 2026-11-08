@@ -1,5 +1,9 @@
 // TubeHaus interface text: tr. Key = the Korean original.
 export default {
+ "오디오": "Ses",
+ "넣지 않음": "Yok",
+ "자동 더빙": "otomatik dublaj",
+ "자막을 넣지 못해서 자막 없이 저장했어요": "Altyazı eklenemedi, video altyazısız kaydedildi",
  "스크립트 다운로드": "Metni indir",
  "텍스트 (.txt)": "Metin (.txt)",
  "타임스탬프 포함 텍스트 (.txt)": "Zaman damgalı metin (.txt)",

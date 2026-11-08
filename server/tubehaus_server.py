@@ -2695,10 +2695,13 @@ ytdl_jobs = {}
 ytdl_lock = threading.Lock()
 
 
-def _ytdl_part(vid, itag, path, prog):
-    r = urllib.request.urlopen(f"{COMPANION}/companion/latest_version?id={vid}&itag={itag}&local=true", timeout=30)
-    url = r.geturl()
-    r.close()
+def _ytdl_part(vid, itag, path, prog, url=None):
+    """one stream into path: by default the itag YouTube serves first (the original audio); url = one exact stream
+    through the companion (another audio track)"""
+    if not url:
+        r = urllib.request.urlopen(f"{COMPANION}/companion/latest_version?id={vid}&itag={itag}&local=true", timeout=30)
+        url = r.geturl()
+        r.close()
     m = re.search(r"clen=(\d+)", url)
     if not m:
         raise IOError(f"itag {itag}: size unknown")
@@ -2730,27 +2733,107 @@ def _ytdl_part(vid, itag, path, prog):
         list(ex.map(get, range(0, size, step)))
 
 
-def _ytdl_run(jid, vid, vitag, aitag, ext, name):
+# ISO 639-2 codes for the language tags in a saved file (MP4 wants three letters)
+_ISO3 = {"ar": "ara", "bn": "ben", "de": "deu", "en": "eng", "es": "spa", "fr": "fra", "hi": "hin", "id": "ind", "it": "ita",
+         "ja": "jpn", "ko": "kor", "nl": "nld", "pl": "pol", "pt": "por", "ru": "rus", "th": "tha", "tr": "tur", "uk": "ukr",
+         "vi": "vie", "zh": "zho"}
+
+
+def _iso3(lang):
+    return _ISO3.get((lang or "").split("-")[0].lower(), "")
+
+
+def _ytdl_track_url(vid, itag, track):
+    """the companion address of one audio stream: this itag in this audio track (dub, description, ...)"""
+    for f in _video_json(vid).get("adaptiveFormats") or []:
+        t = _atrack(f) if str(f.get("itag")) == str(itag) and f.get("url") else None
+        if t and t["id"] == track and not t["drc"]:
+            return COMPANION + _companion_url(f["url"])
+    raise IOError("That audio track isn't there any more")
+
+
+def _clean_vtt(raw):
+    """a caption file as plain WebVTT for a saved video: no styling or word timings, and automatic captions'
+    rolling lines (each cue repeats the one before) and 10 ms in-between cues kept once"""
+    import html
+
+    def sec(t):
+        return sum(float(x) * 60 ** i for i, x in enumerate(reversed(t.strip().replace(",", ".").split(":"))))
+    out, last = ["WEBVTT", ""], ""
+    for timing, lines in _vtt_cues(raw):
+        a, b = timing.split("-->", 1)
+        a, b = a.strip(), (b.split() or [""])[0]
+        try:
+            if sec(b) - sec(a) < 0.05:
+                continue
+        except ValueError:
+            continue
+        txt = [t for t in (re.sub(r"[\u200b-\u200f\ufeff]", "", html.unescape(re.sub(r"<[^>]*>", "", ln))).strip() for ln in lines) if t]
+        while txt and txt[0] == last:
+            txt.pop(0)
+        if not txt:
+            continue
+        last = txt[-1]
+        out += ["%s --> %s" % (a, b)] + txt + [""]
+    return "\n".join(out)
+
+
+def _ytdl_sub(vid, label, path):
+    """the caption track with this label (as /api/v1/videos lists it) into path, through the companion"""
+    raw = urllib.request.urlopen("%s/companion/api/v1/captions/%s?label=%s" % (COMPANION, vid, urllib.parse.quote(label)),
+                                 timeout=60).read().decode("utf-8", "replace")
+    vtt = _clean_vtt(raw)
+    if "-->" not in vtt:
+        raise IOError("no captions")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(vtt)
+
+
+def _ytdl_run(jid, vid, vitag, aitag, ext, name, track="", sub="", sub_lang="", track_lang=""):
+    """vitag "" = the sound only; track = an audio track other than the original; sub = a caption track's label to put in"""
     j = ytdl_jobs[jid]
     d = f"{YTDL_DIR}/{jid}"
     os.makedirs(d, exist_ok=True)
     t0 = time.time()
     try:
         from concurrent.futures import ThreadPoolExecutor
-        vp, ap = f"{d}/v.part", f"{d}/a.part"
-        with ThreadPoolExecutor(2) as ex:
-            for f in [ex.submit(_ytdl_part, vid, vitag, vp, j["prog"]), ex.submit(_ytdl_part, vid, aitag, ap, j["prog"])]:
+        vp, ap, sp = f"{d}/v.part", f"{d}/a.part", f"{d}/s.vtt"
+        aurl = _ytdl_track_url(vid, aitag, track) if track else None
+        with ThreadPoolExecutor(3) as ex:
+            jobs = [ex.submit(_ytdl_part, vid, aitag, ap, j["prog"], aurl)]
+            if vitag:
+                jobs.append(ex.submit(_ytdl_part, vid, vitag, vp, j["prog"]))
+            sj = ex.submit(_ytdl_sub, vid, sub, sp) if sub and vitag else None
+            for f in jobs:
                 f.result()
+            if sj:
+                try:
+                    sj.result()
+                except Exception as e:                  # the video still gets saved, without them
+                    sub = ""
+                    j["warn"] = "The captions couldn't be added, the video was saved without them"
+                    log("ytdl", f"{vid} captions {repr(e)[:100]}", every=0)
         j["status"] = "merge"
         out = f"{d}/out.{ext}"
-        cmd = ["ffmpeg", "-v", "error", "-y", "-i", vp, "-i", ap, "-map", "0:v:0", "-map", "1:a:0", "-c", "copy"]
-        if ext == "mp4":
+        if vitag:
+            cmd = ["ffmpeg", "-v", "error", "-y", "-i", vp, "-i", ap] + (["-i", sp] if sub else []) + \
+                  ["-map", "0:v:0", "-map", "1:a:0"] + (["-map", "2:s:0"] if sub else []) + ["-c:v", "copy", "-c:a", "copy"]
+            if sub:
+                cmd += ["-c:s", "mov_text" if ext == "mp4" else "webvtt", "-metadata:s:s:0", "title=" + sub]
+                if _iso3(sub_lang):
+                    cmd += ["-metadata:s:s:0", "language=" + _iso3(sub_lang)]
+        else:
+            cmd = ["ffmpeg", "-v", "error", "-y", "-i", ap, "-map", "0:a:0", "-c", "copy"]
+        if _iso3(track_lang):
+            cmd += ["-metadata:s:a:0", "language=" + _iso3(track_lang)]
+        if ext in ("mp4", "m4a"):
             cmd += ["-movflags", "+faststart"]
         r = subprocess.run(cmd + [out], capture_output=True, text=True, timeout=3600)
         if r.returncode != 0:
             raise IOError("Merging failed: " + r.stderr.strip()[-200:])
-        for x in (vp, ap):
-            os.remove(x)
+        for x in (vp, ap, sp):
+            if os.path.exists(x):
+                os.remove(x)
         j.update(status="done", path=out, size=os.path.getsize(out), done_at=time.time())
         log("ytdl", f"{vid} {vitag}+{aitag} done {j['size']}B", t0, every=0)
     except Exception as ex:
@@ -2760,15 +2843,22 @@ def _ytdl_run(jid, vid, vitag, aitag, ext, name):
 
 
 def ytdl_start(b):
-    vid, vitag, aitag = str(b.get("id", "")), str(b.get("v", "")), str(b.get("a", ""))
-    ext = "webm" if b.get("ext") == "webm" else "mp4"
-    if not re.fullmatch(r"[\w-]{11}", vid) or not vitag.isdigit() or not aitag.isdigit():
+    """{id, v (video itag, "" = the sound only), a (audio itag), ext, name, at (audio track id, "" = the original),
+    sub (a caption track's label to put in the video), sl (its language), al (the audio track's language)}"""
+    vid, vitag, aitag = str(b.get("id", "")), str(b.get("v") or ""), str(b.get("a", ""))
+    ext = str(b.get("ext") or "")
+    ext = ext if ext in (("webm", "m4a") if not vitag else ("webm",)) else "mp4" if vitag else "m4a"
+    track, sub = str(b.get("at") or ""), str(b.get("sub") or "")[:100]
+    sl, al = str(b.get("sl") or ""), str(b.get("al") or "")
+    if not re.fullmatch(r"[\w-]{11}", vid) or not (vitag.isdigit() or not vitag) or not aitag.isdigit() \
+            or not re.fullmatch(r"[\w.-]{0,40}", track) or re.search(r"[\x00-\x1f]", sub) \
+            or not re.fullmatch(r"[A-Za-z]{0,3}(-[A-Za-z0-9]{1,8})*", sl) or not re.fullmatch(r"[A-Za-z]{0,3}(-[A-Za-z0-9]{1,8})*", al):
         return 400, {"error": "Bad request"}
     name = re.sub(r'[\\/:*?"<>|\r\n]+', " ", str(b.get("name") or vid)).strip()[:120] or vid
     ytdl_gc()
     with ytdl_lock:
         busy = [x for x in ytdl_jobs.values() if x["status"] in ("download", "merge")]
-        same = next((k for k, x in ytdl_jobs.items() if x["key"] == (vid, vitag, aitag) and x["status"] != "error"), None)
+        same = next((k for k, x in ytdl_jobs.items() if x["key"] == (vid, vitag, aitag, track, sub) and x["status"] != "error"), None)
         if same:
             return 200, {"job": same}
         if len(busy) >= 2:
@@ -2778,8 +2868,8 @@ def ytdl_start(b):
         if st.f_bavail * st.f_frsize < 10e9:
             return 507, {"error": "Not enough disk space on the server"}
         jid = secrets.token_hex(8)
-        ytdl_jobs[jid] = {"key": (vid, vitag, aitag), "status": "download", "prog": {}, "name": f"{name}.{ext}", "t": time.time()}
-    threading.Thread(target=_ytdl_run, args=(jid, vid, vitag, aitag, ext, name), name="ytdl-" + jid, daemon=True).start()
+        ytdl_jobs[jid] = {"key": (vid, vitag, aitag, track, sub), "status": "download", "prog": {}, "name": f"{name}.{ext}", "t": time.time()}
+    threading.Thread(target=_ytdl_run, args=(jid, vid, vitag, aitag, ext, name, track, sub, sl, al), name="ytdl-" + jid, daemon=True).start()
     return 200, {"job": jid}
 
 
@@ -2790,7 +2880,7 @@ def ytdl_status(jid):
     got = sum(x[0] for x in j["prog"].values())
     tot = sum(x[1] for x in j["prog"].values()) or 1
     pct = 100 if j["status"] == "done" else round(got / tot * 95, 1) if j["status"] == "download" else 97
-    return {"status": j["status"], "pct": pct, "name": j["name"], "size": j.get("size") or tot, "err": j.get("err")}
+    return {"status": j["status"], "pct": pct, "name": j["name"], "size": j.get("size") or tot, "err": j.get("err"), "warn": j.get("warn")}
 
 
 def ytdl_gc():
@@ -3513,7 +3603,7 @@ class H(BaseHTTPRequestHandler):
             if not j or j["status"] != "done":
                 return self.send(404, {"error": "Not ready yet"})
             self.send_response(200)
-            self.send_header("Content-Type", "video/webm" if j["path"].endswith(".webm") else "video/mp4")
+            self.send_header("Content-Type", "video/webm" if j["path"].endswith(".webm") else "audio/mp4" if j["path"].endswith(".m4a") else "video/mp4")
             self.send_header("Content-Length", str(j["size"]))
             self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + urllib.parse.quote(j["name"]))
             self.end_headers()

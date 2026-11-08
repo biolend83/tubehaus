@@ -1,6 +1,6 @@
 // App skeleton: router, shared state (my library), cards, popup menus, dialogs
 import { $, $$, el, esc, icon, api, lib, settings, local, toast, copy, fmtTime, fmtViews, ago, exactTime, thumb, normVideo, metaOf, pickThumb, dropCache, PUBLIC } from "./util.js";
-import { Player } from "./player.js";
+import { Player, audioName } from "./player.js";
 import { knownAvatar } from "./avatars.js";
 import { $t, $tMsg, fmtShort, LANG, LOCALE } from "./i18n.js";
 
@@ -329,47 +329,83 @@ export async function downloadDialog(v) {
   try { info = await api(`/api/v1/videos/${v.id}`, { ttl: 600000 }); } catch (e) { box.querySelector(".dlbody").textContent = e.message; return; }
   const name = (info.title || v.id).replace(/[\/:*?"<>|]+/g, " ").slice(0, 120);
   const af = info.adaptiveFormats || [];
-  const aud = af.filter((f) => /^audio/.test(f.type));
+  const audAll = af.filter((f) => /^audio/.test(f.type));
+  // "stable volume" (drc) copies are left out, as the player does
+  const aud = audAll.filter((f) => !atrack(f).drc).length ? audAll.filter((f) => !atrack(f).drc) : audAll;
   const best = (list) => list.sort((a, b) => b.bitrate - a.bitrate)[0];
-  // pick the original audio first (not an auto-dubbed track)
-  const orig = (list) => list.filter((f) => !/acont%3Ddubbed|acont=dubbed/.test(f.url || "")) .length ? list.filter((f) => !/acont%3Ddubbed|acont=dubbed/.test(f.url || "")) : list;
-  const m4a = best(orig(aud.filter((f) => /mp4/.test(f.type))));
-  const opus = best(orig(aud.filter((f) => /webm/.test(f.type))));
-  // one per quality: H.264 (MP4) plays everywhere -> else AV1 (MP4) -> else VP9 (WebM)
+  // the audio tracks (original, dubs, audio description): one per language and role, the original first
+  const tracks = [];
+  for (const f of aud) { const t = atrack(f); if (!tracks.some((x) => x.id === t.id)) tracks.push(t); }
+  for (const t of tracks) t.label = (t.lang ? audioName({ lang: t.lang, orig: t.orig, desc: t.kind === "descriptive" }) : t.name || $t("오디오")) + (t.kind === "dubbed-auto" ? ` (${$t("자동 더빙")})` : "");
+  tracks.sort((a, b) => b.orig - a.orig || (a.kind === "descriptive") - (b.kind === "descriptive") || a.label.localeCompare(b.label, LOCALE));
+  const caps = info.liveNow ? [] : (info.captions || []);
   const vids = af.filter((f) => /^video/.test(f.type) && f.clen);
   const heights = [...new Set(vids.map((f) => parseInt(f.qualityLabel || f.resolution) || 0))].filter(Boolean).sort((a, b) => b - a);
-  const hd = [];
-  for (const h of heights) {
-    const at = vids.filter((f) => (parseInt(f.qualityLabel || f.resolution) || 0) === h);
-    const pick = (re) => at.filter((f) => re.test(f.type)).sort((a, b) => (+b.fps || 0) - (+a.fps || 0) || b.bitrate - a.bitrate)[0];
-    const f = pick(/avc1/) || pick(/av01/) || pick(/vp9|vp09/);
-    if (!f) continue;
-    const webm = /webm/.test(f.type);
-    const a = webm ? opus : m4a;
-    if (!a) continue;
-    const codec = /avc1/.test(f.type) ? $t("H.264 · 어디서나 재생") : /av01/.test(f.type) ? $t("AV1 · 최신 기기") : $t("VP9 · 컴퓨터/안드로이드");
-    hd.push({ v: f.itag, a: a.itag, ext: webm ? "webm" : "mp4", label: `${f.qualityLabel || h + "p"}`, sub: codec, size: (+f.clen || 0) + (+a.clen || 0), h });
-  }
   const mb = (n) => (n >= 1073741824 ? (n / 1073741824).toFixed(2) + " GB" : (n / 1048576).toFixed(0) + " MB");
-  const direct = [];
-  if (m4a) direct.push({ itag: m4a.itag, label: `${$t("음악만 · M4A {0}kbps", Math.round(m4a.bitrate / 1000))}`, ext: "m4a", size: m4a.clen });
-  if (opus) direct.push({ itag: opus.itag, label: `${$t("음악만 · Opus {0}kbps", Math.round(opus.bitrate / 1000))}`, ext: "webm", size: opus.clen });
-  box.querySelector(".dlbody").innerHTML =
-    (hd.length ? `<div class="dlsec">${$t("동영상 (소리 포함)")}</div>` + hd.map((o, i) =>
-      `<button class="dlopt" data-i="${i}">${icon("download")}<span><b>${esc(o.label)}</b> <small>${esc(o.sub)}</small></span><em>${mb(o.size)}</em></button>`).join("") : "") +
-    (direct.length ? `<div class="dlsec">${$t("음악")}</div>` + direct.map((o) =>
-      `<a class="dlopt" href="/latest_version?id=${esc(v.id)}&itag=${o.itag}&local=true&title=${encodeURIComponent(name + "." + o.ext)}" download="${esc(name + "." + o.ext)}">${icon("audio")}<span>${esc(o.label)}</span>${o.size ? `<em>${mb(+o.size)}</em>` : ""}</a>`).join("") : "") +
+  const body = box.querySelector(".dlbody");
+  let tr = tracks[0], hd = [], direct = [];
+  const picks = (tracks.length > 1 ? `<label>${$t("오디오 트랙")}<select class="dl-at">${tracks.map((t, i) => `<option value="${i}">${esc(t.label)}</option>`).join("")}</select></label>` : "") +
+    (caps.length ? `<label>${$t("자막")}<select class="dl-cc"><option value="">${$t("넣지 않음")}</option>${caps.map((c, i) => `<option value="${i}">${esc(c.label)}</option>`).join("")}</select></label>` : "");
+  body.innerHTML = (picks ? `<div class="dlpick">${picks}</div>` : "") + `<div class="dlopts"></div>` +
     `<div class="dlprog" hidden><div class="dlbar"><i></i></div><div class="dltxt"></div></div>` +
     `<p class="hint">${$t("영상과 소리를 서버가 받아서 한 파일로 합친 다음 내려줘요. 창을 닫아도 서버에서 계속 준비하고, 다 되면 알려줘요.")}</p>`;
-  box.querySelectorAll("a.dlopt").forEach((a) => (a.onclick = () => { toast($t("다운로드를 시작했어요")); setTimeout(close, 300); }));
-  box.querySelectorAll("button.dlopt").forEach((b) => (b.onclick = async () => {
-    const o = hd[+b.dataset.i];
-    box.querySelectorAll("button.dlopt").forEach((x) => (x.disabled = true));
+  const opts = body.querySelector(".dlopts");
+  const draw = () => {
+    const mine = aud.filter((f) => !tr || atrack(f).id === tr.id);
+    const m4a = best(mine.filter((f) => /mp4/.test(f.type)));
+    const opus = best(mine.filter((f) => /webm/.test(f.type)));
+    // one per quality: H.264 (MP4) plays everywhere -> else AV1 (MP4) -> else VP9 (WebM)
+    hd = [];
+    for (const h of heights) {
+      const at = vids.filter((f) => (parseInt(f.qualityLabel || f.resolution) || 0) === h);
+      const pick = (re) => at.filter((f) => re.test(f.type)).sort((a, b) => (+b.fps || 0) - (+a.fps || 0) || b.bitrate - a.bitrate)[0];
+      const f = pick(/avc1/) || pick(/av01/) || pick(/vp9|vp09/);
+      if (!f) continue;
+      const webm = /webm/.test(f.type);
+      const a = webm ? opus : m4a;
+      if (!a) continue;
+      const codec = /avc1/.test(f.type) ? $t("H.264 · 어디서나 재생") : /av01/.test(f.type) ? $t("AV1 · 최신 기기") : $t("VP9 · 컴퓨터/안드로이드");
+      hd.push({ v: f.itag, a: a.itag, ext: webm ? "webm" : "mp4", label: `${f.qualityLabel || h + "p"}`, sub: codec, size: (+f.clen || 0) + (+a.clen || 0), h });
+    }
+    direct = [];
+    if (m4a) direct.push({ itag: m4a.itag, label: `${$t("음악만 · M4A {0}kbps", Math.round(m4a.bitrate / 1000))}`, ext: "m4a", size: m4a.clen });
+    if (opus) direct.push({ itag: opus.itag, label: `${$t("음악만 · Opus {0}kbps", Math.round(opus.bitrate / 1000))}`, ext: "webm", size: opus.clen });
+    // the original sound comes straight from YouTube; another track has to be picked out by the server
+    opts.innerHTML =
+      (hd.length ? `<div class="dlsec">${$t("동영상 (소리 포함)")}</div>` + hd.map((o, i) =>
+        `<button class="dlopt" data-i="${i}">${icon("download")}<span><b>${esc(o.label)}</b> <small>${esc(o.sub)}</small></span><em>${mb(o.size)}</em></button>`).join("") : "") +
+      (direct.length ? `<div class="dlsec">${$t("음악")}</div>` + direct.map((o, i) => !tr || tr.orig
+        ? `<a class="dlopt" href="/latest_version?id=${esc(v.id)}&itag=${o.itag}&local=true&title=${encodeURIComponent(name + "." + o.ext)}" download="${esc(name + "." + o.ext)}">${icon("audio")}<span>${esc(o.label)}</span>${o.size ? `<em>${mb(+o.size)}</em>` : ""}</a>`
+        : `<button class="dlopt" data-m="${i}">${icon("audio")}<span>${esc(o.label)}</span>${o.size ? `<em>${mb(+o.size)}</em>` : ""}</button>`).join("") : "");
+    opts.querySelectorAll("a.dlopt").forEach((a) => (a.onclick = () => { toast($t("다운로드를 시작했어요")); setTimeout(close, 300); }));
+  };
+  const btns = () => box.querySelectorAll("button.dlopt, .dlpick select");
+  opts.addEventListener("click", async (e) => {
+    const b = e.target.closest("button.dlopt");
+    if (!b) return;
+    const cc = caps[box.querySelector(".dl-cc")?.value ?? ""];
+    const o = b.dataset.i != null ? hd[+b.dataset.i] : { ...direct[+b.dataset.m], v: "", a: direct[+b.dataset.m].itag, label: "" };
+    const what = [o.label, tr && !tr.orig ? tr.label : "", o.v && cc ? cc.label : ""].filter(Boolean).join(", ");
+    btns().forEach((x) => (x.disabled = true));
     try {
-      const r = await api("/api/p/yt/dl", { method: "POST", body: { id: v.id, v: o.v, a: o.a, ext: o.ext, name: `${name} (${o.label})` } });
+      const r = await api("/api/p/yt/dl", { method: "POST", body: {
+        id: v.id, v: o.v, a: o.a, ext: o.ext, name: what ? `${name} (${what})` : name,
+        at: tr && !tr.orig ? tr.id : "", al: tr?.lang || "", sub: o.v && cc ? cc.label : "", sl: o.v && cc ? cc.language_code : "" } });
       watchDl(r.job, box);
-    } catch (e) { toast(e.message); box.querySelectorAll("button.dlopt").forEach((x) => (x.disabled = false)); }
-  }));
+    } catch (err) { toast(err.message); btns().forEach((x) => (x.disabled = false)); }
+  });
+  box.querySelector(".dl-at")?.addEventListener("change", (e) => { tr = tracks[+e.target.value]; draw(); });
+  draw();
+}
+// an audio stream's track, as the server reads it (_atrack): from audioTrack, else from the address's xtags
+// (acont=dubbed:lang=ko, drc=1 = stable volume)
+function atrack(f) {
+  const x = {};
+  try { for (const p of (new URL(f.url, location.href).searchParams.get("xtags") || "").split(":")) { const i = p.indexOf("="); if (i > 0) x[p.slice(0, i)] = p.slice(i + 1); } } catch { }
+  const t = f.audioTrack || {};
+  const lang = x.lang || (t.id || "").split(".")[0];
+  const kind = x.acont || (t.isDefault ? "original" : Object.keys(t).length ? "dubbed" : "");
+  return { id: t.id || (lang ? `${lang}.${kind}` : ""), lang, kind, orig: kind === "original" || !!t.isDefault || !lang, drc: x.drc === "1", name: t.displayName || "" };
 }
 // follow the server job and download the file when it is done (keeps going if the dialog is closed)
 function watchDl(job, box) {
@@ -383,6 +419,7 @@ function watchDl(job, box) {
       box.querySelector(".dltxt").textContent = s.status === "merge" ? $t("영상과 소리를 합치는 중...") : s.status === "done" ? $t("완료! 저장을 시작해요") : s.status === "error" ? $tMsg(s.err) : `${$t("서버가 받는 중 {0}%", Math.floor(s.pct))}`;
     }
     if (s.status === "error") { toast($t("저장 실패: ") + $tMsg(s.err || "")); return; }
+    if (s.status === "done" && s.warn) toast($tMsg(s.warn));
     if (s.status !== "done") return setTimeout(tick, 1500);
     const a = el(`<a href="/api/p/yt/dl/file?job=${job}" download="${esc(s.name)}" hidden></a>`);
     document.body.append(a);

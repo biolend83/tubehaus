@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- Save offline: choose the audio track (original, a dubbed language or audio description) for the video or for the sound alone, and put a caption track into the saved video as a subtitle stream (MP4 or WebM, language tagged). If the captions can't be fetched, the video is saved without them and you're told
+
 From Vildor Pierre's fork ([micronlogivdev/tubehaus](https://github.com/micronlogivdev/tubehaus)), written into this code:
 
 ### Added
