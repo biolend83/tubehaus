@@ -1,0 +1,4 @@
+- Download: pick the audio track (the original, a dub or audio description) and captions to keep with the video; saved captions show when it plays offline
+- Transcript: any caption language, and save it as text, text with times, SRT or WebVTT
+- Search filters: fewest views, oldest first and a view count range
+- macOS: what plays shows in Control Center, and the media keys work
