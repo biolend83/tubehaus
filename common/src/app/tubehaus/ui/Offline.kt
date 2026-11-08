@@ -8,7 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -27,7 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.tubehaus.data.JsonFile
+import app.tubehaus.engine.Caption
 import app.tubehaus.engine.Format
+import app.tubehaus.engine.Sys
 import app.tubehaus.engine.Net
 import app.tubehaus.engine.Stream
 import app.tubehaus.engine.Video
@@ -65,6 +73,10 @@ data class SavedFile(
     val file: String,
 )
 
+/** captions saved with a video, cleaned WebVTT ([file] relative to the offline folder) */
+@Serializable
+data class SavedCaption(val lang: String, val name: String, val file: String)
+
 @Serializable
 data class SavedVideo(
     val id: String,
@@ -75,6 +87,9 @@ data class SavedVideo(
     val video: SavedFile,
     val audio: SavedFile,
     val at: Long = 0,
+    /** the audio track's name when it isn't the original (a dub, audio description) */
+    val audioName: String = "",
+    val caption: SavedCaption? = null,
 ) {
     val size: Long get() = video.size + audio.size
     fun asVideo() = Video(id, title, author, channelId, lengthSec)
@@ -89,16 +104,49 @@ fun sizeText(bytes: Long): String = when {
     else -> "${(bytes shr 20).coerceAtLeast(1)} MB"
 }
 
-/** Which quality to save: asked once per download, the last choice is remembered. */
+/** a video's audio tracks to pick from: (track id, name), the original first; empty when it has one */
+fun audioChoices(audio: List<Format>): List<Pair<String, String>> {
+    val out = audio.filter { !it.drc && it.audioTrack != null }.distinctBy { it.audioTrack }.sortedBy { if (it.audioDefault) 0 else 1 }
+        .map { f -> f.audioTrack!! to (f.audioTrackName ?: f.audioLang?.let { Sys.languageName(it, L.lang) } ?: f.audioTrack) }
+    return if (out.size > 1) out else emptyList()
+}
+
+/** a label with the choice beside it; the choice opens a list */
+@Composable
+private fun Choice(label: String, now: String, options: List<String>, pick: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Box {
+            TextButton(onClick = { open = true }) { Text(now, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            DropdownMenu(open, onDismissRequest = { open = false }) {
+                options.forEachIndexed { i, o -> DropdownMenuItem(text = { Text(o) }, onClick = { open = false; pick(i) }) }
+            }
+        }
+    }
+}
+
+/**
+ * Which quality to save (asked once per download, the last choice is remembered), and where the
+ * device can: the audio track (original, a dub, audio description) and captions to keep with it.
+ */
 @Composable
 fun OfflineDialog(app: AppState, v: Video) {
     val heights = listOf(2160, 1440, 1080, 720, 480, 360)
     var pick by remember { mutableStateOf(app.store.settings.value.offlineHeight) }
+    // the video's audio tracks and captions, asked for while the dialog is open
+    var tracks by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var caps by remember { mutableStateOf<List<Caption>>(emptyList()) }
+    if (app.offline.pickTracks) LaunchedEffect(v.id) {
+        runCatching { YouTube.stream(v.id) }.getOrNull()?.let { s -> tracks = audioChoices(s.audio); caps = s.captions }
+    }
+    var track by remember { mutableStateOf(0) }
+    var cap by remember { mutableStateOf<Caption?>(null) }
     AlertDialog(
         onDismissRequest = { app.offline.asking = null },
         title = { Text(tr("Download")) },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(v.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(bottom = 8.dp))
                 for (h in heights) Row(
@@ -108,6 +156,8 @@ fun OfflineDialog(app: AppState, v: Video) {
                     RadioButton(pick == h, onClick = { pick = h })
                     Text(if (h == 360) "${h}p · " + tr("smallest") else "${h}p")
                 }
+                if (tracks.isNotEmpty()) Choice(tr("Audio track"), tracks.getOrNull(track)?.second ?: "", tracks.map { it.second }) { track = it }
+                if (caps.isNotEmpty()) Choice(tr("Captions"), cap?.name ?: tr("Off"), listOf(tr("Off")) + caps.map { it.name }) { cap = caps.getOrNull(it - 1) }
                 Text(tr("If the video isn't that sharp, the best it has is saved."), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
                 Text(tr("For your own viewing only. Sharing or re-uploading it is your own responsibility."), style = MaterialTheme.typography.bodySmall,
@@ -118,7 +168,7 @@ fun OfflineDialog(app: AppState, v: Video) {
             TextButton(onClick = {
                 app.store.settings.update { it.copy(offlineHeight = pick) }
                 app.offline.asking = null
-                app.offline.start(v, pick)
+                app.offline.start(v, pick, tracks.getOrNull(track)?.takeIf { track > 0 }?.first, cap)
             }) { Text(tr("Download")) }
         },
         dismissButton = { TextButton(onClick = { app.offline.asking = null }) { Text(tr("Cancel")) } },
@@ -182,7 +232,7 @@ fun DownloadsScreen(app: AppState) {
         items(items, key = { "s" + it.id }) { s ->
             VideoRow(s.asVideo(), app, extra = listOf(tr("Remove download") to { app.offline.remove(s.id) }))
             Text(
-                listOf("${s.video.height}p", sizeText(s.size)).joinToString(" · "),
+                listOfNotNull("${s.video.height}p", s.audioName.ifEmpty { null }, s.caption?.name, sizeText(s.size)).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 16.dp, bottom = 6.dp),
             )

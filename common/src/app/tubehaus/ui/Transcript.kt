@@ -13,6 +13,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +34,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import app.tubehaus.engine.Caption
 import app.tubehaus.engine.Net
 import app.tubehaus.engine.Vtt
 import app.tubehaus.engine.YouTube
@@ -49,9 +52,10 @@ fun TranscriptPanel(app: AppState, onClose: (() -> Unit)?) {
     val s = pb.stream
     val st by app.player.state.collectAsState()
     val choice = remember(s) { pb.captionChoice(s) }
-    // the captions on screen if there are any, else the track the captions button would pick
-    val cap = st.captions ?: choice?.first
-    val to = if (st.captions != null) st.captionsTranslated else choice?.second
+    // a language picked here, else the captions on screen if there are any, else the track the captions button would pick
+    var picked by remember(s) { mutableStateOf<Caption?>(null) }
+    val cap = picked ?: st.captions ?: choice?.first
+    val to = if (picked != null) null else if (st.captions != null) st.captionsTranslated else choice?.second
     val url = cap?.let { YouTube.captionUrl(it, to) }
     var lines by remember(url) { mutableStateOf(url?.let { transcripts[it] }) }
     var failed by remember(url) { mutableStateOf(false) }
@@ -68,8 +72,33 @@ fun TranscriptPanel(app: AppState, onClose: (() -> Unit)?) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(tr("Transcript"), style = MaterialTheme.typography.titleMedium)
-                if (cap != null) Text(cap.name + (to?.let { t -> " → " + (LANGS.firstOrNull { it.first == t }?.second ?: t) } ?: ""),
-                    style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant, maxLines = 1)
+                // the language: any of the video's caption tracks
+                var langs by remember { mutableStateOf(false) }
+                val all = s?.captions ?: emptyList()
+                if (cap != null) Box {
+                    Text(cap.name + (to?.let { t -> " → " + (LANGS.firstOrNull { it.first == t }?.second ?: t) } ?: "") + if (all.size > 1) " ▾" else "",
+                        Modifier.then(if (all.size > 1) Modifier.tvClickable(RoundedCornerShape(6.dp)) { langs = true } else Modifier),
+                        style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant, maxLines = 1)
+                    DropdownMenu(langs, onDismissRequest = { langs = false }) {
+                        for (x in all) DropdownMenuItem(text = { Text(x.name) }, onClick = { langs = false; picked = x })
+                    }
+                }
+            }
+            // the transcript as a file: text, text with times, SubRip or WebVTT
+            var saving by remember { mutableStateOf(false) }
+            val got = lines
+            if (got != null && got.isNotEmpty() && cap != null) Box {
+                IconButton(onClick = { saving = true }) { Icon(Sym.Download.outline, tr("Download transcript")) }
+                DropdownMenu(saving, onDismissRequest = { saving = false }) {
+                    for ((fmt, label) in listOf("txt" to tr("Text (.txt)"), "tt" to tr("Text with timestamps (.txt)"), "srt" to "SubRip (.srt)", "vtt" to "WebVTT (.vtt)")) {
+                        DropdownMenuItem(text = { Text(label) }, onClick = {
+                            saving = false
+                            val (name, body) = transcriptFile(got, fmt, s?.title ?: "", to ?: cap.lang)
+                            app.platform.saveFile(name, if (fmt == "srt") "application/x-subrip" else if (fmt == "vtt") "text/vtt" else "text/plain",
+                                body.encodeToByteArray()) { ok -> if (ok) app.toast(tr("Saved")) }
+                        })
+                    }
+                }
             }
             if (onClose != null) IconButton(onClick = onClose) { Icon(Sym.Close.fill, tr("Close")) }
         }
@@ -120,6 +149,21 @@ fun TranscriptPanel(app: AppState, onClose: (() -> Unit)?) {
             }
         }
     }
+}
+
+private fun pad(n: Long, w: Int = 2) = n.toString().padStart(w, '0')
+private fun stamp(ms: Long, sep: Char) = "${pad(ms / 3_600_000)}:${pad(ms / 60_000 % 60)}:${pad(ms / 1000 % 60)}$sep${pad(ms % 1000, 3)}"
+
+/** the transcript as a file: (name, text); [fmt] = txt, tt (text with times), srt, vtt */
+fun transcriptFile(lines: List<Vtt.Line>, fmt: String, title: String, lang: String): Pair<String, String> {
+    val body = when (fmt) {
+        "txt" -> lines.joinToString("\n") { it.text }
+        "tt" -> lines.joinToString("\n") { "[${durationMs(it.startMs)}] ${it.text}" }
+        "srt" -> lines.withIndex().joinToString("\n") { (i, l) -> "${i + 1}\n${stamp(l.startMs, ',')} --> ${stamp(l.endMs, ',')}\n${l.text}\n" }
+        else -> "WEBVTT\n\n" + lines.joinToString("\n") { "${stamp(it.startMs, '.')} --> ${stamp(it.endMs, '.')}\n${it.text}\n" }
+    }
+    val base = title.map { if (it < ' ' || it in "\\/:*?\"<>|") ' ' else it }.joinToString("").replace(Regex("\\s+"), " ").trim().take(120).ifEmpty { "transcript" }
+    return "$base [$lang]${if (fmt == "tt") " (timestamps)" else ""}.${if (fmt == "tt") "txt" else fmt}" to body.trimEnd() + "\n"
 }
 
 /** [text] with every [term] in it in bold */

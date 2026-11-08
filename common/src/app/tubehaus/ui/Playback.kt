@@ -285,7 +285,7 @@ class Playback(private val app: AppState) {
                 speed = if (music) 1f else speedFor(video?.channelId ?: s.channelId),
                 audioOnly = music && set.musicAudioOnly && !withVideo,
                 codec = set.codec,
-                captions = choice?.first?.takeIf { set.captions },
+                captions = choice?.first?.takeIf { set.captions || s.client == "offline" },
                 captionLang = set.captionLang.ifEmpty { lang() },
                 standbyCaption = choice?.first,
                 standbyTranslate = choice?.second,
@@ -303,7 +303,7 @@ class Playback(private val app: AppState) {
     fun captionChoice(s: Stream? = stream): Pair<Caption, String?>? {
         val want = store.settings.value.captionLang.ifEmpty { lang() }
         val c = pickCaption(s?.captions ?: return null, want) ?: return null
-        return c to want.takeIf { c.lang.substringBefore('-') != it }
+        return c to want.takeIf { c.lang.substringBefore('-') != it && s.client != "offline" }
     }
 
     fun pickCaption(list: List<Caption>, want: String): Caption? =
