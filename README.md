@@ -11,9 +11,9 @@ there too.
 Have a TubeHaus server at home? Connect it in Settings and your library is shared with your other
 devices and the web version (optional).
 
-**[⬇ .deb (Debian, Ubuntu, Mint)](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.1/TubeHaus-1.0.1-linux-amd64.deb)** · **[⬇ .rpm (Fedora, openSUSE)](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.1/TubeHaus-1.0.1-linux-x86_64.rpm)** · **[⬇ tar.gz (Arch, CachyOS, any distro)](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.1/TubeHaus-1.0.1-linux-x64.tar.gz)** (0.5.4, beta)
+**[⬇ .deb (Debian, Ubuntu, Mint)](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.2/TubeHaus-1.0.2-linux-amd64.deb)** · **[⬇ .rpm (Fedora, openSUSE)](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.2/TubeHaus-1.0.2-linux-x86_64.rpm)** · **[⬇ tar.gz (Arch, CachyOS, any distro)](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.2/TubeHaus-1.0.2-linux-x64.tar.gz)** (0.5.4, beta)
 
-ARM64 (Raspberry Pi 4/5 and others): [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.1/TubeHaus-1.0.1-linux-arm64.deb) · [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.1/TubeHaus-1.0.1-linux-aarch64.rpm) · [tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.1/TubeHaus-1.0.1-linux-arm64.tar.gz)
+ARM64 (Raspberry Pi 4/5 and others): [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.2/TubeHaus-1.0.2-linux-arm64.deb) · [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.2/TubeHaus-1.0.2-linux-aarch64.rpm) · [tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.2/TubeHaus-1.0.2-linux-arm64.tar.gz)
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · [macOS](https://github.com/biolend83/tubehaus/tree/mac-app) · **Linux** · [iPad / iPhone](https://github.com/biolend83/tubehaus/tree/ios-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 

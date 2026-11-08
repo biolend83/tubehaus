@@ -39,6 +39,9 @@ import androidx.compose.ui.unit.dp
 import app.tubehaus.engine.Video
 import app.tubehaus.engine.YouTube
 import app.tubehaus.engine.SearchOptions
+import app.tubehaus.engine.SearchRefine
+import app.tubehaus.engine.Sys
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -51,6 +54,7 @@ fun SearchScreen(app: AppState, initial: String) {
     var text by remember { mutableStateOf(initial) }
     var query by remember { mutableStateOf(initial) }
     var filter by remember { mutableStateOf(SearchOptions()) }
+    var refine by remember { mutableStateOf(SearchRefine()) }
     var filters by remember { mutableStateOf(false) }
     var suggestions by remember { mutableStateOf<List<String>>(emptyList()) }
     val focus = remember { FocusRequester() }
@@ -150,7 +154,8 @@ fun SearchScreen(app: AppState, initial: String) {
             LazyRow(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 // the kind of result, then the rest of YouTube's filters in a panel
                 item {
-                    Chip(filter.count > 0, onClick = { filters = true }, label = tr("Filters") + if (filter.count > 0) " (${filter.count})" else "")
+                    val n = filter.count + refine.count
+                    Chip(n > 0, onClick = { filters = true }, label = tr("Filters") + if (n > 0) " ($n)" else "")
                 }
                 items(listOf(0 to "All", 1 to "Videos", 2 to "Channels", 3 to "Playlists", 4 to "Movies")) { (t, label) ->
                     Chip(filter.type == t, onClick = { filter = filter.copy(type = t) }, label = tr(label))
@@ -162,15 +167,30 @@ fun SearchScreen(app: AppState, initial: String) {
                 else Icon(Sym.GridView.outline, tr("Show as a grid"))
             }
         }
-        if (filters) SearchFilters(filter, { filter = it }) { filters = false }
+        if (filters) SearchFilters(filter, { filter = it }, refine, { refine = it }) { filters = false }
         val pager = rememberPager(query to filter, { YouTube.search(query, filter) }, { YouTube.searchMore(it) })
+        val loaded = pager.items.filter { !(app.noShorts && it is Video && it.short) }
+        // refined: only within what is loaded, so more is loaded on request, not on reaching the end
+        val shown = if (refine.active) refine.apply(loaded, Sys.nowMs() / 1000) else loaded
         when {
             pager.items.isEmpty() && pager.loading -> Skeleton(rows = !compact && !grid && !app.platform.tv, wide = true)
             pager.items.isEmpty() && pager.error != null -> Problem(pager.error!!) { scope.launch { pager.load() } }
             pager.items.isEmpty() && pager.started -> Empty(tr("No results"))
             else -> ItemGrid(
-                pager.items.filter { !(app.noShorts && it is Video && it.short) }, app,
-                loading = pager.loading, onEnd = { pager.loadMore() }, rows = !compact && !grid && !app.platform.tv, wideRows = true,
+                shown, app,
+                loading = pager.loading, onEnd = if (refine.active) null else ({ pager.loadMore() }),
+                rows = !compact && !grid && !app.platform.tv, wideRows = true,
+                header = if (!refine.active) null else ({
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                        val videos = loaded.count { it is Video }
+                        Text(if (shown.isEmpty()) tr("No matching videos in the loaded results")
+                            else tr("{m} of {n} loaded videos match. This order and view range only apply to the results loaded so far.")
+                                .replace("{n}", "$videos").replace("{m}", "${shown.size}"),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (pager.next != null) TextButton(onClick = { scope.launch { pager.loadMore() } }, enabled = !pager.loading) { Text(tr("Load more results")) }
+                        else Text(tr("No more results to load."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }),
             )
         }
         }
@@ -178,9 +198,12 @@ fun SearchScreen(app: AppState, initial: String) {
     }
 }
 
-/** YouTube's Filters panel: upload date, length, features and the order of the results. */
+/**
+ * YouTube's Filters panel: upload date, length, features and the order of the results; and what
+ * YouTube doesn't offer, done here on the loaded results: fewest views, oldest first, a view range.
+ */
 @Composable
-private fun SearchFilters(o: SearchOptions, set: (SearchOptions) -> Unit, close: () -> Unit) {
+private fun SearchFilters(o: SearchOptions, set: (SearchOptions) -> Unit, r: SearchRefine, setR: (SearchRefine) -> Unit, close: () -> Unit) {
     ModalBottomSheet(onDismissRequest = close) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
             @Composable
@@ -193,9 +216,28 @@ private fun SearchFilters(o: SearchOptions, set: (SearchOptions) -> Unit, close:
             group("Upload date", listOf(0 to "Any time", 1 to "Last hour", 2 to "Today", 3 to "This week", 4 to "This month", 5 to "This year"), o.date) { set(o.copy(date = it)) }
             group("Duration", listOf(0 to "Any length", 1 to "Under 4 minutes", 3 to "4 - 20 minutes", 2 to "Over 20 minutes"), o.duration) { set(o.copy(duration = it)) }
             group("Features", listOf(0 to "Any", 1 to "Live"), if (o.live) 1 else 0) { set(o.copy(live = it == 1)) }
-            group("Sort by", listOf(0 to "Relevance", 2 to "Upload date", 3 to "View count", 1 to "Rating"), o.sort) { set(o.copy(sort = it)) }
+            // the last two are done here: a "most viewed" list turned around would never reach the little-watched videos,
+            // so YouTube is asked by relevance
+            group("Sort by", listOf(0 to "Relevance", 2 to "Upload date", 3 to "View count", 1 to "Rating", 11 to "Fewest views", 12 to "Oldest first"),
+                if (r.sort != 0) 10 + r.sort else o.sort) {
+                if (it > 10) { setR(r.copy(sort = it - 10)); set(o.copy(sort = 0)) } else { setR(r.copy(sort = 0)); set(o.copy(sort = it)) }
+            }
+            Text(tr("View count range"), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                @Composable
+                fun limit(label: String, now: Long?, pick: (Long?) -> Unit, m: Modifier) {
+                    var t by remember(now == null) { mutableStateOf(now?.toString() ?: "") }
+                    OutlinedTextField(t, { x -> t = x.filter { it.isDigit() }.take(15); pick(t.toLongOrNull()) }, m,
+                        label = { Text(tr(label)) }, placeholder = { Text(tr("No limit")) }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }
+                limit("Minimum views", r.minViews, { setR(r.copy(minViews = it)) }, Modifier.weight(1f))
+                limit("Maximum views", r.maxViews, { setR(r.copy(maxViews = it)) }, Modifier.weight(1f))
+            }
+            if (r.minViews != null && r.maxViews != null && r.maxViews < r.minViews)
+                Text(tr("Maximum views must be at least the minimum"), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { set(SearchOptions(type = o.type)) }) { Text(tr("Reset")) }
+                TextButton(onClick = { set(SearchOptions(type = o.type)); setR(SearchRefine()) }) { Text(tr("Reset")) }
                 TextButton(onClick = close) { Text(tr("Done")) }
             }
         }
