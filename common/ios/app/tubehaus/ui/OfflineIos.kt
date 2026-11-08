@@ -54,6 +54,8 @@ class Offline(private val app: AppState) {
     val progress = mutableStateMapOf<String, Float>()
     val pending = mutableStateMapOf<String, Video>()
     var asking by mutableStateOf<Video?>(null)
+    /** the iPad saves Apple's HLS package, which has its own tracks: no audio track or captions to pick */
+    val pickTracks = false
 
     /** the desktop can keep downloads in a folder of its choosing; iOS keeps them where Apple puts them */
     val folder: String get() = ""
@@ -92,7 +94,7 @@ class Offline(private val app: AppState) {
         )
     }
 
-    fun start(v: Video, maxHeight: Int) {
+    fun start(v: Video, maxHeight: Int, track: String? = null, caption: app.tubehaus.engine.Caption? = null) {
         if (has(v.id) || downloading(v.id)) return
         progress[v.id] = 0f
         pending[v.id] = v

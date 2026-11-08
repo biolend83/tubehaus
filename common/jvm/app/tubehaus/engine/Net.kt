@@ -34,6 +34,7 @@ object Net {
 
     /** a subtitle track, cleaned, as a file the desktop player can open; null when it can't be fetched */
     fun captionFile(url: String): String? = runCatching {
+        if (url.startsWith("file:")) return java.io.File(java.net.URI(url)).takeIf { it.isFile }?.absolutePath
         client.newCall(Request.Builder().url(url).build()).execute().use { r ->
             if (!r.isSuccessful) return null
             val f = java.io.File.createTempFile("tubehaus-subs", ".vtt")
@@ -46,6 +47,8 @@ object Net {
     private val JSON = "application/json".toMediaType()
 
     suspend fun get(url: String, headers: Map<String, String> = emptyMap()): String = withContext(Dispatchers.IO) {
+        // a file saved with a download (its captions)
+        if (url.startsWith("file:")) return@withContext java.io.File(java.net.URI(url)).readText()
         val b = Request.Builder().url(url)
         headers.forEach { (k, v) -> b.header(k, v) }
         client.newCall(b.build()).execute().use { r ->
