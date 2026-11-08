@@ -177,6 +177,8 @@ private fun startApp() {
     System.setProperty("jna.library.path", if (isMac) "$bundled:/opt/homebrew/lib:/usr/local/lib" else bundled)
     val platform = DesktopPlatform()
     val state = AppState(platform, Store(platform.dataDir))
+    // macOS Control Center and the media keys: what plays and its buttons
+    MacMediaControls(state, File(platform.cacheDir.toString(), "nowplaying")).start()
     application {
         val ws = rememberWindowState(size = DpSize(1280.dp, 820.dp))
         platform.window = ws

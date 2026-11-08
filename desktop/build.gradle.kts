@@ -89,6 +89,21 @@ compose.desktop {
     }
 }
 
+// macOS: Control Center and the media keys (nowplaying/NowPlaying.swift, Apple's MediaPlayer) as a small
+// library loaded into the app's process, in the jar as /nowplaying/libnowplaying.dylib; elsewhere none
+val nowPlayingLib = tasks.register<Exec>("nowPlayingLib") {
+    val src = layout.projectDirectory.file("nowplaying/NowPlaying.swift")
+    val out = layout.buildDirectory.dir("generated/nowplaying")
+    val arch = if (System.getProperty("os.arch") == "aarch64") "arm64" else "x86_64"
+    inputs.file(src)
+    outputs.dir(out)
+    onlyIf { System.getProperty("os.name").startsWith("Mac") && File("/usr/bin/swiftc").exists() }
+    doFirst { out.get().dir("nowplaying").asFile.mkdirs() }
+    commandLine("/usr/bin/swiftc", "-O", "-emit-library", "-target", "$arch-apple-macos12", src.asFile.path,
+        "-o", out.get().file("nowplaying/libnowplaying.dylib").asFile.path)
+}
+sourceSets["main"].resources.srcDir(nowPlayingLib)
+
 // runs every engine call against YouTube: ./gradlew :desktop:engineCheck
 tasks.register<JavaExec>("engineCheck") {
     classpath = sourceSets["main"].runtimeClasspath
