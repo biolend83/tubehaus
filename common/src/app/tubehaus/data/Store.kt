@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
@@ -45,7 +46,11 @@ class JsonFile<T>(private val file: Path, private val ser: KSerializer<T>, empty
     val value: T get() = flow.value
 
     init {
-        flow.drop(1).debounce(400).onEach { save(it) }.launchIn(scope)
+        // Windows: an antivirus, the search indexer or a second copy of the app can hold the file for a moment.
+        // Try again a few times, and never let a save that fails take the app down (it did: issue #47)
+        flow.drop(1).debounce(400).onEach { v ->
+            for (i in 1..5) { if (trySave(v)) break; delay(300L * i) }
+        }.launchIn(scope)
     }
 
     private fun load(): T? = try {
@@ -59,13 +64,23 @@ class JsonFile<T>(private val file: Path, private val ser: KSerializer<T>, empty
     private fun save(v: T) = writing.run {
         file.parent?.let { fs.createDirectories(it) }
         val tmp = (file.toString() + ".tmp").toPath()
-        fs.write(tmp) { writeUtf8(storeJson.encodeToString(ser, v)) }
-        fs.atomicMove(tmp, file)
+        val text = storeJson.encodeToString(ser, v)
+        fs.write(tmp) { writeUtf8(text) }
+        try {
+            fs.atomicMove(tmp, file)
+        } catch (e: okio.IOException) {
+            // the swap was refused (the file is open elsewhere): write it in place, which Windows often still allows
+            fs.write(file) { writeUtf8(text) }
+            runCatching { fs.delete(tmp) }
+        }
     }
+
+    /** false when the file couldn't be written this time (the next change, or the retry, writes it) */
+    private fun trySave(v: T): Boolean = try { save(v); true } catch (e: Exception) { false }
 
     fun update(f: (T) -> T) = flow.update(f)
 
-    fun flushNow() = save(flow.value)
+    fun flushNow() { trySave(flow.value) }
 }
 
 private fun now() = Sys.nowMs() / 1000
