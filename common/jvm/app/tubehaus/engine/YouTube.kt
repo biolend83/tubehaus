@@ -457,5 +457,6 @@ object YouTube {
 
     /** WebVTT text of a caption track, optionally machine-translated to [to]. */
     fun captionUrl(c: Caption, to: String? = null): String =
-        ServerVideo.captionUrl(c, to) ?: c.url + "&fmt=vtt" + (to?.takeIf { it != c.lang.substringBefore('-') }?.let { "&tlang=$it" } ?: "")
+        if (c.url.startsWith("file:")) c.url        // saved with a download: as it is
+        else ServerVideo.captionUrl(c, to) ?: c.url + "&fmt=vtt" + (to?.takeIf { it != c.lang.substringBefore('-') }?.let { "&tlang=$it" } ?: "")
 }
