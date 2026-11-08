@@ -5,7 +5,9 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.tubehaus.data.JsonFile
+import app.tubehaus.engine.Caption
 import app.tubehaus.engine.Format
+import app.tubehaus.engine.Vtt
 import app.tubehaus.engine.Net
 import app.tubehaus.engine.Stream
 import app.tubehaus.engine.Video
@@ -86,6 +88,8 @@ class Offline(private val app: AppState) {
     val pending = mutableStateMapOf<String, Video>()
     /** the quality question is open for this video */
     var asking by mutableStateOf<Video?>(null)
+    /** the download dialog can offer the audio tracks and captions */
+    val pickTracks = true
 
     private val jobs = HashMap<String, Job>()
     // four at a time, the rest wait their turn: more would only split the same connection, and many
@@ -105,20 +109,24 @@ class Offline(private val app: AppState) {
             id = s.id, title = s.title, author = s.author, channelId = s.channelId, lengthSec = s.lengthSec, views = 0,
             description = "", keywords = emptyList(), live = false, hls = null,
             video = listOf(s.video.format(vf)), audio = listOf(s.audio.format(af)),
-            captions = emptyList(), expiresAt = Long.MAX_VALUE, client = "offline",
+            captions = s.caption?.let { c -> File(dir, c.file).takeIf { it.isFile }?.let { listOf(Caption(c.lang, c.name, it.toURI().toString(), false)) } }
+                ?: emptyList(),
+            expiresAt = Long.MAX_VALUE, client = "offline",
         )
     }
 
-    fun start(v: Video, maxHeight: Int) {
+    /** [track] = an audio track other than the original; [caption] = captions to keep with it */
+    fun start(v: Video, maxHeight: Int, track: String? = null, caption: Caption? = null) {
         if (has(v.id) || downloading(v.id)) return
         progress[v.id] = 0f
         pending[v.id] = v
         app.toast(tr("Downloading: {t}").replace("{t}", v.title))
         jobs[v.id] = app.scope.launch {
             try {
-                val got = slots.withPermit { withContext(Dispatchers.IO) { download(v, maxHeight) } }
+                val got = slots.withPermit { withContext(Dispatchers.IO) { download(v, maxHeight, track, caption) } }
                 index.update { it.copy(items = it.items + (v.id to got)) }
-                app.toast(tr("Saved for offline: {t}").replace("{t}", got.title))
+                app.toast(if (caption != null && got.caption == null) tr("The captions couldn't be added, the video was saved without them")
+                    else tr("Saved for offline: {t}").replace("{t}", got.title))
             } catch (e: CancellationException) {
                 withContext(Dispatchers.IO + kotlinx.coroutines.NonCancellable) { File(dir, v.id).deleteRecursively() }
                 throw e
@@ -140,12 +148,23 @@ class Offline(private val app: AppState) {
 
     // ------------------------------------------------------------------ downloading
 
-    private suspend fun download(v: Video, maxHeight: Int): SavedVideo {
+    private suspend fun download(v: Video, maxHeight: Int, track: String?, caption: Caption?): SavedVideo {
         val s = YouTube.stream(v.id)
         if (s.live) error(tr("Live streams can't be downloaded"))
         val video = pickVideo(s.video, maxHeight) ?: error(tr("This video can't be downloaded"))
-        val audio = pickAudio(s.audio, video) ?: error(tr("This video can't be downloaded"))
+        val audio = pickAudio(s.audio, video, track) ?: error(tr("This video can't be downloaded"))
         val folder = File(dir, v.id).apply { deleteRecursively(); mkdirs() }
+        // the captions, cleaned as the player shows them; without them the video is still saved
+        val cap = caption?.let { want ->
+            runCatching {
+                val c = s.captions.firstOrNull { it.lang == want.lang && it.name == want.name } ?: want
+                val text = Vtt.clean(Net.get(YouTube.captionUrl(c)))
+                require("-->" in text)
+                val name = "${v.id}/captions.vtt"
+                File(dir, name).writeText(text)
+                SavedCaption(c.lang, c.name, name)
+            }.getOrNull()
+        }
         val vName = "${v.id}/video.${ext(video)}"
         val aName = "${v.id}/audio.${ext(audio)}"
         val total = (video.contentLength + audio.contentLength).coerceAtLeast(1)
@@ -158,6 +177,8 @@ class Offline(private val app: AppState) {
             id = v.id, title = s.title.ifEmpty { v.title }, author = s.author.ifEmpty { v.author },
             channelId = s.channelId.ifEmpty { v.channelId }, lengthSec = s.lengthSec.takeIf { it > 0 } ?: v.lengthSec,
             video = saved(video, vSize, vName), audio = saved(audio, aSize, aName), at = System.currentTimeMillis() / 1000,
+            audioName = if (track != null && audio.audioTrack == track) audio.audioTrackName ?: audio.audioLang ?: "" else "",
+            caption = cap,
         )
     }
 
@@ -239,10 +260,14 @@ class Offline(private val app: AppState) {
                 .sortedWith(compareBy<Format>({ rank[it.codecFamily] ?: 3 }, { -it.fps }, { -it.bitrate })).firstOrNull()
         }
 
-        /** the original-language audio, in the container that goes with the video (AAC with MP4, Opus with WebM) */
-        fun pickAudio(list: List<Format>, video: Format): Format? {
+        /**
+         * the original-language audio (or the [track] asked for: a dub, audio description), in the
+         * container that goes with the video (AAC with MP4, Opus with WebM)
+         */
+        fun pickAudio(list: List<Format>, video: Format, track: String? = null): Format? {
             val usable = list.filter { it.indexRange != null && !it.drc }
-            val main = usable.filter { it.audioDefault }.ifEmpty { usable }
+            val main = usable.filter { track != null && it.audioTrack == track }
+                .ifEmpty { usable.filter { it.audioDefault } }.ifEmpty { usable }
             val want = if (video.mime.endsWith("webm")) "webm" else "mp4"
             return (main.filter { it.mime.endsWith(want) }.ifEmpty { main }).maxByOrNull { it.bitrate }
         }
