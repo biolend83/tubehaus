@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import app.tubehaus.engine.SponsorBlock
 import app.tubehaus.engine.Sys
 import androidx.compose.ui.draw.alpha
@@ -768,12 +770,13 @@ private fun SItem(title: String, sub: String, onClick: () -> Unit) {
 @Composable
 private fun Toggle(title: String, sub: String, on: Boolean, enabled: Boolean = true, set: (Boolean) -> Unit) {
     val tv = LocalPlatform.current.tv
-    Row(Modifier.fillMaxWidth().heightIn(min = if (tv) 0.dp else 60.dp).clickable(enabled = enabled) { set(!on) }.padding(horizontal = 16.dp, vertical = 10.dp),
+    Row(Modifier.fillMaxWidth().heightIn(min = if (tv) 0.dp else 60.dp).toggleable(on, enabled = enabled, role = Role.Switch) { set(it) }
+        .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Words(title, sub, Modifier.weight(1f).padding(end = 12.dp))
         // a TV: an "off" switch has to read as a switch on dark and black themes (it nearly vanished);
         // elsewhere the web's switch, teal when on, a white knob on a grey track when off
-        Switch(on, set, enabled = enabled, colors = if (tv) SwitchDefaults.colors(
+        Switch(on, null, enabled = enabled, colors = if (tv) SwitchDefaults.colors(
             uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
             uncheckedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
             uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,

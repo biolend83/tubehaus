@@ -1,5 +1,11 @@
 package app.tubehaus.ui
 
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import app.tubehaus.engine.SponsorBlock
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.Canvas
@@ -569,6 +575,7 @@ private fun Volume(app: AppState, st: PlayerState) {
         onDrag = { v -> player.setMuted(false); player.setVolume(v) },
         onDone = { v -> if (app.casting.link == null) app.store.settings.update { it.copy(volume = v) } },
         modifier = Modifier.width(88.dp).padding(end = 4.dp),
+        label = tr("Volume"), state = "${((if (st.muted) 0f else st.volume) * 100).toInt()}%",
     )
 }
 
@@ -668,6 +675,7 @@ private fun SeekBar(app: AppState, st: PlayerState, dragging: Float?, onDrag: (F
             (s.startMs.toFloat() / st.durationMs)..(s.endMs.toFloat() / st.durationMs) to Color(SponsorBlock.color(s.category))
         },
         heatSpan = (heat?.spanMs ?: 0L).toFloat() / st.durationMs,
+        label = tr("Seek bar"), state = tr("{a} of {b}").replace("{a}", durationMs(st.positionMs)).replace("{b}", durationMs(st.durationMs)),
         above = if (live) null else { f ->
             val ms = (f * st.durationMs).toLong()
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -713,6 +721,9 @@ internal fun Track(
     heatSpan: Float = 1f,
     /** parts drawn in a colour of their own (SponsorBlock's); a single point shows as a short mark */
     spans: List<Pair<ClosedFloatingPointRange<Float>, Color>> = emptyList(),
+    /** for screen readers: what the bar is ("Seek bar") and where it is now ("1:23 of 14:28") */
+    label: String = "",
+    state: String = "",
 ) {
     var hover by remember { mutableStateOf(false) }
     var held by remember { mutableStateOf<Float?>(null) }
@@ -720,6 +731,12 @@ internal fun Track(
     val shown = held ?: value
     BoxWithConstraints(
         modifier.height(24.dp)
+            .semantics {
+                if (label.isNotEmpty()) contentDescription = label
+                if (state.isNotEmpty()) stateDescription = state
+                progressBarRangeInfo = ProgressBarRangeInfo(value.coerceIn(0f, 1f), 0f..1f)
+                setProgress { v -> val f = v.coerceIn(0f, 1f); onDrag(f); onDone(f); true }
+            }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
