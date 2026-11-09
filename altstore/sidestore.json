@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.0.3",
+          "buildVersion": "40",
+          "date": "2026-11-09T10:35:04+00:00",
+          "localizedDescription": "1.0.3: works with VoiceOver: buttons, filter chips and switches say what they are, and the seek bar and volume can be read and moved.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.3/TubeHaus-1.0.3-ipad.ipa",
+          "size": 20939917,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.0.2",
           "buildVersion": "39",
           "date": "2026-11-08T08:43:37+00:00",
@@ -158,11 +167,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.0.2",
-      "versionDate": "2026-11-08T08:43:37+00:00",
-      "versionDescription": "1.0.2: the transcript in any caption language, saved as text, SRT or WebVTT; search by fewest views, oldest first and a view count range.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.2/TubeHaus-1.0.2-ipad.ipa",
-      "size": 20930222
+      "version": "1.0.3",
+      "versionDate": "2026-11-09T10:35:04+00:00",
+      "versionDescription": "1.0.3: works with VoiceOver: buttons, filter chips and switches say what they are, and the seek bar and volume can be read and moved.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.3/TubeHaus-1.0.3-ipad.ipa",
+      "size": 20939917
     }
   ],
   "news": [],
