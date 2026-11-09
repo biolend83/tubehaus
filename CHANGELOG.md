@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v1.0.3 — 2026-11-09
+
+Security fixes for personal servers, a guide to opening TubeHaus only to your household, and a daily check of the apps' YouTube engine. The apps 1.0.3 work with screen readers.
 
 ### Security
 - Other web sites can no longer read or change a personal server's library: requests for the library, downloads, casting and sign-in that a browser marks as coming from another site are refused, and those parts no longer give other sites CORS permission. Streams, captions and thumbnails stay open to every origin
