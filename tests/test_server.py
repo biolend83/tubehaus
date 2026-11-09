@@ -901,6 +901,11 @@ class HouseholdAccounts(unittest.TestCase):
         self.assertIsNone(ts._lib_owners()[0])                      # and the shared one
         self.assertNotIn("bbbbbbbbbbb", ts._yt_load(None)["pos"])   # nothing went into the shared library
 
+    def test_account_folders_stay_inside_users(self):
+        for bad in ("../etc", "a/b", "..", "AB", "x", "", None, "a"*25):
+            self.assertIsNone(ts._udir(bad), bad)
+        self.assertTrue(ts._udir("hh_anna").endswith(os.path.join("users", "hh_anna")))
+
     def test_no_accounts_means_the_shared_library(self):
         ts.ACCOUNTS = False
         self.as_user("hh_anna")
@@ -927,10 +932,10 @@ class HouseholdAccounts(unittest.TestCase):
         self.assertEqual(ts.auth_password({"old": "wrong one!", "new": "new password 2"}, "hh_pw", "8.8.8.1")[0], 403)
         self.assertEqual(ts.auth_password({"old": "old password 1", "new": "short"}, "hh_pw", "8.8.8.1")[0], 400)
         self.assertEqual(ts.auth_password({"old": "old password 1", "new": "x"}, None, "8.8.8.1")[0], 401)
-        code, d = ts.auth_password({"old": "old password 1", "new": "new password 2"}, "hh_pw", "8.8.8.1")
+        code, _, gen = ts.auth_password({"old": "old password 1", "new": "new password 2"}, "hh_pw", "8.8.8.1")
         self.assertEqual(code, 200)
         self.assertIsNone(ts.session_user(old_cookie))              # other devices are signed out
-        self.assertEqual(ts.session_user(d["cookie"]), "hh_pw")
+        self.assertEqual(ts.session_user(ts.session_make("hh_pw", gen)), "hh_pw")
         self.assertEqual(ts.auth_login({"username": "hh_pw", "password": "new password 2"}, "8.8.8.2")[0], 200)
         self.assertEqual(ts.auth_login({"username": "hh_pw", "password": "old password 1"}, "8.8.8.3")[0], 401)
 

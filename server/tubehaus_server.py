@@ -1166,7 +1166,12 @@ def _uid():
 
 
 def _udir(u):
-    return f"{STATE}/users/{u}" if u and re.fullmatch(r"[a-z0-9_]{3,24}", u) else None
+    """STATE/users/<name>, only for a valid account name and only ever inside STATE/users."""
+    if not (u and re.fullmatch(r"[a-z0-9_]{3,24}", u)):
+        return None
+    base = os.path.abspath(os.path.join(STATE, "users"))
+    d = os.path.normpath(os.path.join(base, u))
+    return d if d.startswith(base + os.sep) else None
 
 
 def _ytlib_file(u=_ME):
@@ -3373,29 +3378,29 @@ def auth_signup(b, ip):
 def auth_password(b, user, ip):
     """A new password for the signed-in account; every other device is signed out."""
     if not user:
-        return 401, {"error": "Please sign in"}
+        return 401, {"error": "Please sign in"}, 0
     old, new = str(b.get("old", "")), str(b.get("new", ""))
     if _too_many("pw:" + user, 5, 600) or _too_many("pwip:" + ip, 10, 600):
-        return 429, {"error": "Too many attempts. Please wait a few minutes"}
+        return 429, {"error": "Too many attempts. Please wait a few minutes"}, 0
     if len(new) < 8 or len(new) > 200:
-        return 400, {"error": "The password needs at least 8 characters"}
+        return 400, {"error": "The password needs at least 8 characters"}, 0
     if new.lower() == user or new in ("password", "12345678", "123456789", "qwertyui", "11111111"):
-        return 400, {"error": "Please choose a less guessable password"}
+        return 400, {"error": "Please choose a less guessable password"}, 0
     u = jload(USERS, {}).get(user)
     if not u or not hmac.compare_digest(_pw_hash(old, bytes.fromhex(u["salt"])), u["hash"]):
-        return 403, {"error": "The current password is wrong"}
+        return 403, {"error": "The current password is wrong"}, 0
     salt = secrets.token_bytes(16)
     h = _pw_hash(new, salt)
     with auth_lk:
         users = jload(USERS, {})
         if user not in users:
-            return 401, {"error": "Please sign in"}
+            return 401, {"error": "Please sign in"}, 0
         gen = int(users[user].get("gen", 1)) + 1
         users[user].update(salt=salt.hex(), hash=h, gen=gen)
         jsave(USERS, users)
         os.chmod(USERS, 0o600)
     log("auth", "password changed", every=0)
-    return 200, {"ok": True, "cookie": session_make(user, gen)}
+    return 200, {"ok": True}, gen
 
 
 def auth_login(b, ip):
@@ -3894,11 +3899,10 @@ class H(BaseHTTPRequestHandler):
         if ACCOUNTS and p.endswith("/api/p/auth/logout"):
             return self.send_cookie(200, {"ok": True}, "", 0)
         if ACCOUNTS and p.endswith("/api/p/auth/password"):
-            code, d = auth_password(body, _req.user, self.client_ip())
+            code, d, gen = auth_password(body, _req.user, self.client_ip())
             if code != 200:
                 return self.send(code, d)
-            cookie = d.pop("cookie")
-            return self.send_cookie(200, d, cookie, SESSION_DAYS * 86400)
+            return self.send_cookie(200, d, session_make(_req.user, gen), SESSION_DAYS * 86400)
         if ACCOUNTS and (p.endswith("/api/p/auth/signup") or p.endswith("/api/p/auth/login")):
             fn = auth_signup if p.endswith("/signup") else auth_login
             code, d = fn(body, self.client_ip())
