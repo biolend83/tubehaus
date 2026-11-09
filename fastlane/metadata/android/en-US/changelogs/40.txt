@@ -1,0 +1,2 @@
+- Screen readers (TalkBack, Narrator, VoiceOver): buttons are read as buttons, filter chips say which one is chosen, each settings switch reads as on or off
+- The seek bar, the volume and the Shorts bar are read ("1:23 of 14:28") and can be moved with a swipe up or down
