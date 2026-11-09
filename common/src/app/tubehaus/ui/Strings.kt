@@ -44,6 +44,9 @@ fun tr(s: String): String {
 fun textOverride(key: String, lang: String): String = ""
 
 private val KO by lazy { mapOf(
+    "Seek bar" to "탐색 막대",
+    "Volume" to "볼륨",
+    "{a} of {b}" to "{b} 중 {a}",
     "Fewest views" to "조회수 낮은순",
     "Oldest first" to "오래된 업로드순",
     "View count range" to "조회수 범위",
@@ -613,6 +616,9 @@ private val KO by lazy { mapOf(
 
 // Español. Machine-made, not yet read by a native speaker: corrections welcome
 private val ES by lazy { mapOf(
+    "Seek bar" to "Barra de progreso",
+    "Volume" to "Volumen",
+    "{a} of {b}" to "{a} de {b}",
     "Fewest views" to "Menos vistas",
     "Oldest first" to "Más antiguos primero",
     "View count range" to "Número de vistas",
@@ -1223,6 +1229,9 @@ private val ES by lazy { mapOf(
 
 // 日本語. Machine-made, not yet read by a native speaker: corrections welcome
 private val JA by lazy { mapOf(
+    "Seek bar" to "シークバー",
+    "Volume" to "音量",
+    "{a} of {b}" to "{b} 中 {a}",
     "Fewest views" to "視聴回数が少ない順",
     "Oldest first" to "古い順",
     "View count range" to "視聴回数",
@@ -1833,6 +1842,9 @@ private val JA by lazy { mapOf(
 
 // Deutsch. Machine-made, not yet read by a native speaker: corrections welcome
 private val DE by lazy { mapOf(
+    "Seek bar" to "Suchleiste",
+    "Volume" to "Lautstärke",
+    "{a} of {b}" to "{a} von {b}",
     "Fewest views" to "Wenigste Aufrufe",
     "Oldest first" to "Älteste zuerst",
     "View count range" to "Aufrufe",
@@ -2443,6 +2455,9 @@ private val DE by lazy { mapOf(
 
 // 简体中文 (Simplified Chinese). Machine-made, not yet read by a native speaker: corrections welcome
 private val ZH by lazy { mapOf(
+    "Seek bar" to "进度条",
+    "Volume" to "音量",
+    "{a} of {b}" to "{a} / {b}",
     "Fewest views" to "观看次数最少",
     "Oldest first" to "最早上传",
     "View count range" to "观看次数",
@@ -3053,6 +3068,9 @@ private val ZH by lazy { mapOf(
 
 // Português (Portuguese). Machine-made, not yet read by a native speaker: corrections welcome
 private val PT by lazy { mapOf(
+    "Seek bar" to "Barra de progresso",
+    "Volume" to "Volume",
+    "{a} of {b}" to "{a} de {b}",
     "Fewest views" to "Menos visualizações",
     "Oldest first" to "Mais antigos primeiro",
     "View count range" to "Número de visualizações",
@@ -3663,6 +3681,9 @@ private val PT by lazy { mapOf(
 
 // Français (French). Machine-made, not yet read by a native speaker: corrections welcome
 private val FR by lazy { mapOf(
+    "Seek bar" to "Barre de progression",
+    "Volume" to "Volume",
+    "{a} of {b}" to "{a} sur {b}",
     "Fewest views" to "Moins de vues",
     "Oldest first" to "Plus anciennes d'abord",
     "View count range" to "Nombre de vues",
@@ -4273,6 +4294,9 @@ private val FR by lazy { mapOf(
 
 // Русский (Russian). Machine-made, not yet read by a native speaker: corrections welcome
 private val RU by lazy { mapOf(
+    "Seek bar" to "Шкала воспроизведения",
+    "Volume" to "Громкость",
+    "{a} of {b}" to "{a} из {b}",
     "Fewest views" to "Меньше просмотров",
     "Oldest first" to "Сначала старые",
     "View count range" to "Число просмотров",
@@ -4883,6 +4907,9 @@ private val RU by lazy { mapOf(
 
 // हिन्दी (Hindi). Machine-made, not yet read by a native speaker: corrections welcome
 private val HI by lazy { mapOf(
+    "Seek bar" to "सीक बार",
+    "Volume" to "वॉल्यूम",
+    "{a} of {b}" to "{b} में से {a}",
     "Fewest views" to "सबसे कम व्यूज़",
     "Oldest first" to "सबसे पुराने पहले",
     "View count range" to "व्यू संख्या",
@@ -5493,6 +5520,9 @@ private val HI by lazy { mapOf(
 
 // Bahasa Indonesia (Indonesian). Machine-made, not yet read by a native speaker: corrections welcome
 private val ID by lazy { mapOf(
+    "Seek bar" to "Bilah putar",
+    "Volume" to "Volume",
+    "{a} of {b}" to "{a} dari {b}",
     "Fewest views" to "Penayangan paling sedikit",
     "Oldest first" to "Terlama dulu",
     "View count range" to "Jumlah penayangan",
@@ -6103,6 +6133,9 @@ private val ID by lazy { mapOf(
 
 // Türkçe (Turkish). Machine-made, not yet read by a native speaker: corrections welcome
 private val TR by lazy { mapOf(
+    "Seek bar" to "Arama çubuğu",
+    "Volume" to "Ses",
+    "{a} of {b}" to "{a} / {b}",
     "Fewest views" to "En az görüntülenen",
     "Oldest first" to "Önce en eski",
     "View count range" to "Görüntülenme sayısı",
@@ -6713,6 +6746,9 @@ private val TR by lazy { mapOf(
 
 // বাংলা (Bengali). Machine-made, not yet read by a native speaker: corrections welcome
 private val BN by lazy { mapOf(
+    "Seek bar" to "সিক বার",
+    "Volume" to "ভলিউম",
+    "{a} of {b}" to "{b} এর মধ্যে {a}",
     "Fewest views" to "সবচেয়ে কম ভিউ",
     "Oldest first" to "পুরোনো আগে",
     "View count range" to "ভিউ সংখ্যা",
