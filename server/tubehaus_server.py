@@ -3378,29 +3378,29 @@ def auth_signup(b, ip):
 def auth_password(b, user, ip):
     """A new password for the signed-in account; every other device is signed out."""
     if not user:
-        return 401, {"error": "Please sign in"}, 0
+        return 401, {"error": "Please sign in"}
     old, new = str(b.get("old", "")), str(b.get("new", ""))
     if _too_many("pw:" + user, 5, 600) or _too_many("pwip:" + ip, 10, 600):
-        return 429, {"error": "Too many attempts. Please wait a few minutes"}, 0
+        return 429, {"error": "Too many attempts. Please wait a few minutes"}
     if len(new) < 8 or len(new) > 200:
-        return 400, {"error": "The password needs at least 8 characters"}, 0
+        return 400, {"error": "The password needs at least 8 characters"}
     if new.lower() == user or new in ("password", "12345678", "123456789", "qwertyui", "11111111"):
-        return 400, {"error": "Please choose a less guessable password"}, 0
+        return 400, {"error": "Please choose a less guessable password"}
     u = jload(USERS, {}).get(user)
     if not u or not hmac.compare_digest(_pw_hash(old, bytes.fromhex(u["salt"])), u["hash"]):
-        return 403, {"error": "The current password is wrong"}, 0
+        return 403, {"error": "The current password is wrong"}
     salt = secrets.token_bytes(16)
     h = _pw_hash(new, salt)
     with auth_lk:
         users = jload(USERS, {})
         if user not in users:
-            return 401, {"error": "Please sign in"}, 0
+            return 401, {"error": "Please sign in"}
         gen = int(users[user].get("gen", 1)) + 1
         users[user].update(salt=salt.hex(), hash=h, gen=gen)
         jsave(USERS, users)
         os.chmod(USERS, 0o600)
     log("auth", "password changed", every=0)
-    return 200, {"ok": True}, gen
+    return 200, {"ok": True}
 
 
 def auth_login(b, ip):
@@ -3899,9 +3899,10 @@ class H(BaseHTTPRequestHandler):
         if ACCOUNTS and p.endswith("/api/p/auth/logout"):
             return self.send_cookie(200, {"ok": True}, "", 0)
         if ACCOUNTS and p.endswith("/api/p/auth/password"):
-            code, d, gen = auth_password(body, _req.user, self.client_ip())
+            code, d = auth_password(body, _req.user, self.client_ip())
             if code != 200:
                 return self.send(code, d)
+            gen = int(jload(USERS, {}).get(_req.user, {}).get("gen", 1))     # the one the change just made
             return self.send_cookie(200, d, session_make(_req.user, gen), SESSION_DAYS * 86400)
         if ACCOUNTS and (p.endswith("/api/p/auth/signup") or p.endswith("/api/p/auth/login")):
             fn = auth_signup if p.endswith("/signup") else auth_login
