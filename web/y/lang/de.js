@@ -563,5 +563,12 @@ export default {
  "초": " s",
  "지금 부르는 줄 누르기": "Gesungene Zeile antippen",
  "지금 부르는 줄을 눌러 주세요": "Jetzt die gesungene Zeile antippen",
- "자동": "Automatisch"
+ "자동": "Automatisch",
+ "유리 테마": "Glas",
+ "밝은 유리 테마": "Helles Glas",
+ "비밀번호 바꾸기": "Passwort ändern",
+ "지금 비밀번호": "Aktuelles Passwort",
+ "새 비밀번호": "Neues Passwort",
+ "비밀번호를 바꿨어요. 다른 기기에서는 로그아웃됐어요": "Passwort geändert. Andere Geräte wurden abgemeldet",
+ "지금 비밀번호가 틀렸어요": "Das aktuelle Passwort ist falsch"
 };

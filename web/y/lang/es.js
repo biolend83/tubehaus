@@ -563,5 +563,12 @@ export default {
  "초": " s",
  "지금 부르는 줄 누르기": "Toca la línea que suena",
  "지금 부르는 줄을 눌러 주세요": "Ahora toca la línea que suena",
- "자동": "Automático"
+ "자동": "Automático",
+ "유리 테마": "Cristal",
+ "밝은 유리 테마": "Cristal claro",
+ "비밀번호 바꾸기": "Cambiar contraseña",
+ "지금 비밀번호": "Contraseña actual",
+ "새 비밀번호": "Contraseña nueva",
+ "비밀번호를 바꿨어요. 다른 기기에서는 로그아웃됐어요": "Contraseña cambiada. Se cerró la sesión en los demás dispositivos",
+ "지금 비밀번호가 틀렸어요": "La contraseña actual no es correcta"
 };

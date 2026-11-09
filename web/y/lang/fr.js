@@ -563,5 +563,12 @@ export default {
  "초": " s",
  "지금 부르는 줄 누르기": "Touchez la ligne chantée",
  "지금 부르는 줄을 눌러 주세요": "Touchez maintenant la ligne chantée",
- "자동": "Auto"
+ "자동": "Auto",
+ "유리 테마": "Verre",
+ "밝은 유리 테마": "Verre clair",
+ "비밀번호 바꾸기": "Changer le mot de passe",
+ "지금 비밀번호": "Mot de passe actuel",
+ "새 비밀번호": "Nouveau mot de passe",
+ "비밀번호를 바꿨어요. 다른 기기에서는 로그아웃됐어요": "Mot de passe changé. Les autres appareils ont été déconnectés",
+ "지금 비밀번호가 틀렸어요": "Le mot de passe actuel est incorrect"
 };

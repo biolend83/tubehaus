@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+From Vildor Pierre's fork ([micronlogivdev/tubehaus](https://github.com/micronlogivdev/tubehaus)), written into this code:
+
+### Added
+- **A library for each person:** with `TUBEHAUS_AUTH=accounts` (or `HT_ACCOUNTS=1` on a server that isn't public), everyone signs up with a name and password and gets their own subscriptions, history, playlists, resume points and Shorts recommendations, and sees only their own TVs to cast to. The first account keeps the library that was there before. `TUBEHAUS_MAX_ACCOUNTS` closes sign-ups once the household has its accounts. The server itself turns away library calls from anyone not signed in
+- **Change password** in Settings (with accounts): every other device is signed out
+- **Glass themes:** "Glass" and "Light glass" in Settings → Theme, frosted panels over a soft blurred backdrop. Not on TVs; lighter for people who asked their system for less transparency or motion
+- `HT_VID_PREFETCH` (`TUBEHAUS_PREFETCH`): how many of the videos you're likely to click next are looked up ahead (4, as before; 0 sends YouTube only what you ask for)
+
+### Changed
+- The theme choice in Settings wraps under its title when it doesn't fit on one line
+
 ## v1.0.3 — 2026-11-09
 
 Security fixes for personal servers, a guide to opening TubeHaus only to your household, and a daily check of the apps' YouTube engine. The apps 1.0.3 work with screen readers.

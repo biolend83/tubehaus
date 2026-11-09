@@ -1,0 +1,123 @@
+/* The two glass themes ("Glass", "Glass light" in Settings): frosted panels floating over a soft
+   blurred backdrop. From Vildor Pierre's fork (micronlogivdev/tubehaus, "Spatial"). Everything is
+   scoped to html.spatial:not(.tv), so TVs and the other themes keep the stock look. */
+html.spatial:not(.tv) {
+  --bg: transparent; --bg2: rgba(34, 36, 46, .52); --pop: rgba(30, 32, 42, .86);
+  --line: rgba(255, 255, 255, .12); --hover: rgba(255, 255, 255, .12);
+  --chip: rgba(255, 255, 255, .12); --chip-h: rgba(255, 255, 255, .2); --chip-on: #fff; --chip-on-fg: #111;
+  --input: rgba(0, 0, 0, .25); --input-line: rgba(255, 255, 255, .16); --sbtn: rgba(255, 255, 255, .1);
+  --fg2: rgba(255, 255, 255, .72); --fg3: rgba(255, 255, 255, .5);
+  --shadow: 0 12px 40px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .08);
+  --glass: blur(28px) saturate(160%);
+  --mastc: 64px; --mg: 84px;
+  background: #0d0f18;
+}
+/* the backdrop: soft colour blobs, fixed behind everything */
+html.spatial:not(.tv) body { background: transparent; }
+html.spatial:not(.tv) body::before {
+  content: ""; position: fixed; inset: -10%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(40% 50% at 15% 20%, rgba(255, 80, 80, .35), transparent 70%),
+    radial-gradient(45% 55% at 85% 15%, rgba(70, 120, 255, .35), transparent 70%),
+    radial-gradient(50% 60% at 70% 90%, rgba(170, 80, 255, .3), transparent 70%),
+    radial-gradient(40% 50% at 20% 85%, rgba(0, 200, 180, .22), transparent 70%),
+    #0d0f18;
+  filter: blur(40px);
+}
+
+/* shared glass surface */
+html.spatial:not(.tv) #mast, html.spatial:not(.tv) #mguide, html.spatial:not(.tv) #guide, html.spatial:not(.tv) .chips:not(.small),
+html.spatial:not(.tv) #sugg, html.spatial:not(.tv) #mini, html.spatial:not(.tv) .sheet-in, html.spatial:not(.tv) #bnav {
+  background: var(--bg2); -webkit-backdrop-filter: var(--glass); backdrop-filter: var(--glass);
+  border: 1px solid var(--line); box-shadow: var(--shadow);
+}
+
+/* top bar: a floating rounded window bar */
+html.spatial:not(.tv) #mast { top: calc(8px + var(--sat)); left: 8px; right: 8px; height: 56px; padding-top: 0; border-radius: 22px; }
+html.spatial:not(.tv) .sbox { border-radius: 20px 0 0 20px; box-shadow: none; }
+html.spatial:not(.tv) .sbtn { border-radius: 0 20px 20px 0; }
+html.spatial:not(.tv) #sugg { border-radius: 16px; top: 46px; }
+
+/* left rail: a floating pill, like visionOS' tab bar */
+html.spatial:not(.tv) #mguide { left: 12px; top: calc(var(--mast) + 8px); bottom: auto; width: 60px; padding: 8px 0; border-radius: 30px; }
+html.spatial:not(.tv) #mguide a { height: 60px; margin: 0 6px; border-radius: 24px; font-size: 9px; }
+html.spatial:not(.tv) #mguide a.act { background: var(--hover); }
+html.spatial:not(.tv) #mguide a.act .ic { color: #fff; }
+
+/* side drawer */
+html.spatial:not(.tv) #guide { top: 8px; bottom: 8px; left: 8px; border-radius: 24px; transform: translateX(calc(-100% - 16px)); }
+html.spatial:not(.tv) body.guide-open #guide { transform: none; }
+html.spatial:not(.tv) .gi { border-radius: 12px; }
+
+/* category chips: a floating glass strip */
+html.spatial:not(.tv) .chips:not(.small) { margin: -16px 0 24px; padding: 10px 16px; border-radius: 20px; top: calc(var(--mast) + 4px); }
+html.spatial:not(.tv) .chip, html.spatial:not(.tv) .pill { border-radius: 999px; }
+
+/* cards: rounder thumbnails with a soft lift on hover */
+html.spatial:not(.tv) .th { border-radius: 16px; }
+html.spatial:not(.tv) .card.short .th { border-radius: 18px; }
+html.spatial:not(.tv) .card .th { transition: transform .18s ease, box-shadow .18s ease; }
+html.spatial:not(.tv) .card:hover .th { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }
+html.spatial:not(.tv) .av, html.spatial:not(.tv) .avl img { border-radius: 50%; }
+
+/* watch page: player and description as glass cards */
+html.spatial:not(.tv) .w-slot { border-radius: 20px; overflow: hidden; }
+html.spatial:not(.tv) .w-desc { border: 1px solid var(--line); border-radius: 16px; background: var(--bg2);
+  -webkit-backdrop-filter: var(--glass); backdrop-filter: var(--glass); padding: 16px; margin: 12px 0; }
+html.spatial:not(.tv) .w-actions .pill { background: var(--chip); }
+html.spatial:not(.tv) .w-actions .pill:hover { background: var(--chip-h); }
+
+/* menus, dialogs, mini player */
+html.spatial:not(.tv) #mini { border-radius: 18px; overflow: hidden; }
+html.spatial:not(.tv) .sheet-in { border-radius: 24px 24px 0 0; }
+
+/* phones: no floating rail, keep the bottom bar but glassy */
+@media (max-width: 792px) {
+  html.spatial:not(.tv) { --mg: 0px; --mastc: 60px; }
+  html.spatial:not(.tv) #mast { top: calc(4px + var(--sat)); left: 4px; right: 4px; border-radius: 18px; }
+  html.spatial:not(.tv) #bnav { left: 8px; right: 8px; bottom: 8px; border-radius: 24px; }
+  html.spatial:not(.tv) .chips:not(.small) { margin: -16px -8px 16px; }
+}
+
+/* people who asked their system for less transparency or motion */
+@media (prefers-reduced-transparency: reduce) {
+  html.spatial:not(.tv) { --bg2: rgba(34, 36, 46, .96); --pop: #20222c; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.spatial:not(.tv) .card .th { transition: none; }
+  html.spatial:not(.tv) .card:hover .th { transform: none; }
+}
+
+/* ---------- "Spatial Light": white frosted glass over a soft lavender room ---------- */
+html.spatial.spatial-light:not(.tv) {
+  --bg2: rgba(255, 255, 255, .55); --pop: rgba(255, 255, 255, .9); --fg: #1d1b26;
+  --fg2: rgba(29, 27, 38, .66); --fg3: rgba(29, 27, 38, .45);
+  --line: rgba(255, 255, 255, .7); --hover: rgba(255, 255, 255, .6);
+  --chip: rgba(255, 255, 255, .55); --chip-h: rgba(255, 255, 255, .8); --chip-on: #1d1b26; --chip-on-fg: #fff;
+  --input: rgba(255, 255, 255, .6); --input-line: rgba(255, 255, 255, .8); --sbtn: rgba(255, 255, 255, .5);
+  --blue: #5b4bdb; --accent: #ff5c8a;
+  --shadow: 0 12px 40px rgba(90, 60, 130, .18), 0 0 0 1px rgba(255, 255, 255, .6);
+  background: #e9dcef;
+}
+html.spatial.spatial-light:not(.tv) body::before {
+  background:
+    radial-gradient(45% 55% at 12% 15%, rgba(255, 182, 214, .75), transparent 70%),
+    radial-gradient(50% 60% at 88% 20%, rgba(196, 178, 255, .8), transparent 70%),
+    radial-gradient(55% 60% at 70% 90%, rgba(255, 214, 236, .7), transparent 70%),
+    radial-gradient(45% 50% at 20% 85%, rgba(214, 196, 255, .7), transparent 70%),
+    #eadcf0;
+}
+html.spatial.spatial-light:not(.tv) #mguide a.act { background: rgba(255, 92, 138, .16); }
+html.spatial.spatial-light:not(.tv) #mguide a.act .ic, html.spatial.spatial-light:not(.tv) .gi.act .ic { color: var(--accent); }
+html.spatial.spatial-light:not(.tv) .gi.act { background: rgba(255, 92, 138, .16); }
+/* each video sits on its own small glass card */
+html.spatial.spatial-light:not(.tv) .vgrid .card.grid {
+  background: var(--bg2); -webkit-backdrop-filter: var(--glass); backdrop-filter: var(--glass);
+  border: 1px solid var(--line); border-radius: 18px; padding: 8px 8px 12px; box-shadow: 0 6px 20px rgba(90, 60, 130, .12);
+}
+html.spatial.spatial-light:not(.tv) .vgrid .card.grid .th { border-radius: 12px; }
+html.spatial.spatial-light:not(.tv) .vgrid { row-gap: 24px; }
+html.spatial.spatial-light:not(.tv) .card:hover .th { box-shadow: 0 10px 26px rgba(90, 60, 130, .25); }
+@media (prefers-reduced-transparency: reduce) {
+  html.spatial.spatial-light:not(.tv) { --bg2: rgba(255, 255, 255, .96); --pop: #fff; }
+}

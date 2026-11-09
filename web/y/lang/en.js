@@ -563,5 +563,12 @@ export default {
  "초": "s",
  "지금 부르는 줄 누르기": "Tap the line being sung",
  "지금 부르는 줄을 눌러 주세요": "Now tap the line being sung",
- "자동": "Auto"
+ "자동": "Auto",
+ "유리 테마": "Glass",
+ "밝은 유리 테마": "Light glass",
+ "비밀번호 바꾸기": "Change password",
+ "지금 비밀번호": "Current password",
+ "새 비밀번호": "New password",
+ "비밀번호를 바꿨어요. 다른 기기에서는 로그아웃됐어요": "Password changed. Other devices were signed out",
+ "지금 비밀번호가 틀렸어요": "The current password is wrong"
 };

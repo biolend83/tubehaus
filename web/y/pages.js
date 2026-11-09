@@ -740,7 +740,7 @@ export function settingsPage(page) {
   const sections = [
     ["look", "dark", $t("모양"), `
       ${row(langLabel(), sel("lang", [["auto", $t("자동 (브라우저 언어)")], ...LANGS]))}
-      ${row($t("테마"), seg("theme", [["system", $t("기기 테마 사용"), "tune"], ["light", $t("밝은 테마"), "sun"], ["dark", $t("어두운 테마"), "dark"]]), "", "wide")}
+      ${row($t("테마"), seg("theme", [["system", $t("기기 테마 사용"), "tune"], ["light", $t("밝은 테마"), "sun"], ["dark", $t("어두운 테마"), "dark"], ["spatial", $t("유리 테마"), "sparkle"], ["spatial-light", $t("밝은 유리 테마"), "sparkle"]]), "", "wide")}
       ${tog("ambient", $t("앰비언트 모드"), $t("영상 색이 플레이어 뒤로 은은하게 번져요 (어두운 테마)"))}
       ${row($t("TV 모드"), seg("tv", [["auto", $t("자동")], ["on", $t("켜기")], ["off", $t("끄기")]]), $t("리모컨 방향키로 이동 · 큰 글씨 · 바꾸면 새로고침"), "wide")}`],
     ["play", "play", $t("재생"), `
@@ -849,11 +849,33 @@ export function settingsPage(page) {
   // signed-in account on an instance that requires one
   api("/api/p/auth/me", { quiet: true }).then((d) => {
     if (!d?.accounts || !d.user) return;
-    const r = el(`<div class="sx-row sx-acct"><span class="sx-tx"><b>${esc($t("{0} 으로 로그인했어요", d.user))}</b></span><button class="pill ghost logout">${$t("로그아웃")}</button></div>`);
+    const r = el(`<div class="sx-row sx-acct"><span class="sx-tx"><b>${esc($t("{0} 으로 로그인했어요", d.user))}</b></span><button class="pill ghost chpw">${$t("비밀번호 바꾸기")}</button><button class="pill ghost logout">${$t("로그아웃")}</button></div>`);
     $("#sx-data .sx-rows", page).prepend(r);
     $(".logout", r).onclick = async () => {
       await api("/api/p/auth/logout", { method: "POST", body: {} }).catch(() => { });
       location.href = "/login";
+    };
+    // a new password signs every other device out (the server bumps the session generation)
+    $(".chpw", r).onclick = () => {
+      if ($(".pwform", page)) return $(".pwform input[name=old]", page).focus();
+      const f = el(`<form class="pwform" autocomplete="on">
+        <input type="text" name="username" autocomplete="username" value="${esc(d.user)}" hidden>
+        <label>${$t("지금 비밀번호")}<input type="password" name="old" autocomplete="current-password" required></label>
+        <label>${$t("새 비밀번호")}<input type="password" name="new" autocomplete="new-password" minlength="8" maxlength="200" required></label>
+        <div class="pwbtns"><button class="pill ghost" type="button">${$t("취소")}</button><button class="pill" type="submit">${$t("저장")}</button></div></form>`);
+      r.after(f);
+      $("input[name=old]", f).focus();
+      $(".pwbtns .ghost", f).onclick = () => f.remove();
+      f.onsubmit = async (e) => {
+        e.preventDefault();
+        const b = $("button[type=submit]", f);
+        b.disabled = true;
+        try {
+          await api("/api/p/auth/password", { method: "POST", quiet: true, body: { old: f.old.value, new: f.new.value } });
+          f.remove();
+          toast($t("비밀번호를 바꿨어요. 다른 기기에서는 로그아웃됐어요"));
+        } catch (err) { toast(err.message); b.disabled = false; }
+      };
     };
   }).catch(() => { });
   $(".simp", page).onclick = () => $(".simpfile", page).click();

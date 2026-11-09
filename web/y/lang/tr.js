@@ -563,5 +563,12 @@ export default {
  "초": " sn",
  "지금 부르는 줄 누르기": "Söylenen satıra dokunun",
  "지금 부르는 줄을 눌러 주세요": "Şimdi söylenen satıra dokunun",
- "자동": "Otomatik"
+ "자동": "Otomatik",
+ "유리 테마": "Cam",
+ "밝은 유리 테마": "Açık cam",
+ "비밀번호 바꾸기": "Şifreyi değiştir",
+ "지금 비밀번호": "Mevcut şifre",
+ "새 비밀번호": "Yeni şifre",
+ "비밀번호를 바꿨어요. 다른 기기에서는 로그아웃됐어요": "Şifre değişti. Diğer cihazlarda oturum kapatıldı",
+ "지금 비밀번호가 틀렸어요": "Mevcut şifre yanlış"
 };

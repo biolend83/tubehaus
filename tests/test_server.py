@@ -872,6 +872,92 @@ class OtherSites(unittest.TestCase):
             ts.PUBLIC_PROXIES = old
 
 
+class HouseholdAccounts(unittest.TestCase):
+    """HT_ACCOUNTS=1 without public mode: one library per account, password change, casting per account."""
+
+    def setUp(self):
+        self.old = (ts.ACCOUNTS, ts.PUBLIC_MODE, ts.USERS, getattr(ts._req, "user", None))
+        ts.ACCOUNTS, ts.PUBLIC_MODE = True, False
+        ts.USERS = os.path.join(tempfile.mkdtemp(prefix="th-users-"), "users.json")
+        ts.auth_tries.clear()
+
+    def tearDown(self):
+        ts.ACCOUNTS, ts.PUBLIC_MODE, ts.USERS, ts._req.user = self.old
+        ts.auth_tries.clear()
+
+    def as_user(self, u):
+        ts._req.user = u
+
+    def test_each_account_has_its_own_library(self):
+        self.as_user("hh_anna")
+        self.assertEqual(ts.ytlib_post("/api/p/yt/pos", {"id": "aaaaaaaaaaa", "t": 30, "len": 100})[0], 200)
+        self.as_user("hh_ben")
+        self.assertNotIn("aaaaaaaaaaa", ts._yt_load()["pos"])
+        ts.ytlib_post("/api/p/yt/pos", {"id": "bbbbbbbbbbb", "t": 5, "len": 100})
+        self.as_user("hh_anna")
+        self.assertEqual(set(ts._yt_load()["pos"]), {"aaaaaaaaaaa"})
+        self.assertTrue(os.path.exists(os.path.join(ts.STATE, "users", "hh_anna", "ytlib.json")))
+        self.assertIn("hh_ben", ts._lib_owners())
+        self.assertIsNone(ts._lib_owners()[0])                      # and the shared one
+        self.assertNotIn("bbbbbbbbbbb", ts._yt_load(None)["pos"])   # nothing went into the shared library
+
+    def test_no_accounts_means_the_shared_library(self):
+        ts.ACCOUNTS = False
+        self.as_user("hh_anna")
+        self.assertEqual(ts._ytlib_file(), ts.YTLIB)
+
+    def test_public_instances_keep_libraries_in_browsers(self):
+        ts.PUBLIC_MODE = True
+        self.as_user("hh_anna")
+        self.assertEqual(ts._ytlib_file(), ts.YTLIB)
+
+    def test_first_account_takes_over_the_shared_library(self):
+        ts.jsave(ts.YTLIB, {"subs": {"UCaaaaaaaaaaaaaaaaaaaaaa": {"name": "x"}}, "hist": [], "pos": {}})
+        try:
+            self.assertEqual(ts.auth_signup({"username": "hh_first", "password": "a fine password"}, "7.7.7.7")[0], 200)
+            self.assertIn("UCaaaaaaaaaaaaaaaaaaaaaa", ts._yt_load("hh_first")["subs"])
+            self.assertEqual(ts.auth_signup({"username": "hh_second", "password": "a fine password"}, "7.7.7.8")[0], 200)
+            self.assertEqual(ts._yt_load("hh_second")["subs"], {})
+        finally:
+            os.remove(ts.YTLIB)
+
+    def test_password_change(self):
+        _, d = ts.auth_signup({"username": "hh_pw", "password": "old password 1"}, "8.8.8.1")
+        old_cookie = d["cookie"]
+        self.assertEqual(ts.auth_password({"old": "wrong one!", "new": "new password 2"}, "hh_pw", "8.8.8.1")[0], 403)
+        self.assertEqual(ts.auth_password({"old": "old password 1", "new": "short"}, "hh_pw", "8.8.8.1")[0], 400)
+        self.assertEqual(ts.auth_password({"old": "old password 1", "new": "x"}, None, "8.8.8.1")[0], 401)
+        code, d = ts.auth_password({"old": "old password 1", "new": "new password 2"}, "hh_pw", "8.8.8.1")
+        self.assertEqual(code, 200)
+        self.assertIsNone(ts.session_user(old_cookie))              # other devices are signed out
+        self.assertEqual(ts.session_user(d["cookie"]), "hh_pw")
+        self.assertEqual(ts.auth_login({"username": "hh_pw", "password": "new password 2"}, "8.8.8.2")[0], 200)
+        self.assertEqual(ts.auth_login({"username": "hh_pw", "password": "old password 1"}, "8.8.8.3")[0], 401)
+
+    def test_casting_stays_within_an_account(self):
+        self.as_user("hh_tvowner")
+        ts.cast_wait({"id": "tv-living-room", "name": "TV", "tv": "1"})
+        self.assertIn("tv-living-room", [x["id"] for x in ts.cast_devices()["devices"]])
+        self.as_user("hh_other")
+        self.assertNotIn("tv-living-room", [x["id"] for x in ts.cast_devices()["devices"]])
+        code, _ = ts.cast_send({"to": "tv-living-room", "cmd": {"type": "toggle"}})
+        self.assertEqual(code, 404)
+        self.assertEqual(ts.cast_wait({"id": "tv-living-room", "name": "x"}), {"error": "bad id"})
+
+    def test_library_calls_need_a_sign_in(self):
+        class F:
+            sent = None
+            def send(self, code, obj): self.sent = code
+        f = F()
+        self.as_user(None)
+        self.assertTrue(ts.H.needs_sign_in(f, "/api/p/yt/lib"))
+        self.assertEqual(f.sent, 401)
+        self.assertFalse(ts.H.needs_sign_in(f, "/api/p/auth/login"))
+        self.assertFalse(ts.H.needs_sign_in(f, "/api/p/live/aaaaaaaaaaa.m3u8"))
+        self.as_user("hh_anna")
+        self.assertFalse(ts.H.needs_sign_in(f, "/api/p/yt/lib"))
+
+
 
 if __name__ == "__main__":
     unittest.main()

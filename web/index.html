@@ -13,10 +13,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="/y/font/pretendard.css?v=1">
 <link rel="stylesheet" href="/y/app.css?v=__V__">
+<link rel="stylesheet" href="/y/spatial.css?v=__V__">
 <script>
   // apply the theme early so the first paint does not flash white
   try { var s = JSON.parse(localStorage.getItem("yt.settings") || "{}"), t = s.theme || "light";
     if (t === "system") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    // the glass themes: the dark or light colours plus spatial.css
+    if (t === "spatial" || t === "spatial-light") { document.documentElement.classList.add("spatial"); if (t === "spatial-light") document.documentElement.classList.add("spatial-light"); t = t === "spatial" ? "dark" : "light"; }
     document.documentElement.dataset.theme = t;
     // calm mode: subscriptions only, no Shorts / trending / recommendations (set before the first paint)
     if (s.calm) document.documentElement.classList.add("calm"); } catch (e) { }

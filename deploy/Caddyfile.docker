@@ -1,10 +1,12 @@
 # Used by docker-compose.yml. The site address comes from TUBEHAUS_SITE in .env
 # (a domain gets HTTPS automatically; ":8080" serves plain HTTP on a LAN).
 #
-# TubeHaus has no accounts of its own. For a simple password, set in .env:
-#   TUBEHAUS_AUTH=basic
-#   TUBEHAUS_USER=me
-#   TUBEHAUS_PASSWORD_HASH=<from: docker compose run --rm caddy caddy hash-password>  (write every $ as $$)
+# Without a login everyone who opens the address shares one library. In .env:
+#   TUBEHAUS_AUTH=basic       one shared password:
+#     TUBEHAUS_USER=me
+#     TUBEHAUS_PASSWORD_HASH=<from: docker compose run --rm caddy caddy hash-password>  (write every $ as $)
+#   TUBEHAUS_AUTH=accounts    everyone signs up with a name and password and gets a library of their own
+#     (TUBEHAUS_MAX_ACCOUNTS=4 closes sign-ups once the household has its accounts)
 # or put Authelia / Authentik / a passkey gate in front with forward_auth instead.
 
 (auth-none) {
@@ -13,6 +15,37 @@
 (auth-basic) {
 	basic_auth {
 		{$TUBEHAUS_USER} {$TUBEHAUS_PASSWORD_HASH}
+	}
+}
+
+(auth-accounts) {
+	# the sign-up / sign-in pages and their API stay open; everything else needs an account
+	@member not path /signup /login /y/* /api/p/auth/* /api/p/health /robots.txt
+	forward_auth @member tubehaus:3010 {
+		uri /api/p/auth/check
+		@unauth status 401
+		handle_response @unauth {
+			@htmlreq header Accept *text/html*
+			redir @htmlreq /login?r={uri} 302
+			respond 401
+		}
+	}
+	# Invidious' own account pages would bypass the per-person libraries
+	@inv_accounts path /register* /signout* /subscription_manager* /data_control* /delete_account* /change_password* /token_manager* /authorize_token* /modify_notifications* /clear_watch_history* /api/v1/auth/*
+	handle @inv_accounts {
+		respond 404
+	}
+	handle /signup {
+		root * /srv/web
+		header Cache-Control "no-cache"
+		rewrite * /y/auth.html
+		file_server
+	}
+	handle /login {
+		root * /srv/web
+		header Cache-Control "no-cache"
+		rewrite * /y/auth.html
+		file_server
 	}
 }
 

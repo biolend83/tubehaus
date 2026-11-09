@@ -14,6 +14,8 @@ changes that library**. That's fine on your home network or behind a VPN, but be
 reached from the internet, put a login in front of it:
 
 - the built-in password (`TUBEHAUS_AUTH=basic` in `.env`, see the README),
+- a sign-in for each person (`TUBEHAUS_AUTH=accounts`): everyone gets a library of their own, and
+  the server itself refuses library calls from anyone not signed in,
 - Authelia, Authentik or a passkey gate through `forward_auth`,
 - or don't expose it at all and reach it over WireGuard or Tailscale: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
 

@@ -87,6 +87,11 @@ itself; ports 80 and 443 must be open.
 
 - **Built-in password:** `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER` and `TUBEHAUS_PASSWORD_HASH` in `.env`
   (the hash comes from `docker compose run --rm caddy caddy hash-password`; write every `$` as `$$`).
+- **A sign-in for each person:** `TUBEHAUS_AUTH=accounts`. Everyone signs up with a name and a
+  password on TubeHaus' own sign-in page and gets their own subscriptions, history and playlists;
+  the first account keeps the library that was there before. Once everyone has an account, set
+  `TUBEHAUS_MAX_ACCOUNTS` to that number so nobody else can sign up. Passwords can be changed in
+  Settings.
 - **Your own sign-in service:** Authelia, Authentik or a passkey gate, with Caddy's `forward_auth`.
 
 Already running nginx, Traefik or another Caddy? See [reverse-proxy.md](reverse-proxy.md).

@@ -563,5 +563,12 @@ export default {
  "초": " dtk",
  "지금 부르는 줄 누르기": "Ketuk baris yang sedang dinyanyikan",
  "지금 부르는 줄을 눌러 주세요": "Sekarang ketuk baris yang dinyanyikan",
- "자동": "Otomatis"
+ "자동": "Otomatis",
+ "유리 테마": "Kaca",
+ "밝은 유리 테마": "Kaca terang",
+ "비밀번호 바꾸기": "Ubah kata sandi",
+ "지금 비밀번호": "Kata sandi saat ini",
+ "새 비밀번호": "Kata sandi baru",
+ "비밀번호를 바꿨어요. 다른 기기에서는 로그아웃됐어요": "Kata sandi diubah. Perangkat lain telah keluar",
+ "지금 비밀번호가 틀렸어요": "Kata sandi saat ini salah"
 };

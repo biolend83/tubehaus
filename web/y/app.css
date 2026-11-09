@@ -1608,6 +1608,16 @@ label.sx-row { cursor: pointer; }
 .sx-about { margin: 6px 0 12px; color: var(--fg2); font-size: 13px; line-height: 1.6; }
 .sx-about a { color: var(--acc, var(--blue)); font-weight: 600; }
 .sx-acct .pill { flex: none; }
+/* a wide choice (five themes) goes under its title instead of squeezing it */
+.sx-row.wide { flex-wrap: wrap; }
+.sx-row.wide > .sx-tx { flex: 1 0 auto; }
+.sx-row.wide .sx-seg { flex-wrap: wrap; max-width: 100%; }
+@media (max-width: 640px) { .sx-row.wide .sx-seg label { flex: 1 1 30%; } }
+.sx-acct .chpw { margin-right: 8px; }
+.pwform { display: flex; flex-direction: column; gap: 10px; padding: 12px 0 14px; }
+.pwform label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--fg2); }
+.pwform input { height: 40px; padding: 0 12px; border: 1px solid var(--input-line); border-radius: 10px; background: var(--input); color: var(--fg); font-size: 15px; }
+.pwbtns { display: flex; gap: 8px; justify-content: flex-end; }
 @media (max-width: 1000px) {
   .sx { grid-template-columns: minmax(0, 1fr); gap: 0; max-width: 760px; margin: 0 auto; padding-top: 0; }
   .sx-nav { display: contents; }

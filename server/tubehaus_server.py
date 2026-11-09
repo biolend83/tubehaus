@@ -66,9 +66,11 @@ MAX_HEIGHT = env_int("HT_MAX_HEIGHT", 0)                 # highest quality offer
 # front (Cloudflare's orange cloud) can't be told from visitors, so say how many there are.
 PUBLIC_PROXIES = max(0, env_int("HT_PUBLIC_PROXIES", 0))
 MAX_BODY = env_int("HT_MAX_BODY_MB", 64) * 1024 * 1024     # largest request body (a big YouTube history import fits)
-# Sign-up required (meant for public instances): username + password only, no e-mail.
-# The reverse proxy asks GET /api/p/auth/check before letting anyone in (see deploy/Caddyfile.public).
-ACCOUNTS = env("HT_ACCOUNTS", "0") == "1"
+# Sign-in required: username + password only, no e-mail. The reverse proxy asks GET /api/p/auth/check
+# before letting anyone in (deploy/Caddyfile.public, or TUBEHAUS_AUTH=accounts with docker compose).
+# On a public instance libraries stay in each visitor's browser; on a household server every
+# account has a library of its own on the server.
+ACCOUNTS = env("HT_ACCOUNTS", "0") == "1" or env("TUBEHAUS_AUTH", "") == "accounts"
 MAX_ACCOUNTS = env_int("HT_MAX_ACCOUNTS", 1000)
 def _names(v, n):
     """a name, or one per language as {"ko": "홈튜브", "en": "HomeTube"} (the page picks the visitor's language)"""
@@ -129,7 +131,9 @@ LIVE_BASE = LIVE_ORIGIN + "/api/p/live/s/"   # + base64url(segment url) + ".ts";
 VID_FRESH = 900        # younger than this: hand it over, do nothing else
 VID_STALE = 7200       # older than this: fetch synchronously (URLs would be near expiry)
 VID_KEEP = 400         # entries
-VID_PREFETCH = 4       # recommended videos warmed after a cold click (off on public instances)
+# recommended videos warmed after a cold click (off on public instances); 0 = never look anything
+# up that nobody asked for, the least traffic to YouTube, at the cost of slower next clicks
+VID_PREFETCH = max(0, env_int("HT_VID_PREFETCH", 4))
 vid_cache = {}         # path -> (ts, code, body)
 vid_lk = threading.Lock()
 vid_busy = set()       # paths currently being refreshed
@@ -666,6 +670,7 @@ def jload(p, d):
 
 
 def jsave(p, v):
+    os.makedirs(os.path.dirname(p) or ".", exist_ok=True)     # an account's own folder, the first time
     # titles are any language: always UTF-8, whatever the system locale says
     t = p + ".tmp"
     with open(t, "w", encoding="utf-8") as f:
@@ -1144,15 +1149,49 @@ def warp_rotate(why, started):
 
 
 # ---------- library: subscriptions / history / resume points / playlists ----------
-# Every device shares this one file (put TubeHaus behind your own login - it has no
-# accounts of its own). The subscription feed is gathered from YouTube RSS every 15 min.
+# Without accounts every device shares this one file (put TubeHaus behind a login). With
+# accounts on a household server (HT_ACCOUNTS=1, not public), everyone who signs in has a library
+# of their own in STATE/users/<name>/: subscriptions, history, playlists, Shorts and the TVs
+# they can cast to. The subscription feed is gathered from YouTube RSS every 15 min.
 YTLIB = f"{STATE}/ytlib.json"
 yt_lock = threading.Lock()
 yt_feed = {"items": {}, "updated": 0, "running": False}   # cid -> [entries]
+_req = threading.local()          # .user: the account signed in on the request this thread answers
+_ME = object()                    # "whoever this request belongs to"
 
 
-def _yt_load():
-    d = jload(YTLIB, {})
+def _uid():
+    """The account whose library this request uses; None = the one shared library."""
+    return getattr(_req, "user", None) if ACCOUNTS and not PUBLIC_MODE else None
+
+
+def _udir(u):
+    return f"{STATE}/users/{u}" if u and re.fullmatch(r"[a-z0-9_]{3,24}", u) else None
+
+
+def _ytlib_file(u=_ME):
+    d = _udir(_uid() if u is _ME else u)
+    return f"{d}/ytlib.json" if d else YTLIB
+
+
+def _shorts_file(u=_ME):
+    d = _udir(_uid() if u is _ME else u)
+    return f"{d}/shorts.json" if d else SHORTS
+
+
+def _lib_owners():
+    """Every library on this server: None (the shared one) and each account's."""
+    owners = [None]
+    if ACCOUNTS and not PUBLIC_MODE:
+        try:
+            owners += sorted(n for n in os.listdir(f"{STATE}/users") if _udir(n))
+        except OSError:
+            pass
+    return owners
+
+
+def _yt_load(u=_ME):
+    d = jload(_ytlib_file(u), {})
     for k, v in (("subs", {}), ("hist", []), ("pos", {}), ("wl", []), ("likes", []), ("dislikes", []), ("playlists", {})):
         d.setdefault(k, v)
     return d
@@ -1289,7 +1328,7 @@ def ytlib_post(path, b):
                 d["pos"].pop(vid, None)
         else:
             return 404, {"error": "not found"}
-        jsave(YTLIB, d)
+        jsave(_ytlib_file(), d)
     return 200, res
 
 
@@ -1356,7 +1395,7 @@ def ytlib_export(fmt, d=None):
                '  <body>\n    <outline text="YouTube" title="YouTube">' + rows + '\n    </outline>\n  </body>\n</opml>\n')
         return f"subscriptions-{day}.opml", "text/x-opml; charset=utf-8", xml.encode()
     body = {"format": "tubehaus-backup", "version": 1, "exported": int(time.time()), **d,
-            "shorts": {} if given else jload(SHORTS, {})}
+            "shorts": {} if given else jload(_shorts_file(), {})}
     return f"tubehaus-backup-{day}.json", "application/json", json.dumps(body, ensure_ascii=False).encode()
 
 
@@ -1528,19 +1567,19 @@ def ytlib_import(b):
                 else "HP" + secrets.token_hex(8)
             d["playlists"][pid] = {"title": pl["title"] or "Imported", "items": pl["items"][:5000], "updated": now}
             n["playlists"] += 1
-        jsave(YTLIB, d)
-    if p["shorts"] and not jload(SHORTS, {}).get("ch"):
+        jsave(_ytlib_file(), d)
+    if p["shorts"] and not jload(_shorts_file(), {}).get("ch"):
         with sh_lock:
-            jsave(SHORTS, p["shorts"])
+            jsave(_shorts_file(), p["shorts"])
     untitled = list({x["id"] for x in p["hist"] + p["wl"] + p["likes"] + [i for pl in p["playlists"] for i in pl["items"]]
                      if not x.get("title")})
     n["videos"] = len(untitled)
-    threading.Thread(target=_yt_import_fill, args=(bool(n["subs"]), untitled[:500]), daemon=True).start()
+    threading.Thread(target=_yt_import_fill, args=(bool(n["subs"]), untitled[:500], _uid()), daemon=True).start()
     log("import", f"{p['format']}: {n}", every=0)
     return 200, n
 
 
-def _yt_import_fill(new_subs, ids):
+def _yt_import_fill(new_subs, ids, owner=None):
     """After an import: fetch the new channels' feeds, names and pictures, and the titles of
     videos that came as bare IDs (Invidious exports only list video IDs)."""
     if new_subs:
@@ -1558,12 +1597,12 @@ def _yt_import_fill(new_subs, ids):
     if not got:
         return
     with yt_lock:
-        d = _yt_load()
+        d = _yt_load(owner)
         for lst in [d["hist"], d["wl"], d["likes"]] + [pl["items"] for pl in d["playlists"].values()]:
             for i, x in enumerate(lst):
                 if x["id"] in got and not x.get("title"):
                     lst[i] = dict(x, **{k: v for k, v in got[x["id"]].items() if v})
-        jsave(YTLIB, d)
+        jsave(_ytlib_file(owner), d)
     log("import", f"filled {len(got)}/{len(ids)} video titles", every=0)
 
 
@@ -1582,7 +1621,7 @@ SH_MAX_LEN = 180             # what counts as a Short among search results (seco
 
 
 def _sh_load():
-    d = jload(SHORTS, {})
+    d = jload(_shorts_file(), {})
     for k, v in (("ch", {}), ("kw", {}), ("seen", {}), ("names", {}), ("decayed", time.time())):
         d.setdefault(k, v)
     return d
@@ -1652,13 +1691,13 @@ def shorts_signal(b):
             if len(d[table]) > keep:
                 d[table] = dict(sorted(d[table].items(), key=lambda kv: -abs(kv[1]))[:keep])
         d["names"] = {k: v for k, v in d["names"].items() if k in d["ch"]}
-        jsave(SHORTS, d)
+        jsave(_shorts_file(), d)
     return 200, {"ok": True, "score": e}
 
 
 def shorts_reset():
     with sh_lock:
-        jsave(SHORTS, {})
+        jsave(_shorts_file(), {})
     sh_cand.clear()
     return 200, {"ok": True}
 
@@ -2644,7 +2683,8 @@ def yt_fill_thumbs():
     """Imported subscriptions often come without a channel picture, and some import formats
     without a name either; fill both in from Invidious."""
     with yt_lock:
-        missing = [c for c, v in _yt_load()["subs"].items() if not v.get("thumb") or v.get("name") in ("", c)]
+        missing = list(dict.fromkeys(c for u in _lib_owners() for c, v in _yt_load(u)["subs"].items()
+                                     if not v.get("thumb") or v.get("name") in ("", c)))
     got = {}
     for cid in missing[:200]:
         try:
@@ -2658,14 +2698,17 @@ def yt_fill_thumbs():
             log("ytfeed", f"thumb {cid} FAIL {repr(ex)[:80]}")
     if got:
         with yt_lock:
-            d = _yt_load()
-            for cid, (name, u) in got.items():
-                if cid in d["subs"]:
-                    if u and not d["subs"][cid].get("thumb"):
-                        d["subs"][cid]["thumb"] = u
-                    if name and d["subs"][cid].get("name") in ("", cid):
-                        d["subs"][cid]["name"] = name
-            jsave(YTLIB, d)
+            for owner in _lib_owners():
+                d, hit = _yt_load(owner), False
+                for cid, (name, u) in got.items():
+                    if cid in d["subs"]:
+                        hit = True
+                        if u and not d["subs"][cid].get("thumb"):
+                            d["subs"][cid]["thumb"] = u
+                        if name and d["subs"][cid].get("name") in ("", cid):
+                            d["subs"][cid]["name"] = name
+                if hit:
+                    jsave(_ytlib_file(owner), d)
 
 
 def yt_feed_refresh():
@@ -2674,8 +2717,8 @@ def yt_feed_refresh():
     yt_feed["running"] = True
     t0 = time.time()
     try:
-        with yt_lock:
-            subs = list(_yt_load()["subs"])
+        with yt_lock:            # everyone's channels: one fetch each, however many people follow it
+            subs = list(dict.fromkeys(c for u in _lib_owners() for c in _yt_load(u)["subs"]))
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(6) as ex:
             list(ex.map(yt_feed_one, subs))
@@ -2937,7 +2980,7 @@ def cast_devices():
     now = time.time()
     with cast_cond:
         return {"devices": [{"id": k, "name": d["name"], "tv": d["tv"]}
-                            for k, d in cast_devs.items() if now - d["seen"] < 75]}
+                            for k, d in cast_devs.items() if now - d["seen"] < 75 and d.get("u") == _uid()]}   # only your own screens
 
 
 def cast_send(b):
@@ -2957,7 +3000,7 @@ def cast_send(b):
     if typ == "seek":
         clean["d"] = max(-3600, min(3600, int(cmd.get("d") or 0)))
     with cast_cond:
-        if to not in cast_devs or time.time() - cast_devs[to]["seen"] > 75:
+        if to not in cast_devs or time.time() - cast_devs[to]["seen"] > 75 or cast_devs[to].get("u") != _uid():
             return 404, {"error": "That device is off"}
         cast_state["seq"] += 1
         cast_q.append({"seq": cast_state["seq"], "to": to, "cmd": clean,
@@ -2981,7 +3024,9 @@ def cast_wait(qs):
         since = -1
     deadline = time.time() + 25
     with cast_cond:
-        cast_devs[did] = {"name": name, "tv": tv, "seen": time.time()}
+        if did in cast_devs and cast_devs[did].get("u") != _uid() and time.time() - cast_devs[did]["seen"] < 75:   # someone else's screen, still on
+            return {"error": "bad id"}
+        cast_devs[did] = {"name": name, "tv": tv, "seen": time.time(), "u": _uid()}
         if since < 0:   # first connection: do not replay old commands
             return {"seq": cast_state["seq"], "cmds": []}
         while True:
@@ -3309,12 +3354,48 @@ def auth_signup(b, ip):
             return 409, {"error": "That user name is taken"}
         if len(users) >= MAX_ACCOUNTS:
             return 403, {"error": "This server is not taking new accounts right now"}
+        first = not users
         users[user] = {"salt": salt.hex(), "hash": h, "gen": 1, "created": int(time.time())}
         jsave(USERS, users)
         os.chmod(USERS, 0o600)
+    if first and not PUBLIC_MODE:
+        # switching a server that was used without accounts: its library becomes the first account's
+        for src, dst in ((YTLIB, _ytlib_file(user)), (SHORTS, _shorts_file(user))):
+            if os.path.exists(src) and not os.path.exists(dst):
+                with yt_lock:
+                    jsave(dst, jload(src, {}))
+        log("auth", "first account: took over the shared library", every=0)
     log("auth", "new account", every=0)
     stat("signups")
     return 200, {"ok": True, "user": user, "cookie": session_make(user, 1)}
+
+
+def auth_password(b, user, ip):
+    """A new password for the signed-in account; every other device is signed out."""
+    if not user:
+        return 401, {"error": "Please sign in"}
+    old, new = str(b.get("old", "")), str(b.get("new", ""))
+    if _too_many("pw:" + user, 5, 600) or _too_many("pwip:" + ip, 10, 600):
+        return 429, {"error": "Too many attempts. Please wait a few minutes"}
+    if len(new) < 8 or len(new) > 200:
+        return 400, {"error": "The password needs at least 8 characters"}
+    if new.lower() == user or new in ("password", "12345678", "123456789", "qwertyui", "11111111"):
+        return 400, {"error": "Please choose a less guessable password"}
+    u = jload(USERS, {}).get(user)
+    if not u or not hmac.compare_digest(_pw_hash(old, bytes.fromhex(u["salt"])), u["hash"]):
+        return 403, {"error": "The current password is wrong"}
+    salt = secrets.token_bytes(16)
+    h = _pw_hash(new, salt)
+    with auth_lk:
+        users = jload(USERS, {})
+        if user not in users:
+            return 401, {"error": "Please sign in"}
+        gen = int(users[user].get("gen", 1)) + 1
+        users[user].update(salt=salt.hex(), hash=h, gen=gen)
+        jsave(USERS, users)
+        os.chmod(USERS, 0o600)
+    log("auth", "password changed", every=0)
+    return 200, {"ok": True, "cookie": session_make(user, gen)}
 
 
 def auth_login(b, ip):
@@ -3580,6 +3661,13 @@ class H(BaseHTTPRequestHandler):
             return h
         return hops[0]                     # all private: someone at home, as the first proxy saw them
 
+    def needs_sign_in(self, p):
+        """True, with a 401 sent, for a household library call from someone not signed in."""
+        if not (ACCOUNTS and not PUBLIC_MODE) or _req.user or not personal(p) or "/api/p/auth/" in p or "/api/p/admin/" in p:
+            return False
+        self.send(401, {"error": "Please sign in"})
+        return True
+
     def cross_site(self, p):
         """True, with a 403 sent, when another web site's page asks for a personal part.
         Browsers say where a request comes from (Sec-Fetch-Site, Origin) and pages can't change that."""
@@ -3631,6 +3719,7 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(b)
 
     def do_GET(self):
+        _req.user = self.cookie_user() if ACCOUNTS else None
         p = self.path.split("?")[0].rstrip("/")
         if p.endswith("/api/p/auth/check"):         # asked by the reverse proxy for every request
             if not ACCOUNTS or self.cookie_user():
@@ -3640,7 +3729,7 @@ class H(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             return self.send(401, {"error": "Please sign in"})
-        if self.cross_site(p):
+        if self.cross_site(p) or self.needs_sign_in(p):
             return
         if p.endswith("/api/p/auth/me"):
             return self.send(200, {"accounts": ACCOUNTS, "user": self.cookie_user() if ACCOUNTS else None})
@@ -3782,6 +3871,7 @@ class H(BaseHTTPRequestHandler):
         self.send(404, {"error": "not found"})
 
     def do_POST(self):
+        _req.user = self.cookie_user() if ACCOUNTS else None
         p = self.path.split("?")[0].rstrip("/")
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -3790,7 +3880,7 @@ class H(BaseHTTPRequestHandler):
         if n < 0 or n > MAX_BODY:        # never wait for, or keep, more than that in memory
             self.close_connection = True
             return self.send(413, {"error": "That is too much to send at once"})
-        if self.cross_site(p):
+        if self.cross_site(p) or self.needs_sign_in(p):
             self.close_connection = True
             return
         body_bytes = self.rfile.read(n)
@@ -3803,6 +3893,12 @@ class H(BaseHTTPRequestHandler):
         body = body if isinstance(body, dict) else {}
         if ACCOUNTS and p.endswith("/api/p/auth/logout"):
             return self.send_cookie(200, {"ok": True}, "", 0)
+        if ACCOUNTS and p.endswith("/api/p/auth/password"):
+            code, d = auth_password(body, _req.user, self.client_ip())
+            if code != 200:
+                return self.send(code, d)
+            cookie = d.pop("cookie")
+            return self.send_cookie(200, d, cookie, SESSION_DAYS * 86400)
         if ACCOUNTS and (p.endswith("/api/p/auth/signup") or p.endswith("/api/p/auth/login")):
             fn = auth_signup if p.endswith("/signup") else auth_login
             code, d = fn(body, self.client_ip())
@@ -3986,7 +4082,7 @@ class H(BaseHTTPRequestHandler):
                     d = json.loads(body)
             except Exception as ex:
                 log("videos", "parse FAIL %d %s" % (code, repr(ex)[:100]), t0)
-            if isinstance(d, dict) and d.get("recommendedVideos"):
+            if VID_PREFETCH and isinstance(d, dict) and d.get("recommendedVideos"):
                 threading.Thread(target=vid_bg, args=(None, d), name="vid-warm", daemon=True).start()
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
