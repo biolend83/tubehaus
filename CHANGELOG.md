@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Security
+- Other web sites can no longer read or change a personal server's library: requests for the library, downloads, casting and sign-in that a browser marks as coming from another site are refused, and those parts no longer give other sites CORS permission. Streams, captions and thumbnails stay open to every origin
+- `X-Forwarded-For` is only believed from a proxy on this machine or a private network, and read from the end, so a visitor can't get around the rate and sign-in limits by writing another address in it (`HT_PUBLIC_PROXIES` for public-address proxies in front)
+- Request bodies over `HT_MAX_BODY_MB` (64 MB) are refused before they're read; a negative `Content-Length` no longer holds a connection open
+- A flood of made-up user names or addresses can no longer reset the sign-in and rate counts of everyone else
+- Player beacons can't write extra lines into the server log
+
+### Added
+- [Opening TubeHaus to your household](docs/SELF-HOSTING.md): home network only, Tailscale or WireGuard, or the internet with a login
+- [SECURITY.md](SECURITY.md) now says what the server protects against and what it doesn't
+- A daily engine check runs every call of the apps' YouTube engine against live YouTube and opens an issue when one breaks
+
 ## v1.0.2 — 2026-11-08
 
 Choose the audio track and captions when you save a video, transcripts in any language and as files, and more search filters. The apps 1.0.2 have the same.

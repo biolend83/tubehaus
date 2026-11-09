@@ -60,6 +60,12 @@ ADMIN_TOKEN = env("HT_ADMIN_TOKEN", "")
 MAX_VIEWERS = env_int("HT_MAX_VIEWERS", 0)               # people watching at once (by IP, 3 min window)
 RATE_PER_MIN = env_int("HT_RATE_PER_MIN", 120 if PUBLIC_MODE else 0)   # API requests per IP per minute
 MAX_HEIGHT = env_int("HT_MAX_HEIGHT", 0)                 # highest quality offered to players, e.g. 1080
+# The visitor's address comes from X-Forwarded-For only when the request came from this machine or a
+# private network (a reverse proxy), and it's read from the end, past the proxies' own private
+# addresses: the start of that header is whatever the visitor wrote. Proxies with public addresses in
+# front (Cloudflare's orange cloud) can't be told from visitors, so say how many there are.
+PUBLIC_PROXIES = max(0, env_int("HT_PUBLIC_PROXIES", 0))
+MAX_BODY = env_int("HT_MAX_BODY_MB", 64) * 1024 * 1024     # largest request body (a big YouTube history import fits)
 # Sign-up required (meant for public instances): username + password only, no e-mail.
 # The reverse proxy asks GET /api/p/auth/check before letting anyone in (see deploy/Caddyfile.public).
 ACCOUNTS = env("HT_ACCOUNTS", "0") == "1"
@@ -3247,7 +3253,12 @@ def _too_many(key, limit, window):
     with auth_lk:
         hits = [t for t in auth_tries.get(key, []) if now - t < window]
         if len(auth_tries) > 50000:
-            auth_tries.clear()
+            # forget only the old entries: clearing everything would let a flood of made-up
+            # names wipe the counts of someone who is guessing passwords right now
+            for k in [k for k, v in auth_tries.items() if not v or now - v[-1] > 3600]:
+                del auth_tries[k]
+            if len(auth_tries) > 50000:
+                auth_tries.clear()
         if len(hits) >= limit:
             auth_tries[key] = hits
             return True
@@ -3429,7 +3440,11 @@ def rate_ok(ip):
         tokens, last = rate.get(ip, (RATE_PER_MIN, now))
         tokens = min(RATE_PER_MIN, tokens + (now - last) * RATE_PER_MIN / 60)
         if len(rate) > 20000:
-            rate.clear()
+            # a full bucket after a quiet minute is the same as no entry, so only those go
+            for k in [k for k, (_, t) in rate.items() if now - t > 60]:
+                del rate[k]
+            if len(rate) > 20000:
+                rate.clear()
         if tokens < 1:
             rate[ip] = (tokens, now)
             return False
@@ -3476,6 +3491,29 @@ def feed_for(chs):
     return {"items": items, "updated": now, "updating": any(c not in yt_feed_at for c in chs)}
 
 
+# The personal parts (library, history, downloads, casting, sign-in, usage) answer only pages of
+# TubeHaus' own address: another web site open in the same browser can neither read nor change
+# them. The playback parts below stay open to every origin, like Invidious' API, because players
+# on other origins (Invidious' own page for live streams) load them.
+OPEN_PARTS = ("/api/p/health", "/api/p/live/", "/api/p/hls/", "/api/p/dash/", "/api/p/sub/", "/api/p/plog",
+              "/api/p/yt/dathumb", "/api/p/yt/music/img", "/api/p/auth/check")
+
+
+def personal(path):
+    p = path.split("?")[0]
+    return "/api/p/" in p and not any(o in p for o in OPEN_PARTS)
+
+
+def _private_peer(ip):
+    import ipaddress
+    try:
+        a = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    a = getattr(a, "ipv4_mapped", None) or a
+    return not a.is_global          # this machine, a home or Docker network, Tailscale's 100.64/10, ...
+
+
 class H(BaseHTTPRequestHandler):
     # Invidious re-dialled TCP for every companion call under HTTP/1.0; 1.1 keeps
     # the socket. Every reply below either sends a real Content-Length or sets
@@ -3502,13 +3540,18 @@ class H(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        if not personal(self.path):
+            self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Length", str(len(b)))
         self.end_headers()
         self.wfile.write(b)
 
     def do_OPTIONS(self):
         self.send_response(204)
+        if personal(self.path):                # no permission for other web sites: the browser stops there
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
@@ -3521,8 +3564,38 @@ class H(BaseHTTPRequestHandler):
         return {k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).items()}
 
     def client_ip(self):
-        # behind Caddy the real visitor is the first X-Forwarded-For entry
-        return (self.headers.get("X-Forwarded-For") or self.client_address[0]).split(",")[0].strip()
+        # a proxy adds the address it saw to the end of X-Forwarded-For; what comes before that is
+        # whatever the visitor wrote, so it's read from the end, and only from a proxy we can trust
+        peer = self.client_address[0]
+        hops = [h.strip() for h in (self.headers.get("X-Forwarded-For") or "").split(",") if h.strip()]
+        if not hops or not _private_peer(peer):
+            return peer
+        skip = PUBLIC_PROXIES
+        for h in reversed(hops):
+            if _private_peer(h):           # another proxy of ours (or a visitor on the home network)
+                continue
+            if skip:
+                skip -= 1
+                continue
+            return h
+        return hops[0]                     # all private: someone at home, as the first proxy saw them
+
+    def cross_site(self, p):
+        """True, with a 403 sent, when another web site's page asks for a personal part.
+        Browsers say where a request comes from (Sec-Fetch-Site, Origin) and pages can't change that."""
+        if not personal(p):
+            return False
+        site = (self.headers.get("Sec-Fetch-Site") or "").lower()
+        origin = self.headers.get("Origin")
+        bad = site == "cross-site"
+        if not bad and origin is not None and site != "same-origin":
+            host = (self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or "").split(",")[0].strip().lower()
+            bad = urllib.parse.urlsplit(origin).netloc.lower() != host
+        if bad:
+            log("http", "refused a request from another site to %s (%s)" % (p[:40], (origin or site)[:60]), every=60)
+            self.close_connection = True
+            self.send(403, {"error": "Not allowed from another web site"})
+        return bad
 
     def over_limit(self, p):
         """429 when one visitor sends too much, 503 when the server is full of viewers."""
@@ -3567,6 +3640,8 @@ class H(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             return self.send(401, {"error": "Please sign in"})
+        if self.cross_site(p):
+            return
         if p.endswith("/api/p/auth/me"):
             return self.send(200, {"accounts": ACCOUNTS, "user": self.cookie_user() if ACCOUNTS else None})
         if self.over_limit(p):
@@ -3691,7 +3766,8 @@ class H(BaseHTTPRequestHandler):
         if p.endswith("/plog"):
             # the player is the only place that sees a playback failure; without this
             # beacon a video that dies mid-playback leaves no trace on the server
-            log("player", " ".join("%s=%s" % (k, v[:120]) for k, v in sorted(self.qs().items())) or "?", every=0)
+            log("player", " ".join("%s=%s" % (re.sub(r"[\x00-\x1f\x7f]", " ", k[:30]), re.sub(r"[\x00-\x1f\x7f]", " ", v[:120]))
+                                     for k, v in sorted(self.qs().items())[:20]) or "?", every=0)   # no line breaks: one beacon, one log line
             self.send_response(204)
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Content-Length", "0")
@@ -3707,7 +3783,17 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         p = self.path.split("?")[0].rstrip("/")
-        body_bytes = self.rfile.read(int(self.headers.get("Content-Length", 0) or 0))
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = -1
+        if n < 0 or n > MAX_BODY:        # never wait for, or keep, more than that in memory
+            self.close_connection = True
+            return self.send(413, {"error": "That is too much to send at once"})
+        if self.cross_site(p):
+            self.close_connection = True
+            return
+        body_bytes = self.rfile.read(n)
         if p.startswith("/companion"):
             return self.companion_proxy(body_bytes)
         try:

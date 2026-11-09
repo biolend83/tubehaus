@@ -154,6 +154,9 @@ TubeHaus에는 계정 기능이 없어서, 주소를 아는 사람은 누구나 
 해시는 `docker compose run --rm caddy caddy hash-password`로 만들고, `.env`에서는 `$`를 모두 `$$`로 써야 해요.
 Authelia, Authentik, 패스키 게이트 같은 것을 `forward_auth`로 앞에 둬도 돼요.
 
+아예 밖에 열지 않는 방법도 있어요. 집 네트워크에서만 쓰거나, Tailscale·WireGuard로 어디서든 접속하는 거예요.
+세 가지 방법을 차례로 적어 둔 안내: [가족에게 TubeHaus 열어 주기](docs/SELF-HOSTING.md)(영어).
+
 ### 잘 돌아가는지 점검
 
 ```sh

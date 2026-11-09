@@ -816,5 +816,62 @@ class HlsOneQuality(unittest.TestCase):
         self.assertEqual(self.variants(100), ["aaaaaaaaaaa/160"])      # nothing that small: the smallest
 
 
+class OtherSites(unittest.TestCase):
+    """Personal parts answer only TubeHaus' own pages; client addresses can't be made up."""
+
+    class Fake:
+        def __init__(self, headers, peer="127.0.0.1"):
+            self.headers, self.client_address, self.sent = headers, (peer, 1234), None
+            self.close_connection = False
+
+        def send(self, code, obj):
+            self.sent = code
+
+    def ask(self, path, headers, peer="127.0.0.1"):
+        f = self.Fake(headers, peer)
+        return ts.H.cross_site(f, path), f.sent
+
+    def ip(self, xff, peer="127.0.0.1"):
+        return ts.H.client_ip(self.Fake({"X-Forwarded-For": xff} if xff else {}, peer))
+
+    def test_which_parts_are_personal(self):
+        for p in ("/api/p/yt/lib", "/api/p/yt/pl/new", "/api/p/yt/dl", "/api/p/auth/login", "/api/p/admin/stats"):
+            self.assertTrue(ts.personal(p), p)
+        for p in ("/api/p/health", "/api/p/live/x.m3u8", "/api/p/hls/aaaaaaaaaaa.m3u8", "/api/p/sub/aaaaaaaaaaa.vtt",
+                  "/api/p/yt/dathumb?v=1", "/api/p/auth/check", "/api/v1/videos/aaaaaaaaaaa", "/companion/x"):
+            self.assertFalse(ts.personal(p), p)
+
+    def test_own_page_and_apps_pass(self):
+        self.assertEqual(self.ask("/api/p/yt/lib", {"Sec-Fetch-Site": "same-origin", "Origin": "https://t.example"}), (False, None))
+        self.assertEqual(self.ask("/api/p/yt/lib", {}), (False, None))             # apps and scripts send neither
+        self.assertEqual(self.ask("/api/p/yt/lib", {"Origin": "https://t.example", "Host": "t.example"}), (False, None))
+
+    def test_other_sites_are_refused(self):
+        self.assertEqual(self.ask("/api/p/yt/lib", {"Sec-Fetch-Site": "cross-site"}), (True, 403))
+        self.assertEqual(self.ask("/api/p/yt/pl/new", {"Origin": "https://evil.example", "Host": "t.example"}), (True, 403))
+        self.assertEqual(self.ask("/api/p/yt/pl/new", {"Sec-Fetch-Site": "same-site", "Origin": "https://evil.sslip.io",
+                                                      "Host": "t.sslip.io"}), (True, 403))
+        self.assertEqual(self.ask("/api/p/yt/pl/new", {"Origin": "null", "Host": "t.example"}), (True, 403))
+
+    def test_playback_stays_open(self):
+        self.assertEqual(self.ask("/api/p/live/aaaaaaaaaaa.m3u8", {"Sec-Fetch-Site": "cross-site"}), (False, None))
+
+    def test_client_address(self):
+        self.assertEqual(self.ip(""), "127.0.0.1")
+        self.assertEqual(self.ip("9.9.9.9"), "9.9.9.9")
+        self.assertEqual(self.ip("1.2.3.4, 9.9.9.9"), "9.9.9.9")          # the visitor wrote 1.2.3.4
+        self.assertEqual(self.ip("9.9.9.9, 172.18.0.1"), "9.9.9.9")       # nginx, then Caddy
+        self.assertEqual(self.ip("192.168.1.5"), "192.168.1.5")                   # at home
+        self.assertEqual(self.ip("1.2.3.4", peer="8.8.4.4"), "8.8.4.4") # not from a proxy: ignored
+
+    def test_client_address_behind_cloudflare(self):
+        old, ts.PUBLIC_PROXIES = ts.PUBLIC_PROXIES, 1
+        try:
+            self.assertEqual(self.ip("1.2.3.4, 9.9.9.9, 104.16.0.1"), "9.9.9.9")
+        finally:
+            ts.PUBLIC_PROXIES = old
+
+
+
 if __name__ == "__main__":
     unittest.main()

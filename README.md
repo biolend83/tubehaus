@@ -213,6 +213,9 @@ password: set `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER` and `TUBEHAUS_PASSWORD_HASH
 `docker compose run --rm caddy caddy hash-password`; write every `$` as `$$`). Or put Authelia, Authentik or a
 passkey gate in front with `forward_auth`.
 
+Or don't expose it at all: keep it on your home network, or reach it from anywhere over Tailscale or
+WireGuard. All three ways, step by step: [Opening TubeHaus to your household](docs/SELF-HOSTING.md).
+
 ### Check that everything works
 
 ```sh
@@ -401,6 +404,8 @@ All settings are environment variables — see [`.env.example`](.env.example).
 | `HT_PUBLIC_MODE` | `0` | public instance: libraries stay in visitors' browsers (see above) |
 | `HT_ACCOUNTS`, `HT_MAX_ACCOUNTS` | `0`, `1000` | require sign-up (user name + password) before anything else |
 | `HT_MAX_VIEWERS`, `HT_MAX_HEIGHT`, `HT_RATE_PER_MIN`, `HT_MAX_CONNECTIONS` | `0`, `0`, `120` public / `0`, `256` | load limits (see *Handling a crowd*) |
+| `HT_PUBLIC_PROXIES` | `0` | proxies with public addresses in front of your own (they can't be told from visitors); see [SECURITY.md](SECURITY.md) |
+| `HT_MAX_BODY_MB` | `64` | largest request body (YouTube history imports) |
 | `HT_NAME`, `HT_LINKS` (`TUBEHAUS_NAME`, `TUBEHAUS_LINKS`) | empty | your instance's own name, and extra side-menu links as JSON `[{"name": "…", "url": "https://…"}]` (or `/path`; a `.apk` link downloads). Any name can be one per language, `{"ko": "홈튜브", "en": "HomeTube"}`: visitors see theirs, else English |
 
 ## Translations
