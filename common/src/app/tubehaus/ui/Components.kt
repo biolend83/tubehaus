@@ -1,5 +1,8 @@
 package app.tubehaus.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.CancellationException
@@ -127,9 +130,9 @@ fun Modifier.tvClickable(shape: Shape = RoundedCornerShape(12.dp), onLongClick: 
         val ink = MaterialTheme.colorScheme.onSurface
         return graphicsLayer { scaleX = sink; scaleY = sink }
             .drawBehind { if (shade > 0f) drawOutline(shape.createOutline(size, layoutDirection, this), ink.copy(alpha = shade)) }
-            .combinedClickable(touch, indication = null, onLongClick = onLongClick, onClick = onClick)
+            .combinedClickable(touch, indication = null, role = Role.Button, onLongClick = onLongClick, onClick = onClick)
     }
-    return tvFocus(shape).combinedClickable(remember { MutableInteractionSource() }, indication = null, onLongClick = onLongClick, onClick = onClick)
+    return tvFocus(shape).combinedClickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onLongClick = onLongClick, onClick = onClick)
 }
 
 /**
@@ -144,7 +147,7 @@ fun Chip(selected: Boolean, onClick: () -> Unit, label: String, icon: androidx.c
     val bg by animateColorAsState(if (selected) c.onSurface else c.surfaceVariant, tween(Motion.SHORT))
     val fg by animateColorAsState(if (selected) c.surface else c.onSurface, tween(Motion.SHORT))
     Row(
-        Modifier.height(36.dp).tvClickable(shape, sink = 0.94f, onClick = onClick).clip(shape).background(bg)
+        Modifier.height(36.dp).tvClickable(shape, sink = 0.94f, onClick = onClick).semantics { this.selected = selected }.clip(shape).background(bg)
             .padding(horizontal = if (icon != null && label.isEmpty()) 10.dp else 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -263,6 +263,7 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
                         value = (st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f), color = Red,
                         onDrag = {}, onDone = { f -> player.seekTo((f * st.durationMs).toLong()) },
                         modifier = Modifier.fillMaxWidth(),
+                        label = tr("Seek bar"), state = tr("{a} of {b}").replace("{a}", durationMs(st.positionMs)).replace("{b}", durationMs(st.durationMs)),
                     )
                 }
             }
