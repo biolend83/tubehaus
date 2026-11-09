@@ -1,0 +1,89 @@
+name: Engine check
+
+# Every day: the apps' YouTube engine (android-app branch) runs each of its calls against live
+# YouTube: search, streams, dubs, captions, channels, comments, playlists, downloads. When YouTube
+# changes something and a call breaks, an issue is opened (or the open one gets a comment), so it
+# is fixed before many people notice. GitHub's runners are data-center addresses, which YouTube
+# asks to sign in, so by default the check goes out through Cloudflare WARP like a home server would.
+on:
+  schedule:
+    - cron: "40 21 * * *"   # 06:40 in Korea
+  workflow_dispatch:
+    inputs:
+      warp:
+        description: "Go out through Cloudflare WARP"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: engine-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: android-app
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Compile
+        run: ./gradlew --no-daemon :desktop:classes
+
+      - name: Cloudflare WARP
+        if: github.event_name == 'schedule' || inputs.warp
+        run: |
+          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq cloudflare-warp
+          for i in 1 2 3 4 5; do warp-cli --accept-tos registration new && break; sleep 3; done
+          warp-cli --accept-tos mode proxy
+          warp-cli --accept-tos connect
+          for i in $(seq 1 20); do
+            curl -s --max-time 5 -x socks5h://127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace | grep -q "warp=on" && break
+            sleep 2
+          done
+          curl -s --max-time 10 -x socks5h://127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace | grep -E "warp=|loc="
+          echo "TH_SOCKS=127.0.0.1:40000" >> "$GITHUB_ENV"
+
+      - name: Run every engine call
+        id: run
+        env:
+          TH_REPORT: ${{ runner.temp }}/failed.txt
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon -q :desktop:engineCheck | tee "$RUNNER_TEMP/out.txt"
+
+      - name: Open or update the issue
+        if: failure() && steps.run.outcome == 'failure' && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const failed = fs.existsSync(process.env.RUNNER_TEMP + "/failed.txt") ? fs.readFileSync(process.env.RUNNER_TEMP + "/failed.txt", "utf8").trim() : "";
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `The daily engine check found calls that no longer work:\n\n\`\`\`\n${failed || "(the check itself didn't finish: see the run log)"}\n\`\`\`\n\n[Run log](${run})`;
+            const title = "Engine check: YouTube calls failing";
+            const open = (await github.rest.issues.listForRepo({ ...context.repo, state: "open", labels: "engine-check" })).data;
+            if (open.length) await github.rest.issues.createComment({ ...context.repo, issue_number: open[0].number, body });
+            else await github.rest.issues.create({ ...context.repo, title, body, labels: ["engine-check"] });
+
+      - name: Close the issue when all is well again
+        if: success() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const open = (await github.rest.issues.listForRepo({ ...context.repo, state: "open", labels: "engine-check" })).data;
+            for (const i of open) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: i.number, body: "Today's engine check passed again." });
+              await github.rest.issues.update({ ...context.repo, issue_number: i.number, state: "closed" });
+            }
