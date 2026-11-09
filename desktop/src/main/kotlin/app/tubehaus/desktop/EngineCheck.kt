@@ -16,6 +16,9 @@ import okhttp3.Request
 
 /** `./gradlew :desktop:engineCheck` - runs every engine call against YouTube and prints what came back. */
 fun main() = runBlocking {
+    // TH_SOCKS=127.0.0.1:40000: every request through that SOCKS proxy (the daily CI check goes out through WARP)
+    System.getenv("TH_SOCKS")?.split(':')?.let { (h, p) -> System.setProperty("socksProxyHost", h); System.setProperty("socksProxyPort", p) }
+    val failed = ArrayList<String>()
     app.tubehaus.engine.InnerTube.identityFile = okio.Path.Companion.run { java.io.File(System.getProperty("java.io.tmpdir"), "tubehaus-check-identity.json").toOkioPath() }
     var fails = 0
     suspend fun check(name: String, f: suspend () -> String) {
@@ -25,6 +28,7 @@ fun main() = runBlocking {
             println("ok   %-14s %5dms  %s".format(name, System.currentTimeMillis() - t, r))
         } catch (e: Throwable) {
             fails++
+            failed += "$name: $e"
             println("FAIL %-14s %s".format(name, e))
         }
     }
@@ -264,4 +268,7 @@ fun main() = runBlocking {
     }
     println(if (fails == 0) "\nall good" else "\n$fails failed")
     Net.client.dispatcher.executorService.shutdown()
+    // TH_REPORT=file: the failed checks, one per line, for the daily CI job to put in an issue
+    System.getenv("TH_REPORT")?.let { java.io.File(it).writeText(failed.joinToString("\n")) }
+    if (fails > 0) kotlin.system.exitProcess(1)
 }
