@@ -78,6 +78,11 @@ data class Settings(
     val autoplay: Boolean = true,
     val captions: Boolean = false,
     val captionLang: String = "",
+    /** captions: text size in % (50..200), the box behind them in % opacity (0 = no box, an outline instead),
+     *  and where they sit: 0 at the bottom, 1 a little higher, 2 at the top (#54) */
+    val captionSize: Int = 100,
+    val captionBg: Int = 75,
+    val captionPos: Int = 0,
     val speed: Float = 1f,
     val backgroundPlay: Boolean = true,
     /** calm mode: no view counts, no Shorts tab, no autoplay of the next video */
