@@ -106,6 +106,10 @@
 			flush_interval -1
 		}
 	}
+	# the caption files go through the server, which takes the word timings out (Apple's player shows them as text)
+	handle /companion/api/v1/captions/* {
+		reverse_proxy tubehaus:3010
+	}
 	handle /companion/* {
 		reverse_proxy companion:8282 {
 			flush_interval -1

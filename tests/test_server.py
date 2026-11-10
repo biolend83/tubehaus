@@ -964,5 +964,30 @@ class HouseholdAccounts(unittest.TestCase):
 
 
 
+
+class CleanCaptions(unittest.TestCase):
+    RAW = ("WEBVTT\nKind: captions\nLanguage: en\n\n"
+           "00:03:08.000 --> 00:03:09.000 align:start position:0%\n \nhaven't been doing that yet.\n\n"
+           "00:03:09.000 --> 00:03:10.500\nhaven't been doing that yet.\n"
+           "Now<00:03:09.217><c> is</c><00:03:09.316><c> the</c><00:03:09.417><c> time.</c>\n")
+
+    def test_word_timings_and_settings_go(self):
+        out = ts._clean_vtt(self.RAW)
+        self.assertNotIn("<", out)
+        self.assertNotIn("align:", out)
+        self.assertIn("Now is the time.", out)
+        # the rolling line shows once
+        self.assertEqual(out.count("haven't been doing that yet."), 1)
+
+    def test_line_after_a_pause(self):
+        # a cue after a pause has " " as its top line; the words under it belong to the cue and keep its start
+        raw = ("WEBVTT\n\n00:00:05.200 --> 00:00:06.230\n \nWhat's<00:00:05.360><c> up,</c><00:00:05.480><c> friend?</c>\n\n"
+               "00:00:06.230 --> 00:00:06.240\nWhat's up, friend?\n \n\n"
+               "00:00:06.240 --> 00:00:07.790\nWhat's up, friend?\nanother<00:00:06.480><c> video.</c>\n")
+        out = ts._clean_vtt(raw)
+        self.assertIn("00:00:05.200 --> 00:00:06.230\nWhat's up, friend?\n", out)
+        self.assertIn("00:00:06.240 --> 00:00:07.790\nanother video.\n", out)
+        self.assertEqual(out.count("What's up, friend?"), 1)
+
 if __name__ == "__main__":
     unittest.main()
