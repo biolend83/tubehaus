@@ -75,6 +75,10 @@ tube.example.com {
 		}
 	}
 
+	# caption files go through TubeHaus, which takes the word timings out (the apps' player shows them as text)
+	handle /companion/api/v1/captions/* {
+		reverse_proxy 127.0.0.1:3010
+	}
 	handle /companion/* {
 		reverse_proxy 127.0.0.1:8282 {
 			flush_interval -1
