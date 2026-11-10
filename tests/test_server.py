@@ -964,5 +964,20 @@ class HouseholdAccounts(unittest.TestCase):
 
 
 
+
+class CleanCaptions(unittest.TestCase):
+    RAW = ("WEBVTT\nKind: captions\nLanguage: en\n\n"
+           "00:03:08.000 --> 00:03:09.000 align:start position:0%\n \nhaven't been doing that yet.\n\n"
+           "00:03:09.000 --> 00:03:10.500\nhaven't been doing that yet.\n"
+           "Now<00:03:09.217><c> is</c><00:03:09.316><c> the</c><00:03:09.417><c> time.</c>\n")
+
+    def test_word_timings_and_settings_go(self):
+        out = ts._clean_vtt(self.RAW)
+        self.assertNotIn("<", out)
+        self.assertNotIn("align:", out)
+        self.assertIn("Now is the time.", out)
+        # the rolling line shows once
+        self.assertEqual(out.count("haven't been doing that yet."), 1)
+
 if __name__ == "__main__":
     unittest.main()

@@ -3867,6 +3867,8 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
+        if re.fullmatch(r"/companion/api/v1/captions/[\w-]{11}", p):
+            return self.captions_clean()
         if p.startswith("/companion"):
             return self.companion_proxy()
         if "/api/v1/videos/" in p:
@@ -3989,6 +3991,28 @@ class H(BaseHTTPRequestHandler):
             log("companion", "streamed %dB with %d resume(s) %s" % (
                 sent, resumes, self.path.split("?")[0][:40]), t0, every=0)
         return
+
+    def captions_clean(self):
+        # A caption file from the companion as plain WebVTT: YouTube's automatic captions have a timestamp before every
+        # word, which Apple's player (the iPad/iPhone app) shows as text. The list of tracks (JSON) passes as it is
+        try:
+            r = urllib.request.urlopen(COMPANION + self.path, timeout=60)
+            code, hdrs, body = r.status, r.headers, r.read()
+        except urllib.error.HTTPError as e:
+            code, hdrs, body = e.code, e.headers, e.read()
+        except Exception as ex:
+            log("captions", "FAIL %s" % repr(ex)[:80], every=60)
+            return self.send(502, {"error": "Couldn't get the captions"})
+        ctype = hdrs.get("Content-Type") or "application/json; charset=utf-8"
+        if code == 200 and body.lstrip(b"\xef\xbb\xbf").startswith(b"WEBVTT"):
+            body, ctype = _clean_vtt(body.decode("utf-8", "replace")).encode(), "text/vtt; charset=utf-8"
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def companion_proxy(self, data=None):
         # Point Invidious' companion private_url here. Everything is passed to the real
