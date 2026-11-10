@@ -150,6 +150,8 @@ interface VideoPlayer {
     fun setLoop(on: Boolean)
     /** read about 20 minutes ahead instead of 5 */
     fun setReadAhead(long: Boolean) {}
+    /** Settings → captions: text size in %, the box behind them in % opacity (0 = an outline instead), 0 bottom / 1 higher / 2 top */
+    fun setCaptionStyle(size: Int, bg: Int, pos: Int) {}
     /** the desktop: the sound outputs to choose from, as (name, description); empty where the system picks */
     fun audioDevices(): List<Pair<String, String>> = emptyList()
     /** one of [audioDevices]; "" = the system's default */

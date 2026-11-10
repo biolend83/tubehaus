@@ -13,7 +13,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -87,6 +90,10 @@ class IosPlayer : VideoPlayer {
     private var heightsJob: Job? = null
     private var capsJob: Job? = null
     private var cues by mutableStateOf<List<Cue>>(emptyList())
+    /** Settings → caption size (%), background (% opacity) and position (0 bottom, 1 higher, 2 top) (#54) */
+    private var capStyle by mutableStateOf(Triple(100, 75, 0))
+
+    override fun setCaptionStyle(size: Int, bg: Int, pos: Int) { capStyle = Triple(size, bg, pos) }
     private var readAhead = false
 
     /**
@@ -256,11 +263,19 @@ class IosPlayer : VideoPlayer {
             UIKitView(factory = { PlayerHost(::hostMoved) }, modifier = Modifier.fillMaxSize())
             val line = if (s.captions != null) cues.lastOrNull { s.positionMs >= it.start && s.positionMs < it.end }?.text else null
             // sized to the player like Android's (about 1/19 of its height): a fixed size was tiny on an iPad in full screen
-            val size = (maxHeight.value / 19f).coerceIn(16f, 44f)
+            val (pct, bg, pos) = capStyle
+            val base = (maxHeight.value / 19f).coerceIn(16f, 44f)
+            val size = base * pct / 100f
+            // no box: a soft shadow keeps white text readable on a bright picture
+            val style = if (bg == 0) TextStyle(shadow = Shadow(Color.Black, Offset(0f, 1f), 6f)) else TextStyle.Default
+            val place = when (pos) {
+                2 -> Modifier.align(Alignment.TopCenter).padding(start = 24.dp, end = 24.dp, top = (base * 1.4f).dp)
+                1 -> Modifier.align(Alignment.BottomCenter).padding(start = 24.dp, end = 24.dp, bottom = (maxHeight.value * 0.2f).dp)
+                else -> Modifier.align(Alignment.BottomCenter).padding(start = 24.dp, end = 24.dp, bottom = (base * 1.4f).dp)
+            }
             if (line != null) Text(
-                line, color = Color.White, fontSize = size.sp, lineHeight = (size * 1.25f).sp, textAlign = TextAlign.Center,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 24.dp, end = 24.dp, bottom = (size * 1.4f).dp)
-                    .background(Color(0xB3000000)).padding(horizontal = (size / 2).dp, vertical = 2.dp),
+                line, color = Color.White, fontSize = size.sp, lineHeight = (size * 1.25f).sp, textAlign = TextAlign.Center, style = style,
+                modifier = place.background(Color.Black.copy(alpha = bg / 100f)).padding(horizontal = (size / 2).dp, vertical = 2.dp),
             )
         }
     }
