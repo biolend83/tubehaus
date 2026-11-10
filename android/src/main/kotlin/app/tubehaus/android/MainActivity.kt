@@ -188,7 +188,8 @@ class MainActivity : ComponentActivity() {
         if (state.pip || state.platform.tv) return
         val landscape = newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
         if (newConfig.smallestScreenWidthDp >= 600) return
-        if (landscape && !state.fullscreen && state.current is Screen.Watch && state.playback.video != null) {
+        // Settings → Full screen when turned sideways (#58)
+        if (landscape && state.store.settings.value.rotateFull && !state.fullscreen && state.current is Screen.Watch && state.playback.video != null) {
             state.fullscreen = true; bars(false)
         } else if (!landscape && state.fullscreen) {
             state.fullscreen = false; bars(true)

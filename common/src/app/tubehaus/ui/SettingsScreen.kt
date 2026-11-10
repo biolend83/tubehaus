@@ -414,6 +414,13 @@ private fun SettingsRows(
             Choice(tr("Beside the video"), tr(if (s.sideTab == "comments") "Comments" else "Up next"),
                 listOf("next" to tr("Up next"), "comments" to tr("Comments"))) { c -> set { it.copy(sideTab = c) } }
         }
+        // things some people would rather not see (#57)
+        r.row("display", tr("Music tab") + " music tabs") {
+            Toggle(tr("Music tab"), tr("Music in the tabs"), !s.hideMusicTab) { b -> set { it.copy(hideMusicTab = !b) } }
+        }
+        r.row("display", tr("Logo in the top bar") + " logo") {
+            Toggle(tr("Logo in the top bar"), tr("The TubeHaus name and house at the top"), !s.hideLogo) { b -> set { it.copy(hideLogo = !b) } }
+        }
         // ------------------------------------------------------------------ language
         r.row("language", tr("Language") + " language") { Choice(tr("Language"), LANGS.firstOrNull { it.first == s.lang }?.second ?: "English", LANGS) { c -> set { it.copy(lang = c) } } }
         r.row("language", tr("Region") + " region country") {
@@ -445,6 +452,19 @@ private fun SettingsRows(
         val capPos = listOf("0" to tr("At the bottom"), "1" to tr("A little higher"), "2" to tr("At the top"))
         r.row("player", tr("Caption position") + " subtitles captions") {
             Choice(tr("Caption position"), (capPos.getOrNull(s.captionPos) ?: capPos[0]).second, capPos) { c -> set { it.copy(captionPos = c.toInt()) } }
+        }
+        // the player's touch gestures, one switch each (#57), and full screen when a phone turns sideways (#58)
+        if (touch) r.row("player", tr("Double-tap to skip") + " gestures seek") {
+            Toggle(tr("Double-tap to skip"), tr("Double-tap the left or right of the video to go back or forward 10 seconds"), s.doubleTapSeek) { b -> set { it.copy(doubleTapSeek = b) } }
+        }
+        if (touch) r.row("player", tr("Swipe for brightness and volume") + " gestures") {
+            Toggle(tr("Swipe for brightness and volume"), tr("In full screen, swipe up or down on the left for brightness, on the right for volume"), s.swipeGestures) { b -> set { it.copy(swipeGestures = b) } }
+        }
+        if (touch && !app.platform.tv) r.row("player", tr("Full screen when turned sideways") + " rotate landscape") {
+            Toggle(tr("Full screen when turned sideways"), tr("Turning the phone sideways while a video plays goes full screen"), s.rotateFull) { b -> set { it.copy(rotateFull = b) } }
+        }
+        if (app.platform.airplay != null || app.platform.caster != null) r.row("player", tr("Cast button") + " airplay cast tv") {
+            Toggle(tr("Cast button"), tr("The AirPlay or cast button on the player"), !s.hideCastButton) { b -> set { it.copy(hideCastButton = !b) } }
         }
         r.row("player", tr("Most replayed") + " heatmap") { Toggle(tr("Most replayed"), tr("A wave over the seek bar shows the parts people watch again"), s.heatmap) { b -> set { it.copy(heatmap = b) } } }
         if (android) r.row("player", tr("Ambient mode")) {

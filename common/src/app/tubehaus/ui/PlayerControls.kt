@@ -241,6 +241,10 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
     }
 
     val blank = app.platform.blankPointer
+    // Settings → gestures (#57); the mouse's double-click (full screen) stays
+    val prefs by app.store.settings.state.collectAsState()
+    val dtap = !touch || prefs.doubleTapSeek
+    val swipe = prefs.swipeGestures
     // the mouse: on the outer box, so moving over the buttons counts too
     BoxWithConstraints(
         Modifier.fillMaxSize()
@@ -291,7 +295,7 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
         Box(
             Modifier.fillMaxSize()
                 .let { if (tv) it.onKeyEvent { e -> e.type == KeyEventType.KeyDown && remote(e.key) }.focusRequester(videoFocus).focusable() else it }
-                .pointerInput(touch, st.durationMs, w) {
+                .pointerInput(touch, st.durationMs, w, dtap) {
                     detectTapGestures(
                         onTap = { o ->
                             when {
@@ -301,8 +305,9 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
                                 else -> { shown = !shown; poke++ }
                             }
                         },
-                        onDoubleTap = { o ->
-                            if (!touch) { app.setFull(!fullscreen); return@detectTapGestures }
+                        // no double-tap at all when it's switched off, so a single tap answers at once
+                        onDoubleTap = if (!dtap) null else { o ->
+                            if (!touch) app.setFull(!fullscreen) else {
                             val side = when {
                                 o.x < w * 0.4f -> -1
                                 o.x > w * 0.6f -> 1
@@ -313,14 +318,15 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
                                 seekBy(side * 10)
                                 jump = side to ((if (jump?.first == side) jump!!.second else 0) + 10)
                             }
+                            }
                         },
                     )
                 }
                 // full screen on a phone: swipe up or down on the left for brightness, on the right for volume;
                 // beside the comments on a tablet the same, on the outer thirds (the middle still
                 // swipes the video down into the mini player)
-                .pointerInput(touch, fullscreen, sideGestures) {
-                    if (!touch || !(fullscreen || sideGestures)) return@pointerInput
+                .pointerInput(touch, fullscreen, sideGestures, swipe) {
+                    if (!touch || !swipe || !(fullscreen || sideGestures)) return@pointerInput
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val x = down.position.x
@@ -453,7 +459,10 @@ private fun TouchOverlay(
                 if (st.speed != 1f) Text("${st.speed}x", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(end = 4.dp))
                 FullscreenButton(app, fullscreen)
             }
-            SeekBar(app, st, dragging, onDrag) { f -> player.seekTo((f * st.durationMs).toLong()); onDragEnd() }
+            // outside full screen the bar ran to the video's edges and the handle stuck out past them (#56)
+            Box(Modifier.padding(horizontal = if (fullscreen) 0.dp else 12.dp)) {
+                SeekBar(app, st, dragging, onDrag) { f -> player.seekTo((f * st.durationMs).toLong()); onDragEnd() }
+            }
             if (fullscreen) FullscreenActions(app) { poke() }
         }
     }
