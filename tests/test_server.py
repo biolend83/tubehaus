@@ -979,5 +979,15 @@ class CleanCaptions(unittest.TestCase):
         # the rolling line shows once
         self.assertEqual(out.count("haven't been doing that yet."), 1)
 
+    def test_line_after_a_pause(self):
+        # a cue after a pause has " " as its top line; the words under it belong to the cue and keep its start
+        raw = ("WEBVTT\n\n00:00:05.200 --> 00:00:06.230\n \nWhat's<00:00:05.360><c> up,</c><00:00:05.480><c> friend?</c>\n\n"
+               "00:00:06.230 --> 00:00:06.240\nWhat's up, friend?\n \n\n"
+               "00:00:06.240 --> 00:00:07.790\nWhat's up, friend?\nanother<00:00:06.480><c> video.</c>\n")
+        out = ts._clean_vtt(raw)
+        self.assertIn("00:00:05.200 --> 00:00:06.230\nWhat's up, friend?\n", out)
+        self.assertIn("00:00:06.240 --> 00:00:07.790\nanother video.\n", out)
+        self.assertEqual(out.count("What's up, friend?"), 1)
+
 if __name__ == "__main__":
     unittest.main()

@@ -560,9 +560,11 @@ def _vtt_cues(text):
             cur = (line, [])
             out.append(cur)
         elif cur is not None:
-            if line.strip() == "":
+            # only an empty line ends a cue: automatic captions start a line after a pause with " " (the empty top
+            # line of two), and ending the cue there lost the words below it
+            if line == "":
                 cur = None
-            else:
+            elif line.strip():
                 cur[1].append(line)
     return out
 
