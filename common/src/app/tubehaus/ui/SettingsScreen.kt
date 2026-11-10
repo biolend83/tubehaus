@@ -94,7 +94,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "1.0.3"
+const val VERSION = "1.0.4"
 
 /** Settings' categories, as cards on its first page: key, icon, title, what is inside */
 private class Cat(val key: String, val icon: Symbol, val title: String, val sub: String)
@@ -435,6 +435,17 @@ private fun SettingsRows(
             Toggle(tr("Tap the video to pause"), tr("A tap plays or pauses; the controls show with it"), s.tapToPause) { b -> set { it.copy(tapToPause = b) } }
         }
         r.row("player", tr("Captions") + " subtitles") { Toggle(tr("Captions"), tr("Turn captions on when a video has them"), s.captions) { b -> set { it.copy(captions = b) } } }
+        // the look of the captions, as in the web player's caption menu, plus where they sit (#54)
+        r.row("player", tr("Caption size") + " subtitles captions text") {
+            Choice(tr("Caption size"), "${s.captionSize}%", listOf(50, 75, 100, 150, 200).map { "$it" to "$it%" }) { c -> set { it.copy(captionSize = c.toInt()) } }
+        }
+        r.row("player", tr("Caption background") + " subtitles captions box") {
+            Choice(tr("Caption background"), "${s.captionBg}%", listOf(0, 50, 75, 100).map { "$it" to "$it%" }) { c -> set { it.copy(captionBg = c.toInt()) } }
+        }
+        val capPos = listOf("0" to tr("At the bottom"), "1" to tr("A little higher"), "2" to tr("At the top"))
+        r.row("player", tr("Caption position") + " subtitles captions") {
+            Choice(tr("Caption position"), (capPos.getOrNull(s.captionPos) ?: capPos[0]).second, capPos) { c -> set { it.copy(captionPos = c.toInt()) } }
+        }
         r.row("player", tr("Most replayed") + " heatmap") { Toggle(tr("Most replayed"), tr("A wave over the seek bar shows the parts people watch again"), s.heatmap) { b -> set { it.copy(heatmap = b) } } }
         if (android) r.row("player", tr("Ambient mode")) {
             Toggle(tr("Ambient mode"), tr("In the dark theme, the video's colours glow softly around it"), s.ambient) { b -> set { it.copy(ambient = b) } }

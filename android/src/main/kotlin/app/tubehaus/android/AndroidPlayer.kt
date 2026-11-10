@@ -174,7 +174,7 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
     init {
         exo.addListener(object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) = sync()
-            override fun onCues(cueGroup: CueGroup) { captions?.setCues(cueGroup.cues.map(::centred)) }
+            override fun onCues(cueGroup: CueGroup) { captions?.setCues(placed(cueGroup.cues)) }
             override fun onPlayerError(error: PlaybackException) {
                 st.update { it.copy(error = error.message ?: error.errorCodeName) }
                 // stream URLs expire after a few hours: fetch fresh ones and carry on
@@ -380,10 +380,32 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
      * larger than the phone's own caption style, and the video's colours and fonts left out.
      */
     private fun SubtitleView.youTubeLook() {
-        setStyle(CaptionStyleCompat(android.graphics.Color.WHITE, 0xBF080808.toInt(), android.graphics.Color.TRANSPARENT,
-            CaptionStyleCompat.EDGE_TYPE_NONE, android.graphics.Color.BLACK, null))
-        setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * 1.1f)
+        // Settings → caption size, background (no box: an outline keeps them readable) and position (#54)
+        val a = (capBg * 255 / 100).coerceIn(0, 255)
+        setStyle(CaptionStyleCompat(android.graphics.Color.WHITE, (a shl 24) or 0x080808, android.graphics.Color.TRANSPARENT,
+            if (a == 0) CaptionStyleCompat.EDGE_TYPE_OUTLINE else CaptionStyleCompat.EDGE_TYPE_NONE, android.graphics.Color.BLACK, null))
+        setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * 1.1f * capSize / 100f)
+        setBottomPaddingFraction(if (capPos == 1) 0.2f else SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION)
         setApplyEmbeddedStyles(false)
+    }
+
+    @Volatile private var capSize = 100
+    @Volatile private var capBg = 75
+    @Volatile private var capPos = 0
+
+    override fun setCaptionStyle(size: Int, bg: Int, pos: Int) {
+        capSize = size; capBg = bg; capPos = pos
+        captions?.let { v -> v.post { v.youTubeLook(); v.setCues(placed(exo.currentCues.cues)) } }
+    }
+
+    /** the cues to show: centred, and with captions at the top stacked down from the top edge, one under the other */
+    private fun placed(cues: List<Cue>): List<Cue> {
+        if (capPos != 2) return cues.map(::centred)
+        var line = 1
+        return cues.map { c ->
+            val n = c.text?.lines()?.size ?: 1
+            centred(c).buildUpon().setLine(line.toFloat(), Cue.LINE_TYPE_NUMBER).setLineAnchor(Cue.ANCHOR_TYPE_START).build().also { line += n }
+        }
     }
 
     /**
@@ -427,7 +449,7 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
                     val subs = SubtitleView(c).apply {
                         layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                         youTubeLook()
-                        setCues(exo.currentCues.cues.map(::centred))
+                        setCues(placed(exo.currentCues.cues))
                     }
                     overlayFrameLayout?.addView(subs)
                     captions = subs

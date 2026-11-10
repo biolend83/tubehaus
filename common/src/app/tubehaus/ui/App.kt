@@ -172,6 +172,9 @@ fun App(app: AppState) {
                     }
                     LaunchedEffect(settings.hideBars) { app.platform.setImmersive(settings.hideBars) }
                     LaunchedEffect(settings.longBuffer) { app.player.setReadAhead(settings.longBuffer) }
+                    LaunchedEffect(settings.captionSize, settings.captionBg, settings.captionPos) {
+                        app.player.setCaptionStyle(settings.captionSize, settings.captionBg, settings.captionPos)
+                    }
                     LaunchedEffect(settings.audioDevice) { app.player.setAudioDevice(settings.audioDevice) }
                     app.update?.let { UpdateDialog(app, it) }
                     if (app.casting.picking) CastDialog(app)
