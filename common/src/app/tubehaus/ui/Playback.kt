@@ -206,7 +206,11 @@ class Playback(private val app: AppState) {
         abA = -1L; abB = -1L
         countedStart = false
         video = v
-        queue = newQueue.filter { it.id != v.id }
+        // a queue made by hand (#59) keeps going when another video is opened on the way, and as it plays;
+        // a playlist's list replaces it
+        val mine = ownQueue && !asSong && newQueue.all { n -> queue.any { it.id == n.id } }
+        queue = (if (mine && newQueue.isEmpty()) queue else newQueue).filter { it.id != v.id }
+        ownQueue = mine && queue.isNotEmpty()
         stream = null
         details = null
         error = null; errorAge = false
@@ -387,7 +391,7 @@ class Playback(private val app: AppState) {
         finishCurrent()
         job?.cancel()
         player.stop()
-        video = null; stream = null; details = null; error = null; errorAge = false; queue = emptyList()
+        video = null; stream = null; details = null; error = null; errorAge = false; queue = emptyList(); ownQueue = false
         segments = emptyList(); skippable = null; justSkipped = null
         music = false; songs = emptyList(); songAt = 0; radio = false; abA = -1L; abB = -1L
     }
@@ -483,6 +487,27 @@ class Playback(private val app: AppState) {
         if (!music || songs.isEmpty()) { playSongs(listOf(s)); return }
         val rest = songs.filterIndexed { j, x -> j <= songAt || x.id != s.id }
         songs = rest.take(songAt + 1) + s + rest.drop(songAt + 1)
+    }
+
+    /** the queue was made by hand with Play next / Add to queue (#59): it stays until it has played or playback stops */
+    var ownQueue by mutableStateOf(false)
+
+    /** a video's ⋮ menu: right after the one playing (nothing playing: it plays now) */
+    fun queueNext(v: Video) {
+        if (video == null || music) { app.watch(v); return }
+        queue = listOf(v) + queue.filter { it.id != v.id }
+        ownQueue = true
+    }
+
+    fun queueAdd(v: Video) {
+        if (video == null || music) { app.watch(v); return }
+        if (queue.none { it.id == v.id }) queue = queue + v
+        ownQueue = true
+    }
+
+    fun unqueue(v: Video) {
+        queue = queue.filter { it.id != v.id }
+        if (queue.isEmpty()) ownQueue = false
     }
 
     fun addToQueue(s: Song) {
