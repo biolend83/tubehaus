@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v1.0.4 — 2026-11-10
+
+A library for each person in the household, password change, two glass themes and a prefetch setting, from the forks. The apps stay at 1.0.3 (nothing in them changed).
 
 From Vildor Pierre's fork ([micronlogivdev/tubehaus](https://github.com/micronlogivdev/tubehaus)), written into this code:
 
@@ -12,6 +14,9 @@ From Vildor Pierre's fork ([micronlogivdev/tubehaus](https://github.com/micronlo
 
 ### Changed
 - The theme choice in Settings wraps under its title when it doesn't fit on one line
+
+### Security
+- Account folders are normalised and checked to stay inside `STATE/users`, and a new session after a password change is made apart from the passwords (GitHub code scanning alerts on the unreleased per-person libraries; none was reachable)
 
 ## v1.0.3 — 2026-11-09
 
