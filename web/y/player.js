@@ -530,7 +530,8 @@ export class Player {
       const name = (LANGS.find(([c]) => c === LANG) || [, LANG])[1];
       list.push({ label: $t("{0} (자동 번역)", name), lang: LANG, url: `/api/p/sub/${this.info.videoId}.vtt?tl=${LANG}`, tr: true });
     }
-    if (this.info) for (const src of captionSources) { try { list.push(...(src.list(this.info) || [])); } catch { } }
+    // an add-on's tracks first in the menu, where they are seen without scrolling past every language
+    if (this.info) for (const src of [...captionSources].reverse()) { try { list.unshift(...(src.list(this.info) || [])); } catch { } }
     return list;
   }
   setupCaptions() {
@@ -640,7 +641,7 @@ export class Player {
     else {
       settings.captions = true;
       this.setupCaptions();
-      if (!this.capTrack) { const l = this.captionList(); if (l.length) this.setCaption(l[0]); }
+      if (!this.capTrack) { const l = this.captionList(); const c = l.find((x) => !x.poll) || l[0]; if (c) this.setCaption(c); }
       if (this.capTrack) this.flash(this.capTrack.label);
     }
   }
