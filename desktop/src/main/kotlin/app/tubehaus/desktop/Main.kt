@@ -2,6 +2,12 @@ package app.tubehaus.desktop
 
 import app.tubehaus.ui.tr
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -201,6 +207,18 @@ private fun startApp() {
                         ws.placement = WindowPlacement.Floating; true
                     } else state.back()
                     Key.F11 -> { state.setFull(!state.fullscreen); true }
+                    // back and forward as in a browser: Alt+Left/Right, on a Mac also Cmd+[ and Cmd+]
+                    Key.DirectionLeft, Key.DirectionRight, Key.LeftBracket, Key.RightBracket -> {
+                        val arrow = e.key == Key.DirectionLeft || e.key == Key.DirectionRight
+                        val back = e.key == Key.DirectionLeft || e.key == Key.LeftBracket
+                        when {
+                            !platform.tv && (if (arrow) e.isAltPressed else e.isMetaPressed) -> { if (back) state.back() else state.forward(); true }
+                            platform.tv -> false
+                            state.current is Screen.Shorts -> state.shortsKeys?.invoke(e.key) ?: false
+                            state.fullscreen || state.current is Screen.Watch -> playerKey(state, e.key)
+                            else -> false
+                        }
+                    }
                     // the player's keys (space, arrows, J/K/L, F, M) where a video is on screen
                     else -> when {
                         platform.tv -> false
@@ -215,7 +233,17 @@ private fun startApp() {
                 platform.frame = window
                 WinFrame.darkTitleBar(window)
             }
-            App(state)
+            // the mouse's side buttons go back and forward
+            @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+            androidx.compose.foundation.layout.Box(
+                androidx.compose.ui.Modifier.onPointerEvent(PointerEventType.Press, PointerEventPass.Initial) { ev ->
+                    when (ev.button) {
+                        PointerButton.Back -> { state.back(); ev.changes.forEach { it.consume() } }
+                        PointerButton.Forward -> { state.forward(); ev.changes.forEach { it.consume() } }
+                        else -> {}
+                    }
+                },
+            ) { App(state) }
         }
     }
 }

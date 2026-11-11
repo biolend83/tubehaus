@@ -280,6 +280,12 @@ fun VideoMenu(v: Video, app: AppState, extra: List<Pair<String, () -> Unit>> = e
                 app.store.setInList("wl", v, !inWl); open = false
             })
             DropdownMenuItem(text = { Text(tr("Save to playlist")) }, onClick = { open = false; pick = true })
+            // while a video plays: line this one up after it (#59)
+            val pb = app.playback
+            if (pb.video != null && !pb.music && pb.video?.id != v.id) {
+                DropdownMenuItem(text = { Text(tr("Play next")) }, onClick = { open = false; pb.queueNext(v); app.toast(tr("Plays next")) })
+                DropdownMenuItem(text = { Text(tr("Add to queue")) }, onClick = { open = false; pb.queueAdd(v); app.toast(tr("Added to the queue")) })
+            }
             DropdownMenuItem(text = { Text(tr("Share")) }, onClick = {
                 open = false; app.share(v.title, "https://youtu.be/${v.id}")
             })
