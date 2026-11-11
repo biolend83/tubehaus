@@ -172,6 +172,8 @@ class Casting(private val app: AppState) {
 /** The cast button in the player's controls (AirPlay's on the iPad); nothing where neither exists */
 @Composable
 fun CastButton(app: AppState, tint: Color = Color.White, iconSize: Int = 24, poke: () -> Unit = {}) {
+    // Settings → Cast button off (#57); still there while something is playing on a TV, to stop it
+    if (app.store.settings.value.hideCastButton && app.casting.link == null) return
     val air = app.platform.airplay
     if (air != null) { air(Modifier.size(48.dp)); return }
     if (app.platform.caster == null || app.platform.tv) return

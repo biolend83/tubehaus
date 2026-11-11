@@ -83,6 +83,15 @@ data class Settings(
     val captionSize: Int = 100,
     val captionBg: Int = 75,
     val captionPos: Int = 0,
+    /** player gestures on touch screens, each its own switch (#57): double-tap the sides to skip 10 s; swipe for brightness and volume */
+    val doubleTapSeek: Boolean = true,
+    val swipeGestures: Boolean = true,
+    /** phones: turning sideways while a video plays goes full screen, upright leaves it (#58) */
+    val rotateFull: Boolean = true,
+    /** hidden by choice (#57): the Music tab, the AirPlay/cast button on the player, the logo in the top bar */
+    val hideMusicTab: Boolean = false,
+    val hideCastButton: Boolean = false,
+    val hideLogo: Boolean = false,
     val speed: Float = 1f,
     val backgroundPlay: Boolean = true,
     /** calm mode: no view counts, no Shorts tab, no autoplay of the next video */

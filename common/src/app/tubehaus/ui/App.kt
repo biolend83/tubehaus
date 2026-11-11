@@ -145,6 +145,17 @@ fun App(app: AppState) {
                     // phones get the phone layout; tablets and the desktop the wide one
                     BoxWithConstraints(Modifier.fillMaxSize()) {
                         val d = LocalDensity.current
+                        // iPhone: full screen when turned sideways while a video plays, out of it upright (#58);
+                        // Android phones do the same in MainActivity
+                        if (app.platform.name == "ios") {
+                            val landscape = maxWidth > maxHeight
+                            val phone = minOf(maxWidth, maxHeight) < 600.dp
+                            LaunchedEffect(landscape) {
+                                if (!phone || !app.store.settings.value.rotateFull) return@LaunchedEffect
+                                if (landscape && !app.fullscreen && app.current is Screen.Watch && app.playback.video != null) app.setFull(true)
+                                else if (!landscape && app.fullscreen) app.setFull(false)
+                            }
+                        }
                         CompositionLocalProvider(
                             LocalCompact provides (app.platform.touch && maxWidth < 600.dp),
                             LocalDensity provides Density(d.density, d.fontScale * settings.textScale),
@@ -211,7 +222,7 @@ private fun tabs(app: AppState, phone: Boolean): List<Tab> {
         Tab(Screen.Home, tr("Home"), Sym.Home.fill, Sym.Home.outline),
         if (app.noShorts) null else Tab(Screen.Shorts, tr("Shorts"), Sym.Bolt.fill, Sym.Bolt.outline),
         if (phone) null else Tab(Screen.Subs, tr("Subscriptions"), Sym.Subscriptions.fill, Sym.Subscriptions.outline),
-        Tab(Screen.Music, tr("Music"), Sym.Music.fill, Sym.Music.outline),
+        if (app.store.settings.value.hideMusicTab) null else Tab(Screen.Music, tr("Music"), Sym.Music.fill, Sym.Music.outline),
         Tab(Screen.Library, tr("Library"), Sym.VideoLibrary.fill, Sym.VideoLibrary.outline),
     )
 }
@@ -279,6 +290,15 @@ private fun Shell(app: AppState) {
                     header = {
                         IconButton(onClick = { app.store.settings.update { it.copy(railCollapsed = true) } }) {
                             Icon(Sym.MenuOpen.fill, tr("Fold the menu"))
+                        }
+                        // the desktop: back and forward, like a browser's, out of the video page's way; dim when there is nowhere to go
+                        if (!app.platform.touch && !app.platform.tv) Row {
+                            IconButton(onClick = { app.back() }, enabled = app.canBack, modifier = Modifier.size(36.dp)) {
+                                Icon(Sym.ArrowBack.fill, tr("Back"), Modifier.size(20.dp))
+                            }
+                            IconButton(onClick = { app.forward() }, enabled = app.ahead.isNotEmpty(), modifier = Modifier.size(36.dp)) {
+                                Icon(Sym.ArrowBack.fill, tr("Forward"), Modifier.size(20.dp).graphicsLayer { scaleX = -1f })
+                            }
                         }
                     },
                 ) {
@@ -501,7 +521,7 @@ private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null) {
             if (app.stack.size > 1) {
                 IconButton(onClick = { app.back() }) { Icon(Sym.ArrowBack.fill, tr("Back")) }
             }
-            Logo(Modifier.clickable { app.go(Screen.Home) })
+            if (!app.store.settings.value.hideLogo) Logo(Modifier.clickable { app.go(Screen.Home) })
             Spacer(Modifier.weight(1f))
             IconButton(onClick = { app.go(Screen.Search()) }) { Icon(Sym.Search.outline, tr("Search")) }
             if (LocalCompact.current || onMenu != null) IconButton(onClick = { app.go(Screen.Settings) }) { Icon(Sym.Settings.outline, tr("Settings")) }
