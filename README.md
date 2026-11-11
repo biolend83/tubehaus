@@ -115,6 +115,9 @@ libmpv on Windows, macOS and Linux, AVPlayer on iOS. Details for iOS are on the
   for Fedora/openSUSE, or [a tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.5/TubeHaus-1.0.5-linux-x64.tar.gz) to unpack anywhere and run `TubeHaus/bin/TubeHaus`.
   ARM64 (Raspberry Pi 4/5 and others): [.deb](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.5/TubeHaus-1.0.5-linux-arm64.deb), [.rpm](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.5/TubeHaus-1.0.5-linux-aarch64.rpm),
   [tar.gz](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.5/TubeHaus-1.0.5-linux-arm64.tar.gz).
+  From 1.0.6 also an **AppImage** (`TubeHaus-<version>-linux-x86_64.AppImage` / `-aarch64.AppImage` on the release page:
+  `chmod +x` it and run; it needs libmpv like the tar.gz) and a **Flatpak** (`TubeHaus-x86_64.flatpak`, mpv included:
+  `flatpak install --user TubeHaus-x86_64.flatpak`).
   It uses your system's mpv: `sudo apt install libmpv2` (Fedora: `sudo dnf install mpv-libs`, Arch: `mpv`). New and not yet tested much: reports welcome.
 
 Don't want to re-sign every week? On iPhone and iPad the TubeHaus web app (the server version) needs no
