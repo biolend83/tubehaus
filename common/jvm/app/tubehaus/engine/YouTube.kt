@@ -86,6 +86,9 @@ object YouTube {
         throw first ?: YtError("This video can't be played")
     }
 
+    /** one client's answer for a video, as it is: for the engine check and repair tools (the app goes through [stream]) */
+    suspend fun playerWith(id: String, c: Client): Stream = player(id, c)
+
     private suspend fun player(id: String, c: Client): Stream {
         val d = InnerTube.call("player", mapOf("videoId" to id, "contentCheckOk" to true, "racyCheckOk" to true), c)
         val ps = d.at("playabilityStatus")
