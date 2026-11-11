@@ -1,0 +1,60 @@
+# TubeHaus as a .flatpak file (packaging/flatpak): libmpv inside, so nothing to install on the system.
+# Runs when the Flatpak files change and for each app release, which gets the file attached.
+name: Flatpak
+
+on:
+  push:
+    branches: [android-app]
+    paths: [packaging/flatpak/**, .github/workflows/flatpak.yml]
+    tags: ['app-v*']
+  workflow_dispatch:
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the app
+        run: |
+          ./gradlew --no-daemon :desktop:createReleaseDistributable
+          app=$(find desktop/build/compose/binaries/main-release/app -mindepth 1 -maxdepth 1 -type d | head -1)
+          tar -C "$app" -cf app.tar .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app
+          path: app.tar
+
+  flatpak:
+    needs: app
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08
+      options: --privileged
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: app
+      - name: Put the app next to the manifest
+        run: mkdir -p packaging/flatpak/app && tar -C packaging/flatpak/app -xf app.tar && ls packaging/flatpak/app
+      - uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
+        with:
+          bundle: TubeHaus.flatpak
+          manifest-path: packaging/flatpak/io.github.biolend83.TubeHaus.yml
+          cache-key: flatpak-builder-${{ hashFiles('packaging/flatpak/io.github.biolend83.TubeHaus.yml') }}
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/app-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver=${GITHUB_REF_NAME#app-v}
+          cp TubeHaus.flatpak "TubeHaus-$ver-linux-x86_64.flatpak"
+          dnf install -y gh >/dev/null 2>&1 || true
+          gh release upload "$GITHUB_REF_NAME" "TubeHaus-$ver-linux-x86_64.flatpak" --clobber --repo "$GITHUB_REPOSITORY"
