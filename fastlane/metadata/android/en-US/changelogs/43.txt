@@ -1,0 +1,6 @@
+- Fixed: the Posts tab of a channel could close the app
+- Fixed on iPhone/iPad: ...more under a video closed the app
+- iPhone: the full-screen button turns the picture sideways, and Check for updates works
+- The AirPlay button looks like the other buttons and lights up while playing on a TV
+- Intel Macs: mpv from MacPorts is found too
+- Linux: an AppImage and a Flatpak
