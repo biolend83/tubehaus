@@ -1,14 +1,14 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
 PackageIdentifier: biolend83.TubeHaus
-PackageVersion: 1.0.5
+PackageVersion: 1.0.6
 PackageLocale: en-US
 Publisher: biolend83
 PublisherUrl: https://github.com/biolend83
 PublisherSupportUrl: https://github.com/biolend83/tubehaus/issues
 PackageName: TubeHaus
 PackageUrl: https://github.com/biolend83/tubehaus
-License: AGPL-3.0
-LicenseUrl: https://github.com/biolend83/tubehaus/blob/main/LICENSE
+License: GPL-3.0
+LicenseUrl: https://github.com/biolend83/tubehaus/blob/android-app/LICENSE
 ShortDescription: Private YouTube client with no Google account, no ads and no tracking
 Description: |-
   TubeHaus is a free, open-source YouTube client. It needs no Google account, shows no ads and
@@ -20,6 +20,6 @@ Tags:
 - video
 - privacy
 - open-source
-ReleaseNotesUrl: https://github.com/biolend83/tubehaus/releases/tag/app-v1.0.5
+ReleaseNotesUrl: https://github.com/biolend83/tubehaus/releases/tag/app-v1.0.6
 ManifestType: defaultLocale
 ManifestVersion: 1.9.0

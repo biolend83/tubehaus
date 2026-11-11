@@ -84,7 +84,7 @@ write("bucket/tubehaus.json", JSON.stringify({
   version: v,
   description: DESC,
   homepage: "https://github.com/biolend83/tubehaus",
-  license: "AGPL-3.0-only",
+  license: "GPL-3.0-only",
   architecture: {
     "64bit": { url: `${base}/${f.winZip}`, hash: need(f.winZip) },
     arm64: { url: `${base}/${f.winArm}`, hash: need(f.winArm) },
@@ -134,8 +134,8 @@ PublisherUrl: https://github.com/biolend83
 PublisherSupportUrl: https://github.com/biolend83/tubehaus/issues
 PackageName: TubeHaus
 PackageUrl: https://github.com/biolend83/tubehaus
-License: AGPL-3.0
-LicenseUrl: https://github.com/biolend83/tubehaus/blob/main/LICENSE
+License: GPL-3.0
+LicenseUrl: https://github.com/biolend83/tubehaus/blob/android-app/LICENSE
 ShortDescription: ${DESC}
 Description: |-
   TubeHaus is a free, open-source YouTube client. It needs no Google account, shows no ads and
@@ -160,7 +160,7 @@ pkgrel=1
 pkgdesc="${DESC}"
 arch=('x86_64' 'aarch64')
 url="https://github.com/biolend83/tubehaus"
-license=('AGPL-3.0-only')
+license=('GPL-3.0-only')
 depends=('mpv' 'alsa-lib' 'fontconfig' 'freetype2' 'libglvnd' 'libx11' 'libxext' 'libxi' 'libxrender' 'libxtst' 'xdg-utils')
 provides=('tubehaus')
 conflicts=('tubehaus')
@@ -190,7 +190,7 @@ write("packaging/aur/.SRCINFO", `pkgbase = tubehaus-bin
 \turl = https://github.com/biolend83/tubehaus
 \tarch = x86_64
 \tarch = aarch64
-\tlicense = AGPL-3.0-only
+\tlicense = GPL-3.0-only
 \tdepends = mpv
 \tdepends = alsa-lib
 \tdepends = fontconfig
