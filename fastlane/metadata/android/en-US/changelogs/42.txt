@@ -1,0 +1,4 @@
+- A queue: Play next and Add to queue in a video's menu; it shows as Up next and keeps going while you open other videos
+- New switches in Settings: double-tap to skip, swipe for brightness and volume, full screen when turned sideways, the cast button, the Music tab, the logo
+- Back and forward on computers: buttons in the side menu, Alt+Left/Right and the mouse's side buttons
+- The seek bar's handle no longer sticks out past the video
