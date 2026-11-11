@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.0.5",
+          "buildVersion": "42",
+          "date": "2026-11-11T03:08:52+00:00",
+          "localizedDescription": "1.0.5: a queue (Play next, Add to queue), full screen when the iPhone is turned sideways, switches for gestures, the AirPlay button, the Music tab and the logo, and fixes for the AirPlay button and the seek bar.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.5/TubeHaus-1.0.5-ipad.ipa",
+          "size": 20994171,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.0.4",
           "buildVersion": "41",
           "date": "2026-11-10T13:33:09+00:00",
@@ -176,11 +185,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.0.4",
-      "versionDate": "2026-11-10T13:33:09+00:00",
-      "versionDescription": "1.0.4: caption size, background and position in Settings → Player.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.4/TubeHaus-1.0.4-ipad.ipa",
-      "size": 20957027
+      "version": "1.0.5",
+      "versionDate": "2026-11-11T03:08:52+00:00",
+      "versionDescription": "1.0.5: a queue (Play next, Add to queue), full screen when the iPhone is turned sideways, switches for gestures, the AirPlay button, the Music tab and the logo, and fixes for the AirPlay button and the seek bar.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.5/TubeHaus-1.0.5-ipad.ipa",
+      "size": 20994171
     }
   ],
   "news": [],
