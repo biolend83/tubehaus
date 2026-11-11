@@ -109,3 +109,10 @@ tasks.register<JavaExec>("engineCheck") {
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("app.tubehaus.desktop.EngineCheckKt")
 }
+
+// when YouTube stops answering the player clients in clients.json: finds the ones that still work and rewrites the list
+// ./gradlew :desktop:engineRepair
+tasks.register<JavaExec>("engineRepair") {
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("app.tubehaus.desktop.EngineRepairKt")
+}
