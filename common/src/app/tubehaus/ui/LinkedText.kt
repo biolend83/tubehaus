@@ -14,10 +14,31 @@ import androidx.compose.ui.text.style.TextOverflow
 import app.tubehaus.engine.TextLink
 import app.tubehaus.engine.secondsOf
 
+// Only plain patterns: no lookbehind and no \p{..} classes, which the iPad's Kotlin (Kotlin/Native) may not take
+// (a pattern it can't read throws the first time this file is used, and "...more" closed the app).
 private val URL = Regex("""(https?://|www\.)[^\s<>"]+""")
-private val TAG = Regex("""(?<![\w#&])#[\p{L}\p{N}_]+""")
+private val TIME = Regex("""(\d{1,2}:)?\d{1,2}:\d{2}""")
+
+/** #tags: a # not right after a letter, a digit, # or &, then letters, digits and _ (any script) */
+private fun tags(text: String): List<IntRange> {
+    val out = ArrayList<IntRange>()
+    var i = text.indexOf('#')
+    while (i >= 0) {
+        val before = text.getOrNull(i - 1)
+        var end = i + 1
+        while (end < text.length && (text[end].isLetterOrDigit() || text[end] == '_')) end++
+        if (end > i + 1 && (before == null || !(before.isLetterOrDigit() || before == '_' || before == '#' || before == '&'))) out += i until end
+        i = text.indexOf('#', end.coerceAtLeast(i + 1))
+    }
+    return out
+}
+
 /** 1:23 or 1:02:03, not part of a longer number like a date or a time of day with seconds */
-private val TIME = Regex("""(?<![\d:.])(\d{1,2}:)?\d{1,2}:\d{2}(?![\d:])""")
+private fun times(text: String): List<MatchResult> = TIME.findAll(text).filter { m ->
+    val before = text.getOrNull(m.range.first - 1)
+    val after = text.getOrNull(m.range.last + 1)
+    (before == null || !(before.isDigit() || before == ':' || before == '.')) && (after == null || !(after.isDigit() || after == ':'))
+}.toList()
 
 /**
  * Text with its links in the link colour, as in YouTube's descriptions and posts: addresses open
@@ -43,10 +64,11 @@ fun LinkedText(
         val s = m.value.trimEnd('.', ',', ')', ']', '!', '?', ';', ':', '"', '\'')
         if (free(m.range.first, m.range.first + s.length)) spans += Triple(m.range.first, m.range.first + s.length) { app.openLink(s) }
     }
-    for (m in TAG.findAll(text)) if (free(m.range.first, m.range.last + 1)) {
-        spans += Triple(m.range.first, m.range.last + 1) { app.go(Screen.Search(m.value)) }
+    for (r in tags(text)) if (free(r.first, r.last + 1)) {
+        val tag = text.substring(r.first, r.last + 1)
+        spans += Triple(r.first, r.last + 1) { app.go(Screen.Search(tag)) }
     }
-    if (onTime != null) for (m in TIME.findAll(text)) if (free(m.range.first, m.range.last + 1)) {
+    if (onTime != null) for (m in times(text)) if (free(m.range.first, m.range.last + 1)) {
         val sec = secondsOf(m.value)
         spans += Triple(m.range.first, m.range.last + 1) { onTime(sec) }
     }

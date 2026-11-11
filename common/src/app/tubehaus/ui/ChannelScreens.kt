@@ -31,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryScrollableTabRow
@@ -401,7 +402,8 @@ private fun ChannelAboutSheet(app: AppState, h: ChannelPage, onClose: () -> Unit
         val t = h.aboutToken ?: return@LaunchedEffect
         try { info = YouTube.channelAbout(t) } catch (e: CancellationException) { throw e } catch (e: Exception) { failed = true }
     }
-    ModalBottomSheet(onDismissRequest = onClose, shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)) {
+    ModalBottomSheet(onDismissRequest = onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)) {
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             item {
                 Text(h.name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp))
