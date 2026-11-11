@@ -4,6 +4,7 @@ import app.tubehaus.engine.Dislikes
 import app.tubehaus.engine.Details
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -374,7 +375,9 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
     val d = app.playback.details
     val calm = app.store.settings.value.calm
     val desc = app.playback.stream?.description ?: ""
-    ModalBottomSheet(onDismissRequest = onClose, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
+    // open all the way at once, as the player's settings sheet does
+    ModalBottomSheet(onDismissRequest = onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             item {
                 Text(v.title, style = MaterialTheme.typography.titleLarge)
