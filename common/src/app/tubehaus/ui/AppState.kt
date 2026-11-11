@@ -195,7 +195,25 @@ class AppState(val platform: Platform, val store: Store) {
     var lastMove = 0
         private set
 
+    /** the pages Back left, newest last: Forward opens them again; going anywhere else forgets them */
+    val ahead = mutableStateListOf<Screen>()
+
+    /** there is a page to go back to (the side menu's Back button) */
+    val canBack: Boolean get() = stack.size > 1 || stack.lastOrNull() != Screen.Home
+
+    fun forward(): Boolean {
+        if (fullscreen || ahead.isEmpty()) return false
+        val s = ahead.removeAt(ahead.size - 1)
+        lastMove = 1
+        // a video that was closed meanwhile is opened again
+        if (s is Screen.Watch && playback.video?.id != s.id) playback.open(Video(s.id, ""))
+        if (s is Screen.Watch) stack.removeAll { it is Screen.Watch }
+        stack.add(s)
+        return true
+    }
+
     fun go(s: Screen) {
+        ahead.clear()
         if (s in TABS) {
             lastMove = 0
             stack.clear(); stack.add(s)
@@ -214,7 +232,7 @@ class AppState(val platform: Platform, val store: Store) {
     fun back(): Boolean {
         tvBack?.let { if (it()) return true }
         if (fullscreen) { setFull(false); return true }
-        if (stack.size > 1) { lastMove = -1; stack.removeAt(stack.size - 1); return true }
+        if (stack.size > 1) { lastMove = -1; ahead.add(stack.removeAt(stack.size - 1)); return true }
         if (stack.last() != Screen.Home) { lastMove = 0; stack[0] = Screen.Home; return true }
         return false
     }
