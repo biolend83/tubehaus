@@ -742,6 +742,9 @@ export function settingsPage(page) {
       ${row(langLabel(), sel("lang", [["auto", $t("자동 (브라우저 언어)")], ...LANGS]))}
       ${row($t("테마"), seg("theme", [["system", $t("기기 테마 사용"), "tune"], ["light", $t("밝은 테마"), "sun"], ["dark", $t("어두운 테마"), "dark"], ["spatial", $t("유리 테마"), "sparkle"], ["spatial-light", $t("밝은 유리 테마"), "sparkle"]]), "", "wide")}
       ${tog("ambient", $t("앰비언트 모드"), $t("영상 색이 플레이어 뒤로 은은하게 번져요 (어두운 테마)"))}
+      ${PUBLIC ? "" : tog("trTitles", $t("제목 번역"), $t("다른 글자로 쓰인 영상 제목을 내 언어로 보여줘요. 제목이 이 서버를 거쳐 번역기(구글)로 가요"))}
+      ${tog("hideMusic", $t("음악 탭 숨기기"))}
+      ${tog("hideLogo", $t("로고 숨기기"))}
       ${row($t("TV 모드"), seg("tv", [["auto", $t("자동")], ["on", $t("켜기")], ["off", $t("끄기")]]), $t("리모컨 방향키로 이동 · 큰 글씨 · 바꾸면 새로고침"), "wide")}`],
     ["play", "play", $t("재생"), `
       ${tog("calm", $t("차분 모드"), $t("홈은 구독 채널의 새 영상만, 쇼츠·인기·추천 영상은 숨기고, 자동재생은 끄고, 댓글은 눌러야 보여요"))}

@@ -89,6 +89,9 @@ const DEFAULTS = {
   dearrowThumbs: true,    // and thumbnails
   miniplayer: true,
   annotations: true,
+  trTitles: false,        // video titles written in another script, shown in the interface language (asked through the server)
+  hideMusic: false,       // no Music tab
+  hideLogo: false,        // no logo in the top bar and the side menu
 };
 let SET = {};
 try { SET = JSON.parse(localStorage.getItem("yt.settings") || "{}"); } catch { }

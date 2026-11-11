@@ -22,7 +22,9 @@
     if (t === "spatial" || t === "spatial-light") { document.documentElement.classList.add("spatial"); if (t === "spatial-light") document.documentElement.classList.add("spatial-light"); t = t === "spatial" ? "dark" : "light"; }
     document.documentElement.dataset.theme = t;
     // calm mode: subscriptions only, no Shorts / trending / recommendations (set before the first paint)
-    if (s.calm) document.documentElement.classList.add("calm"); } catch (e) { }
+    if (s.calm) document.documentElement.classList.add("calm");
+    if (s.hideMusic) document.documentElement.classList.add("no-music");
+    if (s.hideLogo) document.documentElement.classList.add("no-logo"); } catch (e) { }
 </script>
 </head>
 <body data-route="">

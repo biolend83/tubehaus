@@ -618,6 +618,84 @@ def _translate(lines, tl=SUB_LANG):
     return done
 
 
+# ---------- titles in the viewer's language ----------
+# The web app can show video titles written in another script in the viewer's language (Settings ->
+# Translate titles, off by default). The titles go to the translator the captions use, and the
+# answers are kept, so a title is only ever asked once. Not on public instances.
+TR_FILE = os.path.join(STATE, "titles-tr.json")      # {language: {title: its translation}}
+TR_KEEP = 5000                                        # titles kept per language; the oldest go first
+tr_lock = threading.Lock()
+tr_mem = None
+tr_saved = 0.0
+
+
+def _translate_auto(lines, tl):
+    """[(translation or None, answered)] for each line, whatever language it is in. None with
+    answered=True: the line is in tl already (or came back unchanged). answered=False: the
+    translator didn't answer, ask again another time."""
+    UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"}
+    out, i = [], 0
+    while i < len(lines):
+        url = "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=" + urllib.parse.quote(tl)
+        chunk = []
+        while i < len(lines) and len(chunk) < 20:
+            q = "&q=" + urllib.parse.quote(lines[i])
+            if chunk and len(url) + len(q) > 6000:
+                break
+            url += q
+            chunk.append(lines[i])
+            i += 1
+        try:
+            r = json.loads(urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30).read())
+            if not isinstance(r, list) or len(r) != len(chunk):
+                raise ValueError("an answer of another length")
+            for src, x in zip(chunk, r):
+                text, lang = (x[0], x[1] if len(x) > 1 else "") if isinstance(x, list) and x else (x if isinstance(x, str) else "", "")
+                same = str(lang).lower().split("-")[0] == tl.lower().split("-")[0]
+                out.append((None if same or not text or text.strip() == src.strip() else str(text), True))
+        except Exception as ex:
+            log("tr", "titles FAIL %s" % repr(ex)[:80])
+            out += [(None, False)] * len(chunk)
+        if i < len(lines):
+            time.sleep(0.2)
+    return out
+
+
+def titles_tr(b):
+    """{"tl": "ko", "q": [titles]} -> {"t": [the same titles in that language]}; a title that is
+    in that language already, or that couldn't be translated just now, comes back as it is."""
+    global tr_mem, tr_saved
+    tl, q = str(b.get("tl") or ""), b.get("q")
+    if not re.fullmatch(r"[a-z]{2,3}(-[A-Za-z]{2,4})?", tl) or not isinstance(q, list):
+        return 400, {"error": "Bad request"}
+    q = [str(x)[:300] for x in q[:60]]
+    with tr_lock:
+        if tr_mem is None:
+            d = jload(TR_FILE, {})
+            tr_mem = {k: v for k, v in d.items() if isinstance(v, dict)} if isinstance(d, dict) else {}
+        have = tr_mem.setdefault(tl, {})
+        need = list(dict.fromkeys(x for x in q if x.strip() and x not in have))
+    if need:
+        got = _translate_auto(need, tl)
+        with tr_lock:
+            have = tr_mem.setdefault(tl, {})
+            for src, (text, answered) in zip(need, got):
+                if answered:
+                    have[src] = text or src
+            while len(have) > TR_KEEP:
+                have.pop(next(iter(have)))
+            if time.time() - tr_saved > 30:
+                tr_saved = time.time()
+                try:
+                    jsave(TR_FILE, tr_mem)
+                except OSError as ex:
+                    log("tr", "save FAIL %s" % repr(ex)[:80])
+    with tr_lock:
+        have = tr_mem.get(tl, {})
+        return 200, {"t": [have.get(x, x) for x in q]}
+
+
 def sub_vtt(vid, tl=SUB_LANG):
     """Translated VTT for one video id, cached on disk."""
     # both end up in a file name: only a video id and a language code may get through
@@ -3941,6 +4019,8 @@ class H(BaseHTTPRequestHandler):
             return self.send(*shorts_signal(body))
         if p.endswith("/yt/shorts/reset"):
             return self.send(*shorts_reset())
+        if p.endswith("/yt/tr"):                     # titles in the viewer's language (Settings -> Translate titles)
+            return self.send(*titles_tr(body))
         if "/yt/" in p and "/api/p/" in self.path:
             return self.send(*ytlib_post(p, body))
         self.send(404, {"error": "not found"})

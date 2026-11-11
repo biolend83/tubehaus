@@ -989,5 +989,64 @@ class CleanCaptions(unittest.TestCase):
         self.assertIn("00:00:06.240 --> 00:00:07.790\nanother video.\n", out)
         self.assertEqual(out.count("What's up, friend?"), 1)
 
+
+class TitleTranslation(unittest.TestCase):
+    def setUp(self):
+        self.asked = []
+        self.real = ts._translate_auto
+
+        def fake(lines, tl):
+            self.asked.append(list(lines))
+            return [(None, False) if l == "no answer" else (None, True) if l.startswith("mine:") else ("[%s] %s" % (tl, l), True) for l in lines]
+        ts._translate_auto = fake
+        ts.tr_mem, ts.tr_saved = {}, 0.0
+
+    def tearDown(self):
+        ts._translate_auto = self.real
+        ts.tr_mem = None
+
+    def test_translated_once_and_remembered(self):
+        code, d = ts.titles_tr({"tl": "ko", "q": ["Why is the sky blue?", "mine: already Korean", "Why is the sky blue?"]})
+        self.assertEqual(code, 200)
+        self.assertEqual(d["t"], ["[ko] Why is the sky blue?", "mine: already Korean", "[ko] Why is the sky blue?"])
+        self.assertEqual(self.asked, [["Why is the sky blue?", "mine: already Korean"]])       # each title once
+        ts.titles_tr({"tl": "ko", "q": ["Why is the sky blue?", "mine: already Korean"]})
+        self.assertEqual(len(self.asked), 1)                                                   # nothing asked again
+        self.assertEqual(ts.jload(ts.TR_FILE, {})["ko"]["Why is the sky blue?"], "[ko] Why is the sky blue?")
+
+    def test_each_language_has_its_own(self):
+        ts.titles_tr({"tl": "ko", "q": ["Hello"]})
+        self.assertEqual(ts.titles_tr({"tl": "ja", "q": ["Hello"]})[1]["t"], ["[ja] Hello"])
+        self.assertEqual(len(self.asked), 2)
+
+    def test_no_answer_is_asked_again_later(self):
+        self.assertEqual(ts.titles_tr({"tl": "ko", "q": ["no answer"]})[1]["t"], ["no answer"])
+        ts.titles_tr({"tl": "ko", "q": ["no answer"]})
+        self.assertEqual(len(self.asked), 2)
+
+    def test_bad_requests_and_limits(self):
+        self.assertEqual(ts.titles_tr({"tl": "../x", "q": ["a"]})[0], 400)
+        self.assertEqual(ts.titles_tr({"tl": "ko", "q": "a"})[0], 400)
+        code, d = ts.titles_tr({"tl": "ko", "q": ["t%d" % i for i in range(200)] + ["x" * 5000]})
+        self.assertEqual(len(d["t"]), 60)                                                      # 60 titles a request
+        self.assertTrue(all(len(x) <= 300 for q in self.asked for x in q))
+
+    def test_only_so_many_are_kept(self):
+        keep, ts.TR_KEEP = ts.TR_KEEP, 5
+        try:
+            ts.titles_tr({"tl": "ko", "q": ["a%d" % i for i in range(9)]})
+            self.assertEqual(list(ts.tr_mem["ko"]), ["a4", "a5", "a6", "a7", "a8"])
+        finally:
+            ts.TR_KEEP = keep
+
+    def test_not_on_public_instances(self):
+        ts.PUBLIC_MODE = True
+        try:
+            self.assertTrue(ts.public_blocked("POST", "/api/p/yt/tr"))
+        finally:
+            ts.PUBLIC_MODE = False
+        self.assertTrue(ts.personal("/api/p/yt/tr"))            # other web sites can't use it as a translator
+
+
 if __name__ == "__main__":
     unittest.main()

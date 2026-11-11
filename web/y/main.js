@@ -213,6 +213,16 @@ $("#voice").onclick = () => {
 $("#msearch").onclick = () => { document.body.classList.add("msearch"); q.focus(); };
 $("#mback").onclick = () => { document.body.classList.remove("msearch"); q.blur(); };
 
+// ---------------------------------------------------------------- things switched off in Settings, titles in your language
+const applyHidden = () => {
+  document.documentElement.classList.toggle("no-music", !!settings.hideMusic);
+  document.documentElement.classList.toggle("no-logo", !!settings.hideLogo);
+};
+applyHidden();
+addEventListener("settings", (e) => { if (e.detail === "hideMusic" || e.detail === "hideLogo") applyHidden(); });
+// its own file: it needs regular expressions older TV browsers don't have, and those just go without it
+modeReady.then((pub) => { if (!pub) import("./titletr.js").then((m) => m.startTitleTr()).catch(() => { }); });
+
 // ---------------------------------------------------------------- side menu
 // installed as an app there is no browser bar: back and forward sit at the top of the side menu
 if (navigator.standalone || ["standalone", "minimal-ui", "window-controls-overlay"].some((m) => matchMedia(`(display-mode: ${m})`).matches)) document.documentElement.classList.add("installed");

@@ -82,6 +82,9 @@ img { display: block; }
 body.guide-open #guide { transform: none; }
 #scrim { position: fixed; inset: 0; z-index: 390; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .2s; }
 body.guide-open #scrim { opacity: 1; pointer-events: auto; }
+/* Settings: no Music tab, no logo */
+html.no-music .gi[data-r="music"], html.no-music #mguide a[data-r="music"], html.no-music #bnav a[data-r="music"] { display: none !important; }
+html.no-logo .logo { display: none !important; }
 /* back and forward: only where the browser's own aren't there (installed as an app) */
 .g-nav { display: none; padding: 0 12px 4px; gap: 4px; }
 .installed .g-nav { display: flex; }
