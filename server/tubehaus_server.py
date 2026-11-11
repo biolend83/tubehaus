@@ -40,6 +40,9 @@ SUB_LANG = env("HT_SUB_LANG", "en")                      # default target of tra
 WHISPER_BIN = env("HT_WHISPER_BIN", "")                  # whisper.cpp "whisper-cli"; empty = no live captions
 WHISPER_MODEL = env("HT_WHISPER_MODEL", "")              # e.g. ggml-base-q5_1.bin
 WHISPER_LANG = env("HT_WHISPER_LANG", "auto")
+# more live-caption engines to choose from in the player, as "name=/path/to/cli,...": each takes whisper-cli's
+# arguments (-m -f -l ...) and prints its "[00:00:01.000 --> 00:00:03.000]  text" lines
+LIVECC_ALT = env("HT_LIVECC_ALT", "")
 YTDL_DIR = env("HT_DOWNLOAD_DIR", "/var/tmp/tubehaus-dl")
 # Public instance: every visitor keeps their own library in their browser, and the server
 # keeps none. Anything that would be shared between strangers (library, send to TV,
@@ -3131,6 +3134,20 @@ def cast_wait(qs):
 # which sq it is playing and asks /api/p/live/<id>/cc.json for that range.
 # A captioner stops 2 minutes after nobody asks for it.
 LIVE_CC, LIVE_CC_LOCK = {}, threading.Lock()
+
+
+def _livecc_engines():
+    out = {}
+    if WHISPER_BIN and WHISPER_MODEL:
+        out["whisper"] = WHISPER_BIN
+    for item in LIVECC_ALT.split(","):
+        name, _, path = item.strip().partition("=")
+        if re.fullmatch(r"[a-z0-9_-]{1,20}", name.strip()) and path.strip():
+            out[name.strip()] = path.strip()
+    return out
+
+
+LIVECC_ENGINES = _livecc_engines()     # name -> program; the first is the default
 CC_TAG = re.compile(r"[\[(（【♪*].*[\])）】♪*]")   # sound tags like [Music] (applause)
 # phrases whisper invents over music or silence (mostly Korean broadcast sign-offs)
 CC_JUNK = re.compile(r"^(감사합니다|시청해 ?주셔서 감사합니다|구독과 좋아요|자막 제공|"
@@ -3143,8 +3160,10 @@ def _cc_time(t):
 
 
 class LiveCaptioner:
-    def __init__(self, vid):
+    def __init__(self, vid, engine="whisper"):
         self.vid = vid
+        self.engine = engine
+        self.bin = LIVECC_ENGINES.get(engine) or WHISPER_BIN
         self.cues = {}          # sq -> [[start, end, text]] (seconds from the segment start)
         self.used = time.time()
         self.status = "starting"
@@ -3211,13 +3230,13 @@ class LiveCaptioner:
                 log("livecc", f"{self.vid} FAIL {repr(ex)[:160]}", every=30)
                 time.sleep(3)
         with LIVE_CC_LOCK:
-            if LIVE_CC.get(self.vid) is self:
-                del LIVE_CC[self.vid]
-        log("livecc", f"{self.vid} stopped", every=0)
+            if LIVE_CC.get((self.vid, self.engine)) is self:
+                del LIVE_CC[(self.vid, self.engine)]
+        log("livecc", f"{self.vid} {self.engine} stopped", every=0)
 
     def transcribe(self, sqs, blobs, durs):
         t0 = time.time()
-        d = f"/var/tmp/tubehaus-cc-{self.vid}"
+        d = f"/var/tmp/tubehaus-cc-{self.vid}-{self.engine}"
         os.makedirs(d, exist_ok=True)
         wav = f"{d}/chunk.wav"
         r = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-f", "mpegts", "-i", "pipe:0", "-vn",
@@ -3226,10 +3245,10 @@ class LiveCaptioner:
             raise RuntimeError("ffmpeg " + r.stderr.decode()[-120:])
         # one thread and a 768-frame audio window (~15 s instead of 30 s): same speed
         # on a 10 s chunk, never more than one core, and no 100 % CPU bursts
-        r = subprocess.run(["nice", "-n", "10", WHISPER_BIN, "-m", WHISPER_MODEL, "-f", wav, "-l", WHISPER_LANG,
+        r = subprocess.run(["nice", "-n", "10", self.bin, "-m", WHISPER_MODEL, "-f", wav, "-l", WHISPER_LANG,
                             "-t", "1", "-ac", "768", "-np", "-sns"], capture_output=True, timeout=60)
         if r.returncode != 0:     # e.g. a bad model path or a crash: no text is not "silence"
-            raise RuntimeError("whisper exit %d: %s" % (r.returncode, r.stderr.decode("utf-8", "replace").strip()[-160:]))
+            raise RuntimeError("%s exit %d: %s" % (self.engine, r.returncode, r.stderr.decode("utf-8", "replace").strip()[-160:]))
         starts, acc = [], 0.0
         for dd in durs:
             starts.append(acc)
@@ -3246,7 +3265,7 @@ class LiveCaptioner:
             i = max(i for i, st in enumerate(starts) if st <= a + 0.01)   # the segment the line starts in
             self.cues.setdefault(sqs[i], []).append([round(a - starts[i], 2), round(b - starts[i], 2), text[:200]])
             n += 1
-        log("livecc", f"{self.vid} sq {sqs[0]}-{sqs[-1]} {n} cues", t0, every=60)
+        log("livecc", f"{self.vid} {self.engine} sq {sqs[0]}-{sqs[-1]} {n} cues", t0, every=60)
 
     def get(self, lo, hi):
         self.used = time.time()
@@ -3254,11 +3273,12 @@ class LiveCaptioner:
         return {str(k): v for k, v in self.cues.items() if lo <= k <= hi}
 
 
-def live_cc(vid):
+def live_cc(vid, engine=None):
+    engine = engine if engine in LIVECC_ENGINES else next(iter(LIVECC_ENGINES), "whisper")
     with LIVE_CC_LOCK:
-        c = LIVE_CC.get(vid)
+        c = LIVE_CC.get((vid, engine))
         if c is None:
-            c = LIVE_CC[vid] = LiveCaptioner(vid)
+            c = LIVE_CC[(vid, engine)] = LiveCaptioner(vid, engine)
         return c
 
 
@@ -3573,7 +3593,7 @@ def health():
     now = time.time()
     return {"ok": True, "warp_proxy": bool(YT_PROXY), "warp_rotate": WARP_ROTATE,
             "warp_rotations_30min": len([t for t in rot_hist if now - t < 1800]),
-            "live_captions": bool(WHISPER_BIN and WHISPER_MODEL), "public": PUBLIC_MODE,
+            "live_captions": bool(LIVECC_ENGINES), "live_caption_engines": list(LIVECC_ENGINES), "public": PUBLIC_MODE,
             "max_height": MAX_HEIGHT or None, "viewers": len([1 for t in list(viewers.values()) if now - t < 180]),
             "max_viewers": MAX_VIEWERS or None, "accounts": ACCOUNTS, "name": NAME or None, "links": LINKS}
 
@@ -3912,7 +3932,7 @@ class H(BaseHTTPRequestHandler):
         if "/dash/" in p:
             return self.dash(p)
         if "/live/" in p:
-            if p.endswith("/cc.json") and not (WHISPER_BIN and WHISPER_MODEL):
+            if p.endswith("/cc.json") and not LIVECC_ENGINES:
                 return self.send(200, {"status": "off", "lag": None, "cues": {}})
             return self.live(p)
         if "/sub/" in p:
@@ -4382,7 +4402,7 @@ class H(BaseHTTPRequestHandler):
                     lo, hi = int(q.get("from", "0")), int(q.get("to", "0"))
                 except ValueError:
                     return self.send(400, {"error": "bad range"})
-                c = live_cc(mc.group(1))
+                c = live_cc(mc.group(1), q.get("engine"))
                 return self.send(200, {"status": c.status, "lag": c.lag, "cues": c.get(lo, min(hi, lo + 40))})
             m = re.search(r"/live/([\w-]{11})(?:\.m3u8)?(?:/(\d+)(?:\.m3u8)?)?$", p)
             if not m:

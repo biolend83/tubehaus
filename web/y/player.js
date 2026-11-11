@@ -1,6 +1,6 @@
 // YouTube-style player: controls, captions, storyboards, chapters and SponsorBlock drawn on top of Shaka (DASH/HLS).
 // Built once and reused (moving between pages continues seamlessly in the mini player).
-import { $, $$, el, esc, icon, fmtTime, settings, toast, copy, localUrl, parseT, toGate, SERVER_MAX_H, PUBLIC, IPHONE, IPAD, siteName } from "./util.js";
+import { $, $$, el, esc, icon, fmtTime, settings, toast, copy, localUrl, parseT, toGate, SERVER_MAX_H, PUBLIC, IPHONE, IPAD, siteName, LIVE_CC_ENGINES } from "./util.js";
 import { $t, LANG, LANGS, LOCALE } from "./i18n.js";
 
 const isTouch = matchMedia("(pointer: coarse)").matches;
@@ -524,7 +524,16 @@ export class Player {
   // ------------------------------------------------------------ captions
   captionList() {
     // YouTube gives no captions for live streams -> our server transcribes the audio (whisper)
-    if (this.live && this.info) return this.native ? [] : [{ label: $t("자동 받아쓰기 (실시간)"), lang: "auto", url: `live:${this.info.videoId}`, liveCc: true }];
+    if (this.live && this.info) {
+      if (this.native) return [];
+      // one track per engine the server has; with several, the engine's name tells them apart
+      const names = { whisper: "Whisper", sensevoice: "SenseVoice" };
+      const engines = LIVE_CC_ENGINES.length ? LIVE_CC_ENGINES : ["whisper"];
+      return engines.map((e) => ({
+        label: $t("자동 받아쓰기 (실시간)") + (engines.length > 1 ? " · " + (names[e] || e) : ""),
+        lang: "auto", url: `live:${this.info.videoId}:${e}`, liveCc: true, engine: e,
+      }));
+    }
     const list = (this.info?.captions || []).map((c) => ({ label: c.label, lang: c.language_code, url: c.url.replace(/^https?:\/\/[^/]+/, "") }));
     if (this.info && !this.live && !list.some((c) => c.lang.startsWith(LANG) && !/auto/i.test(c.label)) && list.length) {
       const name = (LANGS.find(([c]) => c === LANG) || [, LANG])[1];
@@ -615,7 +624,7 @@ export class Player {
     if (!cur) return;
     this.liveCcBusy = true;
     try {
-      const r = await fetch(`/api/p/live/${this.info.videoId}/cc.json?from=${cur.sq}&to=${cur.sq + 12}`, { credentials: "same-origin" });
+      const r = await fetch(`/api/p/live/${this.info.videoId}/cc.json?from=${cur.sq}&to=${cur.sq + 12}&engine=${c.engine || ""}`, { credentials: "same-origin" });
       const j = await r.json();
       if (this.capTrack !== c) return;
       const bySq = new Map(refs.map((x) => [x.sq, x]));

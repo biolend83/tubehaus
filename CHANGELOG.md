@@ -5,6 +5,7 @@
 ### Added
 - **Titles in your language** (Settings → Look → Translate titles, off by default): video titles written in another script are shown in the interface language, on cards, the watch page and the mini player; the original stays in the tooltip. The titles go from your server to the translator the captions already use (Google) and the answers are kept on the server, so each title is asked once. Not on public instances. For a language in Latin letters, titles in other scripts (Korean, Japanese, Russian, ...) are translated; a title in another Latin-script language can't be told apart and stays as it is
 - **Hide the Music tab** and **Hide the logo** in Settings → Look, for people who want less on the screen
+- Live captions from more than one engine: `HT_LIVECC_ALT="name=/path/to/cli"` adds engines that take whisper-cli's arguments and print its lines, and the player lists one live-caption track per engine (`live_caption_engines` in `/api/p/health`, `?engine=` on `cc.json`)
 - A server's own web add-on: if `web/y/local.js` exists, the web app loads it (it is in .gitignore, so updates leave it alone). It can add caption tracks to the player (`window.tubehaus.captionSources`), for example captions the server makes itself for videos without any
 
 ## v1.0.5 — 2026-11-11
