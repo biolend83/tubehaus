@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TubeHaus</title>
+<title>TubeHaus: YouTube without the Google account</title>
 <meta name="description" content="A private YouTube client with no Google account and no tracking. Apps for Android, Android TV, Windows, macOS, Linux and iPad, or self-host it with Docker. Free and open source.">
 <meta property="og:title" content="TubeHaus">
 <meta property="og:description" content="A private YouTube client with no Google account and no tracking. Free and open source.">
@@ -11,37 +11,55 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <style>
-  :root { --bg: #f6f8fb; --fg: #14283f; --muted: #52637a; --card: #fff; --line: #dfe5ee; --teal: #14a394; --teal-bg: #2dd4bf; }
+  :root { --bg: #f6f8fb; --fg: #14283f; --muted: #52637a; --card: #fff; --line: #dfe5ee; --teal: #0e8f82; --teal-bg: #2dd4bf; --soft: #e6f8f5; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #0f1c2d; --fg: #eaf0f7; --muted: #9fb0c5; --card: #16263b; --line: #24364e; --teal: #2dd4bf; }
+    :root { --bg: #0f1c2d; --fg: #eaf0f7; --muted: #9fb0c5; --card: #16263b; --line: #24364e; --teal: #2dd4bf; --soft: #153a41; }
   }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   a { color: var(--teal); }
+  code { background: var(--soft); padding: 1px 6px; border-radius: 6px; font-size: 0.92em; }
   .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
   header { display: flex; align-items: center; gap: 12px; padding: 20px 0; }
   header img { width: 40px; height: 40px; }
   header b { font-size: 20px; }
-  header nav { margin-left: auto; display: flex; gap: 18px; font-size: 15px; }
+  header nav { margin-left: auto; display: flex; gap: 18px; font-size: 15px; align-items: center; }
   header nav a { color: var(--muted); text-decoration: none; }
+  header nav a:hover { color: var(--fg); }
   .hero { text-align: center; padding: 40px 0 24px; }
   .hero h1 { font-size: clamp(30px, 6vw, 48px); line-height: 1.15; margin: 0 0 14px; letter-spacing: -0.02em; }
-  .hero p { color: var(--muted); font-size: 19px; max-width: 640px; margin: 0 auto 26px; }
+  .hero p { color: var(--muted); font-size: 19px; max-width: 660px; margin: 0 auto 26px; }
   .btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
   .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1px solid var(--line); color: var(--fg); background: var(--card); }
+  .btn:hover { border-color: var(--teal); }
   .btn.primary { background: var(--teal-bg); border-color: var(--teal-bg); color: #0b2230; }
+  .btn small { display: block; font-weight: 400; font-size: 13px; opacity: 0.8; }
+  .ver { color: var(--muted); font-size: 14px; margin-top: 14px; min-height: 22px; }
   .shot { display: block; width: 100%; height: auto; border-radius: 14px; margin: 34px 0 10px; border: 1px solid var(--line); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 40px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 28px 0 40px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; }
   .card h3 { margin: 0 0 6px; font-size: 18px; }
   .card p { margin: 0; color: var(--muted); font-size: 16px; }
-  h2 { font-size: 26px; margin: 50px 0 14px; }
-  ul.dl { padding-left: 20px; }
-  ul.dl li { margin: 4px 0; }
+  .card .files { margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .card .files a { font-size: 14.5px; font-weight: 600; text-decoration: none; padding: 6px 12px; border-radius: 8px; background: var(--soft); color: var(--fg); border: 1px solid transparent; }
+  .card .files a:hover { border-color: var(--teal); }
+  .card .how { margin-top: 10px; font-size: 14.5px; }
+  .card.you { border-color: var(--teal-bg); box-shadow: 0 0 0 3px var(--soft); }
+  h2 { font-size: 26px; margin: 56px 0 6px; letter-spacing: -0.01em; }
+  h2 + p { margin-top: 0; color: var(--muted); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 720px) { .two { grid-template-columns: 1fr; } }
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin: 10px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  details p { margin: 10px 0 2px; color: var(--muted); font-size: 16px; }
+  .star { text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 30px 20px; margin: 56px 0 0; }
+  .star h2 { margin: 0 0 6px; }
+  .star p { color: var(--muted); margin: 0 auto 18px; max-width: 560px; }
   .note { color: var(--muted); font-size: 15px; }
   footer { border-top: 1px solid var(--line); margin-top: 56px; padding: 26px 0 40px; color: var(--muted); font-size: 14px; }
   footer .badges { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
-  @media (max-width: 560px) { header nav { display: none; } }
+  @media (max-width: 560px) { header nav a.wide { display: none; } }
 </style>
 </head>
 <body>
@@ -50,55 +68,160 @@
     <img src="icon.svg" alt="">
     <b>TubeHaus</b>
     <nav>
-      <a href="#apps">Apps</a>
-      <a href="#server">Server</a>
+      <a class="wide" href="#download">Download</a>
+      <a class="wide" href="#features">Features</a>
+      <a class="wide" href="#server">Server</a>
+      <a class="wide" href="#faq">Questions</a>
       <a href="https://github.com/biolend83/tubehaus">GitHub</a>
     </nav>
   </header>
 
   <section class="hero">
     <h1>YouTube, without the Google account.</h1>
-    <p>TubeHaus is a free, open-source YouTube client with no tracking and no ads. Install the app on your TV, phone, computer or iPad, or run it on your own server for the whole household.</p>
+    <p>TubeHaus is a free, open-source YouTube client with no ads, no account and no tracking. Install the app on your TV, phone, computer or iPad, or run it on your own server for the whole household.</p>
     <div class="btns">
-      <a class="btn primary" href="https://github.com/biolend83/tubehaus/releases/latest">Get the app</a>
-      <a class="btn" href="https://github.com/biolend83/tubehaus#quick-start-docker">Run the server</a>
+      <a class="btn primary" id="main-dl" href="https://github.com/biolend83/tubehaus/releases/latest">Get the app</a>
+      <a class="btn" href="#download">All downloads</a>
+      <a class="btn" href="https://github.com/biolend83/tubehaus">★ Star on GitHub<span id="stars"></span></a>
     </div>
+    <div class="ver" id="ver"></div>
     <img class="shot" src="devices.jpg" alt="TubeHaus on Android TV, iPad and an Android phone" width="2400" height="666">
   </section>
 
+  <h2 id="features">What you get</h2>
+  <p>The same app on every screen you own, and nothing about you leaves it.</p>
   <div class="grid">
-    <div class="card"><h3>No account, no tracking</h3><p>Subscriptions, history and playlists stay on your device or your own server, not in a Google account.</p></div>
-    <div class="card"><h3>Looks like YouTube</h3><p>Same layout and keyboard shortcuts, so there is nothing new to learn.</p></div>
-    <div class="card"><h3>Made for the TV too</h3><p>A TV mode that works with a remote, on Android TV and Google TV.</p></div>
-    <div class="card"><h3>SponsorBlock built in</h3><p>Skip sponsor segments and intros automatically.</p></div>
-    <div class="card"><h3>Downloads and background play</h3><p>Save videos for offline, keep audio playing with the screen off, picture-in-picture.</p></div>
-    <div class="card"><h3>Free and open source</h3><p>AGPL-3.0. Read the code, build it yourself, or send a fix.</p></div>
+    <div class="card"><h3>No ads, no account, no tracking</h3><p>Subscriptions, history and playlists stay on your device or your own server, not in a Google account. Bring them over from YouTube (Takeout), NewPipe, FreeTube or Invidious.</p></div>
+    <div class="card"><h3>A home feed that's yours</h3><p>Recommendations are worked out on your device. One page shows everything it learned about you, and you can change or wipe it.</p></div>
+    <div class="card"><h3>A real player</h3><p>Up to 4K, captions with auto-translate in the size and place you like, speed per channel, resume where you stopped, a queue with Play next.</p></div>
+    <div class="card"><h3>Downloads and background play</h3><p>Save videos for offline in the quality you pick, keep the sound playing with the screen off, picture-in-picture.</p></div>
+    <div class="card"><h3>Made for the TV too</h3><p>The same app on Android TV and Google TV, driven with the remote. Cast from your phone to a TV on the same Wi-Fi.</p></div>
+    <div class="card"><h3>Your time back</h3><p>Switches to hide Shorts, comments, thumbnails or the home feed. Calm mode: no view counts, nothing starts by itself. SponsorBlock built in.</p></div>
   </div>
 
-  <h2 id="apps">The app</h2>
-  <p>Each app has its own YouTube engine and talks to YouTube directly. Nothing else to set up.</p>
-  <ul class="dl">
-    <li><b>Android</b> phones, tablets and Android TV / Google TV (on TV: Downloader code <b>3155410</b>)</li>
-    <li><b>Windows</b>, <b>macOS</b> (Apple Silicon and Intel) and <b>Linux</b> (.deb, .rpm)</li>
-    <li><b>iPad / iPhone</b> (beta, installed with <a href="https://sideloadly.io/">Sideloadly</a>)</li>
-  </ul>
-  <p><a class="btn primary" href="https://github.com/biolend83/tubehaus/releases/latest">Download from GitHub Releases</a></p>
+  <h2 id="download">Download</h2>
+  <p>Each app has its own YouTube engine and talks to YouTube directly. No server, nothing else to set up. All free.</p>
+  <div class="grid" id="dl">
+    <div class="card" data-os="android">
+      <h3>Android · Android TV</h3>
+      <p>Phones, tablets and TVs, Android 8.0 or newer.</p>
+      <div class="files"><a data-dl="apk" href="https://github.com/biolend83/tubehaus/releases/latest/download/TubeHaus.apk">APK</a></div>
+      <p class="how">On a TV: open the <i>Downloader</i> app and enter the code <b>3155410</b>. Updates come through the app itself or <a href="https://github.com/biolend83/tubehaus/tree/android-app#install">Obtainium</a>.</p>
+    </div>
+    <div class="card" data-os="windows">
+      <h3>Windows</h3>
+      <p>Windows 10 and 11.</p>
+      <div class="files"><a data-dl="msi" href="https://github.com/biolend83/tubehaus/releases/latest">Installer (.msi)</a><a data-dl="exe" href="https://github.com/biolend83/tubehaus/releases/latest">Setup (.exe)</a><a data-dl="winzip" href="https://github.com/biolend83/tubehaus/releases/latest">Portable (.zip)</a><a data-dl="winarm" href="https://github.com/biolend83/tubehaus/releases/latest">ARM (.zip)</a></div>
+      <p class="how">The installer isn't code-signed yet, so Windows warns the first time: <i>More info → Run anyway</i>.</p>
+    </div>
+    <div class="card" data-os="mac">
+      <h3>macOS</h3>
+      <p>Apple Silicon and Intel.</p>
+      <div class="files"><a data-dl="macarm" href="https://github.com/biolend83/tubehaus/releases/latest">Apple Silicon (.dmg)</a><a data-dl="macx64" href="https://github.com/biolend83/tubehaus/releases/latest">Intel (.dmg)</a></div>
+      <p class="how">First install mpv: <code>brew install mpv</code>. The app isn't signed by Apple yet: right-click it → <i>Open</i> → <i>Open</i>.</p>
+    </div>
+    <div class="card" data-os="linux">
+      <h3>Linux</h3>
+      <p>x86-64 and ARM64 (Raspberry Pi 4 and 5 too).</p>
+      <div class="files"><a data-dl="deb" href="https://github.com/biolend83/tubehaus/releases/latest">.deb</a><a data-dl="rpm" href="https://github.com/biolend83/tubehaus/releases/latest">.rpm</a><a data-dl="tgz" href="https://github.com/biolend83/tubehaus/releases/latest">.tar.gz</a><a data-dl="debarm" href="https://github.com/biolend83/tubehaus/releases/latest">ARM .deb</a><a data-dl="rpmarm" href="https://github.com/biolend83/tubehaus/releases/latest">ARM .rpm</a><a data-dl="tgzarm" href="https://github.com/biolend83/tubehaus/releases/latest">ARM .tar.gz</a></div>
+      <p class="how">It uses your system's mpv: <code>sudo apt install libmpv2</code> (Fedora: <code>mpv-libs</code>, Arch: <code>mpv</code>).</p>
+    </div>
+    <div class="card" data-os="ios">
+      <h3>iPad · iPhone</h3>
+      <p>iOS 16 or newer (beta).</p>
+      <div class="files"><a data-dl="ipa" href="https://github.com/biolend83/tubehaus/releases/latest">.ipa</a></div>
+      <p class="how">Apple only installs apps it signed, so you sign it yourself with <a href="https://sideloadly.io/">Sideloadly</a>, or add the <a href="https://github.com/biolend83/tubehaus/tree/ios-app#install">AltStore / SideStore source</a>. With a free Apple ID it is signed again every 7 days.</p>
+    </div>
+    <div class="card" data-os="tvos">
+      <h3>Apple TV</h3>
+      <p>An early beta with fewer features.</p>
+      <div class="files"><a data-dl="tvos" href="https://github.com/biolend83/tubehaus/releases/latest">.ipa (beta)</a></div>
+      <p class="how">Installed with Sideloadly, like the iPad app.</p>
+    </div>
+  </div>
+  <p class="note">Every file, checksums and older versions are on the <a href="https://github.com/biolend83/tubehaus/releases">releases page</a>. What changed in each version is there too.</p>
 
-  <h2 id="server">The server</h2>
-  <p>One <code>docker compose</code> on a home PC, a Raspberry Pi or a cheap cloud VM. Every device in the house watches in the browser and shares one library, and YouTube never sees your home address. Extras only on the server: live captions for live streams, send to TV, calm mode.</p>
-  <img class="shot" src="screenshot-home.jpg" alt="TubeHaus home screen in the browser" loading="lazy">
-  <p><a class="btn" href="https://github.com/biolend83/tubehaus#quick-start-docker">Quick start</a></p>
+  <h2 id="server">The server (optional)</h2>
+  <p>For a household: one place for everyone's library, and YouTube never sees your home address.</p>
+  <div class="two">
+    <div>
+      <p>One <code>docker compose up -d</code> on a home PC, a Raspberry Pi or a cheap cloud VM. Every device in the house watches in the browser, on a web app that looks and works like YouTube, and the apps can sync their library with it.</p>
+      <ul>
+        <li>Videos are fetched through Cloudflare WARP, so YouTube sees neither your home address nor your server's</li>
+        <li>Live captions for live streams, written on the server</li>
+        <li>A library for each person in the house, with a sign-in</li>
+        <li>Send a video from your phone to the TV</li>
+      </ul>
+      <p><a class="btn" href="https://github.com/biolend83/tubehaus#quick-start-docker">Quick start</a> &nbsp; <a href="https://github.com/biolend83/tubehaus/blob/main/docs/SELF-HOSTING.md">Self-hosting guide</a></p>
+    </div>
+    <img class="shot" style="margin:0" src="screenshot-home.jpg" alt="TubeHaus home screen in the browser" loading="lazy">
+  </div>
+
+  <h2 id="faq">Questions people ask</h2>
+  <details><summary>Do I need a server or an account?</summary><p>No. The apps work by themselves: install, open, watch. The server is an extra for households that want one shared setup.</p></details>
+  <details><summary>Does YouTube still see me?</summary><p>There is no account, no ads and none of Google's tracking scripts. With the app, the video itself still comes from YouTube, so YouTube sees your IP address like any site you visit. With the self-hosted server, videos are fetched through Cloudflare WARP and YouTube doesn't see your address at all.</p></details>
+  <details><summary>It says "Sign in to confirm you're not a bot"</summary><p>YouTube asks that of VPNs and data-center addresses. Turn the VPN off for the app, or try another network. On a normal home or mobile connection it plays without signing in.</p></details>
+  <details><summary>What happens when YouTube changes something?</summary><p>It happens, to every YouTube client. A check runs against YouTube every day, and the part that breaks most often (which of YouTube's own clients the player asks for streams) is a small list the app downloads once a day, so most fixes reach you without installing anything. For bigger fixes the app tells you when an update is out.</p></details>
+  <details><summary>How is it different from NewPipe or FreeTube?</summary><p>Those are good, and each lives on one kind of device. TubeHaus is the same app on your phone, TV, computer and iPad, with the same library on all of them if you connect your own server.</p></details>
+  <details><summary>Why do Windows and macOS warn me when I install it?</summary><p>The apps aren't code-signed yet (the certificates cost money every year). The code is open and every release is built in public by GitHub Actions. On Windows choose <i>More info → Run anyway</i>; on macOS right-click the app → <i>Open</i>.</p></details>
+  <details><summary>Is it free? Who is behind it?</summary><p>Free, with no paid tier, under the AGPL-3.0 license. It's independent software, not affiliated with YouTube or Google. See below.</p></details>
 
   <h2>Who made this</h2>
-  <p>I'm not a programmer. I wanted YouTube on my TV and phone without a Google account, so I built TubeHaus. Most of the code is written with Claude Code, and I test every release on my own devices. Bug reports and ideas are welcome on <a href="https://github.com/biolend83/tubehaus/issues">GitHub</a>.</p>
+  <p style="color:inherit">I'm not a programmer. I wanted YouTube on my TV and phone without a Google account, so I built TubeHaus. Most of the code is written with Claude Code, and I test every release on my own devices. Bug reports and ideas are welcome on <a href="https://github.com/biolend83/tubehaus/issues">GitHub</a>. The server version stands on <a href="https://invidious.io">Invidious</a> and its companion.</p>
+
+  <div class="star">
+    <h2>Like it?</h2>
+    <p>A star on GitHub is how other people find it. It takes one click and it means a lot.</p>
+    <a class="btn primary" href="https://github.com/biolend83/tubehaus">★ Star TubeHaus on GitHub</a>
+  </div>
 
   <footer>
     <div class="badges">
       <a href="https://fazier.com" target="_blank"><img src="https://fazier.com/api/v1//public/badges/launch_badges.svg?badge_type=launched&theme=light" width=120 alt="Fazier badge" /></a>
       <a href="https://www.producthunt.com/products/tubehaus?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-tubehaus" target="_blank" rel="noopener noreferrer"><img alt="TubeHaus - Open-source YouTube client for TV, phone, desktop and iPad | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1300085&amp;theme=light&amp;t=1793523425652"></a>
     </div>
-    Independent open-source software, not affiliated with YouTube or Google. · <a href="https://github.com/biolend83/tubehaus">Source on GitHub</a>
+    Independent open-source software, not affiliated with YouTube or Google. · <a href="https://github.com/biolend83/tubehaus">Source on GitHub</a> · <a href="https://github.com/biolend83/tubehaus/blob/main/README.ko.md">한국어</a>
   </footer>
 </div>
+<script>
+// The buttons point at the newest release's files (asked from GitHub once per visit); without an
+// answer they stay on the releases page. Nothing about the visitor is sent anywhere else.
+(function () {
+  var PICK = {
+    apk: /^TubeHaus-\d[\d.]*\.apk$/, msi: /\.msi$/, exe: /-win-x64-setup\.exe$/, winzip: /-win-x64-portable\.zip$/, winarm: /-win-arm64-portable\.zip$/,
+    macarm: /-mac-arm64\.dmg$/, macx64: /-mac-x64\.dmg$/, deb: /-linux-amd64\.deb$/, rpm: /-linux-x86_64\.rpm$/, tgz: /-linux-x64\.tar\.gz$/,
+    debarm: /-linux-arm64\.deb$/, rpmarm: /-linux-aarch64\.rpm$/, tgzarm: /-linux-arm64\.tar\.gz$/, ipa: /-ipad\.ipa$/, tvos: /AppleTV.*\.ipa$/
+  };
+  var ua = navigator.userAgent, os =
+    /Android/.test(ua) ? "android" : /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "ios" :
+    /Windows/.test(ua) ? "windows" : /Macintosh|Mac OS X/.test(ua) ? "mac" : /Linux|X11/.test(ua) ? "linux" : "";
+  var MAIN = { android: ["apk", "Download for Android"], ios: ["ipa", "Download for iPad / iPhone"], windows: ["msi", "Download for Windows"], mac: ["macarm", "Download for macOS"], linux: ["deb", "Download for Linux"] };
+  var card = os && document.querySelector('[data-os="' + os + '"]');
+  if (card) { card.classList.add("you"); card.parentNode.insertBefore(card, card.parentNode.firstChild); }
+  var main = document.getElementById("main-dl");
+  if (MAIN[os]) { main.textContent = MAIN[os][1]; main.href = "#download"; }
+  function mb(n) { return n > 1048576 ? Math.round(n / 1048576) + " MB" : ""; }
+  fetch("https://api.github.com/repos/biolend83/tubehaus/releases/latest").then(function (r) { return r.ok ? r.json() : null; }).then(function (rel) {
+    if (!rel || !rel.assets) return;
+    var url = {};
+    Object.keys(PICK).forEach(function (k) {
+      var a = rel.assets.filter(function (x) { return PICK[k].test(x.name); })[0];
+      if (!a) return;
+      url[k] = a;
+      [].forEach.call(document.querySelectorAll('[data-dl="' + k + '"]'), function (e) { e.href = a.browser_download_url; e.title = a.name + " · " + mb(a.size); });
+    });
+    var v = (rel.tag_name || "").replace(/^app-v/, "");
+    var when = rel.published_at ? new Date(rel.published_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
+    document.getElementById("ver").innerHTML = "Version " + v + (when ? " · " + when : "") + ' · <a href="' + rel.html_url + '">what\'s new</a>';
+    if (MAIN[os] && url[MAIN[os][0]]) {
+      main.href = url[MAIN[os][0]].browser_download_url;
+      main.innerHTML = MAIN[os][1] + "<small>" + v + " · " + mb(url[MAIN[os][0]].size) + (os === "mac" ? " · Apple Silicon" : "") + "</small>";
+    }
+  }).catch(function () { });
+  fetch("https://api.github.com/repos/biolend83/tubehaus").then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+    if (d && d.stargazers_count) document.getElementById("stars").textContent = " · " + d.stargazers_count;
+  }).catch(function () { });
+})();
+</script>
 </body>
 </html>
