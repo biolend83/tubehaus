@@ -108,8 +108,7 @@ class AppState(val platform: Platform, val store: Store) {
     /** each time the app opens (at most every 10 minutes) unless [now]; [quiet]: say nothing when there is nothing new */
     fun checkForUpdates(now: Boolean = false, quiet: Boolean = true) {
         val set = store.settings.value
-        // iOS: installed by hand (SideStore), there is no file to offer
-        if (platform.name == "ios") return
+        // iOS: installed by hand (Sideloadly, AltStore), so a newer version opens its release page; the engine's fixes come here too
         if (!now && (!set.checkUpdates || Sys.nowMs() - set.checkedAt < 10 * 60_000L)) return
         scope.launch {
             store.settings.update { it.copy(checkedAt = Sys.nowMs()) }

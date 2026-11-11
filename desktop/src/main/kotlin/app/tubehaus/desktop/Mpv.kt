@@ -95,6 +95,9 @@ interface LibMpv : Library {
                 os.startsWith("Windows") && dllPresent ->
                     "mpv couldn't start (" + (firstError ?: "unknown error") + "). Updating your graphics driver usually fixes this."
                 os.startsWith("Windows") -> "mpv is missing: put libmpv-2.dll next to TubeHaus"
+                // Homebrew stopped making ready-made packages for Intel Macs (it then builds llvm and rust from source); MacPorts still has them
+                os.startsWith("Mac") && System.getProperty("os.arch") != "aarch64" ->
+                    "mpv is missing: install it with MacPorts (sudo port install mpv) or Homebrew (brew install mpv), then open TubeHaus again"
                 os.startsWith("Mac") -> "mpv is missing: install it with Homebrew (brew install mpv), then open TubeHaus again"
                 else -> "mpv is missing: install libmpv (Debian/Ubuntu: sudo apt install libmpv2, Fedora: sudo dnf install mpv-libs, Arch: mpv)"
             }

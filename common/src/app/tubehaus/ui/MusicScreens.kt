@@ -139,7 +139,7 @@ private fun CardShelf(app: AppState, title: String, cards: List<MusicCard>) {
     Column {
         ShelfTitle(title)
         LazyRow(contentPadding = PaddingValues(horizontal = 10.dp)) {
-            items(cards, key = { it.id }) { c -> CardTile(c) { openCard(app, c) } }
+            items(cards.distinctBy { it.id }, key = { it.id }) { c -> CardTile(c) { openCard(app, c) } }
         }
     }
 }

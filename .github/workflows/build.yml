@@ -136,6 +136,24 @@ jobs:
           app=$(find $out/app -mindepth 1 -maxdepth 1 -type d | head -1)
           tar -C "$(dirname "$app")" -czf "TubeHaus-$ver-linux-${{ matrix.tar }}.tar.gz" "$(basename "$app")"
           ls -la TubeHaus-*
+      - name: Build .AppImage
+        # one file to download, make executable and run; like the tar.gz it uses the system's libmpv
+        continue-on-error: true
+        run: |
+          ver=$(sed -n 's/^app.version=//p' gradle.properties)
+          arch=$(uname -m)
+          app=$(find desktop/build/compose/binaries/main-release/app -mindepth 1 -maxdepth 1 -type d | head -1)
+          mkdir -p AppDir
+          cp -a "$app" AppDir/TubeHaus
+          cp packaging/flatpak/icon.png AppDir/io.github.biolend83.TubeHaus.png
+          cp packaging/flatpak/icon.png AppDir/.DirIcon
+          sed 's/^Exec=.*/Exec=TubeHaus/' packaging/flatpak/io.github.biolend83.TubeHaus.desktop > AppDir/io.github.biolend83.TubeHaus.desktop
+          printf '%s\n' '#!/bin/sh' 'here="$(dirname "$(readlink -f "$0")")"' 'exec "$here/TubeHaus/bin/TubeHaus" "$@"' > AppDir/AppRun
+          chmod +x AppDir/AppRun
+          curl -fsSL -o appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$arch.AppImage"
+          chmod +x appimagetool
+          ARCH=$arch APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool --no-appstream AppDir "TubeHaus-$ver-linux-$arch.AppImage"
+          ls -la TubeHaus-*.AppImage
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.tar }}
@@ -143,6 +161,7 @@ jobs:
             TubeHaus-*.deb
             TubeHaus-*.rpm
             TubeHaus-*.tar.gz
+            TubeHaus-*.AppImage
 
   mac:
     # mpv comes from Homebrew on the user's Mac (brew install mpv), nothing is bundled
@@ -198,7 +217,7 @@ jobs:
         # not update the ones already installed, so the APK is always uploaded by hand
         run: |
           # whatever was built (a best-effort build that failed is simply missing), plus their checksums
-          files=$(find windows-* mac-* linux-* -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.zip' -o -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' \) 2>/dev/null | sort)
+          files=$(find windows-* mac-* linux-* -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.zip' -o -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' -o -name '*.AppImage' \) 2>/dev/null | sort)
           # the x64 Windows build is not optional: older apps update from its .msi
           echo "$files" | grep -q '\.msi$' || { echo 'no .msi was built'; exit 1; }
           for f in $files; do (cd "$(dirname "$f")" && sha256sum "$(basename "$f")"); done > SHA256SUMS-desktop.txt
