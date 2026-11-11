@@ -15,9 +15,12 @@ on:
         type: boolean
         default: true
 
+# contents and pull-requests: when the player clients stop working, the repair step pushes a branch
+# with a new clients.json and opens a pull request for it
 permissions:
-  contents: read
+  contents: write
   issues: write
+  pull-requests: write
 
 concurrency:
   group: engine-check
@@ -79,15 +82,63 @@ jobs:
             done
           done
 
+      # What breaks most often is the list of player clients (clients.json), not the code: the repair
+      # tool asks every client it knows of (the file's, the app's own, and the ones yt-dlp and YouTube.js
+      # use today) for a few videos, and when the list needs changing it writes a new one. That goes
+      # on a branch with a pull request; merging it reaches installed apps within a day, with no release.
+      - name: Look for player clients that still work
+        id: repair
+        if: failure() && steps.run.outcome == 'failure'
+        env:
+          TH_REPAIR_REPORT: ${{ runner.temp }}/repair.md
+          TH_REPAIR_STATUS: ${{ runner.temp }}/repair.txt
+          TH_REPORT: ${{ runner.temp }}/failed-after.txt
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./gradlew --no-daemon -q :desktop:engineRepair || true
+          status=$(cat "$TH_REPAIR_STATUS" 2>/dev/null || echo none)
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          [ "$status" = rewritten ] || exit 0
+          # the whole check again with the new list: does it pass now?
+          if ./gradlew --no-daemon -q :desktop:engineCheck > "$RUNNER_TEMP/out-after.txt" 2>&1; then echo "recheck=pass" >> "$GITHUB_OUTPUT"; else echo "recheck=fail" >> "$GITHUB_OUTPUT"; fi
+          branch="engine-repair-$(date -u +%Y%m%d-%H%M)"
+          git config user.name biolend83
+          git config user.email 258010694+biolend83@users.noreply.github.com
+          git checkout -q -b "$branch"
+          git add clients.json
+          git commit -q -m "clients.json: the player clients that work today"
+          git push -q origin "$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          # the pull request needs "Allow GitHub Actions to create pull requests" in the repository's settings;
+          # without it the issue links to the branch instead
+          pr=$(gh pr create --repo "$GITHUB_REPOSITORY" --base android-app --head "$branch" --title "clients.json: the player clients that work today" --body-file "$TH_REPAIR_REPORT" 2>/dev/null || true)
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+
       - name: Open or update the issue
         if: failure() && steps.run.outcome == 'failure' && github.event_name == 'schedule'
         uses: actions/github-script@v7
+        env:
+          REPAIR: ${{ steps.repair.outputs.status }}
+          REPAIR_BRANCH: ${{ steps.repair.outputs.branch }}
+          REPAIR_PR: ${{ steps.repair.outputs.pr }}
+          REPAIR_RECHECK: ${{ steps.repair.outputs.recheck }}
         with:
           script: |
             const fs = require("fs");
             const failed = fs.existsSync(process.env.RUNNER_TEMP + "/failed.txt") ? fs.readFileSync(process.env.RUNNER_TEMP + "/failed.txt", "utf8").trim() : "";
             const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const body = `The daily engine check found calls that no longer work:\n\n\`\`\`\n${failed || "(the check itself didn't finish: see the run log)"}\n\`\`\`\n\n[Run log](${run})`;
+            const repo = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}`;
+            const report = fs.existsSync(process.env.RUNNER_TEMP + "/repair.md") ? fs.readFileSync(process.env.RUNNER_TEMP + "/repair.md", "utf8").trim() : "";
+            let repair = "";
+            if (process.env.REPAIR === "rewritten") {
+              const where = process.env.REPAIR_PR || `${repo}/compare/android-app...${process.env.REPAIR_BRANCH}?expand=1`;
+              repair = `\n\n**A repaired client list is ready:** ${where}\nWith it the whole check ${process.env.REPAIR_RECHECK === "pass" ? "passes again" : "still fails (see the run log), so more than the client list is broken"}.\n\n<details><summary>What the repair tool found</summary>\n\n${report}\n</details>`;
+            } else if (process.env.REPAIR === "fine") {
+              repair = "\n\nThe player clients in clients.json still work, so this is in the code: someone has to look.";
+            } else if (process.env.REPAIR === "stuck") {
+              repair = `\n\nThe repair tool couldn't help:\n\n${report}`;
+            }
+            const body = `The daily engine check found calls that no longer work:\n\n\`\`\`\n${failed || "(the check itself didn't finish: see the run log)"}\n\`\`\`${repair}\n\n[Run log](${run})`;
             const title = "Engine check: YouTube calls failing";
             const open = (await github.rest.issues.listForRepo({ ...context.repo, state: "open", labels: "engine-check" })).data;
             if (open.length) await github.rest.issues.createComment({ ...context.repo, issue_number: open[0].number, body });
