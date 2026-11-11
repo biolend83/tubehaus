@@ -279,7 +279,7 @@ private fun ShelfRow(app: AppState, s: Shelf, openTab: (String) -> Unit) {
             }
         }
         LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(s.items, key = { it.id }) { Tile(app, it, videos) }
+            items(s.items.distinctBy { it.id }, key = { it.id }) { Tile(app, it, videos) }
         }
     }
 }
@@ -333,7 +333,8 @@ private fun ChannelPosts(app: AppState, id: String, tab: String?, load: suspend 
     MoreAtEnd(state, pager)
     LazyColumn(Modifier.fillMaxSize(), state) {
         item { header() }
-        items(pager.items, key = { it.id }) { p -> Narrow { PostCard(app, p) } }
+        // each post once: a pinned post comes back in the next page, and two equal keys close the app
+        items(pager.items.distinctBy { it.id }, key = { it.id }) { p -> Narrow { PostCard(app, p) } }
         if (pager.loading) item { Busy() }
         if (pager.items.isEmpty() && !pager.loading && pager.started) item {
             if (pager.error != null) Problem(pager.error!!) { scope.launch { pager.load() } } else Empty(tr("Nothing here"))

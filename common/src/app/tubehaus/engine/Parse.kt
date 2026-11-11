@@ -231,8 +231,8 @@ fun parseShelves(sections: List<JsonElement>, channelId: String): List<Shelf> = 
     Shelf(title, items, playlistId = browse?.takeIf { it.startsWith("VL") }?.drop(2), tabParams = go.at("params").str?.takeIf { browse == channelId })
 }
 
-/** The posts below [root] (a Posts tab, or a page more of it). */
-fun parsePosts(root: JsonElement?): List<Post> = root?.findAll("backstagePostRenderer")?.mapNotNull(::post) ?: emptyList()
+/** The posts below [root] (a Posts tab, or a page more of it), each once: a post that shares another holds the original's renderer too. */
+fun parsePosts(root: JsonElement?): List<Post> = root?.findAll("backstagePostRenderer")?.mapNotNull(::post)?.distinctBy { it.id } ?: emptyList()
 
 private fun post(p: JsonElement): Post? = try {
     val id = p.at("postId").str
