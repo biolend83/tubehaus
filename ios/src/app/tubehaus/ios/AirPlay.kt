@@ -39,7 +39,7 @@ fun AirPlayButton(modifier: Modifier, player: IosPlayer) {
     val vc = LocalUIViewController.current
     // blue while the video plays on a TV, as the system's button was
     var on by remember { mutableStateOf(false) }
-    LaunchedEffect(player) { while (true) { on = player.av.externalPlaybackActive; delay(1000) } }
+    LaunchedEffect(player) { while (true) { on = player.av.isExternalPlaybackActive(); delay(1000) } }
     IconButton(onClick = { openRoutes(vc) }, modifier = modifier) {
         Icon(if (on) Sym.AirPlay.fill else Sym.AirPlay.outline, "AirPlay",
             tint = if (on) Color(0xFF007AFF) else Color.White, modifier = Modifier.size(24.dp))
