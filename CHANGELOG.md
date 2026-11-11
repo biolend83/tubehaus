@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.0.5 — 2026-11-11
+
+Captions through the server are clean and complete again, and the installed web app gets back and forward buttons. The apps go to 1.0.5 today too (a video queue and new switches; see their own release).
+
+### Fixed
+- **Captions through the server** ([#53](https://github.com/biolend83/tubehaus/pull/53), by [Neatly9509](https://github.com/Neatly9509)): in the iPhone/iPad app playing through a server, automatic captions showed YouTube's word timings as text (`Now<00:03:09.217><c> is</c>`). Caption files now go through the server, which takes the timings out and shows each rolling line once; the web player gets the same clean captions
+- **Lines after a pause were lost or a second late** in automatic captions (274 of 1091 lines on a one-hour video), and in translated captions too: a line holding only a space no longer ends the cue
+
+### Added
+- **Back and forward** at the top of the side menu when TubeHaus is installed as an app (where there is no browser bar); dimmed when there is nowhere to go
+
+### Changed
+- **Your own Caddy or nginx:** add the `/companion/api/v1/captions/` block from [`deploy/Caddyfile.example`](deploy/Caddyfile.example) or [`deploy/nginx.conf.example`](deploy/nginx.conf.example) to get the caption fix in the apps. Docker Compose setups get it with the usual `git pull` and `docker compose up -d`
+- The daily engine check takes a new Cloudflare WARP address and runs again before it reports "Sign in to confirm you're not a bot", which is about the address, not the engine
+
 ## v1.0.4 — 2026-11-10
 
 A library for each person in the household, password change, two glass themes and a prefetch setting, from the forks. The apps stay at 1.0.3 (nothing in them changed).

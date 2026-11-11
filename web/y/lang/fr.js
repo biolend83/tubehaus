@@ -178,6 +178,7 @@ export default {
  "동영상이 없어요": "Aucune vidéo",
  "되돌렸어요": "Rétabli",
  "뒤로": "Retour",
+ "앞으로": "Suivant",
  "듣고 있어요...": "Écoute...",
  "디자인: ": "Apparence : ",
  "라이브": "En direct",

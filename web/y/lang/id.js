@@ -178,6 +178,7 @@ export default {
  "동영상이 없어요": "Tidak ada video",
  "되돌렸어요": "Dipulihkan",
  "뒤로": "Kembali",
+ "앞으로": "Maju",
  "듣고 있어요...": "Mendengarkan...",
  "디자인: ": "Tampilan: ",
  "라이브": "Live",

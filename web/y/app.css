@@ -82,6 +82,13 @@ img { display: block; }
 body.guide-open #guide { transform: none; }
 #scrim { position: fixed; inset: 0; z-index: 390; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .2s; }
 body.guide-open #scrim { opacity: 1; pointer-events: auto; }
+/* back and forward: only where the browser's own aren't there (installed as an app) */
+.g-nav { display: none; padding: 0 12px 4px; gap: 4px; }
+.installed .g-nav { display: flex; }
+.tv .g-nav { display: none; }
+.g-nav .ib { width: 36px; height: 36px; }
+.g-nav .ib:disabled { opacity: .3; pointer-events: none; }
+#gfwd svg { transform: scaleX(-1); }
 .g-head { height: var(--mastc); display: flex; align-items: center; gap: 16px; padding: 0 16px; }
 .g-sec { padding: 12px 0; border-bottom: 1px solid var(--line); }
 .gi { display: flex; align-items: center; gap: 24px; height: 40px; padding: 0 24px; font-size: 14px; width: 100%; text-align: left; }

@@ -178,6 +178,7 @@ export default {
  "동영상이 없어요": "No videos",
  "되돌렸어요": "Restored",
  "뒤로": "Back",
+ "앞으로": "Forward",
  "듣고 있어요...": "Listening...",
  "디자인: ": "Appearance: ",
  "라이브": "Live",

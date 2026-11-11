@@ -61,7 +61,23 @@ jobs:
           TH_REPORT: ${{ runner.temp }}/failed.txt
         run: |
           set -o pipefail
-          ./gradlew --no-daemon -q :desktop:engineCheck | tee "$RUNNER_TEMP/out.txt"
+          # "Sign in to confirm you're not a bot" is about the address this run got from WARP, not about
+          # the engine: take a new address and run again (twice at most) before calling it a failure
+          for try in 1 2 3; do
+            rm -f "$TH_REPORT"
+            if ./gradlew --no-daemon -q :desktop:engineCheck | tee "$RUNNER_TEMP/out.txt"; then exit 0; fi
+            if [ "$try" = 3 ] || [ -z "$TH_SOCKS" ] || ! grep -q "not a bot" "$TH_REPORT" 2>/dev/null; then exit 1; fi
+            echo "::notice::YouTube asked this WARP address to sign in; taking a new one (after try $try)"
+            warp-cli --accept-tos disconnect || true
+            warp-cli --accept-tos registration delete || true
+            for i in 1 2 3 4 5; do warp-cli --accept-tos registration new && break; sleep 3; done
+            warp-cli --accept-tos mode proxy
+            warp-cli --accept-tos connect
+            for i in $(seq 1 20); do
+              curl -s --max-time 5 -x socks5h://127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace | grep -q "warp=on" && break
+              sleep 2
+            done
+          done
 
       - name: Open or update the issue
         if: failure() && steps.run.outcome == 'failure' && github.event_name == 'schedule'

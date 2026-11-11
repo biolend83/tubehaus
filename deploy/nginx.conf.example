@@ -90,6 +90,18 @@ server {
         proxy_redirect off;
     }
 
+    # Caption files go through TubeHaus, which takes the word timings out
+    # (the apps' player shows them as text).
+    location ^~ /companion/api/v1/captions/ {
+        proxy_pass http://127.0.0.1:3010;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+    }
+
     # Downloads use TubeHaus when a title is present; otherwise preserve the
     # original Invidious / companion endpoint behaviour.
     location = /latest_version {

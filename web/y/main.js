@@ -214,6 +214,16 @@ $("#msearch").onclick = () => { document.body.classList.add("msearch"); q.focus(
 $("#mback").onclick = () => { document.body.classList.remove("msearch"); q.blur(); };
 
 // ---------------------------------------------------------------- side menu
+// installed as an app there is no browser bar: back and forward sit at the top of the side menu
+if (navigator.standalone || ["standalone", "minimal-ui", "window-controls-overlay"].some((m) => matchMedia(`(display-mode: ${m})`).matches)) document.documentElement.classList.add("installed");
+$("#gback").onclick = () => history.back();
+$("#gfwd").onclick = () => history.forward();
+if (window.navigation && "canGoForward" in navigation) {
+  // dimmed when there is nowhere to go (browsers without the Navigation API leave both lit)
+  const lit = () => { $("#gback").disabled = !navigation.canGoBack; $("#gfwd").disabled = !navigation.canGoForward; };
+  navigation.addEventListener("currententrychange", lit);
+  lit();
+}
 $("#guideBtn").onclick = () => document.body.classList.toggle("guide-open");
 $("#scrim").onclick = () => document.body.classList.remove("guide-open");
 addEventListener("click", (e) => { if (e.target.closest("#guide a[data-nav]")) document.body.classList.remove("guide-open"); });

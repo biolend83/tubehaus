@@ -178,6 +178,7 @@ export default {
  "동영상이 없어요": "Video yok",
  "되돌렸어요": "Geri alındı",
  "뒤로": "Geri",
+ "앞으로": "İleri",
  "듣고 있어요...": "Dinliyorum...",
  "디자인: ": "Görünüm: ",
  "라이브": "Canlı",
