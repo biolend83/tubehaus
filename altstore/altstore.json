@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.0.6",
+          "buildVersion": "43",
+          "date": "2026-11-11T14:13:36+00:00",
+          "localizedDescription": "1.0.6: ...more under a video no longer closes the app, the full-screen button turns the iPhone picture sideways, Check for updates works, and the AirPlay button matches the others and lights up while playing on a TV.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.6/TubeHaus-1.0.6-ipad.ipa",
+          "size": 21003636,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.0.5",
           "buildVersion": "42",
           "date": "2026-11-11T03:08:52+00:00",
@@ -185,11 +194,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.0.5",
-      "versionDate": "2026-11-11T03:08:52+00:00",
-      "versionDescription": "1.0.5: a queue (Play next, Add to queue), full screen when the iPhone is turned sideways, switches for gestures, the AirPlay button, the Music tab and the logo, and fixes for the AirPlay button and the seek bar.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.5/TubeHaus-1.0.5-ipad.ipa",
-      "size": 20994171
+      "version": "1.0.6",
+      "versionDate": "2026-11-11T14:13:36+00:00",
+      "versionDescription": "1.0.6: ...more under a video no longer closes the app, the full-screen button turns the iPhone picture sideways, Check for updates works, and the AirPlay button matches the others and lights up while playing on a TV.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.6/TubeHaus-1.0.6-ipad.ipa",
+      "size": 21003636
     }
   ],
   "news": [],
