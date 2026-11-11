@@ -37,6 +37,7 @@ const DESC = "Private YouTube client with no Google account, no ads and no track
 
 // ------------------------------------------------------------------ Homebrew
 write("Casks/tubehaus.rb", `# brew tap biolend83/tubehaus https://github.com/biolend83/tubehaus
+# brew trust biolend83/tubehaus
 # brew install --cask tubehaus
 cask "tubehaus" do
   arch arm: "arm64", intel: "x64"

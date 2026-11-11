@@ -24,6 +24,8 @@ jobs:
       - name: Tap and install
         run: |
           brew tap biolend83/tubehaus https://github.com/biolend83/tubehaus
+          # Homebrew asks before it loads casks from a tap that isn't its own
+          brew trust biolend83/tubehaus
           brew install --cask tubehaus
       - name: The app is there and macOS will open it
         run: |
