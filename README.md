@@ -100,7 +100,8 @@ libmpv on Windows, macOS and Linux, AVPlayer on iOS. Details for iOS are on the
   isn't code-signed: choose *More info* → *Run anyway*.
 - **macOS** — [Apple Silicon .dmg](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.5/TubeHaus-1.0.5-mac-arm64.dmg) or [Intel .dmg](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.5/TubeHaus-1.0.5-mac-x64.dmg) (beta;
   .zip versions are on the release page).
-  It uses Homebrew's mpv: `brew install mpv`. The app isn't signed by Apple yet, so the first time
+  It uses Homebrew's mpv: `brew install mpv`. On an Intel Mac Homebrew no longer has a ready-made mpv,
+  so use [MacPorts](https://www.macports.org/install.php) there: `sudo port install mpv` (TubeHaus 1.0.6 and later find it). The app isn't signed by Apple yet, so the first time
   right-click it → *Open* → *Open*.
 - **iPad / iPhone (iOS 16+)** — [the .ipa](https://github.com/biolend83/tubehaus/releases/download/app-v1.0.5/TubeHaus-1.0.5-ipad.ipa) (beta). Apple installs only apps it signed, so
   you sign it yourself with **[Sideloadly](https://sideloadly.io/)** (free, Windows or Mac) and your Apple ID: connect the
