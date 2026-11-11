@@ -1,0 +1,28 @@
+# Maintainer: biolend83 <258010694+biolend83@users.noreply.github.com>
+pkgname=tubehaus-bin
+pkgver=1.0.5
+pkgrel=1
+pkgdesc="Private YouTube client with no Google account, no ads and no tracking"
+arch=('x86_64' 'aarch64')
+url="https://github.com/biolend83/tubehaus"
+license=('AGPL-3.0-only')
+depends=('mpv' 'alsa-lib' 'fontconfig' 'freetype2' 'libglvnd' 'libx11' 'libxext' 'libxi' 'libxrender' 'libxtst' 'xdg-utils')
+provides=('tubehaus')
+conflicts=('tubehaus')
+options=('!strip')
+source_x86_64=("TubeHaus-${pkgver}-linux-amd64.deb::https://github.com/biolend83/tubehaus/releases/download/app-v${pkgver}/TubeHaus-${pkgver}-linux-amd64.deb")
+source_aarch64=("TubeHaus-${pkgver}-linux-arm64.deb::https://github.com/biolend83/tubehaus/releases/download/app-v${pkgver}/TubeHaus-${pkgver}-linux-arm64.deb")
+sha256sums_x86_64=('ec287ab95791a2bc9ff08dc906b7c495e6968b742262c29ba5d45aa534c11887')
+sha256sums_aarch64=('cc88e89b7fbf1651a8317db8c274c8a531310571c3f658e554367613a2014e55')
+noextract=("TubeHaus-${pkgver}-linux-amd64.deb" "TubeHaus-${pkgver}-linux-arm64.deb")
+
+package() {
+  local deb
+  for deb in "${srcdir}"/TubeHaus-${pkgver}-linux-*.deb; do
+    bsdtar -xOf "${deb}" 'data.tar.*' | bsdtar -xf - -C "${pkgdir}"
+  done
+  install -Dm644 "${pkgdir}/opt/tubehaus/lib/tubehaus-TubeHaus.desktop" "${pkgdir}/usr/share/applications/tubehaus.desktop"
+  install -Dm644 "${pkgdir}/opt/tubehaus/lib/TubeHaus.png" "${pkgdir}/usr/share/pixmaps/tubehaus.png"
+  install -d "${pkgdir}/usr/bin"
+  ln -s /opt/tubehaus/bin/TubeHaus "${pkgdir}/usr/bin/tubehaus"
+}

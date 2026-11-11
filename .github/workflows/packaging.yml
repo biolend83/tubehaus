@@ -1,0 +1,87 @@
+name: Packaging
+
+# The package manager files (Homebrew cask, Scoop bucket, AUR PKGBUILD, winget manifests) are
+# written by scripts/packaging.mjs after each app release. This installs each one the way a
+# person would, on a clean machine, so a wrong checksum or path is caught here and not by them.
+on:
+  push:
+    branches: [main]
+    paths: ["Casks/**", "bucket/**", "packaging/**", ".github/workflows/packaging.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packaging-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  homebrew:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - name: Tap and install
+        run: |
+          brew tap biolend83/tubehaus https://github.com/biolend83/tubehaus
+          brew install --cask tubehaus
+      - name: The app is there and macOS will open it
+        run: |
+          test -d /Applications/TubeHaus.app
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" /Applications/TubeHaus.app/Contents/Info.plist
+          ! xattr -r /Applications/TubeHaus.app | grep -q com.apple.quarantine
+          command -v mpv
+
+  scoop:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install Scoop
+        shell: pwsh
+        run: |
+          Invoke-RestMethod -Uri https://get.scoop.sh -OutFile install.ps1
+          ./install.ps1 -RunAsAdmin
+          Join-Path (Resolve-Path ~).Path "scoop\shims" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+      - name: Add the bucket and install
+        shell: pwsh
+        run: |
+          scoop bucket add tubehaus https://github.com/biolend83/tubehaus
+          scoop install tubehaus/tubehaus
+      - name: The app is there
+        shell: pwsh
+        run: |
+          $exe = Join-Path (scoop prefix tubehaus) "TubeHaus.exe"
+          if (-not (Test-Path $exe)) { throw "no $exe" }
+          Get-Item $exe | Select-Object Name, Length
+
+  winget:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate the manifests
+        shell: pwsh
+        run: |
+          $dir = Get-ChildItem packaging/winget/manifests/b/biolend83/TubeHaus -Directory | Select-Object -First 1
+          winget validate --manifest $dir.FullName
+
+  aur:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: archlinux:base-devel
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the package
+        run: |
+          useradd -m build
+          cp -r packaging/aur /home/build/pkg && chown -R build /home/build/pkg
+          cd /home/build/pkg
+          # the dependencies (mpv and its libraries) aren't needed to put the package together
+          su build -c "makepkg -d --noconfirm"
+          su build -c "makepkg --printsrcinfo" | diff -u .SRCINFO - || { echo "::error::.SRCINFO does not match the PKGBUILD"; exit 1; }
+      - name: What is in it
+        run: |
+          cd /home/build/pkg
+          pacman -Qip tubehaus-bin-*.pkg.tar.zst | head -12
+          pacman -Qlp tubehaus-bin-*.pkg.tar.zst | grep -v "/opt/tubehaus/lib/\(app\|runtime\)/" | head -30
+          pacman -Qlp tubehaus-bin-*.pkg.tar.zst | grep -q "usr/bin/tubehaus$"

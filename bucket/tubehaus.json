@@ -1,0 +1,41 @@
+{
+    "version": "1.0.5",
+    "description": "Private YouTube client with no Google account, no ads and no tracking",
+    "homepage": "https://github.com/biolend83/tubehaus",
+    "license": "AGPL-3.0-only",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.5/TubeHaus-1.0.5-win-x64-portable.zip",
+            "hash": "97be95db3a40d9230f96443c47e0516e1938a4d1e66cbe5ac29ac6ccebb23929"
+        },
+        "arm64": {
+            "url": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.5/TubeHaus-1.0.5-win-arm64-portable.zip",
+            "hash": "300d18bec2707bbd06cd247917a2b76caab38a607c37684108802571abe11df5"
+        }
+    },
+    "extract_dir": "TubeHaus",
+    "shortcuts": [
+        [
+            "TubeHaus.exe",
+            "TubeHaus"
+        ]
+    ],
+    "checkver": {
+        "url": "https://api.github.com/repos/biolend83/tubehaus/releases/latest",
+        "jsonpath": "$.tag_name",
+        "regex": "app-v([\\d.]+)"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/biolend83/tubehaus/releases/download/app-v$version/TubeHaus-$version-win-x64-portable.zip"
+            },
+            "arm64": {
+                "url": "https://github.com/biolend83/tubehaus/releases/download/app-v$version/TubeHaus-$version-win-arm64-portable.zip"
+            }
+        },
+        "hash": {
+            "url": "$baseurl/SHA256SUMS-desktop.txt"
+        }
+    }
+}
