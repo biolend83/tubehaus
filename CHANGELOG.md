@@ -1,6 +1,8 @@
 # Changelog
 
-## v1.0.6 — unreleased
+## v1.0.6 — 2026-11-11
+
+Titles in your language, switches to hide the Music tab and the logo, and room for a server's own additions (caption tracks, more live-caption engines). The apps go to 1.0.6 too (crash fixes, an AirPlay button that matches the others, AppImage and Flatpak; see their own release).
 
 ### Added
 - **Titles in your language** (Settings → Look → Translate titles, off by default): video titles written in another script are shown in the interface language, on cards, the watch page and the mini player; the original stays in the tooltip. The titles go from your server to the translator the captions already use (Google) and the answers are kept on the server, so each title is asked once. Not on public instances. For a language in Latin letters, titles in other scripts (Korean, Japanese, Russian, ...) are translated; a title in another Latin-script language can't be told apart and stays as it is
