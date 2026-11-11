@@ -538,9 +538,11 @@ export class Player {
     this.q(".b-cc").style.display = list.length ? "" : "none";
     if (!settings.captions || !list.length) return this.setCaption(null);
     const want = settings.capLang;
-    const pick = list.find((c) => c.lang.startsWith(want) && !/auto/i.test(c.label)) ||
-      list.find((c) => c.lang.startsWith(want) && !c.tr) ||
-      (settings.autoTranslate && want === LANG && list.find((c) => c.tr)) ||
+    // an add-on's tracks (e.g. captions a server makes, which take its time) are only chosen by hand
+    const own = list.filter((c) => !c.poll);
+    const pick = own.find((c) => c.lang.startsWith(want) && !/auto/i.test(c.label)) ||
+      own.find((c) => c.lang.startsWith(want) && !c.tr) ||
+      (settings.autoTranslate && want === LANG && own.find((c) => c.tr)) ||
       null;
     this.setCaption(pick);
   }
@@ -1085,7 +1087,7 @@ export class Player {
     if (a === "cc") {
       const c = val === "" ? null : this.captionList()[+val];
       settings.captions = !!c;
-      if (c) settings.capLang = c.lang.slice(0, 2);
+      if (c && !c.poll) settings.capLang = c.lang.slice(0, 2);
       this.setCaption(c);
       return this.closeMenu();
     }
