@@ -28,8 +28,24 @@ struct ComposeView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         MainKt.MainViewController(hideBars: { [bars] on in
             let hide = on.boolValue
-            DispatchQueue.main.async { if bars.hidden != hide { bars.hidden = hide } }
+            DispatchQueue.main.async {
+                if bars.hidden != hide { bars.hidden = hide; turn(sideways: hide) }
+            }
         })
+    }
+
+    /**
+     * iPhone: full screen turns the screen sideways, as YouTube's button does, also with the
+     * orientation lock on; leaving it turns it back upright. Not when the phone is already held
+     * that way (turning it is what opened full screen then), and not on the iPad, where the video
+     * fills the screen either way.
+     */
+    private func turn(sideways: Bool) {
+        guard UIDevice.current.userInterfaceIdiom == .phone,
+              let scene = UIApplication.shared.connectedScenes.first(where: { $0 is UIWindowScene }) as? UIWindowScene
+        else { return }
+        if scene.interfaceOrientation.isLandscape == sideways { return }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: sideways ? .landscapeRight : .portrait)) { _ in }
     }
     func updateUIViewController(_ controller: UIViewController, context: Context) {}
 }
