@@ -23,7 +23,7 @@ interface Platform {
     val player: VideoPlayer
     /** Google Cast: the TVs on this Wi-Fi to send videos to (Android, the desktop); null where there is none */
     val caster: Caster? get() = null
-    /** iPad: the system's AirPlay button, drawn in the player's controls; null elsewhere */
+    /** iPad and iPhone: the AirPlay button in the player's controls; null elsewhere */
     val airplay: (@Composable (Modifier) -> Unit)? get() = null
 
     /** a share sheet where there is one; false when the link was copied to the clipboard instead */
