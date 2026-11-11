@@ -11,6 +11,11 @@ const SB_CATS = {
   music_offtopic: [$t("음악 아닌 부분"), "#ff9900"], filler: [$t("잡담"), "#7300ff"],
 };
 export { SB_CATS };
+
+// Caption tracks from a local add-on (web/y/local.js, see main.js), e.g. captions a server makes itself.
+// Each source: { list(info) -> [{ label, lang, url (unique), poll() -> Promise<{ cues: [[start, end, text]], done }> }] }.
+// poll() is asked again every few seconds until done, so the cues can grow while they are being made.
+export const captionSources = ((window.tubehaus ||= {}).captionSources ||= []);
 const HIGHLIGHT = "poi_highlight";
 
 // ---------------------------------------------------------------- captions (WebVTT)
@@ -525,6 +530,7 @@ export class Player {
       const name = (LANGS.find(([c]) => c === LANG) || [, LANG])[1];
       list.push({ label: $t("{0} (자동 번역)", name), lang: LANG, url: `/api/p/sub/${this.info.videoId}.vtt?tl=${LANG}`, tr: true });
     }
+    if (this.info) for (const src of captionSources) { try { list.push(...(src.list(this.info) || [])); } catch { } }
     return list;
   }
   setupCaptions() {
@@ -551,6 +557,22 @@ export class Player {
       this.cues = [];
       this.liveCcT = setInterval(() => this.liveCcPoll(c), 3000);
       this.liveCcPoll(c);
+      return;
+    }
+    if (c.poll) {
+      // a track that is still being made: show what there is, ask again until it is complete
+      this.cues = [];
+      const tick = async () => {
+        if (this.capTrack !== c) return;
+        try {
+          const r = await c.poll();
+          if (this.capTrack !== c) return;
+          this.cues = (r.cues || []).map(([s, e, text]) => ({ s, e, text }));
+          this.renderCaption(true);
+          if (!r.done) this.liveCcT = setTimeout(tick, 4000);
+        } catch { if (this.capTrack === c) toast($t("자막을 불러오지 못했어요")); }
+      };
+      tick();
       return;
     }
     const info = this.info;

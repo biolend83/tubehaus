@@ -342,6 +342,8 @@ loadLib().then(async (L) => {
   bell();
 });
 if (!history.state) history.replaceState({ k: "first" }, "");
+// a server's own add-on, if it has one (web/y/local.js is not part of TubeHaus and updates leave it alone)
+import("./local.js").catch(() => { });
 window.__step = "render";
 render().then(() => (window.__step = "rendered")).catch((e) => window.__beacon?.({ ev: "renderfail", msg: e && (e.stack || e.message) }));
 if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => { if (r.scope === location.origin + "/") r.unregister(); })).catch(() => { });
