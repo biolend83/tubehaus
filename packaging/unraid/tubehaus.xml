@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>TubeHaus</Name>
+  <Repository>ghcr.io/biolend83/tubehaus:latest</Repository>
+  <Registry>https://github.com/biolend83/tubehaus/pkgs/container/tubehaus</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/biolend83/tubehaus/issues</Support>
+  <Project>https://github.com/biolend83/tubehaus</Project>
+  <Overview>The TubeHaus server: your own YouTube for the whole household, without ads or tracking. It keeps one library (subscriptions, history, playlists, resume points) for every device, plays live streams with live captions, saves videos offline and casts to TVs.&#xD;
+&#xD;
+It needs Invidious and invidious-companion (both in Community Applications) and the TubeHaus-Web container, which serves the app and routes to all three. Set the Invidious and companion addresses below. Easiest of all is the whole set in one go with the Docker Compose Manager plugin and deploy/docker-compose.home.yml from the project.&#xD;
+&#xD;
+In Invidious' own config, point the companion at this container: invidious_companion private_url http://[this server]:3010/companion.</Overview>
+  <Category>MediaApp:Video MediaServer:Video</Category>
+  <WebUI/>
+  <TemplateURL>https://raw.githubusercontent.com/biolend83/tubehaus/main/packaging/unraid/tubehaus.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/biolend83/tubehaus/main/web/y/icon-512.png</Icon>
+  <ExtraParams>--init</ExtraParams>
+  <Config Name="Server port" Target="3010" Default="3010" Mode="tcp" Description="TubeHaus-Web reaches the server here" Type="Port" Display="always" Required="true" Mask="false">3010</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/tubehaus" Mode="rw" Description="The library, offline saves and caches" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/tubehaus</Config>
+  <Config Name="Invidious" Target="HT_INVIDIOUS" Default="http://192.168.1.10:3000" Mode="" Description="Address of your Invidious" Type="Variable" Display="always" Required="true" Mask="false">http://192.168.1.10:3000</Config>
+  <Config Name="invidious-companion" Target="HT_COMPANION" Default="http://192.168.1.10:8282" Mode="" Description="Address of your invidious-companion" Type="Variable" Display="always" Required="true" Mask="false">http://192.168.1.10:8282</Config>
+  <Config Name="WARP" Target="HT_WARP" Default="0" Mode="" Description="0: YouTube straight from your connection (normal at home). 1: through Cloudflare WARP (also add --cap-add=NET_ADMIN to Extra Parameters)" Type="Variable" Display="advanced" Required="false" Mask="false">0</Config>
+  <Config Name="Accounts" Target="TUBEHAUS_AUTH" Default="none" Mode="" Description="none: everyone shares one library. accounts: everyone signs up and gets their own (set the same on TubeHaus-Web)" Type="Variable" Display="advanced" Required="false" Mask="false">none</Config>
+</Container>

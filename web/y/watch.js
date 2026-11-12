@@ -2,6 +2,7 @@
 import { $, $$, el, esc, icon, api, lib, settings, toast, fmtTime, fmtViews, fmtCount, ago, epoch, exactTime, thumb, normVideo, metaOf, pickThumb, fmtSubs, safeHtml, linkify, parseT, copy, PUBLIC, siteName } from "./util.js";
 import { videoInfo, prefetch, player, state, card, norm, remember, known, fillProgress, avatar, subBtn, navigate, videoMenu, shareDialog, saveDialog, downloadDialog, keysDialog, setList, inList, queue, setPosCache, getPos, pageCleanup, popup, mi } from "./core.js";
 import { loadPlaylist } from "./pages.js";
+import { capText } from "./player.js";
 import { $t, LANG, LOCALE, REGION } from "./i18n.js";
 
 const W = {
@@ -183,7 +184,7 @@ export async function watch(page, m, alive) {
     <div class="w-cols">
       <div class="w-primary">
         <div class="w-playerbox"><canvas id="ambient" width="64" height="36" class="${settings.ambient ? "" : "off"}"></canvas><div class="w-slot"></div></div>
-        <div class="w-info"><div class="sk-title"></div></div>
+        <div class="w-info"><div class="sk-title"></div></div><div class="w-glance"></div>
         <div class="w-comments"></div>
       </div>
       <div class="w-secondary"><div class="w-panel"></div><div class="w-plpanel"></div><div class="w-related"></div></div>
@@ -261,6 +262,9 @@ export async function watch(page, m, alive) {
     return;
   }
   renderInfo(page, info);
+  const gl = $(".w-glance", page);
+  if (gl) { gl.innerHTML = ""; if (settings.smart !== false && !info.liveNow) import("./glance.js").then((m) => m.glance(gl, info)).catch(() => { }); }
+  if (!PUBLIC) import("./party.js").then((m) => m.onWatch(id, sp.get("party"))).catch(() => { });
   renderRelated(page);
   renderPlaylistPanel(page);
   renderComments(page, info);
@@ -312,6 +316,7 @@ function renderInfo(page, info) {
       <div class="w-actions">
         <div class="seg-btn"><button class="like ${liked ? "on" : ""}" title="${$t("좋아요")}">${icon("like")}<span>${info.likeCount ? fmtCount(info.likeCount) : ""}</span></button><button class="dislike ${disliked ? "on" : ""}" title="${$t("싫어요")}">${icon("dislike")}<span class="dc"></span></button></div>
         <button class="pill cast" title="${$t("TV로 보내기")}">${icon("tv")}<span>${$t("TV로")}</span></button>
+        ${PUBLIC ? "" : `<button class="pill party" title="${$t("친구와 같이 보기")}">${icon("person")}<span>${$t("같이 보기")}</span></button>`}
         <button class="pill share">${icon("share")}<span>${$t("공유")}</span></button>
         ${info.liveNow ? "" : `<button class="pill dl">${icon("download")}<span>${$t("오프라인 저장")}</span></button>`}
         <button class="pill save">${icon("save")}<span>${$t("저장")}</span></button>
@@ -359,6 +364,8 @@ function renderInfo(page, info) {
   };
   $(".share", box).onclick = () => shareDialog(v);
   $(".cast", box).onclick = (e) => { const btn = e.currentTarget; import("./cast.js").then((m) => m.castTo(v, btn)); };
+  const pty = $(".party", box);
+  if (pty) pty.onclick = (e) => { const btn = e.currentTarget; import("./party.js").then((m) => m.partyMenu(btn)); };
   $(".save", box).onclick = () => saveDialog(v);
   $(".dl", box)?.addEventListener("click", () => downloadDialog(v));
   $(".more", box).onclick = (e) => popup(e.currentTarget, [
@@ -422,7 +429,7 @@ function renderPlaylistPanel(page) {
 const vttSec = (s) => s.split(":").reduce((a, x) => a * 60 + parseFloat(x.replace(",", ".")), 0);
 // a caption file -> transcript lines [{s, e, text}]. Automatic captions roll: each cue repeats the line before it,
 // and between two cues comes a 10 ms one with the same words; both are kept once.
-function transcriptCues(txt) {
+export function transcriptCues(txt) {
   const out = [];
   let last = "";
   for (const b of txt.replace(/\r/g, "").split(/\n{2,}/)) {
@@ -487,9 +494,7 @@ async function openPanel(kind) {
       dl.hidden = true;
       L.innerHTML = `<div class="spinner"></div>`;
       try {
-        const r = await fetch(c.url, { credentials: "same-origin" });
-        if (!r.ok) throw new Error(r.status);
-        const got = transcriptCues(await r.text());
+        const got = transcriptCues(await capText(c, player.info?.videoId));
         if (pick !== c || !L.isConnected) return;      // another language was picked meanwhile
         cues = got;
         const langRow = list.length > 1

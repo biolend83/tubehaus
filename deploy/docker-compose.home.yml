@@ -1,0 +1,89 @@
+# TubeHaus at home, from prebuilt images only (no checkout, no WARP, no extra capabilities): the shape
+# the app-store packages (Umbrel, CasaOS, TrueNAS, Unraid) are made from. On a home connection YouTube
+# needs no detour. If it ever does: HT_PROXY=host:port and COMPANION_PROXY=http://host:port send YouTube
+# through a proxy of your own.
+#   docker compose -f deploy/docker-compose.home.yml up -d      then open http://<this machine>:8080
+# Before the first start set POSTGRES_PASSWORD and INVIDIOUS_HMAC_KEY (openssl rand -hex 24) and
+# COMPANION_KEY (exactly 16 characters: openssl rand -hex 8), e.g. in a .env file next to this one.
+services:
+  web:
+    image: ghcr.io/biolend83/tubehaus-web:latest
+    restart: unless-stopped
+    ports:
+      - "${TUBEHAUS_PORT:-8080}:8080"
+    environment:
+      TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-none}
+    depends_on:
+      - tubehaus
+      - invidious
+
+  tubehaus:
+    image: ghcr.io/biolend83/tubehaus:latest
+    init: true
+    restart: unless-stopped
+    environment:
+      HT_WARP: "0"
+      HT_PROXY: ${HT_PROXY:-}
+      HT_INVIDIOUS: http://invidious:3000
+      HT_COMPANION: http://companion:8282
+      HT_SUB_LANG: ${TUBEHAUS_SUB_LANG:-en}
+      TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-none}
+    volumes:
+      - tubehaus-data:/data
+
+  invidious:
+    image: quay.io/invidious/invidious:latest
+    restart: unless-stopped
+    environment:
+      INVIDIOUS_CONFIG: |
+        db:
+          dbname: invidious
+          user: kemal
+          password: ${POSTGRES_PASSWORD}
+          host: invidious-db
+          port: 5432
+        check_tables: true
+        https_only: false
+        use_innertube_for_captions: true
+        invidious_companion:
+        - private_url: "http://tubehaus:3010/companion"
+        invidious_companion_key: ${COMPANION_KEY}
+        hmac_key: ${INVIDIOUS_HMAC_KEY:?set INVIDIOUS_HMAC_KEY}
+    depends_on:
+      - invidious-db
+
+  companion:
+    image: quay.io/invidious/invidious-companion:latest
+    restart: unless-stopped
+    environment:
+      SERVER_SECRET_KEY: ${COMPANION_KEY:?set COMPANION_KEY (exactly 16 characters)}
+      PROXY: ${COMPANION_PROXY:-}           # with HT_PROXY: the same proxy as http://host:port
+      NETWORKING_FETCH_TIMEOUT_MS: "15000"
+      NETWORKING_FETCH_RETRY_ENABLED: "true"
+      NETWORKING_FETCH_RETRY_TIMES: "3"
+      NETWORKING_FETCH_RETRY_INITIAL_DEBOUNCE: "200"
+      NETWORKING_FETCH_RETRY_DEBOUNCE_MULTIPLIER: "2"
+      JOBS_YOUTUBE_SESSION_FREQUENCY: "0 * * * *"
+    shm_size: 256mb
+    user: "10001:10001"
+    cap_drop: [ALL]
+    read_only: true
+    volumes:
+      - companion-cache:/var/tmp/youtubei.js:rw
+    security_opt:
+      - no-new-privileges:true
+
+  invidious-db:
+    image: docker.io/library/postgres:14
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: invidious
+      POSTGRES_USER: kemal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  tubehaus-data:
+  companion-cache:
+  postgres-data:

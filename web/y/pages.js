@@ -96,6 +96,12 @@ export async function home(page, m, alive) {
       : empty("info", $t("영상이 없어요"));
     return;
   }
+  // TubeHaus 1.5: today's picks large across the top, then the rest as before
+  if (chip === "all" && !settings.calm && document.documentElement.dataset.look === "2" && !document.documentElement.classList.contains("tv")) {
+    const { hero } = await import("./hero.js");
+    if (!alive()) return;
+    hero($(".shorts-shelf", page));
+  }
   // render a bit more on every scroll instead of everything at once
   let i = 0;
   const step = () => { const part = pool.slice(i, i + 24); i += 24; append(box, part, "grid", ""); return i < pool.length; };
@@ -741,6 +747,8 @@ export function settingsPage(page) {
     ["look", "dark", $t("모양"), `
       ${row(langLabel(), sel("lang", [["auto", $t("자동 (브라우저 언어)")], ...LANGS]))}
       ${row($t("테마"), seg("theme", [["system", $t("기기 테마 사용"), "tune"], ["light", $t("밝은 테마"), "sun"], ["dark", $t("어두운 테마"), "dark"], ["spatial", $t("유리 테마"), "sparkle"], ["spatial-light", $t("밝은 유리 테마"), "sparkle"]]), "", "wide")}
+      ${row($t("디자인"), seg("look", [["2", "TubeHaus 1.5", "sparkle"], ["1", $t("기본"), "tune"]]), $t("유리 테마에서는 기본 디자인이에요"), "wide")}
+      ${tog("smart", $t("이 영상 한눈에"), $t("영상 아래에 자주 나오는 말과 중요한 순간 · 이 브라우저에서 자막으로 만들어요"))}
       ${tog("ambient", $t("앰비언트 모드"), $t("영상 색이 플레이어 뒤로 은은하게 번져요 (어두운 테마)"))}
       ${PUBLIC ? "" : tog("trTitles", $t("제목 번역"), $t("다른 글자로 쓰인 영상 제목을 내 언어로 보여줘요. 제목이 이 서버를 거쳐 번역기(구글)로 가요"))}
       ${tog("hideMusic", $t("음악 탭 숨기기"))}

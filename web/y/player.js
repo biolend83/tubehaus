@@ -50,6 +50,23 @@ function parseVtt(txt) {
   return cues.sort((x, y) => x.s - y.s);
 }
 
+// ---------------------------------------------------------------- caption files
+/** a caption file's text. When YouTube refuses the usual way (it does, for hours, from one address) the
+ *  server fetches the same track itself; the player, the transcript and "at a glance" all come here. */
+export async function capText(c, vid) {
+  let st = "net";
+  try {
+    const r = await fetch(c.url, { credentials: "same-origin" });
+    st = r.status;
+    if (r.ok) { const t = await r.text(); if (t.includes("-->")) return t; st = "empty"; }
+  } catch { }
+  if (!vid || c.tr || c.liveCc || c.poll || !/captions\//.test(c.url) || !c.lang) throw new Error(String(st));
+  const auto = /auto/i.test(c.label || "") || /kind=asr/.test(c.url);
+  const r = await fetch(`/api/p/cap/${vid}.vtt?lang=${encodeURIComponent(c.lang)}&auto=${auto ? 1 : 0}`, { credentials: "same-origin" });
+  if (!r.ok) throw new Error(String(r.status));
+  return r.text();
+}
+
 // ---------------------------------------------------------------- chapters
 export function parseChapters(desc, dur) {
   const out = [];
@@ -589,9 +606,7 @@ export class Player {
     }
     const info = this.info;
     try {
-      const r = await fetch(c.url, { credentials: "same-origin" });
-      if (!r.ok) throw new Error(r.status);
-      const cues = parseVtt(await r.text());
+      const cues = parseVtt(await capText(c, info?.videoId));
       if (this.info === info && this.capTrack === c) { this.cues = cues; this.renderCaption(true); }
     } catch {
       if (this.capTrack === c) toast($t("자막을 불러오지 못했어요"));

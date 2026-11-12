@@ -61,6 +61,8 @@ export const IPAD = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(naviga
 
 const DEFAULTS = {
   lang: "auto",           // interface language: auto = the browser's
+  look: "2",              // design: 2 = TubeHaus 2.0 (as in the apps), 1 = the Flow look before it
+  smart: true,            // "this video at a glance" under a video
   theme: "light",         // light | dark | system | spatial | spatial-light (default: light, like classic YouTube)
   autoplay: true,         // autoplay the next video
   calm: false,            // calm mode: subscriptions only, no Shorts, trending or recommendations, no autoplay

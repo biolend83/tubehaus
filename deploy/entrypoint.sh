@@ -1,6 +1,17 @@
 #!/bin/sh
 # Start WARP in proxy mode, share it with the other containers, then run TubeHaus.
+# HT_WARP=0 skips WARP: on a home connection YouTube needs no detour, and the container then needs no
+# extra capabilities (app stores such as Umbrel, CasaOS and TrueNAS run it that way). HT_PROXY then
+# names an optional proxy of your own (host:port) for YouTube.
 set -e
+
+if [ "${HT_WARP:-1}" = "0" ]; then
+  export HT_YT_PROXY="${HT_PROXY:-}" HT_WARP_ROTATE=0
+  echo "WARP is off${HT_PROXY:+ (YouTube through $HT_PROXY)}"
+  mkdir -p "$HT_STATE"
+  exec python3 /app/server/tubehaus_server.py
+fi
+
 W="warp-cli --accept-tos"
 
 warp-svc >/var/log/warp-svc.log 2>&1 &

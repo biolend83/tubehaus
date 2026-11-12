@@ -21,6 +21,8 @@
     // the glass themes: the dark or light colours plus spatial.css
     if (t === "spatial" || t === "spatial-light") { document.documentElement.classList.add("spatial"); if (t === "spatial-light") document.documentElement.classList.add("spatial-light"); t = t === "spatial" ? "dark" : "light"; }
     document.documentElement.dataset.theme = t;
+    // the design: 2 = TubeHaus 2.0 (the glass themes keep the classic one)
+    document.documentElement.dataset.look = document.documentElement.classList.contains("spatial") || String(s.look) === "1" ? "1" : "2";
     // calm mode: subscriptions only, no Shorts / trending / recommendations (set before the first paint)
     if (s.calm) document.documentElement.classList.add("calm");
     if (s.hideMusic) document.documentElement.classList.add("no-music");

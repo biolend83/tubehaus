@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.5.0 — 2026-11-12
+
+TubeHaus 1.5: a new look, watch together, and the gist of a video before you watch it. Captions keep working when the caption service is rate-limited, and TubeHaus is ready for the self-hosting app stores. The apps go to 1.5.0 too (the same look, a new Music home, nearby devices, kids mode; see their own release).
+
+### Added
+- **The TubeHaus 1.5 design** (Settings → Design, the new default; Glass themes keep the classic one): calmer colours, and a Home that greets you and puts **Continue watching** (videos you stopped part-way) at the top. "Classic" brings back the old look
+- **Watch together** (the people button on the watch page): start a room and share its link or code. Everyone in the room stays on the same moment (play, pause, seek and the next video follow the room), with a chat and reactions that float over the video. Not on public instances
+- **Video at a glance** (Settings → "Video at a glance", on by default): under a video, the words it keeps coming back to, its key moments and a search for anything said in it, made in your browser from the captions. Videos without chapters get chapters on the seek bar
+- **Store images:** `ghcr.io/biolend83/tubehaus-web` (the web app with its router) next to `ghcr.io/biolend83/tubehaus`, both for amd64 and arm64, and [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml), a stack for a home server with one port and no extra permissions. `HT_WARP=0` runs the server without Cloudflare WARP (`HT_PROXY` for your own proxy). Packages for Umbrel, CasaOS and Unraid are in [`packaging/`](packaging/)
+
+### Fixed
+- **Captions when YouTube rate-limits the caption service** ("429"): the server fetches the caption file itself (directly, then through WARP with a fresh address) and keeps it for a week, for the player, the transcript and translated captions
+
 ## v1.0.6 — 2026-11-11
 
 Titles in your language, switches to hide the Music tab and the logo, and room for a server's own additions (caption tracks, more live-caption engines). The apps go to 1.0.6 too (crash fixes, an AirPlay button that matches the others, AppImage and Flatpak; see their own release).

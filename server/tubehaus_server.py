@@ -713,14 +713,29 @@ def sub_vtt(vid, tl=SUB_LANG):
         return open(cache, "rb").read()
     t0 = time.time()
     # through the companion (WARP): Invidious' own captions come back empty
-    lst = json.loads(urllib.request.urlopen(f"{COMPANION}/companion/api/v1/captions/{vid}", timeout=60).read())
-    tracks = lst.get("captions") or []
-    # prefer English, else whatever the video has
-    pick = next((c for c in tracks if (c.get("languageCode") or "").startswith("en")), None) \
-        or (tracks[0] if tracks else None)
-    if not pick:
-        raise ValueError("This video has no captions to translate")
-    raw = urllib.request.urlopen(COMPANION + pick["url"], timeout=60).read().decode("utf-8", "replace")
+    try:
+        lst = json.loads(urllib.request.urlopen(f"{COMPANION}/companion/api/v1/captions/{vid}", timeout=60).read())
+        tracks = lst.get("captions") or []
+        # prefer English, else whatever the video has
+        pick = next((c for c in tracks if (c.get("languageCode") or "").startswith("en")), None) \
+            or (tracks[0] if tracks else None)
+        if not pick:
+            raise LookupError("This video has no captions to translate")
+        raw = urllib.request.urlopen(COMPANION + pick["url"], timeout=60).read().decode("utf-8", "replace")
+        src = pick.get("languageCode", "?")
+    except LookupError:
+        raise
+    except Exception:
+        # refused (429): the English track straight from YouTube, as made by people, else the automatic one
+        raw = None
+        for lang, auto in (("en", False), ("en", True)):
+            try:
+                raw, src = cap_direct(vid, lang, auto).decode("utf-8", "replace"), lang
+                break
+            except Exception:
+                pass
+        if raw is None:
+            raise ValueError("Couldn't get the captions")
     cues = _vtt_cues(raw)[:SUB_MAX]
     if not cues:
         raise ValueError("Couldn't read the captions")
@@ -740,8 +755,79 @@ def sub_vtt(vid, tl=SUB_LANG):
     tmp = cache + ".part"
     open(tmp, "wb").write(data)
     os.replace(tmp, cache)
-    log("sub", "%s %s->%s %d cues" % (vid, pick.get("languageCode", "?"), tl, len(cues)), t0, every=0)
+    log("sub", "%s %s->%s %d cues" % (vid, src, tl, len(cues)), t0, every=0)
     return data
+
+
+# ---------- captions straight from YouTube when the companion's are refused ----------
+# YouTube answers caption requests from one address with 429 for hours at a time (the companion's and
+# yt-dlp's over the proxy alike). Then yt-dlp fetches the same track over this server's own line (then
+# over the proxy), and the file is kept for a week. Two at a time; one track per (video, language, kind).
+cap_sem = threading.Semaphore(2)
+CAP_KEEP = 7 * 86400
+cap_fail = {}         # (video, language, kind) -> when it last failed: not tried again for 10 minutes
+
+
+def _cap_cache(vid, lang, auto):
+    if not re.fullmatch(r"[\w-]{11}", vid) or not re.fullmatch(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?", lang):
+        raise ValueError("bad video id or language")
+    os.makedirs(SUBS, exist_ok=True)
+    base = os.path.abspath(SUBS) + os.sep
+    cache = os.path.normpath(os.path.join(base, "cap.%s.%s.%s.vtt" % (vid, lang, "a" if auto else "m")))
+    if not cache.startswith(base):
+        raise ValueError("bad cache path")
+    return cache
+
+
+def cap_direct(vid, lang, auto=False):
+    """One caption track as WebVTT, fetched by yt-dlp without the companion."""
+    import glob
+    import tempfile
+    cache = _cap_cache(vid, lang, auto)
+    fresh = lambda: os.path.exists(cache) and time.time() - os.path.getmtime(cache) < CAP_KEEP
+    if fresh():
+        return open(cache, "rb").read()
+    key = (vid, lang, auto)
+    if time.time() - cap_fail.get(key, 0) < 600:
+        raise ValueError("Couldn't get the captions")
+    t0, err = time.time(), "?"
+    with cap_sem:
+        if fresh():      # fetched by another request while this one waited
+            return open(cache, "rb").read()
+        tries = [None] + (["http://" + YT_PROXY] if YT_PROXY else [])
+        rotated = False
+        while tries:
+            proxy = tries.pop(0)
+            with tempfile.TemporaryDirectory() as tmp:
+                cmd = [YTDLP] + (["--proxy", proxy] if proxy else []) + [
+                    "--skip-download", "--no-playlist", "--no-warnings", "--sub-format", "vtt", "--sub-langs", lang,
+                    "--write-auto-subs" if auto else "--write-subs", "-o", os.path.join(tmp, "c"),
+                    "https://www.youtube.com/watch?v=" + vid]
+                try:
+                    out = subprocess.run(cmd, capture_output=True, text=True, timeout=90,
+                                         env={**os.environ, "PATH": os.environ.get("PATH", "") + ":/usr/local/bin"})
+                except (subprocess.TimeoutExpired, OSError) as ex:
+                    err = repr(ex)[:120]
+                    continue
+                got = glob.glob(os.path.join(tmp, "c*.vtt"))
+                if got and os.path.getsize(got[0]) > 10:
+                    data = open(got[0], "rb").read()
+                    part = cache + ".part"
+                    open(part, "wb").write(data)
+                    os.replace(part, cache)
+                    log("cap", "%s %s%s via %s" % (vid, lang, " auto" if auto else "", "proxy" if proxy else "direct"), t0, every=0)
+                    return data
+                err = ((out.stderr or "").strip().splitlines() or ["no captions in that language"])[-1][:120]
+                # refused over the proxy: once, a new WARP address (rate-limited by warp_rotate) and again
+                if proxy and "429" in err and not rotated:
+                    rotated = True
+                    if warp_rotate("captions 429", t0):
+                        tries.append(proxy)
+    cap_fail[key] = time.time()
+    if len(cap_fail) > 2000:
+        cap_fail.clear()
+    log("cap", "%s %s FAIL %s" % (vid, lang, err), t0, every=0)
+    raise ValueError("Couldn't get the captions")
 
 
 def jload(p, d):
@@ -3127,6 +3213,131 @@ def cast_wait(qs):
             cast_devs[did]["seen"] = time.time()
 
 
+# ---------- watch together: a room that keeps everyone's player on the same video and moment ----------
+# One person opens a room and gets a six-letter code (and a link); others join with it. Whoever plays,
+# pauses, seeks or picks another video moves everyone. A short chat sits beside it. Rooms live in memory
+# only and close 30 minutes after the last member left; nothing about them is written anywhere.
+party_cond = threading.Condition()
+parties = {}       # code -> {"seq", "state": {"v", "t", "playing", "at", "by"}, "members": {mid: {"name", "seen"}}, "chat": [...]}
+PARTY_CODE = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+PARTY_REACTS = ("❤️", "😂", "😮", "👏", "🔥")
+
+
+def _party_gc():
+    now = time.time()
+    for code in [c for c, r in parties.items() if not any(now - m["seen"] < 1800 for m in r["members"].values())]:
+        del parties[code]
+
+
+def _party_name(v):
+    return re.sub(r"[\x00-\x1f<>]", "", str(v or "")).strip()[:30] or "Guest"
+
+
+def _party_state(b, old=None):
+    v = str(b.get("v") or (old or {}).get("v") or "")
+    if not re.fullmatch(r"[\w-]{11}", v):
+        return None
+    try:
+        t = max(0.0, min(float(b.get("t") or 0), 86400.0))
+    except (TypeError, ValueError):
+        t = 0.0
+    return {"v": v, "t": t, "playing": bool(b.get("playing")), "at": time.time()}
+
+
+def _party_view(r, mid):
+    now = time.time()
+    return {"seq": r["seq"], "state": r["state"], "me": mid, "now": now,
+            "members": [m["name"] for k, m in r["members"].items() if now - m["seen"] < 60],
+            "chat": r["chat"][-50:],
+            "reacts": [x for x in r.get("reacts", []) if now - x["at"] < 10]}
+
+
+def party_create(b):
+    st = _party_state(b)
+    if not st:
+        return 400, {"error": "Invalid video ID"}
+    with party_cond:
+        _party_gc()
+        if len(parties) >= 200:
+            return 503, {"error": "Too many rooms are open. Please try again later"}
+        code = "".join(secrets.choice(PARTY_CODE) for _ in range(6))
+        while code in parties:
+            code = "".join(secrets.choice(PARTY_CODE) for _ in range(6))
+        mid = secrets.token_hex(8)
+        st["by"] = _party_name(b.get("name"))
+        parties[code] = {"seq": 1, "state": st, "members": {mid: {"name": st["by"], "seen": time.time()}}, "chat": []}
+        log("party", f"open {code}", every=0)
+        return 200, {"code": code, **_party_view(parties[code], mid)}
+
+
+def party_join(b):
+    code = str(b.get("code") or "").upper().strip()
+    with party_cond:
+        r = parties.get(code)
+        if not r:
+            return 404, {"error": "That room is closed"}
+        if len(r["members"]) >= 20 and b.get("me") not in r["members"]:
+            return 403, {"error": "That room is full"}
+        mid = b.get("me") if b.get("me") in r["members"] else secrets.token_hex(8)
+        r["members"][mid] = {"name": _party_name(b.get("name")), "seen": time.time()}
+        r["seq"] += 1
+        party_cond.notify_all()
+        return 200, {"code": code, **_party_view(r, mid)}
+
+
+def party_update(b):
+    """A member played, paused, seeked, picked a video, said something or left."""
+    code = str(b.get("code") or "").upper().strip()
+    mid = str(b.get("me") or "")
+    with party_cond:
+        r = parties.get(code)
+        if not r or mid not in r["members"]:
+            return 404, {"error": "That room is closed"}
+        m = r["members"][mid]
+        m["seen"] = time.time()
+        if b.get("leave"):
+            del r["members"][mid]
+        elif b.get("say"):
+            text = re.sub(r"[\x00-\x1f]", " ", str(b["say"])).strip()[:300]
+            if text:
+                r["chat"].append({"name": m["name"], "text": text, "at": time.time()})
+                del r["chat"][:-50]
+        elif b.get("react") in PARTY_REACTS:
+            r.setdefault("reacts", []).append({"e": b["react"], "from": mid, "at": time.time()})
+            del r["reacts"][:-20]
+        else:
+            st = _party_state(b, r["state"])
+            if not st:
+                return 400, {"error": "Invalid video ID"}
+            st["by"] = m["name"]
+            st["from"] = mid
+            r["state"] = st
+        r["seq"] += 1
+        party_cond.notify_all()
+        return 200, {"ok": True, "seq": r["seq"]}
+
+
+def party_wait(qs):
+    """Long poll (up to 25 s): what changed in the room after `since`; while waiting the member counts as here."""
+    code = str(qs.get("code") or "").upper().strip()
+    mid = str(qs.get("me") or "")
+    try:
+        since = int(qs.get("since", "0"))
+    except ValueError:
+        since = 0
+    deadline = time.time() + 25
+    with party_cond:
+        while True:
+            r = parties.get(code)
+            if not r or mid not in r["members"]:
+                return 404, {"error": "That room is closed"}
+            r["members"][mid]["seen"] = time.time()
+            left = deadline - time.time()
+            if r["seq"] > since or left <= 0:
+                return 200, _party_view(r, mid)
+            party_cond.wait(left)
+
+
 # ---------- live captions: YouTube gives none for live streams, so transcribe them ----------
 # whisper.cpp + a small ggml model (base-q5_1 keeps up with real time on 2 ARM cores).
 # Audio of the lightest variant is cut into ~10 s chunks (two segments); the text is
@@ -3858,6 +4069,8 @@ class H(BaseHTTPRequestHandler):
             return self.send(403, {"error": "Not available on public instances"})
         if PUBLIC_MODE and p.endswith("/yt/feed"):
             return self.send(200, feed_for(self.qs().get("ch", "").split(",")))
+        if p.endswith("/yt/party/wait"):
+            return self.send(*party_wait(self.qs()))
         if "/yt/cast/" in p:
             if p.endswith("/cast/devices"):
                 return self.send(200, cast_devices())
@@ -3935,6 +4148,20 @@ class H(BaseHTTPRequestHandler):
             if p.endswith("/cc.json") and not LIVECC_ENGINES:
                 return self.send(200, {"status": "off", "lag": None, "cues": {}})
             return self.live(p)
+        if p.startswith("/cap/") or "/api/p/cap/" in self.path.split("?")[0]:
+            vid = p.rsplit("/", 1)[-1].replace(".vtt", "")
+            q = self.qs()
+            try:
+                data = cap_direct(vid, q.get("lang") or "en", q.get("auto") == "1")
+            except Exception as ex:
+                return self.send(502, {"error": str(ex)})
+            self.send_response(200)
+            self.send_header("Content-Type", "text/vtt; charset=utf-8")
+            self.send_header("Cache-Control", "private, max-age=86400")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
         if "/sub/" in p:
             vid = p.rsplit("/", 1)[-1].replace(".vtt", "")
             if not re.fullmatch(r"[\w-]{11}", vid):
@@ -4031,6 +4258,12 @@ class H(BaseHTTPRequestHandler):
             return
         if p.endswith("/yt/cast/send"):
             return self.send(*cast_send(body))
+        if p.endswith("/yt/party/create"):
+            return self.send(*party_create(body))
+        if p.endswith("/yt/party/join"):
+            return self.send(*party_join(body))
+        if p.endswith("/yt/party/update"):
+            return self.send(*party_update(body))
         if p.endswith("/yt/dl"):
             return self.send(*ytdl_start(body))
         if p.endswith("/yt/import"):

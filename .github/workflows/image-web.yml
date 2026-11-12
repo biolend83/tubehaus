@@ -1,0 +1,72 @@
+name: Web image
+
+# The web app + Caddy as one image, ghcr.io/<owner>/tubehaus-web (Dockerfile.web), for amd64 and arm64.
+# It only copies files, so one runner builds both. App stores run it next to ghcr.io/<owner>/tubehaus.
+# With the secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN, both images are also copied to Docker Hub.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/tubehaus-web
+
+jobs:
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Version
+        id: v
+        run: |
+          v="${{ github.event.release.tag_name }}"
+          v="${v#v}"
+          echo "v=${v:-dev}" >> "$GITHUB_OUTPUT"
+          # the page asks for its scripts with ?v=<version>, so a new release is fetched fresh
+          sed -i "s/__V__/${v:-dev}/g" web/index.html
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.web
+          platforms: linux/amd64,linux/arm64
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=TubeHaus web app with its Caddy front
+            org.opencontainers.image.licenses=AGPL-3.0
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ github.event_name == 'release' && format('{0}:{1}', env.IMAGE, steps.v.outputs.v) || '' }}
+          push: true
+
+      - name: Copy both images to Docker Hub
+        env:
+          DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          V: ${{ steps.v.outputs.v }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          if [ -z "$DH_USER" ] || [ -z "$DH_TOKEN" ]; then echo "no Docker Hub secrets: skipped"; exit 0; fi
+          echo "$DH_TOKEN" | docker login docker.io -u "$DH_USER" --password-stdin
+          for name in tubehaus tubehaus-web; do
+            tags="-t docker.io/$DH_USER/$name:latest"
+            [ "$V" != "dev" ] && tags="$tags -t docker.io/$DH_USER/$name:$V"
+            # the server image is built by image.yml at the same time: wait until this release's tag is there
+            src="ghcr.io/$OWNER/$name:$V"; [ "$V" = "dev" ] && src="ghcr.io/$OWNER/$name:latest"
+            for i in $(seq 1 90); do docker buildx imagetools inspect "$src" >/dev/null 2>&1 && break; sleep 60; done
+            docker buildx imagetools create $tags "$src"
+          done

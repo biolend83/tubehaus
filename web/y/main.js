@@ -81,11 +81,13 @@ function applyTheme() {
   document.documentElement.classList.toggle("spatial", glass);
   document.documentElement.classList.toggle("spatial-light", settings.theme === "spatial-light");
   document.documentElement.dataset.theme = t;
-  $('meta[name="theme-color"]').content = t === "dark" ? "#0f0f0f" : "#ffffff";
+  const two = !glass && String(settings.look) !== "1";
+  document.documentElement.dataset.look = two ? "2" : "1";
+  $('meta[name="theme-color"]').content = t === "dark" ? (two ? "#0b0d16" : "#0f0f0f") : (two ? "#f7f8fc" : "#ffffff");
 }
 applyTheme();
 matchMedia("(prefers-color-scheme: light)").addEventListener("change", applyTheme);
-addEventListener("settings", (e) => { if (e.detail === "theme") applyTheme(); });
+addEventListener("settings", (e) => { if (e.detail === "theme" || e.detail === "look") applyTheme(); });
 
 // ---------------------------------------------------------------- link interception (no page reloads)
 document.addEventListener("click", (e) => {

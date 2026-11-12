@@ -1,0 +1,13 @@
+# The TubeHaus web app and the Caddy front that routes it, as one image (ghcr.io/<owner>/tubehaus-web).
+# docker-compose.yml mounts web/ and deploy/Caddyfile.docker from the checkout instead; app stores
+# (Umbrel, CasaOS, TrueNAS, Unraid) have no checkout, so they run this.
+#   TUBEHAUS_SITE        what Caddy serves (default ":8080", plain HTTP; a domain gets HTTPS)
+#   TUBEHAUS_AUTH        none | basic | accounts (see deploy/Caddyfile.docker)
+#   TUBEHAUS_SERVER      the TubeHaus server           (default tubehaus:3010)
+#   TUBEHAUS_COMPANION   invidious-companion           (default companion:8282)
+#   TUBEHAUS_INVIDIOUS   Invidious                     (default invidious:3000)
+FROM caddy:2.11-alpine
+COPY web/ /srv/web/
+COPY deploy/Caddyfile.docker /etc/caddy/Caddyfile
+ENV TUBEHAUS_SITE=:8080 TUBEHAUS_AUTH=none
+EXPOSE 8080
