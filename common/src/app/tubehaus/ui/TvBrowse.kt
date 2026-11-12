@@ -91,6 +91,7 @@ internal fun TvCard(
     v: Video, app: AppState, modifier: Modifier = Modifier, queue: List<Video> = emptyList(),
     onFocus: () -> Unit = {}, onClick: (() -> Unit)? = null,
 ) {
+    if (!app.kidsAllow(v.channelId)) return
     val src = remember { MutableInteractionSource() }
     val focused by src.collectIsFocusedAsState()
     val grow by animateFloatAsState(if (focused) 1.08f else 1f, tween(Motion.SHORT, easing = Motion.standard))

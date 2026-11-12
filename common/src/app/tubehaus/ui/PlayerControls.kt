@@ -325,12 +325,21 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
                 // full screen on a phone: swipe up or down on the left for brightness, on the right for volume;
                 // beside the comments on a tablet the same, on the outer thirds (the middle still
                 // swipes the video down into the mini player)
+                // full screen: swipe down in the middle to leave it (#64)
                 .pointerInput(touch, fullscreen, sideGestures, swipe) {
-                    if (!touch || !swipe || !(fullscreen || sideGestures)) return@pointerInput
+                    if (!touch || !(fullscreen || (swipe && sideGestures))) return@pointerInput
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val x = down.position.x
-                        if (!fullscreen && x in size.width / 3f..size.width * 2f / 3f) return@awaitEachGesture
+                        val middle = x in size.width / 3f..size.width * 2f / 3f
+                        if (fullscreen && (middle || !swipe)) {
+                            val start = awaitVerticalTouchSlopOrCancellation(down.id) { c, _ -> c.consume() } ?: return@awaitEachGesture
+                            var pulled = 0f
+                            verticalDrag(start.id) { c -> pulled += c.position.y - c.previousPosition.y; c.consume() }
+                            if (pulled > 60.dp.toPx()) app.setFull(false)
+                            return@awaitEachGesture
+                        }
+                        if (!swipe || (!fullscreen && middle)) return@awaitEachGesture
                         val kind = if (x < size.width / 2) "brightness" else "volume"
                         var level = (if (kind == "brightness") app.platform.brightness()?.let { perceived(it) } else app.platform.mediaVolume()) ?: return@awaitEachGesture
                         val start = awaitVerticalTouchSlopOrCancellation(down.id) { c, _ -> c.consume() } ?: return@awaitEachGesture
@@ -882,7 +891,7 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
                 }
             }
             if (!app.playback.stream?.captions.isNullOrEmpty()) {
-                SheetRow(Sym.ClosedCaption.fill, tr("Captions"), st.captions?.let { c -> st.captionsTranslated?.let { l -> tr("Auto-translate") + " (" + (LANGS.firstOrNull { it.first == l }?.second ?: l) + ")" } ?: c.name } ?: tr("Off")) { page = "c" }
+                SheetRow(Sym.ClosedCaption.fill, tr("Captions"), st.captions?.let { c -> st.captionsTranslated?.let { l -> tr("Auto-translate") + " (" + langName(l) + ")" } ?: c.name } ?: tr("Off")) { page = "c" }
                 if (!pb.music && !app.platform.tv) SheetRow(Sym.Transcript.outline, tr("Transcript"), "") { pb.transcriptAsked = true; dismiss() }
             }
             SheetHeader(tr("Playback"))
@@ -950,7 +959,7 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
         }
         "c" -> {
             val caps = app.playback.stream?.captions ?: emptyList()
-            val lang = app.store.settings.value.lang.ifEmpty { "en" }
+            val lang = app.store.settings.value.let { s -> s.captionLang.ifEmpty { s.lang.ifEmpty { "en" } } }
             Pick(tr("Off"), st.captions == null) {
                 player.setCaptions(null, null); app.store.settings.update { it.copy(captions = false) }; dismiss()
             }
@@ -958,13 +967,33 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
                 player.setCaptions(c, null); app.store.settings.update { it.copy(captions = true) }; dismiss()
             }
             if (caps.none { it.lang.substringBefore('-') == lang }) caps.firstOrNull()?.let { c ->
-                Pick(tr("Auto-translate") + " (" + (LANGS.firstOrNull { it.first == lang }?.second ?: lang) + ")", st.captions != null && st.captionsTranslated == lang) {
+                Pick(tr("Auto-translate") + " (" + langName(lang) + ")", st.captions != null && st.captionsTranslated == lang) {
                     player.setCaptions(c, lang); app.store.settings.update { it.copy(captions = true) }; dismiss()
                 }
+            }
+            // YouTube translates into any of these, not only the app's language (#62)
+            if (caps.isNotEmpty() && app.playback.stream?.client != "offline") SheetRow(Sym.Language.outline, tr("Translate to"), langName(lang)) { page = "l" }
+        }
+        "l" -> {
+            val now = app.store.settings.value.let { s -> s.captionLang.ifEmpty { s.lang.ifEmpty { "en" } } }
+            for ((code, name) in CAPTION_LANGS) Pick(name, code == now) {
+                app.store.settings.update { it.copy(captionLang = code, captions = true) }
+                app.playback.captionChoice()?.let { (c, t) -> player.setCaptions(c, t) }
+                dismiss()
             }
         }
     }
 }
+
+/** the languages captions can be read or translated in: the app's own, then more that YouTube translates into */
+private val CAPTION_LANGS = LANGS + listOf(
+    "ar" to "العربية", "it" to "Italiano", "nl" to "Nederlands", "pl" to "Polski", "uk" to "Українська",
+    "vi" to "Tiếng Việt", "th" to "ไทย", "fa" to "فارسی", "he" to "עברית", "ur" to "اردو", "sv" to "Svenska",
+    "el" to "Ελληνικά", "cs" to "Čeština", "ro" to "Română", "hu" to "Magyar", "ms" to "Bahasa Melayu",
+    "fil" to "Filipino", "ta" to "தமிழ்",
+)
+
+private fun langName(code: String) = CAPTION_LANGS.firstOrNull { it.first == code }?.second ?: code
 
 private fun codecName(c: String) = when (c) { "h264" -> "H.264"; "vp9" -> "VP9"; "av1" -> "AV1"; else -> "" }
 

@@ -94,7 +94,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "1.0.6"
+const val VERSION = "1.5.0"
 
 /** Settings' categories, as cards on its first page: key, icon, title, what is inside */
 private class Cat(val key: String, val icon: Symbol, val title: String, val sub: String)
@@ -133,6 +133,7 @@ private fun catTitle(key: String): String = when (key) {
  */
 @Composable
 fun SettingsScreen(app: AppState) {
+    if (app.store.settings.state.collectAsState().value.kids) { KidsLock(app); return }
     if (!app.platform.tv) SettingsHome(app, null) else TvSettingsScreen(app)
 }
 
@@ -166,6 +167,7 @@ private fun TvSettingsScreen(app: AppState) {
 /** One category of Settings: on a TV a page of its own, elsewhere the settings scrolled to it */
 @Composable
 fun SettingsPageScreen(app: AppState, key: String) {
+    if (app.store.settings.state.collectAsState().value.kids) { KidsLock(app); return }
     if (!app.platform.tv) { SettingsHome(app, key); return }
     Narrow {
         Column(Modifier.fillMaxSize()) {
@@ -392,6 +394,9 @@ private fun SettingsRows(
                 // Android 12+: Material You, the colours of the wallpaper
                 listOfNotNull(("4" to tr("Wallpaper colours")).takeIf { app.platform.wallpaperColors(false) != null })
             r.row("display", tr("Theme") + " dark light black") { Seg(tr("Theme"), "${s.dark}", themes) { c -> set { it.copy(dark = c.toInt()) } } }
+            if (!app.platform.tv) r.row("display", tr("Design") + " look style layout cards glass") {
+                Seg(tr("Design"), "${s.look}", listOf("3" to tr("TubeHaus 1.5"), "0" to tr("Classic"), "1" to tr("Big cards"), "2" to tr("Glass"))) { c -> set { it.copy(look = c.toInt()) } }
+            }
             val sizes = listOf(1f to tr("Normal"), 1.15f to tr("Large"), 1.3f to tr("Larger"), 1.5f to tr("Largest"))
             r.row("display", tr("Text size") + " font") {
                 Seg(tr("Text size"), "${sizes.firstOrNull { it.first == s.textScale }?.first ?: 1f}", sizes.map { "${it.first}" to it.second }) { c -> set { it.copy(textScale = c.toFloat()) } }
@@ -465,6 +470,15 @@ private fun SettingsRows(
         }
         if (app.platform.airplay != null || app.platform.caster != null) r.row("player", tr("Cast button") + " airplay cast tv") {
             Toggle(tr("Cast button"), tr("The AirPlay or cast button on the player"), !s.hideCastButton) { b -> set { it.copy(hideCastButton = !b) } }
+        }
+        r.row("player", tr("Video at a glance") + " summary smart chapters keywords") {
+            Toggle(tr("Video at a glance"), tr("A summary, key moments and chapters made on this device from the captions"), s.smart) { b -> set { it.copy(smart = b) } }
+        }
+        if (app.near.available) r.row("player", tr("Nearby devices") + " remote tv handoff wifi cast") {
+            Toggle(tr("Nearby devices"), tr("Find TubeHaus on your other devices on this Wi-Fi: carry on watching, send videos, use this as a remote"), s.nearby) { b -> set { it.copy(nearby = b) } }
+        }
+        if (app.near.available && s.nearAllowed.isNotEmpty()) r.row("player", tr("Forget allowed devices") + " nearby") {
+            SItem(tr("Forget allowed devices"), tr("Devices allowed to control this one: {n}").replace("{n}", "${s.nearAllowed.size}")) { set { it.copy(nearAllowed = emptyList()) } }
         }
         r.row("player", tr("Most replayed") + " heatmap") { Toggle(tr("Most replayed"), tr("A wave over the seek bar shows the parts people watch again"), s.heatmap) { b -> set { it.copy(heatmap = b) } } }
         if (android) r.row("player", tr("Ambient mode")) {
@@ -576,6 +590,9 @@ private fun SettingsRows(
             Choice(tr("Daily reminder"), if (s.dailyMinutes == 0) tr("Off") else tr("After {t} a day").replace("{t}", minutesText(s.dailyMinutes.toLong())),
                 daily.map { "$it" to if (it == 0) tr("Off") else tr("After {t} a day").replace("{t}", minutesText(it.toLong())) }) { c -> set { it.copy(dailyMinutes = c.toInt()) } }
         }
+        r.row("wellbeing", tr("Kids mode") + " children child parental pin lock") {
+            SItem(tr("Kids mode"), tr("Only the channels you pick, a daily time limit, and a PIN to leave it")) { dialog = "kids" }
+        }
         r.row("wellbeing", tr("Watch time")) {
             Note(tr("Watch time is counted on this device only and is never sent anywhere. Pausing watch history pauses it too."))
         }
@@ -627,6 +644,7 @@ private fun SettingsRows(
         if (q.isNotEmpty() && r.count == 0) item { Empty(tr("No setting matches \"{q}\"").replace("{q}", q)) }
     }
     when (dialog) {
+        "kids" -> KidsSetupDialog(app) { dialog = null }
         "region" -> {
             var code by remember { mutableStateOf(s.region) }
             AlertDialog(

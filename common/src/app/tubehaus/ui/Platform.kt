@@ -23,6 +23,8 @@ interface Platform {
     val player: VideoPlayer
     /** Google Cast: the TVs on this Wi-Fi to send videos to (Android, the desktop); null where there is none */
     val caster: Caster? get() = null
+    /** the other TubeHaus apps on this Wi-Fi (ui/Nearby.kt); null where there is none */
+    val nearby: Nearby? get() = null
     /** iPad and iPhone: the AirPlay button in the player's controls; null elsewhere */
     val airplay: (@Composable (Modifier) -> Unit)? get() = null
 
