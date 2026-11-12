@@ -120,6 +120,8 @@ fun TvApp(app: AppState) {
     val watching = cur is Screen.Watch
     val focus = LocalFocusManager.current
     val desktop = app.platform.name == "desktop"
+    NearbyAsk(app)
+    AutoSaveRunner(app)
 
     // Back: from a page's content to the menu first; on the menu, Home; on Home's menu, once more to leave
     DisposableEffect(Unit) {

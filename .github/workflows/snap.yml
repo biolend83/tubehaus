@@ -1,0 +1,74 @@
+# TubeHaus as a snap (packaging/snap) for the Ubuntu App Center, x86-64 and ARM64.
+# Each build is installed on the runner and libmpv's libraries are checked inside the snap.
+# Releases: the .snap files are attached, and sent to the Snap Store when the repository has the
+# SNAPCRAFT_STORE_CREDENTIALS secret (from `snapcraft export-login`).
+name: Snap
+
+on:
+  push:
+    branches: [android-app]
+    paths: [packaging/snap/**, .github/workflows/snap.yml]
+    tags: ['app-v*']
+  workflow_dispatch:
+
+jobs:
+  snap:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, arch: amd64 }
+          - { runner: ubuntu-24.04-arm, arch: arm64 }
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the app
+        run: |
+          ./gradlew --no-daemon :desktop:createReleaseDistributable
+          app=$(find desktop/build/compose/binaries/main-release/app -mindepth 1 -maxdepth 1 -type d | head -1)
+          mkdir -p packaging/snap/app && cp -a "$app"/. packaging/snap/app/
+          ver=$(sed -n 's/^app.version=//p' gradle.properties)
+          sed -i "s/^version: .*/version: '$ver'/" packaging/snap/snap/snapcraft.yaml
+          ls packaging/snap/app
+      - uses: snapcore/action-build@v1
+        id: build
+        with:
+          path: packaging/snap
+      - name: Install it and check libmpv inside
+        run: |
+          sudo snap install --dangerous "${{ steps.build.outputs.snap }}"
+          snap info --verbose tubehaus | head -5 || true
+          root=/snap/tubehaus/current
+          lib=$(find $root/usr/lib -name 'libmpv.so.2*' | head -1)
+          echo "libmpv: $lib"
+          test -n "$lib"
+          test -x $root/tubehaus/bin/TubeHaus
+          # the gnome extension's libraries plus the snap's own: nothing libmpv needs may be missing
+          gn=$(find /snap/gnome-46-2404/current/usr/lib -maxdepth 1 -type d -name '*-linux-gnu*' | head -1)
+          a=$(basename $(dirname "$lib"))
+          LD_LIBRARY_PATH="$root/usr/lib/$a:$root/usr/lib/$a/blas:$root/usr/lib/$a/lapack:$root/usr/lib/$a/pulseaudio:$gn:/snap/core24/current/usr/lib/$a" \
+            ldd "$lib" | tee ldd.txt
+          ! grep "not found" ldd.txt
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/app-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver=${GITHUB_REF_NAME#app-v}
+          cp "${{ steps.build.outputs.snap }}" "TubeHaus-$ver-linux-${{ matrix.arch }}.snap"
+          gh release upload "$GITHUB_REF_NAME" "TubeHaus-$ver-linux-${{ matrix.arch }}.snap" --clobber --repo "$GITHUB_REPOSITORY"
+      - name: Send to the Snap Store
+        if: startsWith(github.ref, 'refs/tags/app-v') && env.SNAPCRAFT_STORE_CREDENTIALS != ''
+        uses: snapcore/action-publish@v1
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: stable

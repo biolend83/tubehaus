@@ -22,6 +22,8 @@ object Sys {
 
     /** "2026-10-28", for file names */
     fun today(): String = java.time.LocalDate.now().toString()
+    /** the hour of the day here, 0..23 */
+    fun hour(): Int = java.time.LocalTime.now().hour
 
     /** "13:05" (or "1:05 PM"), the device's way */
     fun shortTime(ms: Long): String = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(ms))

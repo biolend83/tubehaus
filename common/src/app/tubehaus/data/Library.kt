@@ -181,6 +181,24 @@ data class Settings(
     val breakMinutes: Int = 0,
     /** wellbeing: a reminder once a day past this many minutes; 0 off */
     val dailyMinutes: Int = 0,
+    /** Settings → Display → Design: 0 classic, 1 cards, 2 glass (ui/Theme.kt, Components.kt) */
+    val look: Int = 3,
+    /** kids mode (ui/Kids.kt): only [kidsChannels], [kidsMinutes] a day (0 no limit), [kidsPin] to leave it;
+     *  [kidsSaved] the Music tab, Shorts and comments switches as they were before it */
+    val kids: Boolean = false,
+    val kidsPin: String = "",
+    val kidsChannels: List<String> = emptyList(),
+    val kidsMinutes: Int = 0,
+    val kidsSaved: List<Boolean> = emptyList(),
+    /** "This video at a glance" under the video (ui/Smart.kt) */
+    val smart: Boolean = true,
+    /** nearby devices (ui/Nearby.kt): on, this device's id and name, the devices allowed to steer it */
+    val nearby: Boolean = false,
+    val nearId: String = "",
+    val nearName: String = "",
+    val nearAllowed: List<String> = emptyList(),
+    /** channels whose new videos are saved by themselves (ui/AutoSave.kt): channel id → from when (epoch s) */
+    val autoSave: Map<String, Long> = emptyMap(),
 )
 
 /** One day of watching, kept on this device only: seconds of video and music, per channel and artist. */

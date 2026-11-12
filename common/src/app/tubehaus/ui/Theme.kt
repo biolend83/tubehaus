@@ -29,13 +29,63 @@ val Teal = Color(0xFF2DD4BF)
 
 /** the teal of "you are here" and of switches that are on: deeper on a light page, as on the web (--acc) */
 val accent: Color
-    @Composable @ReadOnlyComposable get() =
-        if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Teal else Color(0xFF0D9488)
+    @Composable @ReadOnlyComposable get() = when {
+        LocalLook.current == 3 -> if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF8FB2FF) else Color(0xFF3F5BD8)
+        LocalLook.current != 0 -> if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFFB7A9FF) else Color(0xFF6750A4)
+        MaterialTheme.colorScheme.background.luminance() < 0.5f -> Teal
+        else -> Color(0xFF0D9488)
+    }
 
 /** the soft teal behind the open tab and the chosen section (--acc-soft) */
 val accentSoft: Color
-    @Composable @ReadOnlyComposable get() =
-        if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Teal.copy(alpha = 0.18f) else Color(0xFF14B8A6).copy(alpha = 0.16f)
+    @Composable @ReadOnlyComposable get() = when {
+        LocalLook.current == 3 -> if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF8FB2FF).copy(alpha = 0.2f) else Color(0xFF3F5BD8).copy(alpha = 0.13f)
+        LocalLook.current != 0 -> if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFFB7A9FF).copy(alpha = 0.2f) else Color(0xFF6750A4).copy(alpha = 0.14f)
+        MaterialTheme.colorScheme.background.luminance() < 0.5f -> Teal.copy(alpha = 0.18f)
+        else -> Color(0xFF14B8A6).copy(alpha = 0.16f)
+    }
+
+/** Settings → Design: 0 classic, 1 cards, 2 glass, 3 TubeHaus 1.5 */
+val LocalLook = androidx.compose.runtime.compositionLocalOf { 0 }
+
+// the cards look: violet-tinted greys; the glass look: lavender behind the see-through cards. The
+// containers stay opaque (menus, sheets and dialogs are drawn with them); only the cards are see-through
+private val cardsDark by lazy { dark.copy(
+    background = Color(0xFF141218), surface = Color(0xFF141218), surfaceContainerLowest = Color(0xFF141218),
+    surfaceContainerLow = Color(0xFF1B1922), surfaceContainer = Color(0xFF211E29), surfaceContainerHigh = Color(0xFF2B2734),
+    surfaceContainerHighest = Color(0xFF35303F), surfaceVariant = Color(0xFF2A2633), onSurfaceVariant = Color(0xFFB9B2C8),
+    outline = Color(0xFF332E3D), outlineVariant = Color(0xFF332E3D), secondaryContainer = Color(0x33A99BFF),
+) }
+private val cardsLight by lazy { light.copy(
+    background = Color(0xFFFDFBFF), surface = Color(0xFFFDFBFF), surfaceContainerLowest = Color(0xFFFDFBFF),
+    surfaceContainerLow = Color(0xFFF7F3FC), surfaceContainer = Color(0xFFF1ECF8), surfaceContainerHigh = Color.White,
+    surfaceContainerHighest = Color(0xFFE4DEEE), surfaceVariant = Color(0xFFECE6F4), onSurfaceVariant = Color(0xFF5E5869),
+    outline = Color(0xFFE4DEEE), outlineVariant = Color(0xFFE4DEEE), secondaryContainer = Color(0x296750A4),
+) }
+// TubeHaus 1.5: a deep blue night (dark) or a cool paper white (light), periwinkle for "you are here"
+private val auroraDark by lazy { dark.copy(
+    background = Color(0xFF0B0D16), surface = Color(0xFF0B0D16), surfaceContainerLowest = Color(0xFF0B0D16),
+    surfaceContainerLow = Color(0xFF11141F), surfaceContainer = Color(0xFF161A28), surfaceContainerHigh = Color(0xFF1F2436),
+    surfaceContainerHighest = Color(0xFF283048), surfaceVariant = Color(0xFF1C2132), onSurfaceVariant = Color(0xFFA9B1C9),
+    outline = Color(0xFF242A3D), outlineVariant = Color(0xFF242A3D), secondaryContainer = Color(0x338FB2FF),
+    secondary = Color(0xFF8FB2FF),
+) }
+private val auroraLight by lazy { light.copy(
+    background = Color(0xFFF7F8FC), surface = Color(0xFFF7F8FC), surfaceContainerLowest = Color(0xFFF7F8FC),
+    surfaceContainerLow = Color(0xFFF0F2F9), surfaceContainer = Color(0xFFEBEEF7), surfaceContainerHigh = Color.White,
+    surfaceContainerHighest = Color(0xFFDDE2F0), surfaceVariant = Color(0xFFE5E9F4), onSurfaceVariant = Color(0xFF59607A),
+    outline = Color(0xFFDDE2F0), outlineVariant = Color(0xFFDDE2F0), secondaryContainer = Color(0x293F5BD8),
+    secondary = Color(0xFF3F5BD8),
+) }
+private val glassDark by lazy { cardsDark.copy(
+    background = Color(0xFF121118), surface = Color(0xFF121118), surfaceContainerLowest = Color(0xFF121118),
+    surfaceContainerLow = Color(0xFF19171F), surfaceContainer = Color(0xFF1E1C25),
+) }
+private val glassLight by lazy { cardsLight.copy(
+    background = Color(0xFFE9E6F2), surface = Color(0xFFE9E6F2), surfaceContainerLowest = Color(0xFFE9E6F2),
+    surfaceContainerLow = Color(0xFFF1EFF7), surfaceContainer = Color(0xFFF5F3FA), surfaceVariant = Color(0xFFDFDBEA),
+    outline = Color(0xFFD9D4E6), outlineVariant = Color(0xFFD9D4E6),
+) }
 
 // surfaceVariant: chips, pills, picture placeholders (--chip); surfaceContainer: the boxes that hold
 // rows, settings and descriptions (--box); surfaceContainerHigh: what sits on a box, such as the circle
@@ -118,16 +168,21 @@ object Motion {
 }
 
 @Composable
-fun TubeTheme(mode: Int, wallpaper: ((Boolean) -> ColorScheme?)? = null, font: FontFamily? = null, content: @Composable () -> Unit) {
+fun TubeTheme(mode: Int, wallpaper: ((Boolean) -> ColorScheme?)? = null, font: FontFamily? = null, look: Int = 0, content: @Composable () -> Unit) {
     // 0 follow the system, 1 light, 2 dark, 3 black (pure black for AMOLED screens),
     // 4 the wallpaper's colours (Material You, Android 12+), light or dark with the system
     val darkOn = when (mode) { 1 -> false; 2, 3 -> true; else -> isSystemInDarkTheme() }
     val scheme = when {
         mode == 3 -> black
         mode == 4 -> wallpaper?.invoke(darkOn) ?: if (darkOn) dark else light
+        look == 1 -> if (darkOn) cardsDark else cardsLight
+        look == 2 -> if (darkOn) glassDark else glassLight
+        look == 3 -> if (darkOn) auroraDark else auroraLight
         darkOn -> dark
         else -> light
     }
     val typography = androidx.compose.runtime.remember(font) { type(font) }
-    MaterialTheme(colorScheme = scheme, typography = typography, shapes = shapes, content = content)
+    androidx.compose.runtime.CompositionLocalProvider(LocalLook provides look) {
+        MaterialTheme(colorScheme = scheme, typography = typography, shapes = shapes, content = content)
+    }
 }

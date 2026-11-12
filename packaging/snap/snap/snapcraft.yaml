@@ -1,0 +1,62 @@
+# TubeHaus as a snap (Ubuntu App Center): the desktop app as Gradle builds it (its own Java runtime
+# inside, put in packaging/snap/app by CI, see .github/workflows/snap.yml) and Ubuntu's libmpv.
+# The menu entry and icon are in snap/gui.
+name: tubehaus
+title: TubeHaus
+version: '1.0.6'
+summary: Private YouTube client without a Google account
+description: |
+  TubeHaus plays YouTube without a Google account, without ads and without tracking. Your
+  subscriptions, history, playlists and recommendations stay on your computer.
+
+  - Subscriptions, Watch later, playlists and history, imported from Google Takeout or NewPipe if you like
+  - Recommendations made on your device from what you watch
+  - SponsorBlock, Return YouTube Dislike and DeArrow
+  - Captions, chapters, a video queue and audio-only playback
+  - Videos saved to watch without internet
+  - Optionally synced with your own TubeHaus server
+
+  Not affiliated with YouTube or Google.
+license: GPL-3.0-only
+website: https://github.com/biolend83/tubehaus
+source-code: https://github.com/biolend83/tubehaus/tree/android-app
+issues: https://github.com/biolend83/tubehaus/issues
+base: core24
+grade: stable
+confinement: strict
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  tubehaus:
+    command: tubehaus/bin/TubeHaus
+    extensions: [gnome]
+    plugs:
+      - network
+      - network-bind      # the local web page a TV is cast to
+      - audio-playback
+      - x11
+      - wayland
+      - opengl
+      - home              # saving a video or a transcript where you choose
+      - removable-media
+    environment:
+      # libmpv and the libraries it needs (BLAS/LAPACK sit in their own folders)
+      LD_LIBRARY_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/blas:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/lapack:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/pulseaudio:$LD_LIBRARY_PATH
+      LC_NUMERIC: C
+      _JAVA_AWT_WM_NONREPARENTING: '1'
+
+parts:
+  tubehaus:
+    plugin: dump
+    source: app
+    organize:
+      '*': tubehaus/
+  mpv:
+    plugin: nil
+    stage-packages:
+      - libmpv2
+    prime:
+      - -usr/share/doc
+      - -usr/share/man
