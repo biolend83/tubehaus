@@ -223,14 +223,18 @@ private fun PlayerBox(app: AppState, sideGestures: Boolean = false) {
     }
     Box(
         Modifier.fillMaxWidth().aspectRatio(16f / 9f).ambientGlow(glow).background(Color.Black)
-            // touch screens: swipe the video down to keep it playing in the mini player and go back
+            // touch screens: swipe the video down to keep it playing in the mini player and go back,
+            // up to watch it full screen (#64)
             .pointerInput(touch) {
                 if (!touch) return@pointerInput
                 var pulled = 0f
                 detectVerticalDragGestures(
                     onDragStart = { pulled = 0f },
                     onVerticalDrag = { change, dy -> change.consume(); pulled += dy },
-                    onDragEnd = { if (pulled > 80.dp.toPx()) app.back() },
+                    onDragEnd = {
+                        if (pulled > 80.dp.toPx()) app.back()
+                        else if (pulled < -60.dp.toPx()) app.setFull(true)
+                    },
                 )
             },
     ) {
