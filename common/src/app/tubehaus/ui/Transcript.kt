@@ -40,7 +40,7 @@ import app.tubehaus.engine.Vtt
 import app.tubehaus.engine.YouTube
 
 /** transcripts already fetched, by their captions' address */
-private val transcripts = HashMap<String, List<Vtt.Line>>()
+internal val transcripts = HashMap<String, List<Vtt.Line>>()
 
 /**
  * The video's captions as a transcript: every line with its time, the one being said marked,
@@ -66,7 +66,8 @@ fun TranscriptPanel(app: AppState, onClose: (() -> Unit)?) {
         val r = runCatching { Vtt.lines(Net.get(url)) }.getOrNull()
         if (r == null) failed = true else { transcripts[url] = r; lines = r }
     }
-    var q by remember { mutableStateOf("") }
+    // a word tapped in "at a glance" arrives already searched for
+    var q by remember { mutableStateOf(pb.transcriptSearch.also { pb.transcriptSearch = "" }) }
     val c = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {

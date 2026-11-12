@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -186,7 +187,7 @@ fun Video.badge(): String = when {
 
 /** The line under a title; with thumbnails switched off it starts with the length they would show. */
 @Composable
-private fun Video.details(app: AppState, calm: Boolean): String =
+fun Video.details(app: AppState, calm: Boolean): String =
     listOf(badge().takeIf { app.store.settings.value.hideThumbs } ?: "", subline(calm)).filter { it.isNotEmpty() }.joinToString(" · ")
 
 /**
@@ -313,6 +314,7 @@ fun VideoMenu(v: Video, app: AppState, extra: List<Pair<String, () -> Unit>> = e
 /** Big card: thumbnail on top, avatar + title + details below (home, subscriptions, search). */
 @Composable
 fun VideoCard(v: Video, app: AppState, queue: List<Video> = emptyList()) {
+    if (!app.kidsAllow(v.channelId)) return
     val calm = app.store.settings.value.calm
     val menu = remember { mutableStateOf(false) }
     // as the web app 1.0 draws them: a rounded picture (on a phone inside the page's 12dp margin,
@@ -341,6 +343,7 @@ fun VideoCard(v: Video, app: AppState, queue: List<Video> = emptyList()) {
 /** Compact row: small thumbnail on the left (related videos, playlists, history). */
 @Composable
 fun VideoRow(v: Video, app: AppState, queue: List<Video> = emptyList(), extra: List<Pair<String, () -> Unit>> = emptyList(), thumbWidth: Dp = 168.dp, big: Boolean = false, onClick: (() -> Unit)? = null) {
+    if (!app.kidsAllow(v.channelId)) return
     val calm = app.store.settings.value.calm
     val menu = remember { mutableStateOf(false) }
     Row(
@@ -497,7 +500,10 @@ fun ItemGrid(
     header: (@Composable () -> Unit)? = null,
     /** with rows: one column of large rows down the middle, as YouTube lists search results on a computer */
     wideRows: Boolean = false,
+    /** the cards look on Home: the first video large */
+    hero: Boolean = false,
 ) {
+    val look = LocalLook.current
     val scope = rememberCoroutineScope()
     if (onEnd != null) {
         LaunchedEffect(state, items.size) {
@@ -522,19 +528,24 @@ fun ItemGrid(
     // the large rows' picture shrinks with the window, so a narrow one still leaves room for the title
     val bigThumb = when { maxWidth > 900.dp -> 360.dp; maxWidth > 640.dp -> 246.dp; else -> 168.dp }
     LazyVerticalGrid(
-        columns = if (big) GridCells.Fixed(1) else if (rows) GridCells.Adaptive(560.dp) else if (tv) GridCells.Fixed(4) else GridCells.Adaptive(320.dp),
+        columns = if (big) GridCells.Fixed(1) else if (rows) GridCells.Adaptive(560.dp) else if (tv) GridCells.Fixed(4)
+            else if (look == 2) (if (LocalCompact.current) GridCells.Fixed(2) else GridCells.Adaptive(250.dp))
+            else if (look == 1 || look == 3) GridCells.Adaptive(330.dp) else GridCells.Adaptive(320.dp),
         state = state,
         modifier = Modifier.let { if (big) it.widthIn(max = 1120.dp) else it }.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(if (LocalCompact.current) 0.dp else if (tv) 22.dp else 20.dp),
-        contentPadding = PaddingValues(horizontal = if (LocalCompact.current) 0.dp else if (tv) TV_EDGE else 24.dp, vertical = if (tv) 16.dp else 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (LocalCompact.current || look != 0) 0.dp else if (tv) 22.dp else 20.dp),
+        contentPadding = PaddingValues(horizontal = if (LocalCompact.current) (if (look == 2 && !rows) 7.dp else 0.dp) else if (tv) TV_EDGE else 24.dp, vertical = if (tv) 16.dp else 8.dp),
     ) {
         if (header != null) item(span = { GridItemSpan(maxLineSpan) }) { header() }
-        itemsIndexed(list, key = { _, it -> it.id }, span = { _, it -> if (it is Video && !rows) GridItemSpan(1) else GridItemSpan(maxLineSpan) }) { i, it ->
+        itemsIndexed(list, key = { _, it -> it.id }, span = { i, it -> if (it is Video && !rows && !(hero && i == 0)) GridItemSpan(1) else GridItemSpan(maxLineSpan) }) { i, it ->
             Box((if (tv && it.id == list[0].id) Modifier.focusRequester(first) else Modifier).arrive(it.id, i, seen)) {
                 when (it) {
                     is Video -> if (rows) VideoRow(it, app, thumbWidth = if (big) bigThumb else 168.dp, big = big)
                         // TV: the big-screen card, which grows in a white frame when chosen
                         else if (tv) TvCard(it, app, Modifier.fillMaxWidth().padding(bottom = 30.dp))
+                        else if (hero && i == 0) HeroCard(it, app)
+                        else if (look == 2) GlassCard(it, app)
+                        else if (look == 1 || look == 3) GlassCard(it, app, solid = true)
                         else VideoCard(it, app)
                     is Channel -> ChannelRow(it, app)
                     is Playlist -> PlaylistRow(it, app)
@@ -793,3 +804,108 @@ fun Narrow(content: @Composable () -> Unit) {
         Box(Modifier.widthIn(max = 900.dp).fillMaxWidth()) { content() }
     }
 }
+
+
+// ---------------------------------------------------------------------- the looks (Settings → Design)
+
+/** Design 2 (glass): a small see-through card, two a row on a phone */
+@Composable
+fun GlassCard(v: Video, app: AppState, queue: List<Video> = emptyList(), solid: Boolean = false) {
+    if (!app.kidsAllow(v.channelId)) return
+    val menu = remember { mutableStateOf(false) }
+    // solid: the big cards look, an opaque rounded box with the channel's picture; else see-through glass
+    val shape = RoundedCornerShape(if (solid) 24.dp else 18.dp)
+    val c = MaterialTheme.colorScheme
+    val calm = app.store.settings.value.calm
+    val darkBg = c.background.luminance() < 0.5f
+    val edge = if (solid) Color.Transparent else if (darkBg) Color(0x1FFFFFFF) else Color(0xCCFFFFFF)
+    val fill = if (solid) c.surfaceContainer else if (darkBg) Color(0x14FFFFFF) else Color(0x99FFFFFF)
+    val phone = LocalCompact.current
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = if (solid && phone) 12.dp else 5.dp, vertical = if (solid) 7.dp else 5.dp)
+            .clip(shape).background(fill).border(1.dp, edge, shape)
+            .tvClickable(shape, onLongClick = { menu.value = true }) { app.watch(v, queue) }.padding(if (solid) 8.dp else 6.dp),
+    ) {
+        if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.fillMaxWidth(), rounded = if (solid) 18 else 13)
+        Row(Modifier.padding(top = if (solid) 10.dp else 7.dp, start = 2.dp, bottom = if (solid) 4.dp else 0.dp)) {
+            if (solid && v.channelId.isNotEmpty()) {
+                Avatar(channelAvatar(app, v.channelId, v.avatar), 34,
+                    Modifier.notOnTv().clickable { app.go(Screen.Channel(v.channelId, v.author)) })
+                Spacer(Modifier.width(10.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(titleOf(v, app), fontSize = if (solid) 15.sp else 13.sp, fontWeight = if (solid) FontWeight.Bold else FontWeight.SemiBold,
+                    lineHeight = if (solid) 20.sp else 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                // the channel, views and age, as on the classic card
+                Text(v.details(app, calm), style = if (solid) MaterialTheme.typography.bodySmall else MaterialTheme.typography.labelSmall,
+                    color = c.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+            }
+            VideoMenu(v, app, openState = menu)
+        }
+    }
+}
+
+/** Design 1 (cards): Home's first video, large, its title over the picture */
+@Composable
+fun HeroCard(v: Video, app: AppState, queue: List<Video> = emptyList()) {
+    if (!app.kidsAllow(v.channelId)) return
+    val menu = remember { mutableStateOf(false) }
+    val phone = LocalCompact.current
+    val calm = app.store.settings.value.calm
+    val shape = RoundedCornerShape(26.dp)
+    Box(
+        // a phone: the picture as it is; a computer: a wide banner cut from it, so it doesn't fill the window
+        Modifier.fillMaxWidth().padding(horizontal = if (phone) 12.dp else 5.dp).padding(bottom = 18.dp, top = 4.dp)
+            .aspectRatio(if (phone) 16f / 9f else 2.6f)
+            .clip(shape).tvClickable(shape, onLongClick = { menu.value = true }) { app.watch(v, queue) },
+    ) {
+        Img(if (phone) v.thumb else v.thumbHigh, Modifier.fillMaxSize())
+        Box(Modifier.matchParentSize().background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color(0xD9000000))))
+        val label = v.badge()
+        if (label.isNotEmpty()) Text(label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).background(if (v.live) Red else Color(0xB3000000), RoundedCornerShape(6.dp))
+                .padding(horizontal = 6.dp, vertical = 2.dp))
+        Column(Modifier.align(Alignment.BottomStart).padding(start = if (phone) 18.dp else 28.dp, end = 56.dp, bottom = if (phone) 16.dp else 24.dp)
+            .widthIn(max = 720.dp)) {
+            Text(titleOf(v, app), color = Color.White, fontSize = if (phone) 19.sp else 26.sp, fontWeight = FontWeight.ExtraBold,
+                lineHeight = if (phone) 24.sp else 32.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(v.details(app, calm), color = Color(0xD9FFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+        }
+        Box(Modifier.align(Alignment.BottomEnd).padding(6.dp)) { VideoMenu(v, app, openState = menu) }
+    }
+}
+
+/** Design 1 (cards): the videos you stopped in the middle of, in a row that scrolls sideways */
+@Composable
+fun ContinueRow(app: AppState, forYou: Boolean = true) {
+    val lib by app.store.lib.state.collectAsState()
+    val left = remember(lib.hist, lib.pos) {
+        lib.hist.asSequence().filter { m ->
+            val p = lib.pos[m.id] ?: return@filter false
+            val t = p.getOrNull(0) ?: 0; val len = p.getOrNull(1) ?: 0
+            len > 0 && t > 20 && t < len - 30
+        }.map { it.video() }.filter { app.kidsAllow(it.channelId) }.take(12).toList()
+    }
+    if (left.isEmpty()) return
+    val phone = LocalCompact.current
+    Text(tr("Continue watching"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold,
+        modifier = Modifier.padding(start = if (phone) 16.dp else 4.dp, top = 4.dp, bottom = 8.dp))
+    androidx.compose.foundation.lazy.LazyRow(
+        contentPadding = PaddingValues(horizontal = if (phone) 12.dp else 0.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.padding(bottom = 18.dp),
+    ) {
+        items(left.size, key = { left[it].id }) { i ->
+            val v = left[i]
+            Column(Modifier.width(220.dp).clip(RoundedCornerShape(18.dp)).tvClickable(RoundedCornerShape(18.dp)) { app.watch(v) }) {
+                Thumb(v, app, Modifier.fillMaxWidth(), rounded = 18)
+                Text(titleOf(v, app), style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp))
+            }
+        }
+    }
+    if (forYou) Text(tr("For you"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold,
+        modifier = Modifier.padding(start = if (phone) 16.dp else 4.dp, bottom = 8.dp))
+}
+

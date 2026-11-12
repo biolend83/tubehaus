@@ -1,5 +1,11 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.layout.fillMaxHeight
+
+import androidx.compose.ui.unit.sp
+
+import app.tubehaus.engine.Sys
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
@@ -190,13 +196,17 @@ fun MusicScreen(app: AppState) {
     }
     Narrow {
         Column(Modifier.fillMaxSize()) {
-            SearchField(
-                q, { q = it; if (it.isEmpty()) term = "" }, tr("Songs, artists, albums"),
-                Modifier.padding(horizontal = 16.dp, vertical = 8.dp), leading = Sym.Music.outline, onSearch = { submit(q) },
-                trailing = { IconButton(onClick = { submit(q) }) { Icon(Sym.Search.outline, tr("Search")) } },
-            )
+            val box: @Composable (Modifier) -> Unit = { m ->
+                SearchField(
+                    q, { q = it; if (it.isEmpty()) term = "" }, tr("Songs, artists, albums"),
+                    m, leading = Sym.Music.outline, onSearch = { submit(q) },
+                    trailing = { IconButton(onClick = { submit(q) }) { Icon(Sym.Search.outline, tr("Search")) } },
+                )
+            }
+            if (term.isNotEmpty()) box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             when {
-                term.isEmpty() -> MusicHome(app, md.recent.map { it.song() }, md.opened.map { it.card() }, md.searches) { submit(it) }
+                term.isEmpty() -> MusicHome(app, md.recent.map { it.song() }, md.opened.map { it.card() }, md.searches,
+                    md.liked.map { it.song() }, { submit(it) }, box)
                 busy && res == null -> Busy(Modifier.fillMaxWidth().padding(32.dp))
                 failed && res == null -> Problem(tr("Couldn't search. Check the connection and try again.")) { attempt++ }
                 else -> res?.let { r -> MusicResultsList(app, r) }
@@ -220,7 +230,8 @@ private fun MusicResultsList(app: AppState, r: MusicResults) {
 }
 
 @Composable
-private fun MusicHome(app: AppState, recent: List<Song>, opened: List<MusicCard>, searches: List<String>, search: (String) -> Unit) {
+private fun MusicHome(app: AppState, recent: List<Song>, opened: List<MusicCard>, searches: List<String>, liked: List<Song>,
+                      search: (String) -> Unit, box: @Composable (Modifier) -> Unit) {
     val seed = recent.firstOrNull()
     var quick by remember { mutableStateOf(if (seed != null && seed.id == picksFor) picks else emptyList()) }
     LaunchedEffect(seed?.id) {
@@ -228,43 +239,107 @@ private fun MusicHome(app: AppState, recent: List<Song>, opened: List<MusicCard>
         val r = runCatching { Music.radio(seed.id) }.getOrDefault(emptyList()).filter { it.id != seed.id }.take(20)
         if (r.isNotEmpty()) { picksFor = seed.id; picks = r; quick = r }
     }
-    if (recent.isEmpty() && opened.isEmpty() && searches.isEmpty()) {
-        Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Sym.Music.outline, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(tr("Search for a song, an artist or an album"), Modifier.padding(top = 12.dp), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-            Text(tr("Songs play one after another, with the lyrics and songs like them. Only the sound is loaded, to save data."),
-                Modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        }
-        return
+    val phone = LocalCompact.current
+    val hello = when (Sys.hour()) {
+        in 0..4 -> tr("Late-night music")
+        in 5..11 -> tr("Good morning")
+        in 12..17 -> tr("Afternoon music")
+        else -> tr("Music for tonight")
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-        if (searches.isNotEmpty()) item {
-            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(searches.take(12)) { t -> Chip(false, { search(t) }, t, Sym.History.outline) }
-            }
-        }
-        if (recent.isNotEmpty()) item {
-            ShelfTitle(tr("Jump back in"))
-            SpeedDial(app, recent)
-        }
-        if (quick.isNotEmpty()) {
-            item {
-                ShelfTitle(tr("Quick picks"), end = {
-                    PillButton(tr("Play all"), Sym.PlayArrow.fill, height = 36.dp) { app.playback.playSongs(quick, 0, radio = true) }
-                })
-            }
-            item {
-                RowGroup {
-                    quick.take(8).forEachIndexed { i, s ->
-                        SongRow(app, s, playing = app.playback.song?.id == s.id) { app.playback.playSongs(quick, i, radio = true) }
-                    }
+        // the greeting and the search box: side by side on a wide screen, one over the other on a phone
+        item {
+            val greet: @Composable () -> Unit = {
+                Column {
+                    Text(tr("Music"), color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, letterSpacing = 0.4.sp)
+                    Text(hello, fontSize = if (phone) 28.sp else 36.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp,
+                        modifier = Modifier.padding(top = 4.dp))
                 }
             }
+            if (phone) Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 10.dp)) {
+                greet()
+                box(Modifier.fillMaxWidth().padding(top = 14.dp))
+            } else Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
+                Box(Modifier.weight(1f)) { greet() }
+                box(Modifier.widthIn(max = 520.dp).weight(1f))
+            }
         }
-        if (opened.isNotEmpty()) item { CardShelf(app, tr("Your albums and artists"), opened) }
-        if (recent.size > 1) {
-            item { ShelfTitle(tr("Recently played")) }
-            items(recent.take(30), key = { "r" + it.id }) { s -> SongRow(app, s) { app.playback.playSongs(recent.take(100), recent.indexOf(s)) } }
+        if (searches.isNotEmpty()) item {
+            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(searches.take(10)) { t -> Chip(false, { search(t) }, t, Sym.History.outline) }
+            }
+        }
+        if (quick.isNotEmpty() && seed != null) item {
+            HomeSection(tr("Quick picks"), tr("Based on ‘{0}’").replace("{0}", seed.title),
+                end = { PillButton(tr("Play all"), Sym.PlayArrow.fill, height = 36.dp) { app.playback.playSongs(quick, 0, radio = true) } })
+            QuickGrid(app, quick) { i -> app.playback.playSongs(quick, i, radio = true) }
+        }
+        if (recent.isNotEmpty()) item {
+            HomeSection(tr("Listen again"), end = { PillButton(tr("Play all"), Sym.PlayArrow.fill, height = 36.dp) { app.playback.playSongs(recent.take(100), 0) } })
+            QuickGrid(app, recent.take(20)) { i -> app.playback.playRadio(recent[i]) }
+        }
+        if (liked.isNotEmpty()) item {
+            HomeSection(tr("Liked songs"), "${liked.size}", end = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PillButton(tr("Play all"), Sym.PlayArrow.fill, height = 36.dp) { app.playback.playSongs(liked, 0) }
+                    PillButton(tr("Shuffle"), Sym.Shuffle.fill, height = 36.dp) { app.playback.playSongs(liked, 0, shuffled = true) }
+                }
+            })
+            QuickGrid(app, liked.take(20)) { i -> app.playback.playSongs(liked, i) }
+        }
+        if (opened.isNotEmpty()) item { CardShelf(app, tr("Albums and artists you opened"), opened) }
+        if (recent.isEmpty() && liked.isEmpty()) item {
+            Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Sym.Music.fill, null, Modifier.size(56.dp), tint = accent)
+                Text(tr("Find a song you want to hear"), Modifier.padding(top = 12.dp), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                Text(tr("Albums and artists come from YouTube Music, and songs play sound only. The lyrics come along too."),
+                    Modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            }
+        }
+        // YouTube's own music shelves (videos), as at the bottom of the web's music page
+        item {
+            HomeSection(tr("Music videos on YouTube"))
+            Row(
+                Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainer)
+                    .tvClickable(RoundedCornerShape(20.dp)) { app.go(Screen.Topic("Music")) }.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Sym.MusicVideo.outline, null, tint = accent)
+                Text(tr("Popular music videos, new releases and live performances"), Modifier.weight(1f).padding(horizontal = 12.dp),
+                    style = MaterialTheme.typography.bodyMedium)
+                Icon(Sym.ChevronRight.outline, null)
+            }
+        }
+    }
+}
+
+/** a section's heading with a quiet note after it (a count, "based on ...") and buttons at the end */
+@Composable
+private fun HomeSection(title: String, note: String = "", end: (@Composable () -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 22.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
+            Text(title, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.4).sp, maxLines = 1)
+            if (note.isNotEmpty()) Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 8.dp, bottom = 2.dp))
+        }
+        end?.invoke()
+    }
+}
+
+/** songs four to a column, the columns side by side and swiped across (the web's .m-quick) */
+@Composable
+private fun QuickGrid(app: AppState, songs: List<Song>, play: (Int) -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val colW = if (LocalCompact.current) maxWidth * 0.88f else 320.dp
+        val rows = minOf(4, songs.size)
+        androidx.compose.foundation.lazy.grid.LazyHorizontalGrid(
+            androidx.compose.foundation.lazy.grid.GridCells.Fixed(rows),
+            Modifier.fillMaxWidth().height(64.dp * rows),
+            contentPadding = PaddingValues(horizontal = 4.dp),
+        ) {
+            items(songs.size, key = { "q" + songs[it].id + it }) { i ->
+                Box(Modifier.width(colW).height(64.dp)) { SongRow(app, songs[i], playing = app.playback.song?.id == songs[i].id) { play(i) } }
+            }
         }
     }
 }
@@ -454,28 +529,65 @@ fun NowPlayingScreen(app: AppState) {
         }
         return
     }
+    // as on the web: "Up next" and "Lyrics" under the song; on a phone a tab opens in place of the cover,
+    // and the same tab again goes back to it
     var tab by rememberSaveable { mutableStateOf(0) }
+    var panel by rememberSaveable { mutableStateOf(false) }
+    val c = MaterialTheme.colorScheme
     Box(Modifier.fillMaxSize()) {
-    CoverGlow(s)
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth > 760.dp
-        if (wide) Row(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true) }
-            Column(Modifier.weight(1f).fillMaxSize()) {
-                NowTabs(listOf(tr("Lyrics"), tr("Coming up")), (tab - 1).coerceAtLeast(0)) { tab = it + 1 }
-                if (tab <= 1) LyricsPanel(app, s) else QueuePanel(app)
-            }
-        } else Column(Modifier.fillMaxSize()) {
-            NowTabs(listOf(tr("Song"), tr("Lyrics"), tr("Coming up")), tab) { tab = it }
-            when (tab) {
-                0 -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true) }
-                else -> {
-                    SongPanel(app, s, big = false)
-                    Box(Modifier.weight(1f)) { if (tab == 1) LyricsPanel(app, s) else QueuePanel(app) }
+        CoverGlow(s)
+        Column(Modifier.fillMaxSize()) {
+            NowTop(app, s)
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                val wide = maxWidth > 760.dp
+                if (wide) Row(Modifier.fillMaxSize().padding(start = 40.dp, end = 40.dp, bottom = 32.dp, top = 4.dp), horizontalArrangement = Arrangement.spacedBy(48.dp)) {
+                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true) }
+                    Column(Modifier.weight(1f).widthIn(max = 470.dp).fillMaxHeight().clip(RoundedCornerShape(28.dp))
+                        .background(c.background.copy(alpha = 0.55f)).padding(8.dp)) {
+                        NowTabs(tab) { tab = it }
+                        Box(Modifier.weight(1f)) { if (tab == 0) QueuePanel(app) else LyricsPanel(app, s) }
+                    }
+                } else Column(Modifier.fillMaxSize().padding(bottom = 10.dp)) {
+                    if (!panel) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true) }
+                    else SongPanel(app, s, big = false)
+                    Box(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+                        NowTabs(if (panel) tab else -1) { t -> if (panel && t == tab) panel = false else { tab = t; panel = true } }
+                    }
+                    if (panel) Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(RoundedCornerShape(24.dp))
+                        .background(c.background.copy(alpha = 0.55f)).padding(6.dp)) { if (tab == 0) QueuePanel(app) else LyricsPanel(app, s) }
                 }
             }
         }
     }
+}
+
+/** the player's top: down to leave, "Now playing" and where it came from, and the menu */
+@Composable
+private fun NowTop(app: AppState, s: Song) {
+    val pb = app.playback
+    var more by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = { app.back() }) { Icon(Sym.KeyboardArrowDown.fill, tr("Close")) }
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(tr("Now playing"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(s.album.ifEmpty { s.artist }, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Box {
+            IconButton(onClick = { more = true }) { Icon(Sym.MoreVert.fill, tr("More")) }
+            DropdownMenu(more, { more = false }) {
+                if (!pb.withVideo) DropdownMenuItem(text = { Text(tr("Watch video")) }, leadingIcon = { Icon(Sym.MusicVideo.outline, null) },
+                    onClick = { more = false; pb.showVideo() })
+                else DropdownMenuItem(text = { Text(tr("Open the video")) }, leadingIcon = { Icon(Sym.Fullscreen.outline, null) },
+                    onClick = { more = false; app.go(Screen.Watch(s.id)) })
+                DropdownMenuItem(text = { Text(tr("Start radio")) }, leadingIcon = { Icon(Sym.Explore.outline, null) }, onClick = { more = false; pb.playRadio(s) })
+                if (s.albumId.isNotEmpty()) DropdownMenuItem(text = { Text(tr("Go to album")) }, leadingIcon = { Icon(Sym.Album.outline, null) },
+                    onClick = { more = false; app.go(Screen.Album(s.albumId, s.album)) })
+                if (s.artistId.startsWith("UC")) DropdownMenuItem(text = { Text(tr("Go to artist")) }, leadingIcon = { Icon(Sym.Person.outline, null) },
+                    onClick = { more = false; app.go(Screen.Artist(s.artistId, s.artist)) })
+                DropdownMenuItem(text = { Text(tr("Share")) }, leadingIcon = { Icon(Sym.Share.outline, null) },
+                    onClick = { more = false; app.share(s.title, "https://youtu.be/${s.id}") })
+            }
+        }
     }
 }
 
@@ -496,10 +608,19 @@ private fun CoverGlow(s: Song) {
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(bg.copy(alpha = 0.1f), bg.copy(alpha = 0.55f), bg.copy(alpha = 0.92f)))))
 }
 
+/** "Up next" and "Lyrics" as one segmented bar (the web's .mf-tabs); -1: neither chosen */
 @Composable
-private fun NowTabs(names: List<String>, at: Int, pick: (Int) -> Unit) {
-    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        itemsIndexed(names) { i, n -> Chip(i == at, { pick(i) }, n) }
+private fun NowTabs(at: Int, pick: (Int) -> Unit) {
+    val c = MaterialTheme.colorScheme
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.onBackground.copy(alpha = 0.07f)).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        for ((i, n) in listOf(tr("Up next"), tr("Lyrics")).withIndex()) {
+            val on = i == at
+            Box(Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(16.dp)).background(if (on) c.background else Color.Transparent)
+                .tvClickable(RoundedCornerShape(16.dp)) { pick(i) }, contentAlignment = Alignment.Center) {
+                Text(n, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = if (on) c.onBackground else c.onSurfaceVariant)
+            }
+        }
     }
 }
 
@@ -565,39 +686,20 @@ private fun SongPanel(app: AppState, s: Song, big: Boolean) {
             Spacer(Modifier.weight(1f))
             Text(if (st.durationMs > 0) durationMs(st.durationMs) else "", style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
         }
-        // the big buttons: round previous and next, a wide pill to play or pause
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+        // the five buttons in one row, as on the web: shuffle, previous, the big round play, next, repeat
+        Row(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically) {
-            RoundIcon(Sym.SkipPrevious.fill, tr("Previous"), 60.dp) { pb.previous() }
-            val pill = RoundedCornerShape(50)
-            Box(Modifier.width(124.dp).height(68.dp).clip(pill).background(c.onBackground)
-                .tvClickable(pill) { if (st.playing) app.player.pause() else app.player.play() }, contentAlignment = Alignment.Center) {
-                if (st.buffering && !st.playing) CircularProgressIndicator(Modifier.size(28.dp), color = c.background, strokeWidth = 3.dp)
-                else Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"), Modifier.size(38.dp), tint = c.background)
-            }
-            RoundIcon(Sym.SkipNext.fill, tr("Next"), 60.dp) { pb.skipNext() }
-        }
-        // the quieter ones under them, each in a grey circle; teal when switched on
-        var more by remember { mutableStateOf(false) }
-        Row(Modifier.padding(top = 20.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             RoundIcon(Sym.Shuffle.fill, tr("Shuffle"), on = pb.shuffle) { pb.toggleShuffle() }
+            RoundIcon(Sym.SkipPrevious.fill, tr("Previous"), 56.dp) { pb.previous() }
+            Box(Modifier.size(76.dp).clip(CircleShape).background(c.onBackground)
+                .tvClickable(CircleShape) { if (st.playing) app.player.pause() else app.player.play() }, contentAlignment = Alignment.Center) {
+                if (st.buffering && !st.playing) CircularProgressIndicator(Modifier.size(30.dp), color = c.background, strokeWidth = 3.dp)
+                else Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"), Modifier.size(40.dp), tint = c.background)
+            }
+            RoundIcon(Sym.SkipNext.fill, tr("Next"), 56.dp) { pb.skipNext() }
             RoundIcon(if (pb.repeat == 2) Sym.RepeatOne.fill else Sym.Repeat.fill, tr("Repeat"), on = pb.repeat > 0) {
                 pb.repeat = (pb.repeat + 1) % 3
                 app.toast(tr(when (pb.repeat) { 1 -> "Repeat all"; 2 -> "Repeat this song"; else -> "Repeat off" }))
-            }
-            if (!pb.withVideo) RoundIcon(Sym.MusicVideo.outline, tr("Watch video")) { pb.showVideo() }
-            else RoundIcon(Sym.Fullscreen.outline, tr("Open the video")) { app.go(Screen.Watch(s.id)) }
-            RoundIcon(Sym.Explore.outline, tr("Start radio")) { pb.playRadio(s) }
-            Box {
-                RoundIcon(Sym.MoreVert.fill, tr("More")) { more = true }
-                DropdownMenu(more, { more = false }) {
-                    if (s.albumId.isNotEmpty()) DropdownMenuItem(text = { Text(tr("Go to album")) }, leadingIcon = { Icon(Sym.Album.outline, null) },
-                        onClick = { more = false; app.go(Screen.Album(s.albumId, s.album)) })
-                    if (s.artistId.startsWith("UC")) DropdownMenuItem(text = { Text(tr("Go to artist")) }, leadingIcon = { Icon(Sym.Person.outline, null) },
-                        onClick = { more = false; app.go(Screen.Artist(s.artistId, s.artist)) })
-                    DropdownMenuItem(text = { Text(tr("Share")) }, leadingIcon = { Icon(Sym.Share.outline, null) },
-                        onClick = { more = false; app.share(s.title, "https://youtu.be/${s.id}") })
-                }
             }
         }
     }

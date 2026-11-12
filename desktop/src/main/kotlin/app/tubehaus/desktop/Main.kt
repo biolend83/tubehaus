@@ -67,6 +67,7 @@ class DesktopPlatform : Platform {
     override val caster: app.tubehaus.ui.Caster by lazy {
         app.tubehaus.cast.GoogleCast(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main))
     }
+    override val nearby: app.tubehaus.ui.Nearby by lazy { app.tubehaus.cast.Lan() }
     var window: WindowState? = null
     var frame: Frame? = null
 

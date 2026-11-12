@@ -173,6 +173,7 @@ class AppState(val platform: Platform, val store: Store) {
 
     val feed = Feed(store)
     val rec = Recommender(store, feed)
+    val near by lazy { NearbyHub(this) }
     /** the player in use: this device's own, or a TV's while casting */
     val player by lazy { SwitchPlayer(platform.player, scope) }
     val casting by lazy { Casting(this) }

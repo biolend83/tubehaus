@@ -1,0 +1,6 @@
+- TubeHaus 1.5 design: a greeting, your interests and shelves picked for you on Home
+- A new Music home: quick picks, listen again, mixes for the time of day
+- Video at a glance: a summary, key moments and chapters made on the device from the captions
+- Nearby devices: carry on watching on another device on your Wi-Fi, send videos, use the phone as a remote
+- Kids mode: only the channels you pick, a daily limit, a PIN to leave it
+- Save new videos of a channel automatically for offline

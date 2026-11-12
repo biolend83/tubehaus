@@ -1,5 +1,6 @@
 package app.tubehaus.android
 
+import app.tubehaus.cast.Lan as NearLan
 import android.os.Build
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -99,6 +100,15 @@ class AndroidPlatform(private val app: Application) : Platform {
             awake = { d -> CastService.set(app, d) },
             multicast = { on -> runCatching { if (on) multicastLock.acquire() else multicastLock.release() } },
         )
+    }
+
+    /** nearby devices: lets the other devices' hellos in, as for Cast */
+    private val nearLock by lazy {
+        (app.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager)
+            .createMulticastLock("tubehaus-near").apply { setReferenceCounted(false) }
+    }
+    override val nearby: app.tubehaus.ui.Nearby by lazy {
+        NearLan { on -> runCatching { if (on) nearLock.acquire() else nearLock.release() } }
     }
 
     /** set by the activity: runs file pickers and full screen, which need an Activity */

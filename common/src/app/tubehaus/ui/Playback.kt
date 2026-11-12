@@ -78,6 +78,10 @@ class Playback(private val app: AppState) {
 
     /** the transcript was asked for (the player's menu, the button under the video): the watch page opens it */
     var transcriptAsked by mutableStateOf(false)
+    /** a word to search the transcript for when it opens */
+    var transcriptSearch by mutableStateOf("")
+    /** chapters made from the captions (ui/Smart.kt) for a video without its own, by video id */
+    var autoChapters by mutableStateOf<Pair<String, List<Chapter>>>("" to emptyList())
 
     /** "Loop video": this one plays again from the start; off again for the next video */
     var loop by mutableStateOf(false)
@@ -154,7 +158,7 @@ class Playback(private val app: AppState) {
         get() = details?.chapters?.takeIf { it.isNotEmpty() } ?: stream?.let { s ->
             if (chapterCache.first != s.id) chapterCache = s.id to chaptersIn(s.description)
             chapterCache.second
-        } ?: emptyList()
+        }.orEmpty().ifEmpty { autoChapters.takeIf { it.first == video?.id && store.settings.value.smart }?.second ?: emptyList() }
     private var chapterCache: Pair<String, List<Chapter>> = "" to emptyList()
 
     /** the pictures the seek bar shows while dragging */
@@ -245,6 +249,13 @@ class Playback(private val app: AppState) {
                 // a saved copy plays from the device, also without internet
                 val s = app.offline.stream(v.id) ?: YouTube.stream(v.id)
                 if (video?.id != v.id) return@launch
+                // kids mode: only the picked channels, and nothing once today's time is used up
+                val up = app.kidsTimeUp()
+                if (up || !app.kidsAllow(s.channelId.ifEmpty { v.channelId })) {
+                    error = tr(if (up) KIDS_TIME_UP else "This video isn't from a channel picked for kids mode.")
+                    loading = false
+                    return@launch
+                }
                 stream = s
                 // the player response knows the exact title, channel and length
                 video = v.copy(
@@ -540,6 +551,7 @@ class Playback(private val app: AppState) {
     /** the reminders of Settings → Wellbeing: a break after so long in a row, a daily amount */
     private fun checkReminders() {
         val set = store.settings.value
+        if (app.kidsTimeUp()) { player.pause(); app.reminder = tr(KIDS_TIME_UP); return }
         if (set.breakMinutes > 0 && streakMs >= set.breakMinutes * 60_000L) {
             streakMs = 0
             if (!music) player.pause()
