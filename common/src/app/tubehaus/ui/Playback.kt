@@ -475,13 +475,16 @@ class Playback(private val app: AppState) {
     /** a video's ⋮ menu: right after the one playing (nothing playing: it plays now) */
     fun queueNext(v: Video) {
         if (video == null || music) { app.watch(v); return }
-        queue = listOf(v) + queue.filter { it.id != v.id }
+        // the rest of the list this video was opened from is not a queue you made: yours starts here (#66)
+        val mine = if (ownQueue) queue else emptyList()
+        queue = listOf(v) + mine.filter { it.id != v.id }
         ownQueue = true
     }
 
     fun queueAdd(v: Video) {
         if (video == null || music) { app.watch(v); return }
-        if (queue.none { it.id == v.id }) queue = queue + v
+        val mine = if (ownQueue) queue else emptyList()
+        queue = if (mine.any { it.id == v.id }) mine else mine + v
         ownQueue = true
     }
 

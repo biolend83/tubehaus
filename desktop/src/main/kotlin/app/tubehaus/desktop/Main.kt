@@ -40,11 +40,15 @@ import java.net.URI
 private val home = System.getProperty("user.home")
 val isMac = System.getProperty("os.name").startsWith("Mac")
 
+/** Linux: $XDG_CONFIG_HOME or ~/.config (in the Flatpak, ~/.var/app/<id>/config: the sandbox can't write to ~/.config) */
+private val linuxConfig = System.getenv("XDG_CONFIG_HOME")?.takeIf { it.startsWith("/") } ?: "$home/.config"
+private val linuxCache = System.getenv("XDG_CACHE_HOME")?.takeIf { it.startsWith("/") } ?: "$home/.cache"
+
 class DesktopPlatform : Platform {
     override val name = "desktop"
-    // Windows: %APPDATA%; macOS: ~/Library/Application Support (and Caches); Linux: ~/.config, ~/.cache
-    override val dataDir: Path = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else "$home/.config", "TubeHaus").toOkioPath()
-    override val cacheDir: Path = File(System.getenv("LOCALAPPDATA") ?: if (isMac) "$home/Library/Caches" else "$home/.cache", "TubeHaus").toOkioPath()
+    // Windows: %APPDATA%; macOS: ~/Library/Application Support (and Caches); Linux: XDG config and cache folders
+    override val dataDir: Path = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else linuxConfig, "TubeHaus").toOkioPath()
+    override val cacheDir: Path = File(System.getenv("LOCALAPPDATA") ?: if (isMac) "$home/Library/Caches" else linuxCache, "TubeHaus").toOkioPath()
     override val touch = false
     /** Pretendard, one variable font file for every weight (resources: common/fonts) */
     override val font: androidx.compose.ui.text.font.FontFamily? by lazy {
@@ -136,7 +140,7 @@ class DesktopPlatform : Platform {
 private var shown = false
 
 fun crashed(where: String, e: Throwable) {
-    val dir = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else "$home/.config", "TubeHaus")
+    val dir = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else linuxConfig, "TubeHaus")
     val log = File(dir, "crash.log")
     val text = buildString {
         append("TubeHaus ").append(System.getProperty("jpackage.app-version") ?: "dev").append(" — ").append(java.time.LocalDateTime.now()).append('\n')
