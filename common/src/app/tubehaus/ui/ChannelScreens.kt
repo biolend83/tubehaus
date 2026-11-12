@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.rememberScrollState
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -84,6 +86,7 @@ private val ROW_TABS = setOf("playlists", "courses", "releases", "podcasts", "se
  */
 @Composable
 fun ChannelScreen(app: AppState, id: String, name: String) {
+    if (!app.kidsAllow(id)) { KidsBlocked(app); return }
     var head by remember { mutableStateOf<ChannelPage?>(null) }
     // the open tab's params; null is the channel's first tab (Home)
     var tab by remember { mutableStateOf<String?>(null) }
@@ -198,8 +201,9 @@ private fun ChannelHeader(app: AppState, id: String, name: String, h: ChannelPag
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp).weight(1f, fill = false))
             if (h.linkMore.isNotEmpty()) Text(" " + h.linkMore, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             SubscribeButton(id, h?.name ?: name, h?.avatar ?: "", app)
+            AutoSaveButton(app, id)
             OutlinedButton(onClick = { app.share(h?.name ?: name, channelLink(id, h?.handle ?: "")) },
                 contentPadding = PaddingValues(horizontal = 14.dp), modifier = Modifier.height(36.dp)) {
                 Icon(Sym.Share.outline, null, Modifier.size(18.dp))

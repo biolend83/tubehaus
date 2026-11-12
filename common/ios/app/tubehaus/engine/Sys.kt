@@ -36,6 +36,8 @@ object Sys {
         (iso.dateFromString(s) ?: isoFraction.dateFromString(s))?.timeIntervalSince1970?.toLong()
 
     fun today(): String = NSDateFormatter().apply { dateFormat = "yyyy-MM-dd" }.stringFromDate(NSDate())
+    /** the hour of the day here, 0..23 */
+    fun hour(): Int = NSDateFormatter().apply { dateFormat = "H" }.stringFromDate(NSDate()).toIntOrNull() ?: 12
 
     fun shortTime(ms: Long): String = NSDateFormatter().apply {
         dateStyle = NSDateFormatterNoStyle

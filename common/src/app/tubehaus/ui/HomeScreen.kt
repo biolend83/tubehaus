@@ -52,6 +52,8 @@ private object HomeCache {
 
 @Composable
 fun HomeScreen(app: AppState) {
+    // kids mode: the new videos of the picked channels
+    if (app.store.settings.value.kids) { SubsScreen(app); return }
     if (app.store.settings.value.homeOff) {
         FeedOff(tr("The home feed is off"), tr("Search for what you came for, or open your subscriptions.")) {
             Button(onClick = { app.go(Screen.Search()) }) { Text(tr("Search")) }
@@ -88,9 +90,10 @@ fun HomeScreen(app: AppState) {
         HomeCache.items.isEmpty() && loading -> Skeleton()
         HomeCache.items.isEmpty() && error != null -> Problem(error!!) { scope.launch { load(false) } }
         HomeCache.items.isEmpty() -> Empty(tr("Nothing to show yet. Search for something you like"))
-        else -> ItemGrid(
+        else -> HomeFeed(
             HomeCache.items, app, loading = loading,
             onEnd = { load(true) },
+            hero = LocalLook.current == 1 && !app.discover,
             header = {
                 // one row of chips as on YouTube: where the feed comes from, then All / Discover; the
                 // chip already chosen, tapped again, brings a fresh feed (as does the refresh at the end)
@@ -114,6 +117,8 @@ fun HomeScreen(app: AppState) {
                 if (app.discover) Text(tr("Videos from topics you don't usually watch. Your likes aren't used here."),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                else if (LocalLook.current == 1) Column { ContinueRow(app) }
+                NearbyBanner(app)
             },
         )
     }

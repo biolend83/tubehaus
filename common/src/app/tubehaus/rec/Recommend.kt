@@ -283,8 +283,13 @@ class Recommender(private val store: Store, private val feed: Feed) {
             val seeds = (liked + (if (any) topics.shuffled(rnd) else emptyList())).distinct().take(4)
             cands += seeds.map { q -> async { pool("seed:$q", 3600) { search(q, "pop", q, false) } } }.awaitAll().flatten()
         }
+        for (c in cands) if (c.v.id !in sources) sources[c.v.id] = c.src to (c.tag ?: "")
         rank(cands, n, skip, t, lib.hist.associate { it.id to it }, shorts = false)
     }
+
+    /** where Home's videos came from (subscriptions, related, a liked word...), for the 2.0 home's rows */
+    private val sources = Sys.concurrentMap<String, Pair<String, String>>()
+    fun sourceOf(id: String): Pair<String, String?>? = sources[id]?.let { it.first to it.second.ifEmpty { null } }
 
     /**
      * Discover: what you'd never be shown otherwise. Popular videos from topics you haven't
