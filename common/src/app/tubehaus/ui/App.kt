@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.luminance
 import app.tubehaus.engine.Sys
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -129,7 +131,7 @@ fun App(app: AppState) {
             .build()
     }
     key(lang, settings.tvMode) {
-        TubeTheme(settings.dark, app.platform::wallpaperColors, app.platform.font) {
+        TubeTheme(settings.dark, app.platform::wallpaperColors, app.platform.font, look = if (app.platform.tv) 0 else settings.look) {
             val bg = MaterialTheme.colorScheme.background
             LaunchedEffect(bg) { app.platform.titleBar(bg) }
             val tv = app.platform.tv
@@ -232,7 +234,7 @@ private fun Shell(app: AppState) {
     val cur = app.current
     val compact = LocalCompact.current
     val root = app.stack.firstOrNull()
-    val showTop = cur !is Screen.Watch && cur !is Screen.Shorts && cur !is Screen.Search
+    val showTop = cur !is Screen.Watch && cur !is Screen.Shorts && cur !is Screen.Search && cur !is Screen.NowPlaying
     // the desktop: while you browse, the video keeps playing in a small window at the bottom right
     val floating = !app.platform.touch && !app.platform.tv
     // dragged with the mouse: how far from that corner it was moved, kept inside the window
@@ -275,7 +277,7 @@ private fun Shell(app: AppState) {
                     enter = slideInVertically(tween(Motion.MEDIUM, easing = Motion.emphasizedIn)) { it } + fadeIn(tween(Motion.SHORT)),
                     exit = slideOutVertically(tween(Motion.SHORT, easing = Motion.emphasizedOut)) { it } + fadeOut(tween(Motion.SHORT)),
                 ) { MiniPlayer(app) }
-                if (compact && cur !is Screen.Watch) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) {
+                if (compact && cur !is Screen.Watch && cur !is Screen.NowPlaying) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) {
                     PhoneBar(app, root)
                 }
             }
@@ -334,6 +336,8 @@ private fun Shell(app: AppState) {
                   IconButton(onClick = unfold, modifier = Modifier.padding(start = 4.dp).size(36.dp)) { Icon(Sym.Menu.fill, tr("Menu")) }
               }
               Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { floatArea = it }) {
+                NearbyAsk(app)
+                AutoSaveRunner(app)
                 key(cur) {
                   // a new page fades in: going forward it slides in from the right, going back from the
                   // left, a tab settles from a touch smaller (not the watch page or Shorts: a video
@@ -404,9 +408,19 @@ private fun Screen.lit(root: Screen?): Boolean = when {
 @Composable
 private fun PhoneBar(app: AppState, root: Screen?) {
     val c = MaterialTheme.colorScheme
+    // the cards and glass looks: the bar floats, a rounded pill a little above the bottom edge
+    val look = LocalLook.current
+    val pillShape = RoundedCornerShape(30.dp)
     Column(Modifier.fillMaxWidth().background(c.background).windowInsetsPadding(NavigationBarDefaults.windowInsets)) {
         val soft = accentSoft
-        Row(Modifier.fillMaxWidth().height(58.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.fillMaxWidth().let {
+                if (look == 0) it else it.padding(horizontal = 14.dp, vertical = 6.dp).clip(pillShape)
+                    .background(c.surfaceContainerHigh)
+                    .border(1.dp, if (look == 2) (if (c.background.luminance() < 0.5f) Color(0x1FFFFFFF) else Color.White) else Color.Transparent, pillShape)
+            }.height(58.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             for (t in tabs(app, phone = true)) {
                 val sel = t.screen.lit(root) || (t.screen == Screen.Home && root == Screen.Subs)
                 // pressed as in YouTube's app: a grey circle swells behind the icon, which dips and

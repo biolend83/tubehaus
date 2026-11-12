@@ -102,6 +102,8 @@ fun WatchScreen(app: AppState) {
     // TV: the video plays on this page, beside what's next; OK on the video fills the screen
     // and Back comes back here (it used to fill the screen by itself, which got in the way)
     BoxWithConstraints(Modifier.fillMaxSize()) {
+        // the 2.0 design: the video's colours, soft, behind the top of the page
+        if (LocalLook.current == 3 && !app.platform.tv) Backdrop(v.thumb, Modifier.fillMaxWidth().height(560.dp))
         val tablet = app.platform.touch
         // a tablet held upright stacks like a phone (the video across the top, everything under it);
         // side by side would leave the video small in the middle of a tall screen
@@ -139,7 +141,7 @@ fun WatchScreen(app: AppState) {
                 }
                 if (tabs.isNotEmpty()) {
                     val shown = side.takeIf { s -> tabs.any { it.first == s } } ?: tabs.first().first
-                    Column(Modifier.width(sideWidth).padding(top = 8.dp, end = 8.dp)) {
+                    Column(Modifier.width(sideWidth).padding(top = 8.dp, end = 8.dp).riseIn(v.id)) {
                         if (tabs.size > 1) {
                             Row(Modifier.padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 for ((k, label) in tabs) Chip(shown == k, onClick = { side = k }, label = label)
@@ -157,7 +159,7 @@ fun WatchScreen(app: AppState) {
         } else {
             Column(Modifier.fillMaxSize()) {
                 PlayerBox(app)
-                Box(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize().riseIn(v.id)) {
                     LazyColumn(Modifier.fillMaxSize()) {
                         under(app, v)
                         if (token != null) item { CommentsTeaser(token) { commentsOpen = true } }
@@ -214,14 +216,18 @@ private fun PlayerBox(app: AppState, sideGestures: Boolean = false) {
     }
     Box(
         Modifier.fillMaxWidth().aspectRatio(16f / 9f).ambientGlow(glow).background(Color.Black)
-            // touch screens: swipe the video down to keep it playing in the mini player and go back
+            // touch screens: swipe the video down to keep it playing in the mini player and go back,
+            // up to watch it full screen (#64)
             .pointerInput(touch) {
                 if (!touch) return@pointerInput
                 var pulled = 0f
                 detectVerticalDragGestures(
                     onDragStart = { pulled = 0f },
                     onVerticalDrag = { change, dy -> change.consume(); pulled += dy },
-                    onDragEnd = { if (pulled > 80.dp.toPx()) app.back() },
+                    onDragEnd = {
+                        if (pulled > 80.dp.toPx()) app.back()
+                        else if (pulled < -60.dp.toPx()) app.setFull(true)
+                    },
                 )
             },
     ) {
@@ -491,6 +497,12 @@ private fun Actions(app: AppState, v: Video, has: (String) -> Boolean) {
         if (has("later")) item { Chip(if (saved) Sym.WatchLater.fill else Sym.WatchLater.outline, tr("Watch later")) { app.store.setInList("wl", v, !saved) } }
         if (has("save")) item { Chip(Sym.LibraryAdd.outline, tr("Save")) { pick = true } }
         if (has("share")) item { Chip(Sym.Share.outline, tr("Share")) { app.share(v.title, "https://youtu.be/${v.id}") } }
+        // nearby devices: carry on with this video on the TV or the computer
+        if (app.store.settings.value.nearby && app.near.available) item {
+            var open by remember { mutableStateOf(false) }
+            Chip(Sym.Cast.outline, tr("Other device")) { open = true }
+            if (open) SendToDialog(app, v) { open = false }
+        }
         if (has("download") && !v.live && app.platform.canDownload) item { DownloadChip(app, v) }
         if (!pb.stream?.captions.isNullOrEmpty() && !app.platform.tv) item { Chip(Sym.Transcript.outline, tr("Transcript")) { pb.transcriptAsked = true } }
         if (pb.next != null && has("next")) item { Chip(Sym.SkipNext.outline, tr("Next")) { pb.skipNext() } }
@@ -526,7 +538,7 @@ private fun Chip(icon: ImageVector, label: String, onClick: () -> Unit) {
 /** What sits under the video, by Settings → Under the video: everything, only the title, or nothing. */
 private fun LazyListScope.under(app: AppState, v: Video, flush: Boolean = false) {
     when (app.store.settings.value.underVideo) {
-        0 -> item { Info(app, v, flush) }
+        0 -> { item { Info(app, v, flush) }; item { SmartCard(app, v) } }
         1 -> item {
             Text(titleOf(v, app), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
