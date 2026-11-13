@@ -49,7 +49,7 @@ TubeHaus는 따로 동작하는 두 가지가 있어요. 이름과 생김새는 
 유튜브와 데이터를 주고받는 어려운 일은 이 두 프로젝트가 하고, TubeHaus는 그 옆에 화면과 작은 서버를 붙여요.
 Invidious 팀에 감사드려요.
 
-![TubeHaus 첫 화면](docs/screenshot-home.jpg)
+![TubeHaus: 첫 화면, 검색, 영상과 "이 영상 한눈에"](docs/tour.gif)
 
 ## FreeTube, NewPipe와 뭐가 다른가요?
 

@@ -127,7 +127,7 @@ export function card(v, kind = "grid", extra = "") {
   const more = `<button class="dots" data-menu="${esc(v.id)}" aria-label="${$t("작업 메뉴")}">${icon("more")}</button>`;
   const th = `<a href="${href}" data-nav class="th"><img loading="lazy" src="${thumb(v.id)}" alt="">${badge(v)}</a>`;
   if (kind === "short") {
-    return `<div class="card short" data-vid="${esc(v.id)}"><a href="/shorts/${esc(v.id)}" data-nav class="th"><img loading="lazy" src="${thumb(v.id, "oar2")}" onerror="this.onerror=null;this.classList.add('lb');this.src='${thumb(v.id)}'" alt=""></a>
+    return `<div class="card short" data-vid="${esc(v.id)}"><a href="/shorts/${esc(v.id)}" data-nav class="th"><img loading="lazy" src="${thumb(v.id, "oar2")}" onerror="this.onerror=null;this.classList.add('lb');this.src='${thumb(v.id)}'" onload="if(this.naturalWidth<=120&&!this.classList.contains('lb')){this.classList.add('lb');this.src='${thumb(v.id)}'}" alt=""></a>
       <div class="meta"><a href="/shorts/${esc(v.id)}" data-nav class="t">${esc(v.title)}</a><div class="s">${v.views != null ? fmtViews(v.views) : ""}</div></div>${more}</div>`;
   }
   if (kind === "grid") {

@@ -55,7 +55,7 @@ The server version is built on top of [Invidious](https://invidious.io) and
 [invidious-companion](https://github.com/iv-org/invidious-companion), which do the hard work of talking to
 YouTube. TubeHaus adds its own front end and a small server next to them. All credit to the Invidious team.
 
-![TubeHaus home screen](docs/screenshot-home.jpg)
+![TubeHaus: Home, a search, a video and its "at a glance" panel](docs/tour.gif)
 
 ## How is it different from FreeTube and NewPipe?
 

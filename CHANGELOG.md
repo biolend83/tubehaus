@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Samsung (Tizen) and LG (webOS) TV apps** (experimental, [`tv-apps/`](tv-apps/)): they remember your server's address and open it; the TV mode now handles these TVs' Back and play / pause / fast-forward / rewind keys, and Back on the first screen closes the app
+
+### Fixed
+- **Shorts on Home showing grey placeholders**: when YouTube has no tall thumbnail for a Short it sends an empty image instead of an error; that now falls back to the normal thumbnail too
+- **The "what's new" card on Home** introduced 1.0 in 1.5.0; it now shows 1.5 (new design, watch together, video at a glance), also for people who closed the old one
+
 ## v1.5.0 — 2026-11-12
 
 TubeHaus 1.5: a new look, watch together, and the gist of a video before you watch it. Captions keep working when the caption service is rate-limited, and TubeHaus is ready for the self-hosting app stores. The apps go to 1.5.0 too (the same look, a new Music home, nearby devices, kids mode; see their own release).
