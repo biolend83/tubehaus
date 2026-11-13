@@ -106,6 +106,11 @@ class DesktopPlatform : Platform {
         done(runCatching { File(d.directory, f).readText() }.getOrNull())
     }
 
+    override fun openTextFiles(done: (List<Pair<String, String>>) -> Unit) {
+        val d = FileDialog(frame, "Open", FileDialog.LOAD).apply { isMultipleMode = true; isVisible = true }
+        done(d.files.mapNotNull { f -> runCatching { f.name to f.readText() }.getOrNull() })
+    }
+
     override fun setFullscreen(on: Boolean) {
         // the title bar and borders come off and the window covers the monitor; Java's own full screen keeps the title bar
         val f = frame
@@ -183,7 +188,8 @@ private fun startApp() {
         System.setProperty("apple.awt.application.appearance", when (theme) { "2", "3" -> "NSAppearanceNameDarkAqua"; "1" -> "NSAppearanceNameAqua"; else -> "system" })
     }
     // libmpv-2.dll: next to the installed app, or in desktop/resources/windows when run from Gradle;
-    // on macOS Homebrew's mpv (Apple Silicon /opt/homebrew, Intel /usr/local) or MacPorts' (/opt/local), which aren't on the default search path
+    // on macOS the libmpv inside the app first, else Homebrew's mpv (Apple Silicon /opt/homebrew, Intel /usr/local)
+    // or MacPorts' (/opt/local), which aren't on the default search path
     val bundled = System.getProperty("compose.application.resources.dir") ?: File("resources/windows").absolutePath
     System.setProperty("jna.library.path", if (isMac) "$bundled:/opt/homebrew/lib:/usr/local/lib:/opt/local/lib" else bundled)
     val platform = DesktopPlatform()

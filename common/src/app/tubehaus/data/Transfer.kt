@@ -2,6 +2,7 @@ package app.tubehaus.data
 
 import app.tubehaus.engine.arr
 import app.tubehaus.engine.at
+import app.tubehaus.engine.bool
 import app.tubehaus.engine.long
 import app.tubehaus.engine.str
 import kotlinx.serialization.json.JsonArray
@@ -18,7 +19,8 @@ import kotlin.random.Random
 
 // Import and export, so your data is never stuck in the app. The same formats the TubeHaus
 // server reads and writes: a full TubeHaus backup, Invidious' export, the CSV Google Takeout
-// uses for subscriptions and OPML; on import also NewPipe, FreeTube and Takeout's history.
+// uses for subscriptions and OPML; on import also NewPipe, FreeTube (profiles, playlists, history)
+// and Takeout's history (JSON or HTML) and playlists (one CSV per playlist).
 
 private val UCID = Regex("UC[\\w-]{22}")
 private val VID = Regex("[\\w-]{11}")
@@ -101,20 +103,99 @@ object Transfer {
         )
     }
 
-    /** Recognises the file by its content; returns format = null when nothing is in it. */
-    fun parse(raw: String): Imported {
+    /**
+     * A FreeTube video: a playlist item or a history entry. FreeTube keeps times in milliseconds
+     * (older exports have some in seconds).
+     */
+    private fun freeTube(e: JsonElement, atMs: Long?): Meta? {
+        val id = e.at("videoId").str?.takeIf { VID.matches(it) } ?: return null
+        fun sec(t: Long?) = t?.let { if (it > 100_000_000_000L) it / 1000 else it } ?: 0
+        return Meta(
+            id, (e.at("title").str ?: "").take(300), (e.at("author").str ?: "").take(300),
+            e.at("authorId").str?.takeIf { UCID.matches(it) } ?: "",
+            e.at("lengthSeconds").long?.toInt() ?: 0, sec(e.at("published").long), e.at("viewCount").long ?: 0,
+            at = sec(atMs),
+        )
+    }
+
+    private fun unhtml(s: String) = s.replace("&quot;", "\"").replace("&#39;", "'").replace("&lt;", "<")
+        .replace("&gt;", ">").replace("&nbsp;", " ").replace("&amp;", "&").trim()
+
+    /**
+     * Takeout's watch-history.html (what Takeout gives unless JSON is picked): one cell per video,
+     * newest first. The dates are written in the account's language, so only the order is kept.
+     */
+    private fun takeoutHtml(text: String): List<Meta> {
+        val t = Sys.nowMs() / 1000
+        val video = Regex("""href="https://(?:www|music)\.youtube\.com/watch\?v=([\w-]{11})[^"]*">([\s\S]*?)</a>""")
+        val channel = Regex("""href="https://www\.youtube\.com/channel/(UC[\w-]{22})">([\s\S]*?)</a>""")
+        return Regex("""<div class="content-cell[^"]*body-1">([\s\S]*?)</div>""").findAll(text).mapNotNull { m ->
+            val c = m.groupValues[1]
+            val v = video.find(c) ?: return@mapNotNull null
+            val ch = channel.find(c)
+            Meta(v.groupValues[1], unhtml(v.groupValues[2]).take(300), ch?.let { unhtml(it.groupValues[2]).take(300) } ?: "", ch?.groupValues?.get(1) ?: "")
+        }.take(20000).toList().mapIndexed { i, m -> m.copy(at = t - i) }
+    }
+
+    /** the words Takeout puts after a playlist's name in its file name ("Cats-videos.csv") */
+    private val TAKEOUT_SUFFIXES = listOf("-videos", "-video", "-동영상", "-vidéos", "-vídeos", "-videó", "-動画", "-视频", "-影片", "-видео", "-filmy")
+    private val LIKED = setOf("liked videos", "좋아요 표시한 동영상", "vidéos j'aime", "videos que me gustan", "mag ich-videos", "高く評価した動画")
+    private val LATER = setOf("watch later", "나중에 볼 동영상", "à regarder plus tard", "ver más tarde", "später ansehen", "後で見る")
+
+    /**
+     * One Takeout playlist CSV: rows of video ID and the time it was added. The title comes from
+     * the older files' header (a Title column) or else the file name.
+     */
+    private fun takeoutPlaylist(text: String, name: String): Pair<String, List<Meta>>? {
+        val rows = text.lines().map { l -> l.split(',').map { it.trim().trim('"') } }
+        val date = Regex("""^\d{4}-\d{2}-\d{2}""")
+        val items = rows.mapNotNull { r ->
+            val id = r.getOrNull(0)?.takeIf { VID.matches(it) } ?: return@mapNotNull null
+            val when_ = r.getOrNull(1)?.takeIf { date.containsMatchIn(it) } ?: return@mapNotNull null
+            val at = Sys.isoSeconds(when_) ?: Sys.isoSeconds(when_.replace(" UTC", "Z").replace(' ', 'T')) ?: 0
+            Meta(id, at = at)
+        }
+        if (items.isEmpty()) return null
+        var title = rows.first().indexOfFirst { it.equals("Title", true) }.takeIf { it >= 0 }?.let { rows.getOrNull(1)?.getOrNull(it) } ?: ""
+        if (title.isEmpty()) {
+            val base = name.substringAfterLast('/').substringAfterLast('\\').substringBeforeLast('.')
+            title = TAKEOUT_SUFFIXES.firstOrNull { base.endsWith(it, true) }?.let { base.dropLast(it.length) } ?: base
+        }
+        return title.trim().take(150) to items
+    }
+
+    /**
+     * Recognises the file by its content ([name], the file's name, only names a Takeout playlist);
+     * returns format = null when nothing is in it.
+     */
+    fun parse(raw: String, name: String = ""): Imported {
         val text = raw.trimStart('﻿').trim()
         val subs = LinkedHashMap<String, Sub>()
         fun sub(cid: String?, name: String? = "", thumb: String? = "") {
             if (cid != null && UCID.matches(cid) && cid !in subs) subs[cid] = Sub((name ?: "").ifEmpty { cid }.take(200), (thumb ?: "").take(500))
         }
         val data = runCatching { storeJson.parseToJsonElement(text) }.getOrNull()
-        if (data == null && text.startsWith("{") && '\n' in text) {
-            // FreeTube: one JSON object (a profile) per line
-            text.lineSequence().mapNotNull { runCatching { storeJson.parseToJsonElement(it) }.getOrNull() }.forEach { r ->
+        // FreeTube's .db exports: one JSON object per line, each a profile (its subscriptions), a
+        // playlist or a watched video; playlists exported before 0.20 are one JSON array
+        val rows: List<JsonElement>? = when {
+            data == null && text.startsWith("{") ->
+                text.lineSequence().mapNotNull { l -> l.trim().takeIf { it.startsWith("{") }?.let { runCatching { storeJson.parseToJsonElement(it) }.getOrNull() } }.toList()
+            data is JsonObject && ("playlistName" in data || "timeWatched" in data) -> listOf(data)
+            data is JsonArray && data.firstOrNull()?.at("playlistName") != null -> data
+            else -> null
+        }
+        if (!rows.isNullOrEmpty()) {
+            val pls = ArrayList<Pair<String, List<Meta>>>()
+            val hist = ArrayList<Meta>()
+            for (r in rows) {
+                if (r.at("\$\$deleted").bool) continue
                 r.at("subscriptions").arr.forEach { s -> sub(s.at("id").str, s.at("name").str, s.at("thumbnail").str) }
+                val title = r.at("playlistName").str
+                if (title != null) pls += title.take(150) to r.at("videos").arr.mapNotNull { freeTube(it, it.at("timeAdded").long) }
+                else if (r.at("timeWatched") != null) freeTube(r, r.at("timeWatched").long)?.let(hist::add)
             }
-            if (subs.isNotEmpty()) return Imported("freetube", subs)
+            if (subs.isNotEmpty() || pls.isNotEmpty() || hist.isNotEmpty())
+                return Imported("freetube", subs, hist.sortedByDescending { it.at }.distinctBy { it.id }.take(20000), pls)
         }
         if (data is JsonObject && data["format"].str == "tubehaus-backup") {
             data["subs"].let { it as? JsonObject }?.forEach { (cid, s) -> sub(cid, s.at("name").str, s.at("thumb").str) }
@@ -181,6 +262,10 @@ object Transfer {
             data.forEach { s -> sub(s.at("authorId").str ?: s.at("id").str, s.at("author").str ?: s.at("name").str) }
             return Imported("invidious-subscriptions", subs)
         }
+        if (data == null && "content-cell" in text && "youtube.com/watch?v=" in text) {
+            val hist = takeoutHtml(text)
+            if (hist.isNotEmpty()) return Imported("takeout-history", hist = hist)
+        }
         if ("<opml" in text.take(500).lowercase() || "<outline" in text) {
             Regex("<outline\\b[^>]*>").findAll(text).forEach { m ->
                 val tag = m.value
@@ -189,6 +274,13 @@ object Transfer {
                 sub(cid, name?.replace("&amp;", "&")?.replace("&quot;", "\"")?.replace("&lt;", "<")?.replace("&gt;", ">")?.replace("&#39;", "'"))
             }
             return Imported(if (subs.isEmpty()) null else "opml", subs)
+        }
+        if (data == null && !UCID.containsMatchIn(text)) takeoutPlaylist(text, name)?.let { (title, items) ->
+            return when (title.lowercase()) {
+                in LIKED -> Imported("takeout-playlist", likes = items)
+                in LATER -> Imported("takeout-playlist", wl = items)
+                else -> Imported("takeout-playlist", playlists = listOf(title to items))
+            }
         }
         if (UCID.containsMatchIn(text)) {
             for (line in text.lines()) {

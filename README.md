@@ -13,7 +13,7 @@ devices and the web version (optional).
 
 For Apple Silicon (M1 and later) and Intel Macs.
 
-**[⬇ Apple Silicon](https://github.com/biolend83/tubehaus/releases/download/app-v1.5.0/TubeHaus-1.5.0-mac-arm64.dmg)** · **[⬇ Intel](https://github.com/biolend83/tubehaus/releases/download/app-v1.5.0/TubeHaus-1.5.0-mac-x64.dmg)** (0.5.4, beta; .zip versions on the release page)
+**[⬇ Apple Silicon](https://github.com/biolend83/tubehaus/releases/download/app-v1.5.1/TubeHaus-1.5.1-mac-arm64.dmg)** · **[⬇ Intel](https://github.com/biolend83/tubehaus/releases/download/app-v1.5.1/TubeHaus-1.5.1-mac-x64.dmg)** (0.5.4, beta; .zip versions on the release page)
 
 [Android](https://github.com/biolend83/tubehaus/tree/android-app) · [Windows](https://github.com/biolend83/tubehaus/tree/windows-app) · **macOS** · [Linux](https://github.com/biolend83/tubehaus/tree/linux-app) · [iPad / iPhone](https://github.com/biolend83/tubehaus/tree/ios-app) · [Web app (self-hosted)](https://github.com/biolend83/tubehaus) · [All releases](https://github.com/biolend83/tubehaus/releases)
 
@@ -78,13 +78,9 @@ ExoPlayer (Media3) on Android, libmpv on Windows, macOS and Linux.
 
 ## Install
 
-1. Install mpv with [Homebrew](https://brew.sh), the player TubeHaus uses:
-   ```sh
-   brew install mpv
-   ```
-   If mpv is missing, the app tells you when you first play a video.
-2. Download the .dmg for your Mac, [Apple Silicon](https://github.com/biolend83/tubehaus/releases/download/app-v1.5.0/TubeHaus-1.5.0-mac-arm64.dmg) or [Intel](https://github.com/biolend83/tubehaus/releases/download/app-v1.5.0/TubeHaus-1.5.0-mac-x64.dmg),, open it and drag TubeHaus into *Applications*.
-3. The app isn't signed by Apple yet, so macOS blocks a plain double-click the first time:
+1. Download the .dmg for your Mac, [Apple Silicon](https://github.com/biolend83/tubehaus/releases/download/app-v1.5.1/TubeHaus-1.5.1-mac-arm64.dmg) or [Intel](https://github.com/biolend83/tubehaus/releases/download/app-v1.5.1/TubeHaus-1.5.1-mac-x64.dmg),, open it and drag TubeHaus into *Applications*.
+   mpv comes inside the app, nothing else to install.
+2. The app isn't signed by Apple yet, so macOS blocks a plain double-click the first time:
    right-click TubeHaus → *Open* → *Open*. After that it opens normally.
 
 The app checks for a newer version each time it opens and offers the .dmg for your Mac's chip (Settings → *Check for updates*).
