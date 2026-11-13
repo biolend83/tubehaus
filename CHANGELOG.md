@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **Importing from FreeTube and Google Takeout**: FreeTube's playlists and history files (.db) and Takeout's watch-history.html and playlist CSVs (one per playlist; Liked videos and Watch later go to your likes and Watch later) now import, and you can pick several files at once
 - **Samsung (Tizen) and LG (webOS) TV apps** (experimental, [`tv-apps/`](tv-apps/)): they remember your server's address and open it; the TV mode now handles these TVs' Back and play / pause / fast-forward / rewind keys, and Back on the first screen closes the app
 
 ### Fixed
