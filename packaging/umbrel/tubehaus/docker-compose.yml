@@ -6,7 +6,7 @@ services:
 
   # the web app and its router (Caddy); the other containers are reached by their Umbrel names
   web:
-    image: ghcr.io/biolend83/tubehaus-web:1.5.0@sha256:__WEB_DIGEST__
+    image: ghcr.io/biolend83/tubehaus-web:1.5.0@sha256:216b3f9be4731bebe159b490364b052a299ee80683de63706270e25d2dc2a170
     restart: on-failure
     environment:
       TUBEHAUS_SITE: ":8080"
@@ -21,7 +21,7 @@ services:
   # the TubeHaus server: the shared library, live streams and captions, offline saves.
   # HT_WARP=0: on a home connection YouTube needs no detour, so no extra capabilities.
   server:
-    image: ghcr.io/biolend83/tubehaus:1.5.0@sha256:__SERVER_DIGEST__
+    image: ghcr.io/biolend83/tubehaus:1.5.0@sha256:b910c6a0f31630f816a8bb764c939208072573bad9417fc8fd6120247d922742
     restart: on-failure
     init: true
     stop_grace_period: 30s
@@ -34,7 +34,7 @@ services:
 
   invidious:
     # Invidious publishes its two-architecture image only as "latest"; its dated tags are amd64 only
-    image: quay.io/invidious/invidious:latest@sha256:__INVIDIOUS_DIGEST__
+    image: quay.io/invidious/invidious:latest@sha256:ba09cf7b5c749472c3ccc814e6d3efe929243952077ae4dfd7d77ef74fbc9ec5
     restart: on-failure
     stop_grace_period: 1m
     environment:
@@ -56,7 +56,7 @@ services:
       - db
 
   companion:
-    image: quay.io/invidious/invidious-companion:__COMPANION_TAG__@sha256:__COMPANION_DIGEST__
+    image: quay.io/invidious/invidious-companion:2026.11.07-07ae73c@sha256:292d889ff6d4cb31970cd35ea9eea8b249dc8c1dc3c66b3ad1b9c4fd0ffb62d1
     restart: on-failure
     user: "1000:1000"
     environment:
@@ -71,13 +71,11 @@ services:
     cap_drop:
       - ALL
     read_only: true
-    security_opt:
-      - no-new-privileges:true
     volumes:
       - ${APP_DATA_DIR}/data/companion:/var/tmp/youtubei.js:rw
 
   db:
-    image: postgres:__POSTGRES_TAG__@sha256:__POSTGRES_DIGEST__
+    image: postgres:14.20-bookworm@sha256:a701f1c85fd2aa8b990fca821b9a16907f4c3d3a2eb7027e5897ccdd98a429fc
     restart: on-failure
     user: "1000:1000"
     stop_grace_period: 1m

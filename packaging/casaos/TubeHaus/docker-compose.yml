@@ -63,7 +63,7 @@ services:
 
   companion:
     container_name: tubehaus-companion
-    image: quay.io/invidious/invidious-companion:latest
+    image: quay.io/invidious/invidious-companion:2026.11.07-07ae73c
     restart: unless-stopped
     user: "10001:10001"
     environment:
@@ -89,7 +89,7 @@ services:
 
   invidious-db:
     container_name: tubehaus-db
-    image: postgres:14
+    image: postgres:14.20-bookworm
     restart: unless-stopped
     environment:
       POSTGRES_DB: invidious

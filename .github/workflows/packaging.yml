@@ -67,6 +67,26 @@ jobs:
           $dir = Get-ChildItem packaging/winget/manifests/b/biolend83/TubeHaus -Directory | Select-Object -First 1
           winget validate --manifest $dir.FullName
 
+  chocolatey:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack and install from this folder
+        shell: pwsh
+        run: |
+          choco pack packaging/chocolatey/tubehaus.nuspec --outputdirectory .
+          choco install tubehaus --source . -y --no-progress
+      - name: The app is there
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem "$env:ProgramFiles", "${env:ProgramFiles(x86)}", "$env:LOCALAPPDATA" -Recurse -Filter TubeHaus.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { throw "TubeHaus.exe not found" }
+          $exe | Select-Object FullName, Length
+      - name: Uninstall
+        shell: pwsh
+        run: choco uninstall tubehaus -y --no-progress
+
   aur:
     runs-on: ubuntu-latest
     timeout-minutes: 20

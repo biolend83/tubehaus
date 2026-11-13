@@ -4,6 +4,7 @@
 //   Casks/tubehaus.rb                 Homebrew (macOS):  brew tap biolend83/tubehaus https://github.com/biolend83/tubehaus
 //   bucket/tubehaus.json              Scoop (Windows):   scoop bucket add tubehaus https://github.com/biolend83/tubehaus
 //   packaging/winget/...              winget manifests, to send to microsoft/winget-pkgs
+//   packaging/chocolatey/...          Chocolatey package, to push to community.chocolatey.org
 //   packaging/aur/PKGBUILD, .SRCINFO  Arch Linux (AUR) package tubehaus-bin
 // Run after the release's desktop files are attached (the README's download links are bumped then too).
 import fs from "node:fs";
@@ -150,6 +151,45 @@ Tags:
 ReleaseNotesUrl: https://github.com/biolend83/tubehaus/releases/tag/app-v${v}
 ManifestType: defaultLocale
 ManifestVersion: 1.9.0
+`);
+
+// ------------------------------------------------------------------ Chocolatey
+// choco pack packaging/chocolatey/tubehaus.nuspec, then choco push with an API key from community.chocolatey.org
+const x = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+write("packaging/chocolatey/tubehaus.nuspec", `<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>tubehaus</id>
+    <version>${v}</version>
+    <title>TubeHaus</title>
+    <authors>biolend83</authors>
+    <owners>biolend83</owners>
+    <projectUrl>https://github.com/biolend83/tubehaus</projectUrl>
+    <packageSourceUrl>https://github.com/biolend83/tubehaus/tree/main/packaging/chocolatey</packageSourceUrl>
+    <projectSourceUrl>https://github.com/biolend83/tubehaus/tree/android-app</projectSourceUrl>
+    <docsUrl>https://github.com/biolend83/tubehaus#readme</docsUrl>
+    <bugTrackerUrl>https://github.com/biolend83/tubehaus/issues</bugTrackerUrl>
+    <releaseNotes>https://github.com/biolend83/tubehaus/releases/tag/app-v${v}</releaseNotes>
+    <iconUrl>https://cdn.jsdelivr.net/gh/biolend83/tubehaus@main/web/y/icon-512.png</iconUrl>
+    <licenseUrl>https://github.com/biolend83/tubehaus/blob/android-app/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <tags>youtube video player privacy open-source foss</tags>
+    <summary>${x(DESC)}</summary>
+    <description>${x(`TubeHaus is a free, open-source YouTube client. It needs no Google account, shows no ads and doesn't track you: subscriptions, history and playlists stay on your computer. It has its own YouTube engine, plays up to 4K with mpv (included), and can sync its library with a TubeHaus server you run yourself.
+
+Not affiliated with YouTube or Google.`)}</description>
+  </metadata>
+  <files>
+    <file src="tools\\**" target="tools" />
+  </files>
+</package>
+`);
+write("packaging/chocolatey/tools/chocolateyinstall.ps1", `$ErrorActionPreference = 'Stop'
+# the MSI from the GitHub release; Chocolatey uninstalls it through Windows' own entry
+Install-ChocolateyPackage -PackageName 'tubehaus' -FileType 'msi' \`
+  -Url64bit '${base}/${f.msi}' \`
+  -Checksum64 '${need(f.msi)}' -ChecksumType64 'sha256' \`
+  -SilentArgs '/qn /norestart' -ValidExitCodes @(0, 3010, 1641)
 `);
 
 // ------------------------------------------------------------------ AUR (tubehaus-bin)

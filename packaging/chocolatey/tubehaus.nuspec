@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>tubehaus</id>
+    <version>1.5.0</version>
+    <title>TubeHaus</title>
+    <authors>biolend83</authors>
+    <owners>biolend83</owners>
+    <projectUrl>https://github.com/biolend83/tubehaus</projectUrl>
+    <packageSourceUrl>https://github.com/biolend83/tubehaus/tree/main/packaging/chocolatey</packageSourceUrl>
+    <projectSourceUrl>https://github.com/biolend83/tubehaus/tree/android-app</projectSourceUrl>
+    <docsUrl>https://github.com/biolend83/tubehaus#readme</docsUrl>
+    <bugTrackerUrl>https://github.com/biolend83/tubehaus/issues</bugTrackerUrl>
+    <releaseNotes>https://github.com/biolend83/tubehaus/releases/tag/app-v1.5.0</releaseNotes>
+    <iconUrl>https://cdn.jsdelivr.net/gh/biolend83/tubehaus@main/web/y/icon-512.png</iconUrl>
+    <licenseUrl>https://github.com/biolend83/tubehaus/blob/android-app/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <tags>youtube video player privacy open-source foss</tags>
+    <summary>Private YouTube client with no Google account, no ads and no tracking</summary>
+    <description>TubeHaus is a free, open-source YouTube client. It needs no Google account, shows no ads and doesn't track you: subscriptions, history and playlists stay on your computer. It has its own YouTube engine, plays up to 4K with mpv (included), and can sync its library with a TubeHaus server you run yourself.
+
+Not affiliated with YouTube or Google.</description>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
