@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.5.1 — 2026-11-13
 
 ### Added
 - **Importing from FreeTube and Google Takeout**: FreeTube's playlists and history files (.db) and Takeout's watch-history.html and playlist CSVs (one per playlist; Liked videos and Watch later go to your likes and Watch later) now import, and you can pick several files at once

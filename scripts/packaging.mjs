@@ -58,7 +58,6 @@ cask "tubehaus" do
     strategy :github_releases
   end
 
-  depends_on formula: "mpv"
   depends_on macos: ">= :big_sur"
 
   app "TubeHaus.app"
