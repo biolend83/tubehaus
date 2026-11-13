@@ -57,6 +57,12 @@ parts:
     plugin: nil
     stage-packages:
       - libmpv2
+      - libegl1
+      - libva2
+      - libva-drm2
+      - libva-x11-2
+      - libva-wayland2
+      - libvdpau1
     prime:
       - -usr/share/doc
       - -usr/share/man
