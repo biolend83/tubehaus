@@ -22,3 +22,4 @@ ios/app/TubeHaus.xcodeproj/
 # the app CI puts next to the Flatpak manifest
 packaging/flatpak/app/
 packaging/snap/app/
+desktop/resources/macos/

@@ -164,7 +164,8 @@ jobs:
             TubeHaus-*.AppImage
 
   mac:
-    # mpv comes from Homebrew on the user's Mac (brew install mpv), nothing is bundled
+    # libmpv and the libraries it needs are copied into the app from Homebrew, rewired to load from there,
+    # so the Mac needs no mpv of its own. If that step fails the app still looks for Homebrew's or MacPorts' mpv.
     strategy:
       fail-fast: false
       matrix:
@@ -179,6 +180,52 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - name: Put libmpv inside the app
+        id: mpv
+        continue-on-error: true
+        run: |
+          brew install mpv dylibbundler
+          d=desktop/resources/macos
+          rm -rf $d && mkdir -p $d
+          cp "$(brew --prefix)/lib/libmpv.2.dylib" $d/ && chmod u+w $d/libmpv.2.dylib
+          # every library libmpv needs, copied next to it and pointed at @loader_path
+          dylibbundler -of -b -x $d/libmpv.2.dylib -d $d/ -p @loader_path/
+          install_name_tool -id @loader_path/libmpv.2.dylib $d/libmpv.2.dylib
+          chmod u+w $d/*.dylib
+          # one search path each: macOS refuses a library that lists the same one twice
+          rpaths() { otool -l "$1" | awk '/cmd LC_RPATH/ { getline; getline; print $2 }'; }
+          for f in $d/*.dylib; do
+            for p in $(rpaths "$f" | sort -u); do
+              while rpaths "$f" | grep -qxF "$p"; do install_name_tool -delete_rpath "$p" "$f" || break; done
+            done
+            if otool -L "$f" | grep -q "@rpath/"; then install_name_tool -add_rpath @loader_path/ "$f"; fi
+          done
+          # changed files lose their signature, and Apple Silicon refuses unsigned code: sign them again (ad hoc)
+          for f in $d/*.dylib; do codesign --force --sign - "$f"; done
+          # nothing may still point at Homebrew
+          bad=0
+          for f in $d/*.dylib; do
+            if otool -L "$f" | tail -n +2 | awk '{print $1}' | grep -vE '^(@loader_path|@rpath|/usr/lib|/System)' ; then echo "still outside: $f"; bad=1; fi
+          done
+          test $bad = 0
+          # and it loads, every library from inside the app and none from Homebrew (Apple's Python, not Homebrew's)
+          /usr/bin/python3 - $d/libmpv.2.dylib <<'PY'
+          import ctypes, sys
+          m = ctypes.CDLL(sys.argv[1]); m.mpv_client_api_version.restype = ctypes.c_ulong
+          print("libmpv api", hex(m.mpv_client_api_version()))
+          dyld = ctypes.CDLL("/usr/lib/libSystem.B.dylib"); dyld._dyld_get_image_name.restype = ctypes.c_char_p
+          names = [dyld._dyld_get_image_name(i).decode() for i in range(dyld._dyld_image_count())]
+          brew = [n for n in names if n.startswith(("/opt/homebrew", "/usr/local"))]
+          print(len(names), "libraries loaded,", sum("resources/macos" in n for n in names), "from the app")
+          for n in brew: print("from Homebrew:", n)
+          sys.exit(1 if brew else 0)
+          PY
+          ls $d | wc -l; du -sh $d
+      - name: Without libmpv inside
+        if: steps.mpv.outcome != 'success'
+        run: |
+          rm -rf desktop/resources/macos
+          echo "::warning::libmpv could not be put inside the mac-${{ matrix.arch }} app; it will need Homebrew's or MacPorts' mpv"
       - name: Build .dmg and .zip
         run: |
           # the app icon as .icns, made from the PNG

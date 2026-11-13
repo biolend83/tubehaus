@@ -52,10 +52,14 @@ jobs:
           echo "libmpv: $lib"
           test -n "$lib"
           test -x $root/tubehaus/bin/TubeHaus
-          # the gnome extension's libraries plus the snap's own: nothing libmpv needs may be missing
-          gn=$(find /snap/gnome-46-2404/current/usr/lib -maxdepth 1 -type d -name '*-linux-gnu*' | head -1)
+          # the snap's own libraries, the gnome extension's and the graphics ones (EGL, VA-API, VDPAU):
+          # the extension takes those out of the snap because mesa-2404 provides them at run time,
+          # so it is installed here as it is on a desktop. Nothing libmpv needs may be missing.
+          sudo snap install mesa-2404
           a=$(basename $(dirname "$lib"))
-          LD_LIBRARY_PATH="$root/usr/lib/$a:$root/usr/lib/$a/blas:$root/usr/lib/$a/lapack:$root/usr/lib/$a/pulseaudio:$gn:/snap/core24/current/usr/lib/$a" \
+          gn=/snap/gnome-46-2404/current/usr/lib/$a
+          gpu=/snap/mesa-2404/current/usr/lib/$a
+          LD_LIBRARY_PATH="$root/usr/lib/$a:$root/usr/lib/$a/blas:$root/usr/lib/$a/lapack:$root/usr/lib/$a/pulseaudio:$gn:$gpu:$gpu/vdpau:/snap/core24/current/usr/lib/$a" \
             ldd "$lib" | tee ldd.txt
           ! grep "not found" ldd.txt
       - name: Attach to the release
