@@ -16,7 +16,7 @@ body:
       options:
         - docker compose (this repo)
         - Manual setup
-        - Manual setup with an existing Invidious instance
+        - An app store (Umbrel, CasaOS, TrueNAS, Unraid)
     validations:
       required: true
   - type: input
@@ -33,5 +33,5 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: "`docker compose logs tubehaus --tail 100` (and `companion` / `invidious` if relevant). Remove anything private."
+      description: "`docker compose logs tubehaus --tail 100` (and the output of `--doctor`, see Troubleshooting). Remove anything private."
       render: text

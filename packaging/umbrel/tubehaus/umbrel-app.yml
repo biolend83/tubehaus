@@ -12,7 +12,7 @@ description: >-
   on your Umbrel, and every phone, computer and TV in the house sees the same library.
 
 
-  It runs its own Invidious and Invidious Companion next to it, so nothing else needs to be installed.
+  It asks YouTube itself (TubeHaus' own engine), so nothing else needs to be installed: no Invidious, no database.
 
 
   - A home screen of your subscriptions and recommendations made from what you watch, on this device only

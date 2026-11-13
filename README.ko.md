@@ -26,7 +26,7 @@ TubeHaus는 따로 동작하는 두 가지가 있어요. 이름과 생김새는 
 |---|---|---|
 | **설치하는 것** | 서버 한 대: 클라우드 서버, 집 PC, 라즈베리파이에 docker compose | 기기마다 앱: 안드로이드(폰, 태블릿, 안드로이드 TV / 구글 TV), Windows, macOS, 리눅스, 아이패드/아이폰(Sideloadly로 설치) |
 | **보는 방법** | 아무 브라우저: 폰, 아이폰/아이패드, PC, TV. 홈 화면에 추가하면 앱처럼 써요 | 그 기기의 앱에서 |
-| **유튜브와 통신하는 쪽** | 내 서버가 Invidious와 Cloudflare WARP를 거쳐서. 기기는 내 서버하고만 통신해요 | 기기가 직접, 앱 안의 자체 유튜브 엔진으로. 중간에 Invidious도 TubeHaus 서버도 없어요 |
+| **유튜브와 통신하는 쪽** | 내 서버가 자체 유튜브 엔진으로, Cloudflare WARP를 거쳐서. 기기는 내 서버하고만 통신해요 | 기기가 직접, 앱 안의 자체 유튜브 엔진으로. 중간에 TubeHaus 서버가 없어요 |
 | **유튜브가 보는 주소** | Cloudflare WARP 주소. 집이나 기기 주소가 아니에요 | 내 기기의 인터넷 주소. 다른 유튜브 앱과 같아요 |
 | **구독·기록이 있는 곳** | 서버에. 그 서버를 쓰는 모든 기기와 사람이 같이 써요 | 그 기기에. 또는 앱을 내 TubeHaus 서버에 연결하면(0.5.4부터) 서버, 다른 기기와 라이브러리 하나를 같이 써요 |
 | **여기에만 있는 것** | 라이브 실시간 자막(whisper.cpp), TV로 보내기, 원본 화질 저장, TV 모드, 아이폰/아이패드를 브라우저로(설치 없이) | 오프라인 저장, 백그라운드 재생과 PIP(안드로이드, 아이패드/아이폰), mpv 플레이어(PC), 기기 안에서 배우는 추천 |
@@ -45,8 +45,9 @@ TubeHaus는 따로 동작하는 두 가지가 있어요. 이름과 생김새는 
   무료 Apple ID는 7일마다 다시 서명해야 해요. 자세한 순서: [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). 설치가 싫다면 사파리에서 서버판을 쓰세요.
 - **🖥️ 서버판 돌리기:** 아래 [빠른 설치 (Docker)](#빠른-설치-docker)를 보세요. 이 README의 나머지는 모두 서버판 이야기예요.
 
-서버판은 [Invidious](https://invidious.io)와 [invidious-companion](https://github.com/iv-org/invidious-companion) 위에서 동작해요.
-유튜브와 데이터를 주고받는 어려운 일은 이 두 프로젝트가 하고, TubeHaus는 그 옆에 화면과 작은 서버를 붙여요.
+1.6부터 서버판은 유튜브에 직접 물어봐요. 자체 엔진이 [Invidious](https://invidious.io) API와 같은 모양으로 답해서,
+옆에 Invidious, companion, 데이터베이스를 따로 띄울 필요가 없어요. 1.5까지는 Invidious와
+[invidious-companion](https://github.com/iv-org/invidious-companion) 위에서 동작했고, 유튜브에 대해 아는 많은 것을 두 프로젝트에서 배웠어요.
 Invidious 팀에 감사드려요.
 
 ![TubeHaus: 첫 화면, 검색, 영상과 "이 영상 한눈에"](docs/tour.gif)
@@ -123,7 +124,7 @@ DeArrow 썸네일은 서버를 거쳐 받아서, DeArrow에는 보는 사람 대
 
 ```sh
 git clone https://github.com/biolend83/tubehaus && cd tubehaus
-cp .env.example .env        # 도메인과 비밀값 세 개를 넣어요
+cp .env.example .env        # 도메인을 넣어요
 docker compose pull         # 미리 빌드된 이미지 (amd64, arm64)
 docker compose up -d
 ```
@@ -132,10 +133,13 @@ docker compose up -d
 (해시는 `docker compose run --rm caddy caddy hash-password`로 만들고, `$`는 모두 `$$`로 써요). 이게 없으면 주소를 여는 사람 모두가
 같은 라이브러리를 써요. 다른 방법: [외부에 열기 전에 로그인 붙이기](#외부에-열기-전에-로그인-붙이기).
 
-Caddy, WARP가 들어 있는 TubeHaus 서버, 라이브용 PO 토큰 제공기, 라이브 자막용 whisper.cpp,
-공식 Invidious + companion + PostgreSQL 이미지가 한 번에 올라와요. 끝나면 도메인을 열면 돼요.
+Caddy, WARP와 자체 유튜브 엔진이 들어 있는 TubeHaus 서버, 라이브용 PO 토큰 제공기, 라이브 자막용 whisper.cpp가
+한 번에 올라와요. 끝나면 도메인을 열면 돼요.
 
-**[Flisk](https://flisk.sh)로도 띄울 수 있어요** (선택 사항이고, 기본은 계속 docker compose예요). 같은 컨테이너 여섯 개가
+**1.5 이하에서 업데이트하나요?** 이제 Invidious, companion, PostgreSQL은 필요 없어요. `git pull` 다음에
+`docker compose up -d --remove-orphans`로 내리면 돼요. `.env`의 그쪽 비밀값은 지워도 돼요. 라이브러리는 `tubehaus-data` 볼륨에 그대로 있어요.
+
+**[Flisk](https://flisk.sh)로도 띄울 수 있어요** (선택 사항이고, 기본은 계속 docker compose예요). 같은 컨테이너 세 개가
 Flisk용으로도 적혀 있고 같은 `.env`를 읽어요. Flisk를 이미 쓰고 있다면:
 
 ```sh
@@ -164,7 +168,7 @@ Authelia, Authentik, 패스키 게이트 같은 것을 `forward_auth`로 앞에 
 docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
 ```
 
-WARP, 유튜브 연결, Invidious, 실제 영상 조회, 선택 기능(yt-dlp, ffmpeg, whisper)을 한 줄씩 점검해요.
+WARP, 유튜브 연결, 검색, 실제 영상 조회(스트림 몇 바이트까지), 선택 기능(yt-dlp, ffmpeg, whisper)을 한 줄씩 점검해요.
 문제가 있으면 [문제 해결](docs/TROUBLESHOOTING.md)(영어), 업데이트와 백업은 [업데이트와 백업](docs/UPGRADING.md)(영어)을 보세요.
 
 이미 쓰는 nginx나 Traefik 뒤에 두는 방법은 [docs/reverse-proxy.md](docs/reverse-proxy.md)(영어)에 있어요.
@@ -176,11 +180,11 @@ TubeHaus 이미지는 **두 개**예요. 둘 중에 고르는 판(에디션)이 
 
 | 이미지 | 하는 일 | 포트 |
 |---|---|---|
-| `ghcr.io/biolend83/tubehaus` | **서버.** 라이브러리(구독, 기록, 재생목록, 이어보기), 라이브 자막, 오프라인 저장, 같이 보기 방. 화면은 없어요 | 3010 (안쪽) |
-| `ghcr.io/biolend83/tubehaus-web` | **웹 화면과 출입구.** 브라우저에서 보는 화면과, 나머지 요청을 서버·Invidious·companion으로 보내는 Caddy. 밖으로 여는 포트는 이것 하나 | 8080 |
+| `ghcr.io/biolend83/tubehaus` | **서버.** 유튜브와 통신하고, 라이브러리(구독, 기록, 재생목록, 이어보기), 라이브 자막, 오프라인 저장, 같이 보기 방. 화면은 없어요 | 3010 (안쪽) |
+| `ghcr.io/biolend83/tubehaus-web` | **웹 화면과 출입구.** 브라우저에서 보는 화면과, 나머지 요청을 서버로 보내는 Caddy. 밖으로 여는 포트는 이것 하나 | 8080 |
 
 - **이 저장소에서 `docker compose up`** 하는 방식(위)은 `tubehaus`만 써요. 화면은 받아 둔 저장소의 `web/` 폴더를 일반 `caddy` 이미지가 보여 줘요. 기존 설치는 바뀌는 게 없어요.
-- **앱 스토어**(Umbrel, CasaOS, TrueNAS)는 저장소 파일을 연결할 수 없어서, 화면과 Caddy 설정이 들어 있는 `tubehaus-web`을 써요. 앱은 하나로 보이고, 설치하면 이미지 둘(과 Invidious, companion, PostgreSQL)이 같이 깔리고 포트는 8796 하나만 열려요.
+- **앱 스토어**(Umbrel, CasaOS, TrueNAS)는 저장소 파일을 연결할 수 없어서, 화면과 Caddy 설정이 들어 있는 `tubehaus-web`을 써요. 앱은 하나로 보이고, 설치하면 이미지 둘이 같이 깔리고 포트는 8796 하나만 열려요.
 - **Unraid**는 템플릿 하나에 컨테이너 하나라서 **TubeHaus**, **TubeHaus-Web** 템플릿 두 개로 보여요. 둘 다 설치하거나, Docker Compose Manager 플러그인과 [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml)로 한 번에 올리세요.
 - **저장소 없이 집 서버에 바로:** [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml)이 스토어와 같은 구성이에요(포트 하나, WARP 없음, 추가 권한 없음).
 
@@ -198,12 +202,12 @@ TubeHaus 이미지는 **두 개**예요. 둘 중에 고르는 판(에디션)이 
 
 ## 자주 묻는 질문
 
-**Invidious를 대체하나요?**
-아니요, 같이 돌아가요. 유튜브에서 가져오는 일은 Invidious와 companion이 하고, TubeHaus는 유튜브 같은 화면과,
-라이브, 라이브 자막, 공유 라이브러리, TV로 보내기, 저장, WARP를 더하는 서버예요. docker compose가 공식 Invidious 이미지를 같이 띄워 줘요.
+**아직 Invidious가 필요한가요?**
+아니요, 1.6부터는 서버가 유튜브에 직접 물어봐요. 답은 Invidious API와 같은 모양이라, Invidious 인스턴스의 API를 쓰는 앱
+(Yattee, FreeTube의 API 모드 등)도 붙을 수 있어요. 다만 Invidious 계정이 필요한 부분(그쪽 구독, 로그인)은 없어요.
 
-**이미 쓰는 Invidious(또는 Yattee, FreeTube)와 같이 쓸 수 있나요?**
-네. 직접 설치 방법대로 기존 Invidious를 가리키게 하면 돼요. 같은 Invidious를 쓰는 앱들은 그대로 동작해요.
+**쓰던 Invidious는 그대로 둬도 되나요?**
+네, 서로 방해하지 않아요. TubeHaus가 더 이상 쓰지 않을 뿐이에요.
 
 **영상은 어디서 오나요? 서버에 저장되나요?**
 전부 유튜브에서 와요. 라이브러리(구독, 기록, 재생목록)와, 저장할 때 잠깐 쓰는 임시 파일 말고는 아무것도 저장하지 않아요.
@@ -212,7 +216,7 @@ TubeHaus 이미지는 **두 개**예요. 둘 중에 고르는 판(에디션)이 
 쇼츠에는 있어요. 전부 내 서버에서 돌아가요(위의 "내 서버에서 배우는 쇼츠 추천"). 일반 영상은 구독 피드, 인기와 분야별 탭, 영상마다 유튜브가 주는 관련 영상 목록을 보여줘요. 구글 계정이 없으니 구글이 내 시청을 학습하는 일은 없어요.
 
 **연령 제한 영상은요?**
-대부분 재생되지 않아요. 나이 확인을 통과할 로그인 계정이 없기 때문이에요. Invidious도 마찬가지예요.
+대부분 재생되지 않아요. 나이 확인을 통과할 로그인 계정이 없기 때문이에요.
 
 **구독을 가져오거나, 내 데이터를 빼낼 수 있나요?**
 네. 설정 → 내 데이터(또는 구독 관리 화면)의 **파일에서 가져오기**로 구글 Takeout(구독 CSV, `watch-history.json` 시청 기록),
@@ -221,7 +225,7 @@ Invidious, NewPipe, FreeTube 내보내기 파일, OPML, TubeHaus 백업을 가�
 내 데이터가 TubeHaus에 갇히는 일은 없어요.
 
 **밖으로 정보를 보내나요?**
-아니요. 계정도 원격 수집도 없어요. 밖으로 나가는 요청은 유튜브(Invidious와 WARP를 거쳐서), DeArrow 썸네일 서버(서버에서, DeArrow 썸네일을 켰을 때), 그리고 브라우저의 선택 기능(SponsorBlock, DeArrow, Return YouTube Dislike)뿐이에요.
+아니요. 계정도 원격 수집도 없어요. 밖으로 나가는 요청은 유튜브(서버에서, WARP를 거쳐서), DeArrow 썸네일 서버(서버에서, DeArrow 썸네일을 켰을 때), 그리고 브라우저의 선택 기능(SponsorBlock, DeArrow, Return YouTube Dislike)뿐이에요.
 
 **폰과 TV에서는 어떻게 접속하나요?**
 웹앱이에요. 브라우저에서 내 주소를 열거나, "홈 화면에 추가"로 앱처럼 설치하면 돼요. TV 브라우저에서는 리모컨으로 조작하는 TV 모드가 켜져요.

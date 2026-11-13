@@ -595,17 +595,18 @@ class UsageStats(unittest.TestCase):
 
 
 class FeedFallback(unittest.TestCase):
-    """YouTube's RSS feeds go down now and then (404 for every channel): the subscription feed falls back to Invidious."""
+    """YouTube's RSS feeds go down now and then (404 for every channel): the subscription feed falls back to the
+    channel's Videos tab (the built-in engine)."""
     CID = "UC" + "b" * 22
 
     def setUp(self):
-        self.old_get = ts.get
+        self.old_get, self.old_inv = ts.get, ts._inv
         self.calls = []
         ts.RSS_DOWN.update(until=0, fails=0)
         ts.yt_feed["items"].clear()
 
     def tearDown(self):
-        ts.get = self.old_get
+        ts.get, ts._inv = self.old_get, self.old_inv
         ts.RSS_DOWN.update(until=0, fails=0)
         ts.yt_feed["items"].clear()
 
@@ -618,8 +619,13 @@ class FeedFallback(unittest.TestCase):
                 if rss_error:
                     raise urllib.error.HTTPError(url, rss_error, "Not Found", None, None)
                 return rss
+            raise AssertionError("only the RSS feed is fetched directly: " + url)
+
+        def channel_page(path, *a, **k):
+            self.calls.append(path)
+            self.assertTrue(path.startswith("/api/v1/channels/%s/videos" % self.CID), path)
             return inv
-        ts.get = get
+        ts.get, ts._inv = get, channel_page
 
     def test_rss_404_uses_invidious_and_skips_rss_for_a_while(self):
         self.fake(rss_error=404)
@@ -630,7 +636,7 @@ class FeedFallback(unittest.TestCase):
             ts.yt_feed_one(self.CID)
         self.assertGreater(ts.RSS_DOWN["until"], time.time())
         self.calls.clear()
-        ts.yt_feed_one(self.CID)                     # RSS is down: straight to Invidious
+        ts.yt_feed_one(self.CID)                     # RSS is down: straight to the channel page
         self.assertFalse(any("feeds/videos.xml" in u for u in self.calls))
 
     def test_invidious_just_now_with_no_views_is_not_trusted(self):
@@ -654,6 +660,72 @@ class FeedFallback(unittest.TestCase):
         ts.yt_feed_one(self.CID)
         self.assertEqual([v["id"] for v in ts.yt_feed["items"][self.CID]], ["rss00000001"])
         self.assertEqual(ts.RSS_DOWN["until"], 0)
+
+
+class Engine(unittest.TestCase):
+    """The built-in YouTube engine's own reading of YouTube's texts and answers (no network)."""
+
+    def test_counts(self):
+        for text, n in (("1.2M views", 1200000), ("조회수 79만회", 790000), ("1,234 views", 1234), ("12万回視聴", 120000),
+                        ("No views", 0), ("조회수 1.5억회", 150000000), ("1,5 mil visualizações", 1500),
+                        ("2.3 млн просмотров", 2300000), ("구독자 123만명", 1230000)):
+            self.assertEqual(ts.eng_count(text), n, text)
+        self.assertIsNone(ts.eng_count(""))
+
+    def test_ages(self):
+        now = 2_000_000_000
+        for text, sec in (("3 days ago", 3 * 86400), ("3일 전", 3 * 86400), ("Streamed 2 weeks ago", 14 * 86400),
+                          ("5분 전", 300), ("1年前", 365 * 86400), ("hace 2 horas", 7200)):
+            self.assertEqual(now - ts.eng_ago(text, now), sec, text)
+        self.assertEqual(ts.eng_ago("214M views"), 0)
+
+    def test_search_filters(self):
+        self.assertEqual(ts._search_params({"type": "video"}), "EgIQAQ==")              # YouTube's own "Videos" filter
+        self.assertEqual(ts._search_params({"features": "live"}), "EgJAAQ==")
+        self.assertEqual(base64.b64decode(ts._search_params({"features": "hdr"})), bytes([0x12, 3, 0xC8, 1, 1]))   # field 25
+        self.assertEqual(base64.b64decode(ts._search_params({"sort": "views", "date": "week"})), bytes([8, 3, 0x12, 2, 8, 3]))
+        self.assertIsNone(ts._search_params({}))
+
+    def test_storyboards(self):
+        spec = "https://i.ytimg.com/sb/abc/storyboard3_L$L/$N.jpg?sqp=x|48#27#100#10#10#0#default#rs$A|80#45#150#10#10#2000#M$M#rs$B"
+        sb = ts._storyboards(spec, "aaaaaaaaaaa")
+        self.assertEqual(sb[1]["templateUrl"], "https://i.ytimg.com/sb/abc/storyboard3_L1/M$M.jpg?sqp=x&sigh=rs%24B")
+        self.assertEqual((sb[1]["storyboardCount"], sb[1]["interval"], sb[1]["width"]), (2, 2000, 80))
+
+    def test_stream_addresses(self):
+        url = "https://rr1---sn-abc.googlevideo.com/videoplayback?expire=1&itag=140"
+        self.assertEqual(ts.gv_url(ts._companion_url(url)), url)
+        self.assertIsNone(ts.gv_url("/companion/videoplayback?itag=140&host=example.com"))   # only YouTube's video servers
+
+    def test_items(self):
+        root = {"contents": [
+            {"videoRenderer": {"videoId": "aaaaaaaaaaa", "title": {"runs": [{"text": "A video"}]},
+                               "longBylineText": {"runs": [{"text": "Chan", "navigationEndpoint": {"browseEndpoint": {"browseId": "UC" + "c" * 22}}}]},
+                               "viewCountText": {"simpleText": "1,234 views"}, "publishedTimeText": {"simpleText": "2 days ago"},
+                               "lengthText": {"simpleText": "3:05"}}},
+            {"channelRenderer": {"channelId": "UC" + "d" * 22, "title": {"simpleText": "Other"},
+                                 "subscriberCountText": {"simpleText": "@other"}, "videoCountText": {"simpleText": "1.5M subscribers"}}},
+            {"playlistRenderer": {"playlistId": "PL123", "title": {"simpleText": "List"}, "videoCount": "12"}},
+            {"continuationItemRenderer": {"continuationEndpoint": {"continuationCommand": {"token": "NEXT"}}}}]}
+        items = ts.eng_items(root)
+        self.assertEqual([i["type"] for i in items], ["video", "channel", "playlist"])
+        v, c, p = items
+        self.assertEqual((v["viewCount"], v["lengthSeconds"], v["author"], v["authorUrl"]), (1234, 185, "Chan", "/channel/UC" + "c" * 22))
+        self.assertGreater(v["published"], time.time() - 3 * 86400)
+        self.assertEqual((c["subCount"], c["channelHandle"]), (1500000, "@other"))
+        self.assertEqual(p["videoCount"], 12)
+        self.assertEqual(ts.eng_cont(root), "NEXT")
+
+    def test_fields(self):
+        self.assertEqual(ts._fields({"a": 1, "b": 2, "c": 3}, "a,c"), {"a": 1, "c": 3})
+        self.assertEqual(ts._fields([{"a": 1, "b": 2}], "b"), [{"b": 2}])
+
+    def test_description_links(self):
+        d = {"content": "Hi https://x.com/y and #tag", "commandRuns": [
+            {"startIndex": 3, "length": 15, "onTap": {"innertubeCommand": {"urlEndpoint": {"url": "https://www.youtube.com/redirect?q=https%3A%2F%2Fx.com%2Fy"}}}},
+            {"startIndex": 23, "length": 4, "onTap": {"innertubeCommand": {"browseEndpoint": {"browseId": "FEhashtag"},
+                                                                          "commandMetadata": {"webCommandMetadata": {"url": "/hashtag/tag"}}}}}]}
+        self.assertEqual(ts.eng_text_html(d), 'Hi <a href="https://x.com/y">https://x.com/y</a> and <a href="/hashtag/tag">#tag</a>')
 
 
 class TopicPages(unittest.TestCase):

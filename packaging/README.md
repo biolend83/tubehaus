@@ -17,16 +17,16 @@ Files for app stores and package managers. Most are rewritten on each release by
 In the stores, the server side of TubeHaus is **two images that run together** (not two editions to choose from):
 
 - `ghcr.io/biolend83/tubehaus`: **the server** (library, captions, offline saves, watch-together rooms). It has no web pages and isn't opened in a browser. (The docker compose setup in this repository pairs it with the plain `caddy` image and the `web/` folder instead of tubehaus-web.)
-- `ghcr.io/biolend83/tubehaus-web`: **the web app and its Caddy front door**, the only container with a published port. It serves the pages and routes everything else to the server, Invidious and invidious-companion, found through `TUBEHAUS_SERVER`, `TUBEHAUS_INVIDIOUS` and `TUBEHAUS_COMPANION` (`host:port`).
+- `ghcr.io/biolend83/tubehaus-web`: **the web app and its Caddy front door**, the only container with a published port. It serves the pages and routes everything else to the server, found through `TUBEHAUS_SERVER` (`host:port`).
 
-A store app is the pair plus Invidious, invidious-companion and PostgreSQL. The server runs with `HT_WARP=0` (no Cloudflare WARP inside, so no extra capabilities) and Invidious' companion `private_url` points at the server (`http://<server>:3010/companion`), which passes the companion through and cleans up its captions.
+A store app is just the pair: the server asks YouTube itself (since 1.6; before that a store app also ran Invidious, invidious-companion and PostgreSQL). It runs with `HT_WARP=0` (no Cloudflare WARP inside, so no extra capabilities).
 
 | Folder | Store | How it is installed |
 |---|---|---|
-| [`umbrel/tubehaus`](umbrel/tubehaus) | Umbrel | one app, five containers, port 8796 through `app_proxy` |
-| [`casaos/TubeHaus`](casaos/TubeHaus) | CasaOS | one app, five containers, port 8796 |
-| [`unraid/`](unraid) | Unraid Community Applications | two templates, **TubeHaus** (server) and **TubeHaus-Web**: install both, with Invidious and invidious-companion from CA |
-| TrueNAS | [truenas/apps](https://github.com/truenas/apps) `ix-dev/community/tubehaus` | one app, built from TrueNAS' Invidious app |
+| [`umbrel/tubehaus`](umbrel/tubehaus) | Umbrel | one app, two containers, port 8796 through `app_proxy` |
+| [`casaos/TubeHaus`](casaos/TubeHaus) | CasaOS | one app, two containers, port 8796 |
+| [`unraid/`](unraid) | Unraid Community Applications | two templates, **TubeHaus** (server) and **TubeHaus-Web**: install both |
+| TrueNAS | [truenas/apps](https://github.com/truenas/apps) `ix-dev/community/tubehaus` | one app, two containers |
 
 The same set without any store: [`deploy/docker-compose.home.yml`](../deploy/docker-compose.home.yml).
 

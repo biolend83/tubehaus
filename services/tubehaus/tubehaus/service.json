@@ -7,8 +7,6 @@
   "port": 3010,
   "exposeViaProxy": false,
   "env": {
-    "HT_INVIDIOUS": "http://invidious:3000",
-    "HT_COMPANION": "http://companion:8282",
     "HT_PUBLIC_URL": "${TUBEHAUS_URL}",
     "HT_SUB_LANG": "${TUBEHAUS_SUB_LANG:-en}",
     "HT_WHISPER_LANG": "${TUBEHAUS_CAPTION_LANG:-auto}",

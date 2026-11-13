@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased (1.6.0)
+
+TubeHaus' server now talks to YouTube itself. Invidious, invidious-companion and PostgreSQL are no longer part of it: three fewer containers to run and keep up to date, and an install that is just the TubeHaus server, Caddy and (for live streams) the PO token provider.
+
+### Changed
+- **A built-in YouTube engine** in the server, in place of Invidious and its companion. It asks YouTube the way the TubeHaus apps do (lists from the web client, streams from the visionOS client, the exact upload time from the web player) and answers in Invidious' API format, so the web app, the apps' server mode and other tools that speak that API keep working. Video streams, captions and pictures come through the server as before
+- **Updating:** after `git pull`, `docker compose up -d --remove-orphans` stops the old Invidious, companion and PostgreSQL containers; their volumes and the `COMPANION_KEY`, `INVIDIOUS_HMAC_KEY`, `POSTGRES_PASSWORD`, `TUBEHAUS_DOMAIN`, `TUBEHAUS_HTTPS` and `TUBEHAUS_EXTERNAL_PORT` settings can go (see [Updating](docs/UPGRADING.md)). The store packages (Umbrel, CasaOS, Unraid) are two containers now
+- New settings: `HT_REGION` (the default region of searches and trending) and `HT_HL` (YouTube's language for its texts)
+- `--doctor` checks a search, a video lookup and a few bytes of its stream instead of Invidious
+
+### Removed
+- "Import subscriptions from your Invidious account" on the subscriptions page (there is no Invidious account any more; Invidious export files still import)
+
 ## v1.5.1 — 2026-11-13
 
 ### Added

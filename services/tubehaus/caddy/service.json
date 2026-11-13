@@ -8,7 +8,6 @@
   "image": "caddy:2",
   "exposeViaProxy": false,
   "dependsOn": [
-    "invidious",
     "tubehaus"
   ],
   "env": {

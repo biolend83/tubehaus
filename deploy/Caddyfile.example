@@ -1,8 +1,6 @@
 # TubeHaus behind Caddy. Replace tube.example.com and the paths/ports.
 #   web app     /srv/tubehaus/web   (the "web" folder of this repo)
-#   TubeHaus    127.0.0.1:3010      (server/tubehaus_server.py)
-#   Invidious   127.0.0.1:3000
-#   companion   127.0.0.1:8282
+#   TubeHaus    127.0.0.1:3010      (server/tubehaus_server.py: the app's API and its own YouTube engine)
 #
 # TubeHaus has no accounts. Put your own login in front of everything
 # (forward_auth to Authelia/Authentik/..., or basic_auth) before exposing it.
@@ -38,8 +36,7 @@ tube.example.com {
 		file_server
 	}
 
-	# page navigations open the app; everything else (API, thumbnails, /login,
-	# ?classic=1) still reaches Invidious
+	# page navigations open the app; everything else (API, thumbnails, streams) goes to the TubeHaus server below
 	@page {
 		method GET HEAD
 		path / /watch /results /shorts /shorts/* /channel/* /c/* /user/* /@* /playlist /feed/* /settings /hashtag/*
@@ -54,37 +51,11 @@ tube.example.com {
 		file_server
 	}
 
-	# TubeHaus API: library, live streams, live captions, subtitles, send-to-TV, downloads
-	handle /api/p/* {
-		reverse_proxy 127.0.0.1:3010 {
-			flush_interval -1
-		}
-	}
-	# video info goes through TubeHaus's cache (and gets live hlsUrl / subtitle tracks added)
-	handle /api/v1/videos/* {
-		reverse_proxy 127.0.0.1:3010
-	}
-	# downloads started from the player are fetched in ranges by TubeHaus (not one throttled stream)
-	@dl {
-		path /latest_version /companion/latest_version
-		query title=*
-	}
-	handle @dl {
-		reverse_proxy 127.0.0.1:3010 {
-			flush_interval -1
-		}
-	}
-
-	# caption files go through TubeHaus, which takes the word timings out (the apps' player shows them as text)
-	handle /companion/api/v1/captions/* {
-		reverse_proxy 127.0.0.1:3010
-	}
-	handle /companion/* {
-		reverse_proxy 127.0.0.1:8282 {
-			flush_interval -1
-		}
-	}
+	# everything else: the TubeHaus server (its API, YouTube's answers in Invidious' shapes,
+	# the video streams, captions and pictures). flush_interval -1: streams pass as they come
 	handle {
-		reverse_proxy 127.0.0.1:3000
+		reverse_proxy 127.0.0.1:3010 {
+			flush_interval -1
+		}
 	}
 }

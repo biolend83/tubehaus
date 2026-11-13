@@ -4,7 +4,7 @@ services:
       APP_HOST: tubehaus_web_1
       APP_PORT: 8080
 
-  # the web app and its router (Caddy); the other containers are reached by their Umbrel names
+  # the web app and its router (Caddy); the server is reached by its Umbrel name
   web:
     image: ghcr.io/biolend83/tubehaus-web:1.5.1@sha256:b8b03b7d8e844cac2d0aec4972c5951af4b37645ff68526ff2e82aae2eebf109
     restart: on-failure
@@ -12,13 +12,10 @@ services:
       TUBEHAUS_SITE: ":8080"
       TUBEHAUS_AUTH: none
       TUBEHAUS_SERVER: tubehaus_server_1:3010
-      TUBEHAUS_COMPANION: tubehaus_companion_1:8282
-      TUBEHAUS_INVIDIOUS: tubehaus_invidious_1:3000
     depends_on:
       - server
-      - invidious
 
-  # the TubeHaus server: the shared library, live streams and captions, offline saves.
+  # the TubeHaus server: its own YouTube engine, the shared library, live streams and captions, offline saves.
   # HT_WARP=0: on a home connection YouTube needs no detour, so no extra capabilities.
   server:
     image: ghcr.io/biolend83/tubehaus:1.5.1@sha256:75416e3efb2cb83305df09bcd2db794507328926512d7646285923db9c2fbc56
@@ -27,62 +24,5 @@ services:
     stop_grace_period: 30s
     environment:
       HT_WARP: "0"
-      HT_INVIDIOUS: http://tubehaus_invidious_1:3000
-      HT_COMPANION: http://tubehaus_companion_1:8282
     volumes:
       - ${APP_DATA_DIR}/data/tubehaus:/data
-
-  invidious:
-    # Invidious publishes its two-architecture image only as "latest"; its dated tags are amd64 only
-    image: quay.io/invidious/invidious:latest@sha256:ba09cf7b5c749472c3ccc814e6d3efe929243952077ae4dfd7d77ef74fbc9ec5
-    restart: on-failure
-    stop_grace_period: 1m
-    environment:
-      INVIDIOUS_CONFIG: |
-        db:
-          dbname: invidious
-          user: tubehaus
-          password: ${APP_TUBEHAUS_DB_PASSWORD}
-          host: tubehaus_db_1
-          port: 5432
-        check_tables: true
-        https_only: false
-        use_innertube_for_captions: true
-        invidious_companion:
-        - private_url: "http://tubehaus_server_1:3010/companion"
-        invidious_companion_key: ${APP_TUBEHAUS_COMPANION_KEY}
-        hmac_key: ${APP_TUBEHAUS_HMAC_KEY}
-    depends_on:
-      - db
-
-  companion:
-    image: quay.io/invidious/invidious-companion:2026.11.07-07ae73c@sha256:292d889ff6d4cb31970cd35ea9eea8b249dc8c1dc3c66b3ad1b9c4fd0ffb62d1
-    restart: on-failure
-    user: "1000:1000"
-    environment:
-      SERVER_SECRET_KEY: ${APP_TUBEHAUS_COMPANION_KEY}
-      NETWORKING_FETCH_TIMEOUT_MS: "15000"
-      NETWORKING_FETCH_RETRY_ENABLED: "true"
-      NETWORKING_FETCH_RETRY_TIMES: "3"
-      NETWORKING_FETCH_RETRY_INITIAL_DEBOUNCE: "200"
-      NETWORKING_FETCH_RETRY_DEBOUNCE_MULTIPLIER: "2"
-      JOBS_YOUTUBE_SESSION_FREQUENCY: "0 * * * *"
-    shm_size: 256mb
-    cap_drop:
-      - ALL
-    read_only: true
-    volumes:
-      - ${APP_DATA_DIR}/data/companion:/var/tmp/youtubei.js:rw
-
-  db:
-    image: postgres:14.20-bookworm@sha256:a701f1c85fd2aa8b990fca821b9a16907f4c3d3a2eb7027e5897ccdd98a429fc
-    restart: on-failure
-    user: "1000:1000"
-    stop_grace_period: 1m
-    init: true
-    environment:
-      POSTGRES_DB: invidious
-      POSTGRES_USER: tubehaus
-      POSTGRES_PASSWORD: ${APP_TUBEHAUS_DB_PASSWORD}
-    volumes:
-      - ${APP_DATA_DIR}/data/postgres:/var/lib/postgresql/data

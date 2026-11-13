@@ -335,14 +335,7 @@ step("imgfx", () => {
 });
 step("cast", () => modeReady.then((pub) => { if (!pub) startReceiver(); }));   // no send-to-TV on public instances
 addEventListener("settings", (e) => { if (e.detail === "castReceive") startReceiver(); });
-loadLib().then(async (L) => {
-  // first run: import the subscriptions of the Invidious account, if there are any
-  if (!Object.keys(L.subs).length && !local.get("invImported", false)) {
-    local.set("invImported", true);
-    await P.importInvidious(false);
-  }
-  bell();
-});
+loadLib().then(() => bell());
 if (!history.state) history.replaceState({ k: "first" }, "");
 // a server's own add-on, if it has one (web/y/local.js is not part of TubeHaus and updates leave it alone)
 import("./local.js").catch(() => { });

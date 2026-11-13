@@ -9,14 +9,12 @@
   <Project>https://github.com/biolend83/tubehaus</Project>
   <Overview>Part 2 of 2, install TubeHaus too: this container is the web app you open in the browser, and it needs the TubeHaus server.&#xD;
 &#xD;
-The TubeHaus web app: your own YouTube for the whole household, without ads or tracking. Open it in any browser, on a TV too. It routes to the TubeHaus server, Invidious and invidious-companion; install the TubeHaus template first and set their addresses below.</Overview>
+The TubeHaus web app: your own YouTube for the whole household, without ads or tracking. Open it in any browser, on a TV too. It routes to the TubeHaus server; install the TubeHaus template first and set its address below.</Overview>
   <Category>MediaApp:Video MediaServer:Video</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/biolend83/tubehaus/main/packaging/unraid/tubehaus-web.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/biolend83/tubehaus/main/web/y/icon-512.png</Icon>
   <Config Name="Web port" Target="8080" Default="8796" Mode="tcp" Description="Open TubeHaus at http://[this server]:this port" Type="Port" Display="always" Required="true" Mask="false">8796</Config>
   <Config Name="TubeHaus server" Target="TUBEHAUS_SERVER" Default="192.168.1.10:3010" Mode="" Description="host:port of the TubeHaus container" Type="Variable" Display="always" Required="true" Mask="false">192.168.1.10:3010</Config>
-  <Config Name="Invidious" Target="TUBEHAUS_INVIDIOUS" Default="192.168.1.10:3000" Mode="" Description="host:port of your Invidious" Type="Variable" Display="always" Required="true" Mask="false">192.168.1.10:3000</Config>
-  <Config Name="invidious-companion" Target="TUBEHAUS_COMPANION" Default="192.168.1.10:8282" Mode="" Description="host:port of your invidious-companion" Type="Variable" Display="always" Required="true" Mask="false">192.168.1.10:8282</Config>
   <Config Name="Accounts" Target="TUBEHAUS_AUTH" Default="none" Mode="" Description="none: everyone shares one library. accounts: everyone signs up and gets their own (set the same on TubeHaus)" Type="Variable" Display="advanced" Required="false" Mask="false">none</Config>
 </Container>

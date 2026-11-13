@@ -542,13 +542,11 @@ export async function channelsMgr(page) {
     page.innerHTML = `<div class="narrow-page"><h2>${$t("구독 채널 {0}개", subs.length)}</h2>
       <div class="imp"><button class="pill ghost file">${$t("{0} 파일에서 가져오기", icon("upload"))}</button>
       <button class="pill ghost exp">${$t("{0} 내보내기", icon("download"))}</button>
-      <button class="pill ghost inv">${$t("{0} Invidious 계정의 구독 가져오기", icon("download"))}</button>
       <input type="file" class="impfile" hidden multiple accept=".json,.csv,.opml,.xml,.db,.txt,.html">
       <form class="addch"><input placeholder="${$t("채널 주소나 @핸들 (예: @MBCNEWS11)")}"><button class="pill">${$t("추가")}</button></form></div>
       ${PUBLIC ? `<p class="sub pub-note">${$t("공개 서버예요. 구독과 기록은 이 브라우저에만 저장되고 서버에는 남지 않아요. 브라우저 데이터를 지우면 사라지니 가끔 내보내기로 백업해 두세요.")}</p>` : ""}
       <p class="sub imp-hint">${$t("구글 Takeout (구독 CSV, 시청 기록), Invidious, NewPipe, FreeTube, OPML, TubeHaus 백업 파일을 가져올 수 있어요")}</p>
       <div class="chlist">${subs.map(([id, s]) => `<div class="chrow"><a href="/channel/${esc(id)}" data-nav>${avatar(s.thumb, "md")}<span>${esc(s.name)}</span></a>${subBtn(id, s.name, s.thumb)}</div>`).join("") || `<p class='sub'>${$t("아직 없어요")}</p>`}</div></div>`;
-    $(".inv", page).onclick = () => importInvidious(true).then(draw);
     $(".file", page).onclick = () => $(".impfile", page).click();
     $(".impfile", page).onchange = async (e) => { if (await importFiles(e.target.files)) draw(); };
     $(".exp", page).onclick = exportDialog;
@@ -611,20 +609,6 @@ export async function importFiles(files) {
   toast($t("가져왔어요: 구독 {0}개, 재생목록 {1}개, 시청 기록 {2}개", sum.subs, sum.playlists, sum.hist));
   return true;
 }
-export async function importInvidious(loud) {
-  try {
-    const r = await fetch("/api/v1/auth/subscriptions", { credentials: "same-origin" });
-    if (r.status === 403) { if (loud) dialog(`<div class="dh"><b>${$t("Invidious 로그인 필요")}</b><button data-close>${icon("close")}</button></div><p>${$t("Invidious 계정에 로그인되어 있지 않아요. 로그인한 뒤 다시 누르세요.")}</p><a class="pill blue" href="/login?referer=%2Ffeed%2Fchannels">${$t("Invidious 로그인")}</a>`); return; }
-    const list = await r.json();
-    if (!Array.isArray(list) || !list.length) { if (loud) toast($t("가져올 구독이 없어요")); return; }
-    const items = list.map((s) => ({ id: s.authorId, name: s.author, thumb: "" }));
-    const res = await lib("subs/import", { method: "POST", body: { list: items } });
-    await loadLib();
-    dropCache("/yt/feed");
-    if (loud || res.added) toast(`${$t("구독 {0}개를 가져왔어요", res.added)}`);
-  } catch (e) { if (loud) toast(e.message); }
-}
-
 // ---------------------------------------------------------------- history
 export async function history(page, m, alive) {
   page.innerHTML = `<div class="histpage"><div class="hist-main" data-ctx="hist"><h2>${$t("시청 기록")}</h2><div class="results"></div></div>

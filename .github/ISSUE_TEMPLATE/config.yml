@@ -3,6 +3,3 @@ contact_links:
   - name: Questions and setup help
     url: https://github.com/biolend83/tubehaus/discussions
     about: Ask and answer questions in Discussions
-  - name: Problems fetching from YouTube itself
-    url: https://github.com/iv-org/invidious/issues
-    about: If plain Invidious fails the same way, it is probably an Invidious / companion issue

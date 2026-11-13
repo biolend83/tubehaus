@@ -1,8 +1,8 @@
 # TubeHaus behind nginx.
 # Include this file from nginx's http context (for example, via sites-enabled).
 # Replace the hostname, TLS certificate paths and upstream addresses for your setup.
-# This example assumes nginx can reach the TubeHaus server, Invidious and companion
-# on the same host. Keep TubeHaus's own authentication enabled or put an auth gate
+# This example assumes nginx can reach the TubeHaus server (which also asks YouTube
+# itself and passes the video streams) on the same host. Keep TubeHaus's own authentication enabled or put an auth gate
 # in front of the entire site before exposing it publicly.
 
 map $http_accept $tubehaus_accepts_html {
@@ -17,10 +17,8 @@ server {
     ssl_certificate     /etc/letsencrypt/live/tube.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/tube.example.com/privkey.pem;
 
-    # Route non-app requests back to Invidious. The 419 route is used only for
-    # /companion/latest_version when no TubeHaus download title is supplied.
-    error_page 418 = @invidious;
-    error_page 419 = @companion;
+    # Requests that are not an app page (see below) go to the TubeHaus server.
+    error_page 418 = @tubehaus;
 
     # Privacy and hardening; also keep private instances out of search engines.
     add_header Referrer-Policy same-origin always;
@@ -45,7 +43,7 @@ server {
     }
 
     # Page navigations go to the TubeHaus app only for HTML GET/HEAD requests.
-    # The classic= query, API feeds and non-HTML clients stay with Invidious.
+    # Anything else on those paths goes to the TubeHaus server.
     location ~ ^/(?:$|watch$|results$|shorts(?:/.*)?|channel/.*|c/.*|user/.*|@[^/]+(?:/.*)?|playlist$|feed/(?!channel/|playlist/|private(?:/|$)|webhook/).*|settings$|hashtag/.*)$ {
         if ($request_method !~ ^(GET|HEAD)$) { return 418; }
         if ($tubehaus_accepts_html = 0) { return 418; }
@@ -60,118 +58,10 @@ server {
         try_files /index.html =404;
     }
 
-    # TubeHaus API: library, live streams, captions, subtitles, send-to-TV and downloads.
-    # Disable buffering and allow long polling / live playlists to remain connected.
-    location ^~ /api/p/ {
-        proxy_pass http://127.0.0.1:3010;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_buffering off;
-        proxy_request_buffering off;
-        proxy_read_timeout 1h;
-        proxy_send_timeout 1h;
-        proxy_connect_timeout 60s;
-        proxy_redirect off;
-    }
-
-    # Video info goes through TubeHaus's cache and adds live HLS / subtitle data.
-    location ^~ /api/v1/videos/ {
-        proxy_pass http://127.0.0.1:3010;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 1h;
-        proxy_send_timeout 1h;
-        proxy_redirect off;
-    }
-
-    # Caption files go through TubeHaus, which takes the word timings out
-    # (the apps' player shows them as text).
-    location ^~ /companion/api/v1/captions/ {
-        proxy_pass http://127.0.0.1:3010;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_redirect off;
-    }
-
-    # Downloads use TubeHaus when a title is present; otherwise preserve the
-    # original Invidious / companion endpoint behaviour.
-    location = /latest_version {
-        if ($arg_title = "") { return 418; }
-        proxy_pass http://127.0.0.1:3010;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_buffering off;
-        proxy_request_buffering off;
-        proxy_read_timeout 1h;
-        proxy_send_timeout 1h;
-    }
-
-    location = /companion/latest_version {
-        if ($arg_title = "") { return 419; }
-        proxy_pass http://127.0.0.1:3010;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_buffering off;
-        proxy_request_buffering off;
-        proxy_read_timeout 1h;
-        proxy_send_timeout 1h;
-    }
-
-    location ^~ /companion/ {
-        proxy_pass http://127.0.0.1:8282;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_buffering off;
-        proxy_request_buffering off;
-        proxy_read_timeout 1h;
-        proxy_send_timeout 1h;
-        proxy_connect_timeout 60s;
-        proxy_redirect off;
-    }
-
-    # Everything else (including Invidious APIs and classic UI) goes to Invidious.
+    # Everything else: the TubeHaus server (its API, YouTube's answers, the video streams, captions and
+    # pictures). No buffering: streams and long polls pass as they come.
     location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 1h;
-        proxy_send_timeout 1h;
-        proxy_redirect off;
-    }
-
-    location @invidious {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 1h;
-        proxy_send_timeout 1h;
-        proxy_redirect off;
-    }
-
-    location @companion {
-        proxy_pass http://127.0.0.1:8282;
+        proxy_pass http://127.0.0.1:3010;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -181,6 +71,22 @@ server {
         proxy_request_buffering off;
         proxy_read_timeout 1h;
         proxy_send_timeout 1h;
+        proxy_connect_timeout 60s;
+        proxy_redirect off;
+    }
+
+    location @tubehaus {
+        proxy_pass http://127.0.0.1:3010;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+        proxy_connect_timeout 60s;
         proxy_redirect off;
     }
 }

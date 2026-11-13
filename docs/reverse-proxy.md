@@ -14,9 +14,6 @@ TUBEHAUS_SITE=:80
 TUBEHAUS_HTTP_BIND=127.0.0.1:8080       # only your proxy reaches it
 TUBEHAUS_HTTPS_BIND=127.0.0.1:8443      # unused, kept off the public 443
 TUBEHAUS_URL=https://tube.example.com
-TUBEHAUS_DOMAIN=tube.example.com
-TUBEHAUS_HTTPS=true
-TUBEHAUS_EXTERNAL_PORT=443
 ```
 
 Then `docker compose up -d`. `curl -I http://127.0.0.1:8080/` on the server should answer.
@@ -32,7 +29,7 @@ Whatever proxy you use, four things matter:
 
 | | Why |
 |---|---|
-| **Everything** goes to `http://127.0.0.1:8080` | Caddy inside the stack decides what goes to the app, the API, Invidious and the companion. Don't split paths yourself. |
+| **Everything** goes to `http://127.0.0.1:8080` | Caddy inside the stack decides what goes to the app and what to the server. Don't split paths yourself. |
 | **Buffering off** | Video, live streams and downloads are long responses; a buffering proxy holds them back or fills its disk. |
 | **A long read timeout** (1 hour) | Live streams and large downloads stay open for a long time. |
 | **The `Host` header passed through**, plus `X-Forwarded-Proto` | So links and redirects use your hostname and `https`. |

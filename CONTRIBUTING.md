@@ -15,7 +15,8 @@ First pull requests get a reply within a day or two, usually sooner.
 
 Open an [issue](https://github.com/biolend83/tubehaus/issues/new/choose) and include your setup
 (docker compose or manual), device and browser, and the logs (`docker compose logs tubehaus --tail 100`).
-If plain Invidious fails the same way, the problem is probably upstream in Invidious or its companion.
+If videos stop playing everywhere at once, YouTube has probably changed something: the doctor's output
+(`--doctor`) helps most there.
 
 ## Pull requests
 

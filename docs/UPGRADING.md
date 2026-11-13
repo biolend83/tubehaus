@@ -5,14 +5,20 @@
 ```sh
 cd tubehaus
 git pull
-docker compose pull            # newer TubeHaus, Invidious, companion, Caddy, PostgreSQL images
-docker compose up -d            # add --build if you build the TubeHaus image yourself
+docker compose pull            # newer TubeHaus and Caddy images
+docker compose up -d --remove-orphans   # add --build if you build the TubeHaus image yourself
 ```
 
-Your library, the WARP registration and the Invidious database live in Docker volumes, so they survive updates.
+Your library and the WARP registration live in Docker volumes, so they survive updates.
 
-YouTube changes things often, and most breakage is fixed upstream in invidious-companion. If videos suddenly stop
-playing, `docker compose pull && docker compose up -d` is the first thing to try. Watch this repository's releases
+**From 1.5 or older to 1.6:** the server now asks YouTube itself, so Invidious, invidious-companion and
+PostgreSQL are gone from `docker-compose.yml`. `--remove-orphans` above stops their old containers. Then, if you
+like, delete what they left: `docker volume rm tubehaus_postgres-data tubehaus_companion-cache` (the names start
+with your folder's name; `docker volume ls` shows them), and the `COMPANION_KEY`, `INVIDIOUS_HMAC_KEY`,
+`POSTGRES_PASSWORD`, `TUBEHAUS_DOMAIN`, `TUBEHAUS_HTTPS` and `TUBEHAUS_EXTERNAL_PORT` lines in `.env`.
+
+YouTube changes things often. If videos suddenly stop playing, `docker compose pull && docker compose up -d`
+(after a `git pull`) is the first thing to try. Watch this repository's releases
 (Watch → Custom → Releases) to hear about TubeHaus updates.
 
 ## What to back up
@@ -20,7 +26,6 @@ playing, `docker compose pull && docker compose up -d` is the first thing to try
 | Volume | Contents | Needed? |
 |---|---|---|
 | `tubehaus-data` | your library: subscriptions, history, resume points, playlists (`ytlib.json`), subtitle cache | **yes** |
-| `postgres-data` | Invidious' database (mostly cache) | optional |
 | `warp-data` | the WARP registration; a new one is created if it's missing | no |
 | `caddy-data` | HTTPS certificates; Caddy gets new ones if it's missing | no |
 

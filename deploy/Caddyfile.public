@@ -1,5 +1,5 @@
 # A public TubeHaus instance behind Anubis (proof-of-work bot check) and a sign-up wall.
-#   visitor -> :443 (this file, first block) -> anubis:8923 -> :8080 (second block) -> TubeHaus / Invidious
+#   visitor -> :443 (this file, first block) -> anubis:8923 -> :8080 (second block) -> TubeHaus
 # Used with deploy/docker-compose.public.yml; the address comes from TUBEHAUS_SITE in .env.
 {
 	admin off
@@ -43,8 +43,8 @@
 			TXT 200
 	}
 
-	# Invidious' own accounts, admin and webhook pages are off on a public instance
-	@closed path /register* /signout* /subscription_manager* /data_control* /delete_account* /change_password* /token_manager* /authorize_token* /modify_notifications* /clear_watch_history* /feed/webhook* /api/v1/auth/* /api/v1/stats
+	# nothing to see there on a public instance
+	@closed path /api/v1/auth/* /api/v1/stats
 	handle @closed {
 		respond 404
 	}
@@ -94,30 +94,10 @@
 		file_server
 	}
 
-	handle /api/p/* {
+	# everything else: the TubeHaus server (its API, YouTube's answers, the video streams, captions and pictures)
+	handle {
 		reverse_proxy tubehaus:3010 {
 			flush_interval -1
 		}
-	}
-	handle /api/v1/videos/* {
-		reverse_proxy tubehaus:3010
-	}
-
-	# companion: only the reads a player makes (video bytes, manifests)
-	@companion {
-		method GET HEAD
-		path /companion/videoplayback* /companion/latest_version* /companion/api/manifest/*
-	}
-	handle @companion {
-		reverse_proxy companion:8282 {
-			flush_interval -1
-		}
-	}
-	handle /companion/* {
-		respond 403
-	}
-
-	handle {
-		reverse_proxy invidious:3000
 	}
 }

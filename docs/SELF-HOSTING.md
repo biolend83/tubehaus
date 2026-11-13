@@ -20,9 +20,6 @@ For a server at home (a mini PC, a Raspberry Pi 4/5, a NAS that runs Docker). In
 TUBEHAUS_SITE=:80
 TUBEHAUS_HTTP_BIND=8080
 TUBEHAUS_URL=http://192.168.1.10:8080      # the server's address on your network
-TUBEHAUS_DOMAIN=192.168.1.10
-TUBEHAUS_HTTPS=false
-TUBEHAUS_EXTERNAL_PORT=8080
 ```
 
 `docker compose up -d`, then open `http://192.168.1.10:8080` on any device at home. Don't forward
@@ -48,9 +45,6 @@ from anywhere. This is the safest way to use a cloud server.
    TUBEHAUS_HTTP_BIND=127.0.0.1:8080
    TUBEHAUS_HTTPS_BIND=127.0.0.1:8443
    TUBEHAUS_URL=https://myserver.your-tailnet.ts.net   # shown by "tailscale serve status"
-   TUBEHAUS_DOMAIN=myserver.your-tailnet.ts.net
-   TUBEHAUS_HTTPS=true
-   TUBEHAUS_EXTERNAL_PORT=443
    ```
 
    ```sh

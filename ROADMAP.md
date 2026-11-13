@@ -28,4 +28,5 @@ Also always welcome:
 - **A personal recommendation algorithm.** Nothing learns from what you watch, on purpose. (Shorts ranking is
   the one exception, and it stays on your server)
 - **Playing age-restricted videos.** That needs a Google account, which TubeHaus never uses
-- **Replacing Invidious.** TubeHaus builds on Invidious and its companion and keeps using their official images
+- **An Invidious account system.** Since 1.6 the server asks YouTube itself and answers in Invidious' API format, but
+  Invidious' own accounts, login and its classic pages are not part of it

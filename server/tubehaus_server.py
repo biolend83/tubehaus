@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """TubeHaus server - the API behind the TubeHaus web app.
 
-It runs next to an Invidious instance and adds what Invidious does not have:
+It asks YouTube itself (the built-in engine below, which answers in Invidious' API shapes, so
+the web app and the apps' server mode read it as they read Invidious) and adds:
   * one shared library (subscriptions, history, resume points, playlists, likes)
     so every device sees the same state;
   * YouTube live streams as HLS, with segments pulled ahead of the player;
@@ -9,7 +10,7 @@ It runs next to an Invidious instance and adds what Invidious does not have:
   * machine-translated subtitles for videos that have none in your language;
   * "send to TV": a phone starts playback on another open TubeHaus screen;
   * high-quality offline save (separate video + audio merged with ffmpeg);
-  * a cache in front of Invidious' /api/v1/videos so clicks answer instantly.
+  * a cache in front of /api/v1/videos so clicks answer instantly.
 
 Configuration comes from environment variables - see .env.example.
 Python standard library only; ffmpeg, yt-dlp and whisper.cpp are optional.
@@ -26,8 +27,6 @@ def env(key, default=""):
 
 BIND = (env("HT_BIND", "127.0.0.1"), int(env("HT_PORT", "3010")))
 STATE = env("HT_STATE", "./state")                       # library, subtitle cache
-INV = env("HT_INVIDIOUS", "http://127.0.0.1:3000").rstrip("/")
-COMPANION = env("HT_COMPANION", "http://127.0.0.1:8282").rstrip("/")
 PUBLIC = env("HT_PUBLIC_URL", "http://localhost:8080").rstrip("/")   # where browsers open TubeHaus
 # YouTube refuses most cloud/VPS addresses ("Sign in to confirm you're not a bot").
 # Sending YouTube traffic out through Cloudflare WARP (warp-cli in proxy mode,
@@ -226,11 +225,9 @@ def vid_fetch_once(key):
 def vid_fetch(key):
     """key is the request path; returns (code, body) with hlsUrl patched in."""
     t0 = time.time()
-    try:
-        r = urllib.request.urlopen(INV + key, timeout=60)
-        code, body = r.status, r.read()
-    except urllib.error.HTTPError as e:
-        code, body = e.code, e.read()
+    u = urllib.parse.urlsplit(key)
+    code, d = eng_api(u.path, dict(urllib.parse.parse_qsl(u.query)))
+    body = json.dumps(d, ensure_ascii=False).encode()
     if code >= 400:
         log("videos", "%d %s" % (code, key.split("?")[0][:60]), t0)
         return code, body
@@ -247,8 +244,7 @@ def vid_fetch(key):
         if exact:
             d["published"] = exact
             body = json.dumps(d, ensure_ascii=False).encode()
-        # Invidious fetches captions from this server's own address and gets nothing back;
-        # the companion fetches them through WARP
+        # the caption files come through /companion/api/v1/captions/ (the address the apps know)
         caps = [c for c in d.get("captions") or [] if (c.get("url") or "").startswith("/api/v1/captions/")]
         for c in caps:
             c["url"] = "/companion" + c["url"]
@@ -295,7 +291,7 @@ def vid_bg(key, prefetch_from=None):
 # Apple's player plays HLS, not DASH, and YouTube's own HLS is only handed to its
 # iOS client. The same MP4 streams the DASH manifest lists work as HLS too: each
 # format's index (sidx box) gives its segments as byte ranges of the one file,
-# fetched through the companion like everything else.
+# fetched through this server's stream proxy like everything else.
 HLS_KEEP = 300
 hls_cache = {}         # (id, itag) -> (ts, playlist text)
 hls_lk = threading.Lock()
@@ -312,14 +308,15 @@ def _video_json(vid):
 
 
 def _companion_url(url):
-    """a googlevideo.com stream address as the companion's proxy path for it (as in its DASH manifest)"""
+    """a googlevideo.com stream address as this server's proxy path for it (/companion/videoplayback, the path
+    Invidious' companion used, so the apps' server mode finds it where it always did)"""
     u = urllib.parse.urlsplit(url)
     return "/companion/videoplayback?%s&host=%s" % (u.query, u.netloc)
 
 
 def _atrack(f):
     """an audio format's track: {"id", "lang", "kind" (original, dubbed, dubbed-auto, descriptive), "orig", "drc", "name"}.
-    From audioTrack when the companion gives it, else from the stream's xtags (acont=dubbed:lang=ko, drc=1 = stable volume)."""
+    From audioTrack when YouTube gives it, else from the stream's xtags (acont=dubbed:lang=ko, drc=1 = stable volume)."""
     q = urllib.parse.parse_qs(urllib.parse.urlsplit(f.get("url") or "").query)
     x = dict(p.split("=", 1) for p in (q.get("xtags") or [""])[0].split(":") if "=" in p)
     t = f.get("audioTrack") or {}
@@ -421,8 +418,7 @@ def _sidx(b):
 
 def dash_mpd(vid):
     """the DASH list of qualities for the web player, with every SDR video format: H.264 and AV1 (MP4)
-    and VP9 (WebM). The companion's own list has only the MP4 ones, so videos whose 1440p and 4K
-    exist only as VP9 stopped at 1080p. HDR (VP9.2, BT.2020) is left out where the same size exists
+    and VP9 (WebM). (The companion's list, used before the built-in engine, had only the MP4 ones.) HDR (VP9.2, BT.2020) is left out where the same size exists
     in SDR (HDR looks washed out on SDR screens); where it is the only one, as 8K often is, it stays."""
     d = _video_json(vid)
     fs = [f for f in d.get("adaptiveFormats") or [] if f.get("url") and f.get("init") and f.get("index")]
@@ -505,8 +501,7 @@ def hls_media(vid, itag):
     url = _companion_url(f["url"])
     i0, i1 = (int(x) for x in f["index"].split("-"))
     init_end = int(f["init"].split("-")[1])
-    req = urllib.request.Request(COMPANION + url, headers={"Range": "bytes=%d-%d" % (i0, i1)})
-    refs, pos = _sidx(urllib.request.urlopen(req, timeout=30).read())
+    refs, pos = _sidx(gv_open(f["url"], "bytes=%d-%d" % (i0, i1), 30).read())
     pos += i0                                            # the box was read from the index range's start
     out = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-TARGETDURATION:%d" % max(1, int(max(r[1] for r in refs) + 0.999)),
            "#EXT-X-PLAYLIST-TYPE:VOD", "#EXT-X-INDEPENDENT-SEGMENTS",
@@ -552,7 +547,8 @@ SUB_MAX = 1200                        # cues; longer videos get truncated, not d
 
 
 def _inv(path, timeout=60):
-    return urllib.request.urlopen(INV + path, timeout=timeout).read()
+    """an Invidious API path, answered by the built-in engine"""
+    return eng_json(path, timeout)
 
 
 def _vtt_cues(text):
@@ -712,16 +708,14 @@ def sub_vtt(vid, tl=SUB_LANG):
     if os.path.exists(cache):
         return open(cache, "rb").read()
     t0 = time.time()
-    # through the companion (WARP): Invidious' own captions come back empty
     try:
-        lst = json.loads(urllib.request.urlopen(f"{COMPANION}/companion/api/v1/captions/{vid}", timeout=60).read())
-        tracks = lst.get("captions") or []
+        tracks = eng_caption_list(vid)
         # prefer English, else whatever the video has
         pick = next((c for c in tracks if (c.get("languageCode") or "").startswith("en")), None) \
             or (tracks[0] if tracks else None)
         if not pick:
             raise LookupError("This video has no captions to translate")
-        raw = urllib.request.urlopen(COMPANION + pick["url"], timeout=60).read().decode("utf-8", "replace")
+        raw = eng_caption(vid, pick["label"]).decode("utf-8", "replace")
         src = pick.get("languageCode", "?")
     except LookupError:
         raise
@@ -759,8 +753,8 @@ def sub_vtt(vid, tl=SUB_LANG):
     return data
 
 
-# ---------- captions straight from YouTube when the companion's are refused ----------
-# YouTube answers caption requests from one address with 429 for hours at a time (the companion's and
+# ---------- captions through yt-dlp when YouTube refuses the engine's ----------
+# YouTube answers caption requests from one address with 429 for hours at a time (the engine's and
 # yt-dlp's over the proxy alike). Then yt-dlp fetches the same track over this server's own line (then
 # over the proxy), and the file is kept for a week. Two at a time; one track per (video, language, kind).
 cap_sem = threading.Semaphore(2)
@@ -780,7 +774,7 @@ def _cap_cache(vid, lang, auto):
 
 
 def cap_direct(vid, lang, auto=False):
-    """One caption track as WebVTT, fetched by yt-dlp without the companion."""
+    """One caption track as WebVTT, fetched by yt-dlp."""
     import glob
     import tempfile
     cache = _cap_cache(vid, lang, auto)
@@ -2389,6 +2383,1242 @@ def _first(o, key):
     return a[0] if a else None
 
 
+# ---------- the built-in YouTube engine (in place of Invidious and invidious-companion) ----------
+# TubeHaus used to stand on Invidious (lists, video pages) and its companion (streams). This
+# section asks YouTube itself, the way the apps do (common/src/app/tubehaus/engine in the app
+# branch), and answers with Invidious' JSON, so the web page, the apps' server mode and the
+# rest of this file keep working unchanged:
+#   * lists (search, channels, playlists, comments, related videos) from the WEB client;
+#   * streams from VISIONOS (plain URLs to the end, no PO token), ANDROID_VR as a fallback;
+#   * the exact upload time, category and like count from WEB's own player answer (which has
+#     no streams any more, but still the page's details);
+#   * every stream, caption and picture through this server (and WARP): a stream only plays
+#     from the address it was given to, and the viewer's browser never talks to Google.
+# Every request carries a visitor identity, as a browser's cookie would; YouTube's bot wall is
+# tied to it, so when every player client is walled the identity is replaced once (at most twice
+# in six hours), then the WARP address.
+import math, random
+from concurrent.futures import ThreadPoolExecutor
+
+ENG_HL = env("HT_HL", "")                   # YouTube's language for texts ("3 days ago"); "" = the viewer's browser
+ENG_REGION = env("HT_REGION", "US")         # the default region of searches and topic pages
+ENG_POOL = ThreadPoolExecutor(16, thread_name_prefix="eng")
+ENG_VISITOR = f"{STATE}/visitor.json"
+VIS_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+VR_UA = "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip"
+# (context.client, X-YouTube-Client-Name, User-Agent), in the order they are tried. When YouTube
+# stops answering one, its version here is the first thing to update (the app's clients.json has
+# the same list and an automatic repair, android-app .github/workflows/engine-check.yml).
+ENG_PLAYERS = [
+    ({"clientName": "VISIONOS", "clientVersion": "1.02", "deviceMake": "Apple", "deviceModel": "RealityDevice17,1",
+      "osName": "visionOS", "osVersion": "26.5.23O471"}, 101, VIS_UA),
+    ({"clientName": "ANDROID_VR", "clientVersion": "1.65.10", "deviceMake": "Oculus", "deviceModel": "Quest 3",
+      "androidSdkVersion": 32, "osName": "Android", "osVersion": "12L"}, 28, VR_UA),
+]
+ENG_WEB = dict(WEB_CLIENT, clientVersion="2.20260708.00.00")
+_vis = {"v": None}
+_vis_lk = threading.Lock()
+_vis_rerolls = []
+VID_RE = re.compile(r"[\w-]{11}")
+UC_RE = re.compile(r"UC[\w-]{22}")
+
+
+class EngError(Exception):
+    """YouTube refused or failed: code is the HTTP status to answer with"""
+    def __init__(self, msg, code=500):
+        super().__init__(msg)
+        self.code = code
+
+
+def _eng_fetch_visitor():
+    try:
+        d = it_call("visitor_id", {}, visitor=False)
+        v = (d.get("responseContext") or {}).get("visitorData")
+        if v:
+            jsave(ENG_VISITOR, {"visitorData": v, "at": int(time.time())})
+        return v
+    except Exception as ex:
+        log("engine", "visitor FAIL %s" % repr(ex)[:100])
+        return None
+
+
+def eng_visitor():
+    """the visitor identity in use: the saved one while it is under a week old, else a new one"""
+    v = _vis["v"]
+    if v:
+        return v
+    with _vis_lk:
+        if _vis["v"]:
+            return _vis["v"]
+        saved = jload(ENG_VISITOR, {})
+        v = saved.get("visitorData") if 0 <= time.time() - (saved.get("at") or 0) < 7 * 86400 else None
+        _vis["v"] = v or _eng_fetch_visitor()
+        return _vis["v"]
+
+
+def eng_reroll():
+    """a new visitor identity for a walled one; at most twice in six hours, so a walled network can't loop"""
+    with _vis_lk:
+        now = time.time()
+        _vis_rerolls[:] = [t for t in _vis_rerolls if now - t < 6 * 3600]
+        if len(_vis_rerolls) >= 2:
+            return False
+        v = _eng_fetch_visitor()
+        if not v:
+            return False
+        _vis_rerolls.append(now)
+        _vis["v"] = v
+        log("engine", "new visitor identity", every=0)
+        return True
+
+
+def it_call(endpoint, body, client=None, cid=1, ua=BROWSER_UA, hl="en", gl="US", timeout=15, visitor=True):
+    """one InnerTube request (YouTube's own JSON API) through YT_PROXY; 429/503 wait 1-2 s, then 3-6 s"""
+    client = client or ENG_WEB
+    v = eng_visitor() if visitor else None
+    ctx = dict(client, hl=hl or "en", gl=gl or "US", userAgent=ua)
+    if v:
+        ctx["visitorData"] = v
+    headers = {"Content-Type": "application/json", "User-Agent": ua, "X-YouTube-Client-Name": str(cid),
+               "X-YouTube-Client-Version": client["clientVersion"], "Origin": "https://www.youtube.com",
+               "Referer": "https://www.youtube.com/", "Accept-Language": hl or "en"}
+    if v:
+        headers["X-Goog-Visitor-Id"] = v
+    data = json.dumps({"context": {"client": ctx}, **{k: x for k, x in body.items() if x is not None}}).encode()
+    url = "https://www.youtube.com/youtubei/v1/%s?prettyPrint=false" % endpoint
+    for attempt in range(3):
+        try:
+            return json.loads(YT.open(urllib.request.Request(url, data=data, headers=headers), timeout=timeout).read())
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 503) and attempt < 2:
+                time.sleep(random.uniform(1, 2) if attempt == 0 else random.uniform(3, 6))
+                continue
+            if e.code in (400, 404):
+                raise EngError("YouTube didn't find that", 404)
+            raise EngError("YouTube answered %d" % e.code, 502)
+        except (urllib.error.URLError, OSError) as e:
+            if attempt < 1:
+                continue
+            raise EngError("No connection to YouTube (%s)" % repr(e)[:80], 502)
+
+
+# ---- numbers and times in YouTube's texts, in the languages it writes them in ----
+_MULT = {"k": 1e3, "m": 1e6, "b": 1e9, "천": 1e3, "만": 1e4, "억": 1e8, "千": 1e3, "万": 1e4, "萬": 1e4, "亿": 1e8, "億": 1e8,
+         "mil": 1e3, "mio": 1e6, "mln": 1e6, "mrd": 1e9, "tys": 1e3, "тыс": 1e3, "млн": 1e6, "млрд": 1e9, "lakh": 1e5, "crore": 1e7,
+         "jt": 1e6, "rb": 1e3, "bin": 1e3, "mn": 1e6, "md": 1e9}
+_NUM = re.compile(r"(\d+(?:[.,  ]\d+)*)\s*(lakh|crore|mil|mio|mln|mrd|tys|тыс|млн|млрд|jt|rb|bin|mn|md|[kmb천만억千万萬亿億])?(?![a-z])", re.I)
+
+
+def eng_count(text):
+    """'1.2M views' / '조회수 79만회' / '1,234 views' / '12万回視聴' -> a number; None when there is none"""
+    if not isinstance(text, str) or not text.strip():
+        return None
+    m = _NUM.search(text.replace(" ", " "))
+    if not m:
+        return 0 if re.search(r"(?i)\bno\b|없음", text) else None
+    num, suf = m.group(1), (m.group(2) or "").lower()
+    if suf:
+        num = num.replace(",", ".") if re.fullmatch(r"\d+,\d{1,2}", num) else num.replace(",", "")
+        num = re.sub(r"[  ]", "", num)
+        try:
+            return int(float(num) * _MULT.get(suf, 1))
+        except ValueError:
+            return None
+    return int(re.sub(r"\D", "", num) or 0)
+
+
+_AGO_UNITS = [(r"second|sec|초|秒|segundo|seconde|sekunde|секунд|detik|saniye", 1),
+              (r"minute|min|분|分|minuto|минут|menit|dakika", 60),
+              (r"hour|시간|時間|小时|小時|hora|heure|stunde|час|jam|saat", 3600),
+              (r"day|일|日|天|día|dia|jour|tag|день|дня|дней|hari|gün", 86400),
+              (r"week|주|週|周|semana|semaine|woche|недел|minggu|hafta", 7 * 86400),
+              (r"month|개월|달|か月|ヶ月|个月|個月|mes|mois|monat|месяц|bulan|ay", 30 * 86400),
+              (r"year|년|年|año|ano|an|jahr|год|лет|tahun|yıl", 365 * 86400)]
+
+
+def eng_ago(text, now=None):
+    """'3 days ago' / '3일 전' / 'Streamed 2 weeks ago' -> the epoch second it means; 0 when it can't be read"""
+    if not isinstance(text, str):
+        return 0
+    m = re.search(r"(\d+)\s*([^\d\s,.]+)", text)
+    if not m:
+        return 0
+    n, word = int(m.group(1)), m.group(2).lower()
+    for pat, sec in _AGO_UNITS:
+        if re.match(pat, word):
+            return int((now or time.time()) - n * sec)
+    return 0
+
+
+def _https(u):
+    return ("https:" + u) if isinstance(u, str) and u.startswith("//") else (u or "")
+
+
+def _vthumbs(vid):
+    """the picture list Invidious gives for a video (through this server's /vi/)"""
+    q = [("maxres", "maxres", 1280, 720), ("maxresdefault", "maxresdefault", 1280, 720), ("sddefault", "sddefault", 640, 480),
+         ("high", "hqdefault", 480, 360), ("medium", "mqdefault", 320, 180), ("default", "default", 120, 90),
+         ("start", "1", 120, 90), ("middle", "2", 120, 90), ("end", "3", 120, 90)]
+    return [{"quality": a, "url": "%s/vi/%s/%s.jpg" % (PUBLIC, vid, b), "width": w, "height": h} for a, b, w, h in q]
+
+
+def _imgs(o):
+    """the sizes of the first picture anywhere below o (YouTube nests them deeper on newer pages)"""
+    th = _thumbs(o) if isinstance(o, dict) else []
+    if th:
+        return th
+    for k in ("sources", "thumbnails"):
+        for arr in _all(o or {}, k):
+            th = _thumbs({k: arr})
+            if th:
+                return th
+    return []
+
+
+def _athumbs(src):
+    """a channel picture in Invidious' six sizes; src is a URL or YouTube's thumbnails object"""
+    if not isinstance(src, str):
+        th = _imgs(src or {})
+        src = th[-1]["url"] if th else ""
+    src = _https(src)
+    if not src:
+        return []
+    if not re.search(r"=s\d+", src):
+        return [{"url": src, "width": 176, "height": 176}]
+    return [{"url": re.sub(r"=s\d+", "=s%d" % s, src), "width": s, "height": s} for s in (32, 48, 76, 100, 176, 512)]
+
+
+def eng_vitem(v, author="", author_id=""):
+    """an item from topic_item() (or alike) as a full Invidious video entry"""
+    vid = v.get("videoId")
+    views_text = v.get("viewCountText") or ""
+    pub_text = v.get("publishedText") or ""
+    views = v.get("viewCount")
+    if views is None:
+        views = eng_count(views_text) if views_text else None
+    return {"type": "video", "title": v.get("title") or "", "videoId": vid, "author": v.get("author") or author,
+            "authorId": v.get("authorId") or author_id, "authorUrl": "/channel/" + (v.get("authorId") or author_id),
+            "authorVerified": bool(v.get("authorVerified")), "authorThumbnails": v.get("authorThumbnails") or [],
+            "videoThumbnails": _vthumbs(vid), "description": v.get("description") or "", "descriptionHtml": "",
+            "viewCount": views if views is not None else 0, "viewCountText": views_text,
+            "published": v.get("published") or eng_ago(pub_text), "publishedText": pub_text,
+            "lengthSeconds": v.get("lengthSeconds") or 0, "liveNow": bool(v.get("liveNow")), "premium": False,
+            "isUpcoming": bool(v.get("isUpcoming")), "premiereTimestamp": 0, "isNew": False, "is4k": False, "is8k": False,
+            "isVr180": False, "isVr360": False, "is3d": False, "hasCaptions": False,
+            **({"short": True} if v.get("short") else {})}
+
+
+def _plvideo(v):
+    """playlistVideoRenderer / playlistPanelVideoRenderer"""
+    vid = v.get("videoId")
+    if not isinstance(vid, str) or not VID_RE.fullmatch(vid):
+        return None
+    author, cid = _byline(v.get("shortBylineText") or v.get("longBylineText") or {})
+    length = int(v.get("lengthSeconds") or 0) or _secs(_txt(v.get("lengthText")))
+    idx = re.sub(r"\D", "", _txt(v.get("index")) or "")
+    info = _txt(v.get("videoInfo"))
+    return {"videoId": vid, "title": _txt(v.get("title")), "author": author, "authorId": cid, "lengthSeconds": length,
+            "index": int(idx) - 1 if idx else None, "viewCountText": info.split("•")[0].strip() if info else "",
+            "publishedText": info.split("•")[1].strip() if "•" in info else ""}
+
+
+def eng_items(root, author="", author_id=""):
+    """every video, channel and playlist below root, in Invidious' shapes, each once"""
+    out, seen = [], set()
+
+    def add(key, it):
+        if key and key not in seen:
+            seen.add(key)
+            out.append(it)
+
+    def walk(e):
+        if isinstance(e, list):
+            for x in e:
+                walk(x)
+            return
+        if not isinstance(e, dict):
+            return
+        for k, v in e.items():
+            if not isinstance(v, dict) or k in ("continuationItemRenderer", "menu", "menuRenderer"):
+                if k not in ("continuationItemRenderer", "menu", "menuRenderer"):
+                    walk(v)
+                continue
+            try:
+                if k in ITEM_KINDS:
+                    it = topic_item(k, v)
+                    if it and it.get("type") == "video" and k == "lockupViewModel":
+                        it = _lockup_fix(it, v)
+                    if it and it.get("type") == "video":
+                        add(it["videoId"], eng_vitem(it, author, author_id))
+                    elif it and it.get("type") == "playlist":
+                        add(it["playlistId"], eng_plitem(it))
+                elif k in ("playlistVideoRenderer", "playlistPanelVideoRenderer"):
+                    it = _plvideo(v)
+                    if it:
+                        add(it["videoId"], dict(eng_vitem(it, author, author_id), index=it["index"]))
+                elif k == "channelRenderer":
+                    ch = eng_chitem(v)
+                    if ch:
+                        add(ch["authorId"], ch)
+                elif k in ("playlistRenderer", "gridPlaylistRenderer"):
+                    pid = v.get("playlistId")
+                    if isinstance(pid, str):
+                        name, cid = _byline(v.get("shortBylineText") or v.get("longBylineText") or {})
+                        th = _thumbs((v.get("thumbnails") or [{}])[0] if isinstance(v.get("thumbnails"), list) else v.get("thumbnail") or {})
+                        count = eng_count(_txt(v.get("videoCountText")) or str(v.get("videoCount") or ""))
+                        add(pid, eng_plitem({"playlistId": pid, "title": _txt(v.get("title")), "author": name, "authorId": cid,
+                                             "videoCount": count, "playlistThumbnail": th[-1]["url"] if th else ""}))
+                else:
+                    walk(v)
+            except Exception:
+                pass                # one odd item must never sink the whole list
+    walk(root)
+    return out
+
+
+def _part_texts(meta):
+    """[(text, the channel it links to or "")] of every metadata part below meta, in order"""
+    out = []
+    for row in _dig(meta, "metadata", "contentMetadataViewModel", "metadataRows") or []:
+        for p in row.get("metadataParts") or [] if isinstance(row, dict) else []:
+            if not isinstance(p, dict):
+                continue
+            t = _txt(p.get("text")) or _txt(_first(p, "text"))
+            ids = [i for i in _all(p, "browseId") if isinstance(i, str) and UC_RE.fullmatch(i)]
+            if t:
+                out.append((t, ids[0] if ids else ""))
+    return out
+
+
+def _lockup_fix(it, v):
+    """a video lockup's channel, views and age by what each text is, not where it is (rows differ by page)"""
+    parts = _part_texts(_dig(v, "metadata", "lockupMetadataViewModel") or {})
+    if not parts:
+        return it
+    owner = next(((t, c) for t, c in parts if c), None)
+    ago = next((t for t, c in parts if not c and eng_ago(t)), "")
+    views = next((t for t, c in parts if not c and t != ago and re.search(r"\d", t) and eng_count(t) is not None), "")
+    if owner:
+        it["author"], it["authorId"] = owner
+    elif len(parts) >= 3 and not it.get("author"):
+        it["author"] = parts[0][0]
+    it["viewCountText"], it["publishedText"] = views, ago
+    return it
+
+
+def eng_plitem(p):
+    return {"type": "playlist", "title": p.get("title") or "", "playlistId": p["playlistId"],
+            "playlistThumbnail": _https(p.get("playlistThumbnail") or ""), "author": p.get("author") or "",
+            "authorId": p.get("authorId") or "", "authorUrl": "/channel/" + (p.get("authorId") or ""),
+            "authorVerified": False, "videoCount": p.get("videoCount") or 0, "videos": []}
+
+
+def eng_chitem(v):
+    cid = v.get("channelId")
+    if not isinstance(cid, str):
+        return None
+    # since 2024 "subscriberCountText" holds the @handle and "videoCountText" the subscribers
+    a, b = _txt(v.get("subscriberCountText")), _txt(v.get("videoCountText"))
+    handle = next((x for x in (a, b) if x.startswith("@")), "")
+    subs = next((x for x in (a, b) if x and not x.startswith("@")), "")
+    return {"type": "channel", "author": _txt(v.get("title")), "authorId": cid, "authorUrl": "/channel/" + cid,
+            "authorVerified": "VERIFIED" in json.dumps(v.get("ownerBadges") or []), "authorThumbnails": _athumbs(v.get("thumbnail")),
+            "autoGenerated": False, "subCount": eng_count(subs) or 0, "videoCount": 0, "channelHandle": handle,
+            "description": _txt(v.get("descriptionSnippet")), "descriptionHtml": html_escape(_txt(v.get("descriptionSnippet")))}
+
+
+def html_escape(s):
+    return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+def eng_cont(root):
+    """the last "load more" token below root (the one that continues this list)"""
+    toks = []
+    for kind in ("continuationItemRenderer", "continuationItemViewModel"):
+        for r in _all(root, kind):
+            t = _all(r, "token")
+            if t and isinstance(t[0], str):
+                toks.append(t[0])
+    return toks[-1] if toks else None
+
+
+def eng_text_html(desc):
+    """an attributedDescription (text + where its links are) as Invidious' descriptionHtml"""
+    if not isinstance(desc, dict) or not isinstance(desc.get("content"), str):
+        return None
+    text, runs = desc["content"], sorted((r for r in desc.get("commandRuns") or [] if isinstance(r, dict)),
+                                         key=lambda r: r.get("startIndex", 0))
+    out, pos = [], 0
+    # YouTube counts in UTF-16 units
+    u16 = text.encode("utf-16-le")
+    sub = lambda a, b: u16[a * 2:b * 2].decode("utf-16-le", "replace")
+    for r in runs:
+        a, n = int(r.get("startIndex") or 0), int(r.get("length") or 0)
+        if a < pos or n <= 0:
+            continue
+        out.append(html_escape(sub(pos, a)))
+        label = sub(a, a + n)
+        cmd = _dig(r, "onTap", "innertubeCommand") or {}
+        href = None
+        u = _dig(cmd, "urlEndpoint", "url")
+        if isinstance(u, str):
+            q = re.search(r"[?&]q=([^&]+)", u)
+            href = urllib.parse.unquote(q.group(1)) if q and "youtube.com/redirect" in u else u
+        elif _dig(cmd, "watchEndpoint", "videoId"):
+            w = cmd["watchEndpoint"]
+            href = "/watch?v=%s%s" % (w["videoId"], "&t=%ds" % w["startTimeSeconds"] if w.get("startTimeSeconds") else "")
+        elif _dig(cmd, "browseEndpoint", "browseId"):
+            bid = cmd["browseEndpoint"]["browseId"]
+            href = "/channel/" + bid if bid.startswith("UC") else _dig(cmd, "commandMetadata", "webCommandMetadata", "url")
+        out.append('<a href="%s">%s</a>' % (html_escape(href), html_escape(label)) if href else html_escape(label))
+        pos = a + n
+    out.append(html_escape(sub(pos, len(u16) // 2)))
+    return "".join(out)
+
+
+# ---- a video: streams, details, related videos ----
+def eng_player(vid):
+    """the first player answer with streams: each client in turn; all walled -> a new identity, then a new WARP address"""
+    t0, first = time.time(), None
+    for attempt in range(3):
+        walled = True
+        for client, cid, ua in ENG_PLAYERS:
+            try:
+                d = it_call("player", {"videoId": vid, "contentCheckOk": True, "racyCheckOk": True}, client, cid, ua, timeout=20)
+            except EngError as e:
+                if e.code == 404:
+                    raise
+                first = first or {"playabilityStatus": {"status": "ERROR", "reason": str(e)}}
+                walled = False
+                continue
+            ps, sd = d.get("playabilityStatus") or {}, d.get("streamingData") or {}
+            if ps.get("status") == "OK" and (any(f.get("url") for f in sd.get("adaptiveFormats") or []) or sd.get("hlsManifestUrl")):
+                return d, client["clientName"]
+            if not yt_blocked(d):
+                walled = False
+                if first is None or yt_blocked(first) or (first.get("playabilityStatus") or {}).get("status") == "OK":
+                    first = d
+            elif first is None:
+                first = d
+        if not walled:
+            break
+        if attempt == 0 and eng_reroll():
+            continue
+        if attempt < 2 and warp_rotate("player LOGIN_REQUIRED", t0):
+            continue
+        break
+    return first or {}, None
+
+
+def _fmt(f):
+    """one streamingData format as Invidious lists it"""
+    mime = f.get("mimeType") or ""
+    m = re.match(r"(\w+)/(\w+)", mime)
+    kind, cont = (m.group(1), m.group(2)) if m else ("", "")
+    codecs = (re.search(r'codecs="([^"]+)"', mime) or [None, ""])[1]
+    enc = {"avc1": "h264", "av01": "av1", "vp9": "vp9", "vp09": "vp9", "mp4a": "aac", "opus": "opus", "ac-3": "ac3", "ec-3": "eac3"}
+    out = {"url": f["url"], "itag": str(f.get("itag")), "type": mime, "bitrate": str(f.get("bitrate") or 0),
+           "clen": str(f.get("contentLength") or ""), "lmt": str(f.get("lastModified") or ""),
+           "projectionType": f.get("projectionType") or "RECTANGULAR",
+           "container": {"mp4": "m4a" if kind == "audio" else "mp4"}.get(cont, cont),
+           "encoding": next((v for k, v in enc.items() if codecs.startswith(k)), codecs.split(".")[0])}
+    if f.get("initRange") and f.get("indexRange"):
+        out["init"] = "%s-%s" % (f["initRange"]["start"], f["initRange"]["end"])
+        out["index"] = "%s-%s" % (f["indexRange"]["start"], f["indexRange"]["end"])
+    if kind == "video":
+        out.update(fps=f.get("fps") or 0, size="%sx%s" % (f.get("width"), f.get("height")),
+                   resolution=f.get("qualityLabel") or "", qualityLabel=f.get("qualityLabel") or "")
+        if f.get("colorInfo"):
+            out["colorInfo"] = f["colorInfo"]
+    else:
+        out.update(audioQuality=f.get("audioQuality") or "", audioSampleRate=int(f.get("audioSampleRate") or 0),
+                   audioChannels=int(f.get("audioChannels") or 2))
+        t = f.get("audioTrack")
+        if isinstance(t, dict):
+            out["audioTrack"] = {"id": t.get("id") or "", "displayName": t.get("displayName") or "",
+                                 "isDefault": bool(t.get("audioIsDefault"))}
+    if f.get("quality") and kind == "video" and "audioQuality" in f:     # a muxed one (formatStreams)
+        out["quality"] = f["quality"]
+    return out
+
+
+def _storyboards(spec, vid):
+    """the seek-bar previews, from the player's storyboard spec"""
+    parts = (spec or "").split("|")
+    out = []
+    for i, p in enumerate(parts[1:]):
+        f = p.split("#")
+        if len(f) < 8:
+            continue
+        try:
+            w, h, count, cols, rows, interval = (int(x) for x in f[:6])
+        except ValueError:
+            continue
+        url = parts[0].replace("$L", str(i)).replace("$N", f[6])
+        url += ("&" if "?" in url else "?") + "sigh=" + urllib.parse.quote(f[7], safe="")
+        out.append({"url": "/api/v1/storyboards/%s?width=%d&height=%d" % (vid, w, h), "templateUrl": url, "width": w, "height": h,
+                    "count": count, "interval": interval, "storyboardWidth": cols, "storyboardHeight": rows,
+                    "storyboardCount": max(1, math.ceil(count / max(1, cols * rows)))})
+    return out
+
+
+eng_caps = {}            # video -> (time, [caption tracks with YouTube's address])
+eng_caps_lk = threading.Lock()
+
+
+def eng_video(vid, hl="", gl=""):
+    """/api/v1/videos/<id>: the streams (a player client), the details (WEB's player) and the watch page (next), at once"""
+    hl, gl = hl or ENG_HL or "en", gl or ENG_REGION
+    t0 = time.time()
+    fp = ENG_POOL.submit(eng_player, vid)
+    fm = ENG_POOL.submit(it_call, "player", {"videoId": vid, "contentCheckOk": True, "racyCheckOk": True}, None, 1, BROWSER_UA, hl, gl)
+    fn = ENG_POOL.submit(it_call, "next", {"videoId": vid}, None, 1, BROWSER_UA, hl, gl)
+    d, client = fp.result()
+    try:
+        meta = (fm.result().get("microformat") or {}).get("playerMicroformatRenderer") or {}
+    except Exception:
+        meta = {}
+    try:
+        nx = fn.result()
+    except Exception:
+        nx = {}
+    ps = d.get("playabilityStatus") or {}
+    if not client:
+        reason = ps.get("reason") or _txt(_first(ps.get("errorScreen") or {}, "reason")) or "This video is unavailable"
+        log("engine", "video %s %s: %s" % (vid, ps.get("status"), reason[:80]), t0, every=0)
+        raise EngError(reason, 403 if ps.get("status") == "LOGIN_REQUIRED" else 404 if ps.get("status") in ("ERROR", "UNPLAYABLE") else 500)
+    vd, sd = d.get("videoDetails") or {}, d.get("streamingData") or {}
+    watch = _dig(nx, "contents", "twoColumnWatchNextResults") or {}
+    primary = _first(watch, "videoPrimaryInfoRenderer") or {}
+    secondary = _first(watch, "videoSecondaryInfoRenderer") or {}
+    owner = _first(watch, "videoOwnerRenderer") or {}
+    # the exact upload time (WEB's details), else the date the watch page writes
+    published = 0
+    for k in ("publishDate", "uploadDate"):
+        try:
+            published = int(datetime.datetime.fromisoformat(str(meta.get(k)).replace("Z", "+00:00")).timestamp())
+            break
+        except Exception:
+            pass
+    rel_text = _txt(primary.get("relativeDateText")) or _txt(primary.get("dateText"))
+    published = published or eng_ago(rel_text)
+    likes = eng_count(str(meta.get("likeCount") or "")) if meta.get("likeCount") else None
+    if likes is None:
+        lb = _first(watch, "likeButtonViewModel") or {}
+        likes = eng_count(_txt(_first(lb, "accessibilityText")) or _txt(_first(lb, "title")) or "") or 0
+    subs_text = _txt(owner.get("subscriberCountText"))
+    caps = []
+    for t in _dig(d, "captions", "playerCaptionsTracklistRenderer", "captionTracks") or []:
+        if not isinstance(t, dict) or not t.get("baseUrl"):
+            continue
+        lang = t.get("languageCode") or ""
+        label = _txt(t.get("name")) or lang
+        if t.get("kind") == "asr" and "auto-generated" not in label:
+            label += " (auto-generated)"
+        caps.append({"label": label, "language_code": lang, "kind": t.get("kind") or "", "baseUrl": t["baseUrl"]})
+    with eng_caps_lk:
+        eng_caps[vid] = (time.time(), caps)
+        if len(eng_caps) > 1000:
+            for k in sorted(eng_caps, key=lambda k: eng_caps[k][0])[:200]:
+                eng_caps.pop(k, None)
+    adaptive = [_fmt(f) for f in sd.get("adaptiveFormats") or [] if f.get("url") and not f.get("isDrc")]
+    muxed = [_fmt(f) for f in sd.get("formats") or [] if f.get("url")]
+    rel = _dig(watch, "secondaryResults", "secondaryResults") or {}
+    desc = vd.get("shortDescription") or _txt(meta.get("description")) or ""
+    author_id = vd.get("channelId") or ""
+    out = {
+        "type": "video", "title": vd.get("title") or _txt(primary.get("title")), "videoId": vid, "aiMade": False,
+        "videoThumbnails": _vthumbs(vid), "storyboards": _storyboards(_dig(d, "storyboards", "playerStoryboardSpecRenderer", "spec"), vid),
+        "description": desc, "descriptionHtml": eng_text_html(secondary.get("attributedDescription")) or html_escape(desc),
+        "published": published, "publishedText": rel_text,
+        "keywords": vd.get("keywords") or [], "viewCount": int(vd.get("viewCount") or 0), "likeCount": likes, "dislikeCount": 0,
+        "paid": False, "premium": False, "isFamilyFriendly": bool(meta.get("isFamilySafe", True)),
+        "allowedRegions": meta.get("availableCountries") or [], "genre": meta.get("category") or "", "genreUrl": None,
+        "author": vd.get("author") or _txt(owner.get("title")), "authorId": author_id, "authorUrl": "/channel/" + author_id,
+        "authorVerified": "VERIFIED" in json.dumps(owner.get("badges") or []), "authorThumbnails": _athumbs(owner.get("thumbnail")),
+        "subCountText": re.sub(r"(?i)\s*(subscribers?|구독자|명)\s*", "", subs_text).strip(),
+        "lengthSeconds": int(vd.get("lengthSeconds") or 0), "allowRatings": bool(vd.get("allowRatings", True)), "rating": 0,
+        "isListed": not meta.get("isUnlisted"), "liveNow": bool(vd.get("isLive")), "isPostLiveDvr": bool(vd.get("isPostLiveDvr")),
+        "isUpcoming": bool(vd.get("isUpcoming")),
+        "dashUrl": "%s/api/manifest/dash/id/%s" % (PUBLIC, vid),
+        "adaptiveFormats": adaptive, "formatStreams": muxed,
+        "captions": [{"label": c["label"], "language_code": c["language_code"],
+                      "url": "/api/v1/captions/%s?label=%s" % (vid, urllib.parse.quote_plus(c["label"]))} for c in caps],
+        "recommendedVideos": [v for v in eng_items(rel) if v.get("type") == "video"][:20],
+        "client": client,
+    }
+    start = _dig(meta, "liveBroadcastDetails", "startTimestamp")
+    if vd.get("isUpcoming") and start:
+        try:
+            out["premiereTimestamp"] = int(datetime.datetime.fromisoformat(start.replace("Z", "+00:00")).timestamp())
+        except ValueError:
+            pass
+    log("engine", "video %s via %s, %d streams" % (vid, client, len(adaptive)), t0, every=300)
+    return out
+
+
+def eng_caption(vid, label="", lang="", tlang=""):
+    """one caption track as WebVTT (label as /api/v1/videos lists it, or a language), optionally machine-translated by YouTube"""
+    with eng_caps_lk:
+        hit = eng_caps.get(vid)
+    if not hit or time.time() - hit[0] > 3 * 3600:
+        eng_video(vid)
+        with eng_caps_lk:
+            hit = eng_caps.get(vid)
+    tracks = hit[1] if hit else []
+    t = next((c for c in tracks if label and c["label"] == label), None) or \
+        next((c for c in tracks if lang and c["language_code"] == lang and c["kind"] != "asr"), None) or \
+        next((c for c in tracks if lang and c["language_code"].split("-")[0] == lang.split("-")[0]), None)
+    if not t:
+        raise EngError("No such caption track", 404)
+    u = t["baseUrl"] + "&fmt=vtt" + ("&tlang=" + urllib.parse.quote(tlang) if tlang else "")
+    req = urllib.request.Request(u, headers={"User-Agent": BROWSER_UA})
+    try:
+        return YT.open(req, timeout=30).read()
+    except urllib.error.HTTPError as e:
+        raise EngError("YouTube answered %d for the captions" % e.code, 502)
+
+
+# ---- search ----
+_FEATURES = {"hd": 4, "subtitles": 5, "creative_commons": 6, "3d": 7, "live": 8, "purchased": 9, "4k": 14, "360": 15,
+             "location": 23, "hdr": 25, "vr180": 26}
+
+
+def _search_params(qs):
+    """YouTube's search filters (a small protobuf message: sort = 1, filters = 2 {date 1, type 2, duration 3, features})"""
+    sort = {"rating": 1, "upload_date": 2, "date": 2, "views": 3, "view_count": 3}.get(qs.get("sort") or qs.get("sort_by") or "", 0)
+    f = []
+
+    def field(n, v):              # a varint field: tag (n << 3, as a varint), then the value (< 128 here)
+        if v:
+            tag = n << 3
+            f.extend([tag] if tag < 0x80 else [tag & 0x7F | 0x80, tag >> 7])
+            f.append(v)
+    field(1, {"hour": 1, "today": 2, "week": 3, "month": 4, "year": 5}.get(qs.get("date") or "", 0))
+    field(2, {"video": 1, "channel": 2, "playlist": 3, "movie": 4}.get(qs.get("type") or "", 0))
+    field(3, {"short": 1, "long": 2, "medium": 3}.get(qs.get("duration") or "", 0))
+    for name in (qs.get("features") or "").split(","):
+        if name.strip() in _FEATURES:
+            field(_FEATURES[name.strip()], 1)
+    out = []
+    if sort:
+        out += [0x08, sort]
+    if f:
+        out += [0x12, len(f)] + f
+    return base64.b64encode(bytes(out)).decode() if out else None
+
+
+eng_pages = {}           # (kind, key) -> [token of page 2, token of page 3, ...]
+eng_pages_lk = threading.Lock()
+
+
+def _paged(kind, key, page, first, more, max_page=20):
+    """page N of a list YouTube only gives one page at a time: walks the "load more" tokens, kept for the next ask"""
+    page = max(1, min(max_page, page))
+    if page == 1:
+        items, tok = first()
+        with eng_pages_lk:
+            eng_pages[(kind, key)] = [tok]
+            if len(eng_pages) > 2000:
+                eng_pages.clear()
+        return items
+    with eng_pages_lk:
+        toks = list(eng_pages.get((kind, key)) or [])
+    if not toks:
+        _, tok = first()
+        toks = [tok]
+    while len(toks) < page - 1 and toks[-1]:
+        _, tok = more(toks[-1])
+        toks.append(tok)
+    tok = toks[page - 2] if len(toks) >= page - 1 else None
+    if not tok:
+        return []
+    items, nxt = more(tok)
+    toks = toks[:page - 1] + [nxt]
+    with eng_pages_lk:
+        eng_pages[(kind, key)] = toks
+    return items
+
+
+def eng_search(qs, hl, gl):
+    q = (qs.get("q") or "").strip()
+    if not q:
+        return []
+    params = _search_params(qs)
+
+    def first():
+        d = it_call("search", {"query": q, "params": params}, hl=hl, gl=gl)
+        root = d.get("contents") or {}
+        return eng_items(root), eng_cont(root)
+
+    def more(tok):
+        d = it_call("search", {"continuation": tok}, hl=hl, gl=gl)
+        root = d.get("onResponseReceivedCommands") or {}
+        return eng_items(root), eng_cont(root)
+    try:
+        page = int(qs.get("page") or 1)
+    except ValueError:
+        page = 1
+    items = _paged("search", (q, params, hl, gl), page, first, more)
+    want = qs.get("type") or "all"
+    if want in ("video", "channel", "playlist"):
+        items = [i for i in items if i.get("type") == want]
+    return items
+
+
+def eng_suggest(qs, hl, gl):
+    q = qs.get("q") or ""
+    if not q.strip():
+        return {"query": q, "suggestions": []}
+    url = "https://suggestqueries-clients6.youtube.com/complete/search?" + urllib.parse.urlencode(
+        {"client": "firefox", "ds": "yt", "hl": qs.get("hl") or hl, "gl": qs.get("gl") or gl, "q": q})
+    try:
+        d = json.loads(YT.open(urllib.request.Request(url, headers={"User-Agent": BROWSER_UA}), timeout=8).read().decode("utf-8", "replace"))
+        return {"query": q, "suggestions": [s for s in d[1] if isinstance(s, str)][:15]}
+    except Exception as ex:
+        log("engine", "suggest FAIL %s" % repr(ex)[:80])
+        return {"query": q, "suggestions": []}
+
+
+# ---- channels ----
+CH_TABS = {"videos": "EgZ2aWRlb3PyBgQKAjoA", "shorts": "EgZzaG9ydHPyBgUKA5oBAA%3D%3D", "streams": "EgdzdHJlYW1z8gYECgJ6AA%3D%3D",
+           "playlists": "EglwbGF5bGlzdHPyBgQKAkIA", "search": "EgZzZWFyY2jyBgQKAloA"}
+eng_ch_cache = {}        # (ucid, hl) -> (time, browse answer of the first tab)
+eng_ch_lk = threading.Lock()
+
+
+def _ch_browse(ucid, hl, gl, params=None, query=None):
+    if not UC_RE.fullmatch(ucid or ""):
+        r = eng_resolve("https://www.youtube.com/" + (ucid if ucid.startswith("@") else "channel/" + ucid), hl, gl)
+        ucid = r.get("ucid") or ucid
+    key = (ucid, hl, params, query)
+    with eng_ch_lk:
+        hit = eng_ch_cache.get(key)
+    if hit and time.time() - hit[0] < 600:
+        return hit[1]
+    d = it_call("browse", {"browseId": ucid, "params": urllib.parse.unquote(params) if params else None, "query": query}, hl=hl, gl=gl)
+    if (d.get("alerts") and not d.get("contents")) or not d.get("contents"):
+        msg = _txt(_first(d.get("alerts") or {}, "text")) or "This channel does not exist"
+        raise EngError(msg, 404)
+    with eng_ch_lk:
+        eng_ch_cache[key] = (time.time(), d)
+        if len(eng_ch_cache) > 300:
+            for k in sorted(eng_ch_cache, key=lambda k: eng_ch_cache[k][0])[:100]:
+                eng_ch_cache.pop(k, None)
+    return d
+
+
+def _sel_tab(d):
+    tabs = _dig(d, "contents", "twoColumnBrowseResultsRenderer", "tabs") or []
+    t = next((t for t in tabs if _dig(t, "tabRenderer", "selected") or _dig(t, "expandableTabRenderer", "selected")),
+             tabs[0] if tabs else {})
+    return _dig(t, "tabRenderer", "content") or _dig(t, "expandableTabRenderer", "content") or {}
+
+
+def eng_channel(ucid, hl, gl):
+    d = _ch_browse(ucid, hl, gl)
+    meta = _dig(d, "metadata", "channelMetadataRenderer") or {}
+    head = _first(d.get("header") or {}, "pageHeaderViewModel") or {}
+    old = _dig(d, "header", "c4TabbedHeaderRenderer") or {}
+    ucid = meta.get("externalId") or ucid
+    rows = [_txt(p.get("text")) for r in _dig(head, "metadata", "contentMetadataViewModel", "metadataRows") or []
+            for p in r.get("metadataParts") or [] if isinstance(p, dict)]
+    handle = next((r for r in rows if r.startswith("@")), "")
+    stats = [r for r in rows if not r.startswith("@") and re.search(r"\d", r)]
+    tabs = []
+    for t in _dig(d, "contents", "twoColumnBrowseResultsRenderer", "tabs") or []:
+        u = _dig(t, "tabRenderer", "endpoint", "commandMetadata", "webCommandMetadata", "url") or ""
+        name = u.rsplit("/", 1)[-1].lower() if u else ""
+        if name:
+            tabs.append({"posts": "community", "featured": "home"}.get(name, name))
+    banner = _imgs(_dig(head, "banner") or old.get("banner") or {})
+    avatar = _dig(head, "image") or old.get("avatar") or meta.get("avatar") or {}
+    home = _sel_tab(d)
+    latest = [v for v in eng_items(home, meta.get("title") or "", ucid) if v.get("type") == "video"]
+    related = [i for i in eng_items(_all(home, "channelRenderer") and home or {}) if i.get("type") == "channel"]
+    title = meta.get("title") or _txt(_dig(head, "title")) or _txt(old.get("title"))
+    return {"author": title, "authorId": ucid, "authorUrl": "https://www.youtube.com/channel/" + ucid,
+            "authorBanners": [{"url": b["url"], "width": b["width"], "height": b["height"]} for b in banner],
+            "authorThumbnails": _athumbs(avatar), "subCount": eng_count(stats[0]) if stats else 0, "totalViews": 0, "joined": 0,
+            "autoGenerated": False, "ageGated": False, "isFamilyFriendly": bool(meta.get("isFamilySafe", True)),
+            "description": meta.get("description") or "", "descriptionHtml": html_escape(meta.get("description") or ""),
+            "allowedRegions": meta.get("availableCountryCodes") or [], "tabs": tabs, "tags": meta.get("keywords", "").split() if isinstance(meta.get("keywords"), str) else [],
+            "authorVerified": "CHECK_CIRCLE" in json.dumps(head.get("title") or {}) or "VERIFIED" in json.dumps(old.get("badges") or []),
+            "pronouns": None, "channelHandle": handle, "videoCountText": stats[1] if len(stats) > 1 else "",
+            "latestVideos": latest[:30], "relatedChannels": related[:12]}
+
+
+def _chip_token(root, n):
+    """the "Latest / Popular / Oldest" chips above a channel's videos: the token of the n-th"""
+    chips = _all(root, "chipViewModel") or _all(root, "chipCloudChipRenderer")
+    toks = [(_all(c, "token") or [None])[0] for c in chips]
+    toks = [t for t in toks if isinstance(t, str)]
+    return toks[n] if len(toks) > n else None
+
+
+def eng_channel_tab(ucid, tab, qs, hl, gl):
+    """/channels/<id>/videos|shorts|streams|playlists ({"videos"|"playlists": [...], "continuation"})"""
+    cont = qs.get("continuation")
+    key = "playlists" if tab == "playlists" else "videos"
+    name = ""
+    if cont:
+        d = it_call("browse", {"continuation": cont}, hl=hl, gl=gl)
+        root = d.get("onResponseReceivedActions") or d.get("onResponseReceivedEndpoints") or {}
+    else:
+        d = _ch_browse(ucid, hl, gl, CH_TABS[tab])
+        name = (_dig(d, "metadata", "channelMetadataRenderer", "title") or "")
+        root = _sel_tab(d)
+        sort = (qs.get("sort_by") or qs.get("sort") or "newest").lower()
+        n = {"popular": 1, "oldest": 2}.get(sort)
+        if n and tab != "playlists":
+            tok = _chip_token(root, n)
+            if tok:
+                d = it_call("browse", {"continuation": tok}, hl=hl, gl=gl)
+                root = d.get("onResponseReceivedActions") or d.get("onResponseReceivedEndpoints") or {}
+    if UC_RE.fullmatch(ucid or ""):
+        cid = ucid
+    else:
+        cid = _dig(d, "metadata", "channelMetadataRenderer", "externalId") or ""
+    items = eng_items(root, name, cid)
+    if tab == "playlists":
+        items = [dict(i, author=name or i.get("author"), authorId=cid or i.get("authorId")) for i in items if i.get("type") == "playlist"]
+    else:
+        items = [dict(i, short=True) if tab == "shorts" else i for i in items if i.get("type") == "video"]
+        if tab == "streams":
+            for i in items:
+                i["isUpcoming"] = i.get("isUpcoming") or ("scheduled" in (i.get("publishedText") or "").lower())
+    return {key: items, "continuation": eng_cont(root)}
+
+
+def eng_channel_search(ucid, qs, hl, gl):
+    q = (qs.get("q") or qs.get("query") or "").strip()
+    if not q:
+        return []
+    cid = ucid if UC_RE.fullmatch(ucid) else ""
+
+    def first():
+        d = _ch_browse(ucid, hl, gl, CH_TABS["search"], q)
+        root = _sel_tab(d)
+        return eng_items(root, _dig(d, "metadata", "channelMetadataRenderer", "title") or "", cid), eng_cont(root)
+
+    def more(tok):
+        d = it_call("browse", {"continuation": tok}, hl=hl, gl=gl)
+        root = d.get("onResponseReceivedActions") or d.get("onResponseReceivedEndpoints") or {}
+        return eng_items(root, "", cid), eng_cont(root)
+    try:
+        page = int(qs.get("page") or 1)
+    except ValueError:
+        page = 1
+    return _paged("chsearch", (ucid, q, hl), page, first, more)
+
+
+def _post(p, cid):
+    """a backstagePostRenderer as Invidious' community entry"""
+    pid = p.get("postId")
+    if not pid:
+        return None
+    runs = _dig(p, "contentText", "runs") or []
+    text = _txt(p.get("contentText"))
+    parts = []
+    for r in runs if isinstance(runs, list) else []:
+        t = html_escape(r.get("text") or "")
+        u = _dig(r, "navigationEndpoint", "urlEndpoint", "url") or _dig(r, "navigationEndpoint", "commandMetadata", "webCommandMetadata", "url")
+        if isinstance(u, str):
+            q = re.search(r"[?&]q=([^&]+)", u)
+            u = urllib.parse.unquote(q.group(1)) if q and "youtube.com/redirect" in u else u
+            parts.append('<a href="%s">%s</a>' % (html_escape(u), t))
+        else:
+            parts.append(t)
+    att = p.get("backstageAttachment") or {}
+    attach = None
+    img = att.get("backstageImageRenderer")
+    if img:
+        attach = {"type": "image", "imageThumbnails": _imgs(img.get("image") or {})}
+    elif att.get("postMultiImageRenderer"):
+        ims = [_imgs(_dig(i, "backstageImageRenderer", "image") or {}) for i in att["postMultiImageRenderer"].get("images") or []]
+        attach = {"type": "multiImage", "images": ims, "imageThumbnails": ims[0] if ims else []}
+    elif att.get("pollRenderer"):
+        pr = att["pollRenderer"]
+        attach = {"type": "poll", "totalVotes": eng_count(_txt(pr.get("totalVotes"))) or 0,
+                  "choices": [{"text": _txt(c.get("text"))} for c in pr.get("choices") or []]}
+    elif att:
+        vids = [v for v in eng_items(att) if v.get("type") == "video"]
+        if vids:
+            attach = dict(vids[0], type="video")
+    author, _ = _byline(p.get("authorText") or {})
+    return {"author": author, "authorThumbnails": _athumbs(p.get("authorThumbnail")), "authorId": cid, "authorUrl": "/channel/" + cid,
+            "isEdited": False, "content": text, "contentHtml": "".join(parts).replace("\n", "<br>"),
+            "published": eng_ago(_txt(p.get("publishedTimeText"))), "publishedText": _txt(p.get("publishedTimeText")),
+            "likeCount": eng_count(_txt(p.get("voteCount"))) or 0,
+            "replyCount": eng_count(_txt(_first(_first(p.get("actionButtons") or {}, "replyButton") or {}, "text"))) or 0,
+            "commentId": pid, "authorIsChannelOwner": True, **({"attachment": attach} if attach else {})}
+
+
+def eng_community(ucid, qs, hl, gl):
+    cont = qs.get("continuation")
+    if cont:
+        d = it_call("browse", {"continuation": cont}, hl=hl, gl=gl)
+        root = d.get("onResponseReceivedActions") or d.get("onResponseReceivedEndpoints") or {}
+        cid = ucid
+    else:
+        d = _ch_browse(ucid, hl, gl)
+        cid = _dig(d, "metadata", "channelMetadataRenderer", "externalId") or ucid
+        params = None
+        for t in _dig(d, "contents", "twoColumnBrowseResultsRenderer", "tabs") or []:
+            u = _dig(t, "tabRenderer", "endpoint", "commandMetadata", "webCommandMetadata", "url") or ""
+            if u.endswith("/posts") or u.endswith("/community"):
+                params = _dig(t, "tabRenderer", "endpoint", "browseEndpoint", "params")
+        if not params:
+            return {"authorId": cid, "comments": []}
+        root = _sel_tab(_ch_browse(cid, hl, gl, params))
+    seen, posts = set(), []
+    for p in _all(root, "backstagePostRenderer"):
+        e = _post(p, cid) if isinstance(p, dict) else None
+        if e and e["commentId"] not in seen:
+            seen.add(e["commentId"])
+            posts.append(e)
+    return {"authorId": cid, "comments": posts, "continuation": eng_cont(root)}
+
+
+# ---- playlists and mixes ----
+def eng_playlist(plid, qs, hl, gl):
+    bid = plid if plid.startswith("VL") else "VL" + plid
+    plid = bid[2:]
+    holder = {}
+
+    def first():
+        d = it_call("browse", {"browseId": bid}, hl=hl, gl=gl)
+        if not d.get("contents"):
+            raise EngError(_txt(_first(d.get("alerts") or {}, "text")) or "This playlist does not exist", 404)
+        holder["d"] = d
+        root = d.get("contents") or {}
+        return eng_items(root), eng_cont(root)
+
+    def more(tok):
+        d = it_call("browse", {"continuation": tok}, hl=hl, gl=gl)
+        root = d.get("onResponseReceivedActions") or d.get("onResponseReceivedEndpoints") or {}
+        return eng_items(root), eng_cont(root)
+    try:
+        page = int(qs.get("page") or 1)
+    except ValueError:
+        page = 1
+    videos = [v for v in _paged("playlist", (plid, hl), page, first, more, 50) if v.get("type") == "video"]
+    d = holder.get("d")
+    if d is None:                         # a later page: the header from page 1 again (cached by YouTube's side cheaply)
+        d = it_call("browse", {"browseId": bid}, hl=hl, gl=gl)
+    head = _first(d.get("header") or {}, "pageHeaderViewModel") or {}
+    old = _first(d.get("header") or {}, "playlistHeaderRenderer") or {}
+    meta = _dig(d, "metadata", "playlistMetadataRenderer") or {}
+    parts = _part_texts(head)
+    flat = [t for t, c in parts]
+    owner = next(((t, c) for t, c in parts if c), ("", ""))
+    author, cid = _byline(old.get("ownerText") or {}) if old else ("", "")
+    author = author or re.sub(r"^(by|제작자:?)\s+", "", owner[0])
+    cid = cid or owner[1]
+    count = next((eng_count(x) for x in flat if re.search(r"(?i)video|동영상|개", x)), None) or eng_count(_txt(old.get("numVideosText"))) or len(videos)
+    views = next((eng_count(x) for x in flat if re.search(r"(?i)view|조회", x)), None) or 0
+    first_vid = videos[0]["videoId"] if videos else ""
+    for i, v in enumerate(videos):
+        if v.get("index") is None:
+            v["index"] = (page - 1) * 100 + i
+    return {"type": "playlist", "title": _txt(head.get("title")) or meta.get("title") or _txt(old.get("title")), "playlistId": plid,
+            "playlistThumbnail": "https://i.ytimg.com/vi/%s/hqdefault.jpg" % first_vid if first_vid else "",
+            "author": author, "authorId": cid, "authorUrl": "/channel/" + cid if cid else "", "subtitle": None,
+            "authorThumbnails": _athumbs(_first(head, "avatarViewModel") or {}), "description": meta.get("description") or "",
+            "descriptionHtml": html_escape(meta.get("description") or ""), "videoCount": count, "viewCount": views,
+            "updated": 0, "isListed": True, "videos": videos}
+
+
+def eng_mix(mid, hl, gl):
+    vid = mid[2:] if len(mid) == 13 and VID_RE.fullmatch(mid[2:]) else mid[-11:]
+    body = {"playlistId": mid}
+    if VID_RE.fullmatch(vid):
+        body["videoId"] = vid
+    d = it_call("next", body, hl=hl, gl=gl)
+    pl = _dig(d, "contents", "twoColumnWatchNextResults", "playlist", "playlist") or {}
+    videos = [v for v in eng_items(pl.get("contents") or []) if v.get("type") == "video"]
+    if not videos:
+        raise EngError("This mix is empty", 404)
+    return {"title": _txt(pl.get("title")), "mixId": mid, "videos": videos}
+
+
+# ---- comments ----
+def _comment_page(d):
+    pay = {}
+    for m in _dig(d, "frameworkUpdates", "entityBatchUpdate", "mutations") or []:
+        p = _dig(m, "payload", "commentEntityPayload")
+        cid = _dig(p, "properties", "commentId")
+        if cid:
+            pay[cid] = p
+    items = []
+    for e in d.get("onResponseReceivedEndpoints") or []:
+        items += _dig(e, "reloadContinuationItemsCommand", "continuationItems") or _dig(e, "appendContinuationItemsAction", "continuationItems") or []
+    out = []
+    for it in items:
+        th = it.get("commentThreadRenderer") if isinstance(it, dict) else None
+        vm = _dig(th, "commentViewModel", "commentViewModel") if th else (it.get("commentViewModel") if isinstance(it, dict) else None)
+        cid = _dig(vm, "commentId")
+        p = pay.get(cid)
+        if not p:
+            continue
+        author = _dig(p, "author") or {}
+        tb = _dig(p, "toolbar") or {}
+        pub_text = _dig(p, "properties", "publishedTime") or ""
+        content = _dig(p, "properties", "content", "content") or ""
+        replies_tok = (_all(th.get("replies") or {}, "token") or [None])[0] if th else None
+        nrep = eng_count(tb.get("replyCount") or "") or 0
+        c = {"authorId": author.get("channelId") or "", "authorUrl": "/channel/" + (author.get("channelId") or ""),
+             "author": author.get("displayName") or "", "verified": bool(author.get("isVerified")),
+             "authorThumbnail": _https(author.get("avatarThumbnailUrl")), "authorThumbnails": _athumbs(author.get("avatarThumbnailUrl")),
+             "authorIsChannelOwner": bool(author.get("isCreator")), "isSponsor": bool(author.get("sponsorBadgeUrl")),
+             "likeCount": eng_count(tb.get("likeCountNotliked") or "") or 0, "isPinned": bool(vm.get("pinnedText")),
+             "commentId": cid, "content": content, "contentHtml": html_escape(content).replace("\n", "<br>"),
+             "isEdited": "(edited)" in pub_text or "수정됨" in pub_text, "published": eng_ago(pub_text),
+             "publishedText": re.sub(r"\s*\((edited|수정됨)\)", "", pub_text)}
+        if tb.get("creatorThumbnailUrl") or tb.get("heartActiveTooltip"):
+            c["creatorHeart"] = {"creatorThumbnail": _https(tb.get("creatorThumbnailUrl")), "creatorName": ""}
+        if replies_tok and nrep:
+            c["replies"] = {"replyCount": nrep, "continuation": replies_tok}
+        out.append(c)
+    nxt = None
+    if items and isinstance(items[-1], dict) and items[-1].get("continuationItemRenderer"):
+        nxt = (_all(items[-1]["continuationItemRenderer"], "token") or [None])[0]
+    return out, nxt
+
+
+def eng_comments(vid, qs, hl, gl):
+    cont = qs.get("continuation")
+    count = None
+    if not cont:
+        n = it_call("next", {"videoId": vid}, hl=hl, gl=gl)
+        panel = next((_dig(p, "engagementPanelSectionListRenderer") for p in n.get("engagementPanels") or []
+                      if _dig(p, "engagementPanelSectionListRenderer", "panelIdentifier") == "engagement-panel-comments-section"), None)
+        cont = (_all(_dig(panel, "content") or {}, "token") or [None])[0] if panel else None
+        if not cont:
+            sec = next((s for s in _all(_dig(n, "contents", "twoColumnWatchNextResults") or {}, "itemSectionRenderer")
+                        if isinstance(s, dict) and s.get("sectionIdentifier") == "comment-item-section"), None)
+            cont = (_all(sec or {}, "token") or [None])[0]
+        if not cont:
+            raise EngError("Comments are turned off", 404)
+        d = it_call("next", {"continuation": cont}, hl=hl, gl=gl)
+        head = next((e for e in d.get("onResponseReceivedEndpoints") or []), {})
+        count = eng_count(_txt(_first(head, "countText")))
+        if (qs.get("sort_by") or "").lower() == "new":
+            sub = _first(head, "sortFilterSubMenuRenderer") or {}
+            items = sub.get("subMenuItems") or []
+            tok = (_all(items[1], "token") or [None])[0] if len(items) > 1 else None
+            if tok:
+                d = it_call("next", {"continuation": tok}, hl=hl, gl=gl)
+    else:
+        d = it_call("next", {"continuation": cont}, hl=hl, gl=gl)
+    comments, nxt = _comment_page(d)
+    out = {"videoId": vid, "comments": comments}
+    if count is not None:
+        out["commentCount"] = count
+    if nxt:
+        out["continuation"] = nxt
+    return out
+
+
+eng_trend = {}           # (topics, hl, gl) -> (time, videos)
+
+
+# ---- trending (YouTube took its Trending page down in 2025): the topic pages' shelves instead ----
+def eng_trending(qs, hl, gl):
+    kind = (qs.get("type") or "").lower()
+    keys = {"music": ["music"], "gaming": ["gaming"], "news": ["news"], "movies": ["live"], "sports": ["sports"]}.get(kind) \
+        or ["music", "gaming", "sports", "news", "learning"]
+    ck = (tuple(keys), hl, gl)
+    with eng_pages_lk:
+        hit = eng_trend.get(ck)
+    if hit and time.time() - hit[0] < 1800:
+        return hit[1]
+
+    def one(k):
+        r = topic_page({"key": k, "region": gl, "hl": hl})
+        got = [eng_vitem(i) for s in r.get("shelves") or [] for i in s.get("items") or [] if i.get("type") == "video"]
+        if not got:              # no such topic page in this region (gaming in Korea): this week's most watched instead
+            try:
+                got = eng_search({"q": {"learning": "lecture", "live": "movie trailer"}.get(k, k), "type": "video",
+                                  "date": "week", "sort": "views"}, hl, gl)
+            except EngError:
+                got = []
+        return got
+    lists = list(ENG_POOL.map(one, keys))
+    out, seen = [], set()
+    for row in zip(*[l + [None] * (max(map(len, lists)) - len(l)) for l in lists]) if lists else []:
+        for v in row:
+            if v and v["videoId"] not in seen and not v.get("short"):
+                seen.add(v["videoId"])
+                out.append(v)
+    out = out[:60]
+    if out:
+        with eng_pages_lk:
+            eng_trend[ck] = (time.time(), out)
+            if len(eng_trend) > 100:
+                eng_trend.clear()
+    return out
+
+
+def eng_resolve(url, hl="en", gl="US"):
+    m = re.search(r"(?:v=|youtu\.be/|shorts/|live/|embed/)([\w-]{11})", url)
+    if m:
+        return {"videoId": m.group(1), "pageType": "WEB_PAGE_TYPE_WATCH"}
+    m = re.search(r"channel/(UC[\w-]{22})", url)
+    if m:
+        return {"ucid": m.group(1), "browseId": m.group(1), "params": None, "pageType": "WEB_PAGE_TYPE_CHANNEL"}
+    d = it_call("navigation/resolve_url", {"url": url}, hl=hl, gl=gl)
+    ep = d.get("endpoint") or {}
+    b = ep.get("browseEndpoint") or {}
+    if b.get("browseId"):
+        bid = b["browseId"]
+        page = _dig(ep, "commandMetadata", "webCommandMetadata", "webPageType") or ""
+        return {"ucid": bid if bid.startswith("UC") else None, "browseId": bid, "params": b.get("params"), "pageType": page}
+    w = ep.get("watchEndpoint") or {}
+    if w.get("videoId"):
+        return {"videoId": w["videoId"], "pageType": "WEB_PAGE_TYPE_WATCH"}
+    raise EngError("Couldn't find that page", 404)
+
+
+def _fields(obj, fields):
+    """Invidious' ?fields=a,b: only those keys (of the object, or of each one in a list)"""
+    keep = [f.strip() for f in (fields or "").split(",") if f.strip()]
+    if not keep:
+        return obj
+    pick = lambda o: {k: o[k] for k in keep if k in o} if isinstance(o, dict) else o
+    return [pick(o) for o in obj] if isinstance(obj, list) else pick(obj)
+
+
+def eng_api(path, qs, hl="", gl=""):
+    """an Invidious API path (/api/v1/...) answered by the engine: (HTTP status, JSON object).
+    YouTube's language is ?hl=, else HT_HL, else English (as Invidious: the numbers in its texts read surely)"""
+    hl = hl or qs.get("hl") or ENG_HL or "en"
+    hl = hl if re.fullmatch(r"[a-zA-Z]{2,3}(-[A-Za-z0-9]{2,4})?", hl) else "en"
+    gl = (qs.get("region") or gl or ENG_REGION).upper()
+    gl = gl if re.fullmatch(r"[A-Z]{2}", gl) else "US"
+    p = path.split("?")[0].rstrip("/")
+    try:
+        m = re.fullmatch(r"/api/v1/videos/([\w-]{11})", p)
+        if m:
+            return 200, _fields(eng_video(m.group(1), hl, gl), qs.get("fields"))
+        if p == "/api/v1/search":
+            return 200, eng_search(qs, hl, gl)
+        if p == "/api/v1/search/suggestions":
+            return 200, eng_suggest(qs, hl, gl)
+        if p in ("/api/v1/trending", "/api/v1/popular"):
+            return 200, eng_trending(qs, hl, gl)
+        m = re.fullmatch(r"/api/v1/channels/([\w@.-]+?)(?:/(videos|shorts|streams|playlists|community|posts|search|latest))?", p)
+        if m:
+            ucid, tab = m.group(1), m.group(2)
+            if tab in ("videos", "shorts", "streams", "playlists", "latest"):
+                return 200, _fields(eng_channel_tab(ucid, "videos" if tab == "latest" else tab, qs, hl, gl), qs.get("fields"))
+            if tab in ("community", "posts"):
+                return 200, eng_community(ucid, qs, hl, gl)
+            if tab == "search":
+                return 200, eng_channel_search(ucid, qs, hl, gl)
+            return 200, _fields(eng_channel(ucid, hl, gl), qs.get("fields"))
+        m = re.fullmatch(r"/api/v1/playlists/([\w-]+)", p)
+        if m:
+            return 200, _fields(eng_playlist(m.group(1), qs, hl, gl), qs.get("fields"))
+        m = re.fullmatch(r"/api/v1/mixes/([\w-]+)", p)
+        if m:
+            return 200, eng_mix(m.group(1), hl, gl)
+        m = re.fullmatch(r"/api/v1/comments/([\w-]{11})", p)
+        if m:
+            return 200, eng_comments(m.group(1), qs, hl, gl)
+        if p == "/api/v1/resolveurl":
+            return 200, eng_resolve(qs.get("url") or "", hl, gl)
+        if p == "/api/v1/stats":
+            return 200, {"version": "2.0", "software": {"name": "tubehaus", "version": "builtin", "branch": "main"},
+                         "openRegistrations": False, "playback": {}, "usage": {"users": {"total": 0}}, "metadata": {"updatedAt": int(time.time())}}
+        if p.startswith("/api/v1/auth/"):
+            return 404, {"error": "This server has no Invidious accounts"}
+        return 404, {"error": "Not found"}
+    except EngError as e:
+        return e.code, {"error": str(e)}
+    except Exception as e:
+        log("engine", "%s FAIL %s" % (p[:60], repr(e)[:160]), every=0)
+        return 500, {"error": "Something went wrong asking YouTube"}
+
+
+def gv_url(path):
+    """/companion/videoplayback?<query>&host=<YouTube's host> (the stream addresses the web player and the apps use) ->
+    YouTube's address of that stream, or None when it isn't one"""
+    u = urllib.parse.urlsplit(path)
+    q = urllib.parse.parse_qsl(u.query, keep_blank_values=True)
+    host = next((v for k, v in q if k == "host"), "")
+    if not re.fullmatch(r"[\w-]+(\.[\w-]+)*\.googlevideo\.com", host or ""):
+        return None
+    rest = urllib.parse.urlencode([(k, v) for k, v in q if k != "host"])
+    return "https://%s/videoplayback?%s" % (host, rest)
+
+
+def gv_open(url, rng=None, timeout=60):
+    """one stream (a googlevideo.com address or our /companion/ path for it) through YT_PROXY, the address it was given to"""
+    if url.startswith("/"):
+        url = gv_url(url) or ""
+    if not url.startswith("https://"):
+        raise ValueError("not a stream address")
+    h = {"User-Agent": VIS_UA, "Origin": "https://www.youtube.com", "Referer": "https://www.youtube.com/"}
+    if rng:
+        h["Range"] = rng
+    return YT.open(urllib.request.Request(url, headers=h), timeout=timeout)
+
+
+def eng_format_url(vid, itag):
+    """YouTube's address of one format of a video (for downloads)"""
+    d = _video_json(vid)
+    for f in (d.get("adaptiveFormats") or []) + (d.get("formatStreams") or []):
+        if str(f.get("itag")) == str(itag) and f.get("url"):
+            return f["url"]
+    raise ValueError("no such format")
+
+
+
+
+def eng_json(path, timeout=None):
+    """an Invidious API path as the JSON text Invidious would have sent (for the parts of this file that used to ask it)"""
+    u = urllib.parse.urlsplit(path)
+    code, obj = eng_api(u.path, dict(urllib.parse.parse_qsl(u.query)))
+    if code != 200:
+        raise EngError((obj or {}).get("error") or "HTTP %d" % code, code)
+    return json.dumps(obj, ensure_ascii=False).encode()
+
+
+def eng_caption_list(vid):
+    """the caption tracks of a video: [{"label", "languageCode", "kind"}] (the original language's first)"""
+    with eng_caps_lk:
+        hit = eng_caps.get(vid)
+    if not hit or time.time() - hit[0] > 3 * 3600:
+        _video_json(vid)
+        with eng_caps_lk:
+            hit = eng_caps.get(vid)
+    return [{"label": c["label"], "languageCode": c["language_code"], "kind": c["kind"],
+             "url": "/companion/api/v1/captions/%s?label=%s" % (vid, urllib.parse.quote_plus(c["label"]))} for c in (hit[1] if hit else [])]
+
+
+def eng_img(path):
+    """/vi/<id>/<name>.jpg, /vi_webp/..., /ggpht/..., /sb/<i, i9...>/... -> (status, content type, bytes, from YouTube's picture servers"""
+    m = re.fullmatch(r"/(vi|vi_webp)/([\w-]{11})/(\w+)\.(jpg|webp)", path.split("?")[0])
+    if m:
+        name = {"maxres": "maxresdefault"}.get(m.group(3), m.group(3))
+        url = "https://i.ytimg.com/%s/%s/%s.%s" % (m.group(1), m.group(2), name, m.group(4))
+    elif path.startswith("/ggpht/"):
+        url = "https://yt3.ggpht.com/" + path[len("/ggpht/"):]
+    else:
+        m = re.fullmatch(r"/sb/(i\d?)/(.+)", path.split("?")[0])
+        if not m:
+            return 404, "text/plain", b"not found"
+        url = "https://%s.ytimg.com/sb/%s" % (m.group(1), path.split("/", 3)[3])
+    try:
+        r = urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": BROWSER_UA}), timeout=20)
+        return 200, r.headers.get("Content-Type") or "image/jpeg", r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, "text/plain", b""
+    except Exception:
+        return 502, "text/plain", b""
+
+
 def _best_img(o):
     """the largest picture anywhere below o"""
     best, bw = "", -1
@@ -2895,12 +4125,12 @@ RSS_DOWN = {"until": 0, "fails": 0}   # YouTube takes its RSS feeds down now and
 RSS_DOWN_AFTER = 8        # failures in a row before that's assumed; one 404 is often just a deleted channel
 
 
-def yt_feed_invidious(cid):
-    """A channel's latest uploads from Invidious, for when YouTube's RSS is down."""
+def yt_feed_channel_page(cid):
+    """A channel's latest uploads from its Videos tab (the engine), for when YouTube's RSS is down."""
     try:
-        d = json.loads(get(f"{INV}/api/v1/channels/{cid}/videos", 20))
+        d = json.loads(_inv(f"/api/v1/channels/{cid}/videos", 20))
     except Exception as ex:
-        log("ytfeed", f"{cid} invidious FAIL {repr(ex)[:100]}")
+        log("ytfeed", f"{cid} channel page FAIL {repr(ex)[:100]}")
         return None
     old = {e["id"]: e for e in yt_feed["items"].get(cid) or []}
     now = time.time()
@@ -2940,7 +4170,7 @@ def yt_feed_one(cid):
         else:
             RSS_DOWN["fails"] = 0
     if root is None:
-        got = yt_feed_invidious(cid)
+        got = yt_feed_channel_page(cid)
         if got is not None:
             yt_feed["items"][cid] = got
         return
@@ -2964,14 +4194,14 @@ def yt_feed_one(cid):
 
 def yt_fill_thumbs():
     """Imported subscriptions often come without a channel picture, and some import formats
-    without a name either; fill both in from Invidious."""
+    without a name either; fill both in from the channel's page."""
     with yt_lock:
         missing = list(dict.fromkeys(c for u in _lib_owners() for c, v in _yt_load(u)["subs"].items()
                                      if not v.get("thumb") or v.get("name") in ("", c)))
     got = {}
     for cid in missing[:200]:
         try:
-            d = json.loads(urllib.request.urlopen(f"{INV}/api/v1/channels/{cid}?fields=author,authorThumbnails", timeout=20).read())
+            d = json.loads(_inv(f"/api/v1/channels/{cid}?fields=author,authorThumbnails", 20))
             th = sorted(d.get("authorThumbnails") or [], key=lambda x: x.get("width", 0))
             th = next((x for x in th if x.get("width", 0) >= 88), th[-1] if th else None)
             got[cid] = (str(d.get("author") or "")[:200],
@@ -3022,18 +4252,16 @@ def yt_feed_loop():
 
 
 # ---------- high-quality offline save: YouTube serves 720p+ as separate video and
-# audio, so fetch both through the companion and merge them with ffmpeg ----------
+# audio, so fetch both (through YT_PROXY) and merge them with ffmpeg ----------
 ytdl_jobs = {}
 ytdl_lock = threading.Lock()
 
 
 def _ytdl_part(vid, itag, path, prog, url=None):
     """one stream into path: by default the itag YouTube serves first (the original audio); url = one exact stream
-    through the companion (another audio track)"""
+    (another audio track)"""
     if not url:
-        r = urllib.request.urlopen(f"{COMPANION}/companion/latest_version?id={vid}&itag={itag}&local=true", timeout=30)
-        url = r.geturl()
-        r.close()
+        url = eng_format_url(vid, itag)
     m = re.search(r"clen=(\d+)", url)
     if not m:
         raise IOError(f"itag {itag}: size unknown")
@@ -3047,7 +4275,7 @@ def _ytdl_part(vid, itag, path, prog, url=None):
         end = min(start + step, size) - 1
         for attempt in range(5):
             try:
-                data = urllib.request.urlopen(f"{url}&range={start}-{end}", timeout=90).read()
+                data = gv_open(f"{url}&range={start}-{end}", timeout=90).read()
                 if len(data) != end - start + 1:
                     raise IOError("short read")
                 with open(path, "r+b") as f:
@@ -3076,11 +4304,11 @@ def _iso3(lang):
 
 
 def _ytdl_track_url(vid, itag, track):
-    """the companion address of one audio stream: this itag in this audio track (dub, description, ...)"""
+    """YouTube's address of one audio stream: this itag in this audio track (dub, description, ...)"""
     for f in _video_json(vid).get("adaptiveFormats") or []:
         t = _atrack(f) if str(f.get("itag")) == str(itag) and f.get("url") else None
         if t and t["id"] == track and not t["drc"]:
-            return COMPANION + _companion_url(f["url"])
+            return f["url"]
     raise IOError("That audio track isn't there any more")
 
 
@@ -3111,9 +4339,8 @@ def _clean_vtt(raw):
 
 
 def _ytdl_sub(vid, label, path):
-    """the caption track with this label (as /api/v1/videos lists it) into path, through the companion"""
-    raw = urllib.request.urlopen("%s/companion/api/v1/captions/%s?label=%s" % (COMPANION, vid, urllib.parse.quote(label)),
-                                 timeout=60).read().decode("utf-8", "replace")
+    """the caption track with this label (as /api/v1/videos lists it) into path"""
+    raw = eng_caption(vid, label).decode("utf-8", "replace")
     vtt = _clean_vtt(raw)
     if "-->" not in vtt:
         raise IOError("no captions")
@@ -3641,21 +4868,20 @@ def doctor():
     except Exception as ex:
         line(False, "YouTube reachable", f"{type(ex).__name__}: {str(ex)[:80]}")
 
-    # 3. Invidious
+    # 3. the built-in engine: a search, then a real video with its streams
     try:
-        st = json.loads(get(INV + "/api/v1/stats"))
-        line(True, "Invidious", f"{INV} (version {st.get('software', {}).get('version', '?')})")
+        found = eng_search({"q": "me at the zoo", "type": "video"}, "en", "US")
+        line(bool(found), "Search", f"{len(found)} results" if found else "no results")
     except Exception as ex:
-        line(False, "Invidious", f"{INV} ({type(ex).__name__}: {str(ex)[:80]})")
-
-    # 4. invidious-companion: does a real video resolve?
+        line(False, "Search", f"{type(ex).__name__}: {str(ex)[:80]}")
     try:
-        d = json.loads(get(INV + "/api/v1/videos/jNQXAC9IVRw?local=true", timeout=30))
+        d = eng_video("jNQXAC9IVRw")
         n = len(d.get("adaptiveFormats") or [])
-        line(n > 0, "Video lookup", f"'{d.get('title', '?')}' -> {n} streams" if n else
-             f"no streams: {str(d.get('error') or d)[:100]}")
-    except urllib.error.HTTPError as ex:
-        line(False, "Video lookup", f"HTTP {ex.code}: {ex.read()[:120]!r}")
+        line(n > 0, "Video lookup", f"'{d.get('title', '?')}' -> {n} streams via {d.get('client')}" if n else "no streams")
+        if n:
+            a = next(f for f in d["adaptiveFormats"] if f["type"].startswith("audio/"))
+            got = len(gv_open(a["url"], "bytes=0-9999", 20).read())
+            line(got == 10000, "Stream download", f"{got} of 10000 bytes")
     except Exception as ex:
         line(False, "Video lookup", f"{type(ex).__name__}: {str(ex)[:80]}")
 
@@ -4112,7 +5338,7 @@ class H(BaseHTTPRequestHandler):
 
     def over_limit(self, p):
         """429 when one visitor sends too much, 503 when the server is full of viewers."""
-        if p.startswith("/companion") or p.endswith("/api/p/health"):
+        if p.startswith("/companion") or p.endswith("/api/p/health") or re.match(r"/(vi|vi_webp|ggpht|sb)/", p):
             return False
         ip = self.client_ip()
         stat("visitors", ip)
@@ -4174,7 +5400,8 @@ class H(BaseHTTPRequestHandler):
                     admin_fails.setdefault(ip, []).append(now)
                 return self.send(403, {"error": "Wrong key"})
             return self.send(200, admin_stats())
-        if public_blocked("GET", p):
+        # (a /latest_version without a title is the music player's audio, a redirect to the stream: open)
+        if public_blocked("GET", p) and not (p.endswith("/latest_version") and not self.qs().get("title")):
             return self.send(403, {"error": "Not available on public instances"})
         if PUBLIC_MODE and p.endswith("/yt/feed"):
             return self.send(200, feed_for(self.qs().get("ch", "").split(",")))
@@ -4251,8 +5478,8 @@ class H(BaseHTTPRequestHandler):
             return self.send(404 if d.get("error") else 200, d)
         if "/hls/" in p:
             return self.hls(p)
-        if "/dash/" in p:
-            return self.dash(p)
+        if "/dash/" in p:          # /api/p/dash/<id>.mpd, or Invidious' /api/manifest/dash/id/<id>
+            return self.dash(p if p.endswith(".mpd") else "/dash/%s.mpd" % p[-11:])
         if "/live/" in p:
             if p.endswith("/cc.json") and not LIVECC_ENGINES:
                 return self.send(200, {"status": "off", "lag": None, "cues": {}})
@@ -4303,14 +5530,18 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        if re.fullmatch(r"/companion/api/v1/captions/[\w-]{11}", p):
+        if re.fullmatch(r"(/companion)?/api/v1/captions/[\w-]{11}", p):
             return self.captions_clean()
-        if p.startswith("/companion"):
-            return self.companion_proxy()
+        if p in ("/companion/videoplayback", "/videoplayback"):
+            return self.stream()
         if "/api/v1/videos/" in p:
             return self.videos_api()
         if p.endswith("/latest_version"):
             return self.download()
+        if p.startswith("/api/v1/"):
+            return self.send(*eng_api(p, self.qs()))
+        if re.match(r"/(vi|vi_webp|ggpht|sb)/", p):
+            return self.image()
         self.send(404, {"error": "not found"})
 
     def do_POST(self):
@@ -4327,8 +5558,6 @@ class H(BaseHTTPRequestHandler):
             self.close_connection = True
             return
         body_bytes = self.rfile.read(n)
-        if p.startswith("/companion"):
-            return self.companion_proxy(body_bytes)
         try:
             body = json.loads(body_bytes or b"{}")
         except Exception:
@@ -4408,7 +5637,7 @@ class H(BaseHTTPRequestHandler):
             try:
                 chunk = resp.read(1 << 20)
             except Exception as ex:
-                log("companion", "stream cut %s at %dB (%s)" % (
+                log("stream", "cut %s at %dB (%s)" % (
                     self.path.split("?")[0][:40], sent, repr(ex)[:50]), t0)
                 chunk = b""
             if chunk:
@@ -4427,111 +5656,72 @@ class H(BaseHTTPRequestHandler):
                     r2.add_header(k, v)
             r2.add_header("Range", "bytes=%d-" % sent)
             try:
-                resp = urllib.request.urlopen(r2, timeout=120)
+                resp = YT.open(r2, timeout=120)
             except Exception as ex:
-                log("companion", "resume FAIL %dB %s" % (sent, repr(ex)[:60]), t0)
+                log("stream", "resume FAIL %dB %s" % (sent, repr(ex)[:60]), t0)
                 break
         if resumes:
-            log("companion", "streamed %dB with %d resume(s) %s" % (
+            log("stream", "%dB with %d resume(s) %s" % (
                 sent, resumes, self.path.split("?")[0][:40]), t0, every=0)
         return
 
     def captions_clean(self):
-        # A caption file from the companion as plain WebVTT: YouTube's automatic captions have a timestamp before every
-        # word, which Apple's player (the iPad/iPhone app) shows as text. The list of tracks (JSON) passes as it is
+        # /companion/api/v1/captions/<id>: the list of tracks (JSON), or with ?label= (or ?lang=, and ?tlang= for
+        # YouTube's machine translation) one track as plain WebVTT: YouTube's automatic captions have a timestamp
+        # before every word, which Apple's player (the iPad/iPhone app) shows as text
+        vid, q = self.path.split("?")[0].rstrip("/")[-11:], self.qs()
         try:
-            r = urllib.request.urlopen(COMPANION + self.path, timeout=60)
-            code, hdrs, body = r.status, r.headers, r.read()
-        except urllib.error.HTTPError as e:
-            code, hdrs, body = e.code, e.headers, e.read()
+            if not q.get("label") and not q.get("lang"):
+                return self.send(200, {"captions": eng_caption_list(vid)})
+            raw = eng_caption(vid, q.get("label", ""), q.get("lang", ""), q.get("tlang", ""))
+        except EngError as e:
+            return self.send(e.code, {"error": str(e)})
         except Exception as ex:
             log("captions", "FAIL %s" % repr(ex)[:80], every=60)
             return self.send(502, {"error": "Couldn't get the captions"})
-        ctype = hdrs.get("Content-Type") or "application/json; charset=utf-8"
-        if code == 200 and body.lstrip(b"\xef\xbb\xbf").startswith(b"WEBVTT"):
-            body, ctype = _clean_vtt(body.decode("utf-8", "replace")).encode(), "text/vtt; charset=utf-8"
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Cache-Control", "no-store")
+        body = _clean_vtt(raw.decode("utf-8", "replace")).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/vtt; charset=utf-8")
+        self.send_header("Cache-Control", "private, max-age=3600")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
-    def companion_proxy(self, data=None):
-        # Point Invidious' companion private_url here. Everything is passed to the real
-        # companion; for live streams the player response gets an
-        # hlsManifestUrl (companion's TV client never returns one), which is
-        # exactly what Invidious' player.ecr needs to play a livestream.
-        req = urllib.request.Request(COMPANION + self.path, data=data,
-                                     method="POST" if data is not None else "GET")
-        for h in ("Authorization", "Content-Type", "Range"):
-            if self.headers.get(h):
-                req.add_header(h, self.headers[h])
+    def stream(self):
+        # /companion/videoplayback?<YouTube's query>&host=<its server>: a video or audio stream, through YT_PROXY
+        # (a stream only plays from the address it was given to). Ranges pass through; a cut connection resumes.
+        url = gv_url(self.path)
+        if not url:
+            return self.send(400, {"error": "Not a stream address"})
+        h = {"User-Agent": VIS_UA, "Origin": "https://www.youtube.com", "Referer": "https://www.youtube.com/"}
+        if self.headers.get("Range"):
+            h["Range"] = self.headers["Range"]
+        req = urllib.request.Request(url, headers=h)
         t0 = time.time()
-        for attempt in (0, 1):
-            r = None
-            try:
-                r = urllib.request.urlopen(req, timeout=120)
-                code, hdrs = r.status, r.headers
-            except urllib.error.HTTPError as e:
-                code, hdrs, body = e.code, e.headers, e.read()
-                if attempt == 0 and yt_blocked(body=body) and warp_rotate(f"companion {code}", t0):
-                    continue
-                break
-            if "/youtubei/v1/player" in self.path and "json" in (hdrs.get("Content-Type") or ""):
-                body = r.read()
-                try:
-                    blocked = yt_blocked(json.loads(body))
-                except Exception:
-                    blocked = False
-                if attempt == 0 and blocked and warp_rotate("player LOGIN_REQUIRED", t0):
-                    continue
-                if blocked:
-                    log("warp", "still blocked after rotation " + self.path.split("?")[0][:50], every=60)
-                r = None
-            break
-        if r is not None and code < 400:
-            # Anything that is not the small player JSON can be a media stream,
-            # and reading one of those in a single call dies about eighty
-            # seconds in: YouTube throttles the connection and the read comes
-            # back short (IncompleteRead), leaving the client with nothing.
-            # Stream it through instead, and pick up where it stopped.
-            if "/youtubei/" not in self.path and "json" not in (hdrs.get("Content-Type") or ""):
-                return self._pipe_resume(req, r, code, hdrs, t0)
-            body = r.read()
-        r = None
-        if code >= 400:
-            log("companion", f"{code} {self.path.split('?')[0][:60]} {len(body)}B", t0)
-        if "/youtubei/v1/player" in self.path and code == 200:
-            try:
-                d = json.loads(body)
-                vd, sd = d.get("videoDetails") or {}, d.setdefault("streamingData", {})
-                if (vd.get("isLive") or vd.get("isLiveContent") and d.get("playabilityStatus", {}).get("liveStreamability")) \
-                        and not sd.get("hlsManifestUrl"):
-                    sd["hlsManifestUrl"] = f"{LIVE_ORIGIN}/api/p/live/{vd['videoId']}.m3u8"
-                    body = json.dumps(d).encode()
-                # Videos YouTube ships without storyboards (old uploads, some
-                # shorts) make Invidious' /api/v1/videos die mid-serialisation and
-                # answer "200 OK" with an empty body, so the player shows nothing.
-                # The key merely has to exist - an empty object is enough.
-                if "storyboards" not in d and vd.get("videoId"):
-                    d["storyboards"] = {}
-                    body = json.dumps(d).encode()
-                    log("companion", "storyboards stub %s" % vd["videoId"][:11], every=300)
-            except Exception as ex:
-                log("companion", f"live-patch FAIL {repr(ex)[:120]}")
+        try:
+            r = YT.open(req, timeout=60)
+        except urllib.error.HTTPError as e:
+            log("stream", "%d %s" % (e.code, url.split("?")[0][:60]), t0)
+            return self.send(e.code, {"error": "YouTube answered %d for the stream" % e.code})
+        except Exception as ex:
+            log("stream", "FAIL %s" % repr(ex)[:80], t0)
+            return self.send(502, {"error": "No connection to YouTube"})
+        return self._pipe_resume(req, r, r.status, r.headers, t0)
+
+    def image(self):
+        # /vi/<id>/<name>.jpg, /ggpht/..., /sb/i/...: pictures from YouTube's servers, so the viewer's browser talks only to this one
+        code, ctype, body = eng_img(self.path)
         self.send_response(code)
-        self.send_header("Content-Type", hdrs.get("Content-Type", "application/json"))
+        self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "public, max-age=86400" if code == 200 else "public, max-age=300")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
     def videos_api(self):
-        # Companion gives no HLS for live streams, so Invidious returns hlsUrl=null
-        # and players show nothing. Pass the call through and point hlsUrl at our
-        # own live proxy instead - and answer from the cache above when we can,
-        # because otherwise every click waits on a YouTube round trip.
+        # The engine's answer, with hlsUrl pointing at our own live proxy for live streams,
+        # from the cache above when we can, because otherwise every click waits on YouTube.
         t0 = time.time()
         key = self.path
         with vid_lk:
@@ -4587,8 +5777,13 @@ class H(BaseHTTPRequestHandler):
             return self.send(400, {"error": "bad id/itag"})
         t0 = time.time()
         try:
-            r = urllib.request.urlopen(f"{COMPANION}/companion/latest_version?id={vid}&itag={itag}&local=true", timeout=30)
-            url = r.geturl(); r.close()
+            url = eng_format_url(vid, itag)
+            if not qs.get("title"):
+                self.send_response(302)
+                self.send_header("Location", _companion_url(url))
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             m = re.search(r"clen=(\d+)", url)
             size = int(m.group(1)) if m else None
         except Exception as ex:
@@ -4599,7 +5794,7 @@ class H(BaseHTTPRequestHandler):
         if size is None:
             # muxed formats (e.g. itag 18) carry no clen but are ratebypass: pass the single stream through
             try:
-                up = urllib.request.urlopen(url, timeout=60)
+                up = gv_open(url, timeout=60)
             except Exception as ex:
                 log("download", f"open {vid}/{itag} FAIL 502 {repr(ex)[:120]}", t0, every=0)
                 return self.send(502, {"error": f"Download failed: {ex}"})
@@ -4631,7 +5826,7 @@ class H(BaseHTTPRequestHandler):
                 end = min(pos + step, size) - 1
                 for attempt in range(3):
                     try:
-                        chunk = urllib.request.urlopen(f"{url}&range={pos}-{end}", timeout=60).read()
+                        chunk = gv_open(f"{url}&range={pos}-{end}", timeout=60).read()
                         break
                     except (BrokenPipeError, ConnectionResetError):
                         raise
@@ -4826,5 +6021,5 @@ if __name__ == "__main__":
     threading.Thread(target=yt_feed_loop, daemon=True).start()
     threading.Thread(target=ytdl_gc_loop, daemon=True).start()
     threading.Thread(target=stats_loop, daemon=True).start()
-    log("start", "TubeHaus server on %s:%d, Invidious %s" % (BIND[0], BIND[1], INV), every=0)
+    log("start", "TubeHaus server on %s:%d, built-in YouTube engine%s" % (BIND[0], BIND[1], ", through " + YT_PROXY if YT_PROXY else ""), every=0)
     Server(BIND, H).serve_forever()

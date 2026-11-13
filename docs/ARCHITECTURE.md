@@ -4,20 +4,24 @@ A map for finding your way around the code. TubeHaus is two small pieces with no
 dependencies of their own: a web app (plain ES modules) and a server (Python standard library only).
 
 ```
-browser ──► Caddy ─┬─ /y/*, page navigations ─────────► web/            (the app, static files)
-                   ├─ /api/p/*, /api/v1/videos/* ─────► TubeHaus server (server/tubehaus_server.py)
-                   ├─ /companion/* ───────────────────► invidious-companion
-                   └─ everything else ────────────────► Invidious
-                                                                 │
-                                                 Cloudflare WARP (proxy mode) ──► YouTube
+browser ──► Caddy ─┬─ /y/*, page navigations ──► web/            (the app, static files)
+                   └─ everything else ─────────► TubeHaus server (server/tubehaus_server.py)
+                                                          │
+                                          Cloudflare WARP (proxy mode) ──► YouTube
 ```
 
-- **Invidious** and **invidious-companion** talk to YouTube: search, channels, video info, stream URLs.
-  TubeHaus uses their API as is and never edits their code.
-- **The TubeHaus server** sits next to them and adds what they don't have (live streams, captions, the
-  shared library, ...). It also answers `/api/v1/videos/*` itself, from a cache in front of Invidious.
-- **The web app** calls the Invidious API (`/api/v1/...`) for YouTube data and the TubeHaus API
-  (`/api/p/...`) for everything else.
+- **The TubeHaus server** talks to YouTube with its own engine (the section "the built-in YouTube engine"
+  in `tubehaus_server.py`) and answers YouTube data in Invidious' API shapes: `/api/v1/videos`, `search`,
+  `channels`, `playlists`, `comments`, ... It also passes the video streams (`/companion/videoplayback`,
+  the path Invidious' companion used, so older apps find it), captions and pictures (`/vi/`, `/ggpht/`,
+  `/sb/`), and adds the rest: live streams, captions, the shared library, ...
+  - Lists come from YouTube's web client, the video streams from its visionOS client (plain addresses,
+    no PO token) with Android VR as a fallback, and the exact upload time and category from the web player.
+  - Every request carries a visitor identity (kept a week in `STATE/visitor.json`). When every client is
+    walled ("Sign in to confirm you're not a bot") it gets a new identity once, then a new WARP address.
+  - The same engine exists in the apps (`common/src/app/tubehaus/engine` on the `android-app` branch);
+    when YouTube changes a client, the versions in `ENG_PLAYERS` are the first thing to update.
+- **The web app** calls `/api/v1/...` for YouTube data and the TubeHaus API (`/api/p/...`) for everything else.
 
 ## The web app: `web/`
 
@@ -82,5 +86,5 @@ path, one after another. Settings come from environment variables at the top (`H
 ## The container
 
 `Dockerfile` builds one image with the server, the official Cloudflare WARP client, yt-dlp (+ the PO token
-plugin) and whisper.cpp. `deploy/entrypoint.sh` starts WARP in proxy mode, re-exposes it on port 1080 for the
-companion, then starts the server. `docker-compose.yml` adds Caddy, Invidious, the companion and PostgreSQL.
+plugin) and whisper.cpp. `deploy/entrypoint.sh` starts WARP in proxy mode, then starts the server.
+`docker-compose.yml` adds Caddy and the PO token provider for live streams.

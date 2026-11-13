@@ -9,8 +9,9 @@ docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
 ```
 [ok  ] WARP proxy             127.0.0.1:40000 -> warp=on ip=2a09:...
 [ok  ] YouTube reachable      via WARP
-[ok  ] Invidious              http://invidious:3000 (version 2026.10.19-...)
-[ok  ] Video lookup           'Me at the zoo' -> 14 streams
+[ok  ] Search                 20 results
+[ok  ] Video lookup           'Me at the zoo' -> 14 streams via VISIONOS
+[ok  ] Stream download        10000 of 10000 bytes
 [ok  ] yt-dlp (live streams)  /opt/venv/bin/yt-dlp
 [ok  ] ffmpeg (HD downloads)  /usr/bin/ffmpeg
 [ok  ] whisper (live captions) /opt/whisper/whisper-cli + ggml-base-q5_1.bin
@@ -28,13 +29,14 @@ When you open an issue, please paste this output together with `docker compose l
 - **WARP is on but videos still fail:** YouTube sometimes flags WARP addresses too. TubeHaus reconnects WARP for
   a fresh address automatically (at most every 45 s and 6 times per 30 min). Look for `[warp] rotated` in the logs.
   If it keeps rotating without success, wait a while; the limit protects you from hammering YouTube.
-- **Video lookup fails but WARP and Invidious are fine:** this usually means invidious-companion can't reach
-  YouTube or is out of date. Check `docker compose logs companion --tail 50` and pull the latest images:
-  `docker compose pull && docker compose up -d`.
+- **Search works but the video lookup fails:** YouTube may have changed the client the engine plays videos
+  with. Look for `[engine]` lines in `docker compose logs tubehaus --tail 100`, update to the latest release
+  (`git pull && docker compose pull && docker compose up -d`), and if that doesn't help, open an issue with
+  the doctor's output.
 
 ## The page loads but nothing plays (black player, spinner forever)
 
-- Open the browser's developer console and look for failed `/companion/` or `/api/manifest/` requests.
+- Open the browser's developer console and look for failed `/companion/videoplayback` or `/api/p/dash/` requests.
 - If you put a login in front of TubeHaus, make sure it covers the whole site, not just `/`. The player loads
   video through `/companion/*` on the same address and needs the same session.
 - `TUBEHAUS_URL` in `.env` must be exactly the address you open in the browser, including `https://`.
@@ -61,11 +63,6 @@ Caddy gets a certificate automatically only if `TUBEHAUS_SITE` is a real hostnam
 ports 80 and 443 are reachable from the internet. On a LAN without a domain, or behind your own reverse proxy,
 use `TUBEHAUS_SITE=:80` with `TUBEHAUS_HTTP_BIND` for the host port: see "No domain, or your own reverse proxy?"
 in the README.
-
-## `COMPANION_KEY` errors in the Invidious logs
-
-`COMPANION_KEY` must be exactly 16 characters, and Invidious and the companion must use the same value
-(`openssl rand -hex 8` gives you one).
 
 ## Health status
 

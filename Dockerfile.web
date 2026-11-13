@@ -4,8 +4,6 @@
 #   TUBEHAUS_SITE        what Caddy serves (default ":8080", plain HTTP; a domain gets HTTPS)
 #   TUBEHAUS_AUTH        none | basic | accounts (see deploy/Caddyfile.docker)
 #   TUBEHAUS_SERVER      the TubeHaus server           (default tubehaus:3010)
-#   TUBEHAUS_COMPANION   invidious-companion           (default companion:8282)
-#   TUBEHAUS_INVIDIOUS   Invidious                     (default invidious:3000)
 FROM caddy:2.11-alpine
 COPY web/ /srv/web/
 COPY deploy/Caddyfile.docker /etc/caddy/Caddyfile

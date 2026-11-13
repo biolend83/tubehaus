@@ -1,6 +1,6 @@
 # A hardened public TubeHaus: Anubis bot check, sign-up wall, load limits, nothing kept about
 # visitors' viewing. Run from the repo root:
-#   cp .env.example .env    (set TUBEHAUS_SITE / TUBEHAUS_URL / TUBEHAUS_DOMAIN, the secrets, and ANUBIS_KEY)
+#   cp .env.example .env    (set TUBEHAUS_SITE / TUBEHAUS_URL and ANUBIS_KEY)
 #   docker compose --env-file .env -f deploy/docker-compose.public.yml up -d
 # Also firewall the box so the containers reach the internet only (see "Running a public instance").
 name: tubehaus-public
@@ -59,10 +59,8 @@ services:
     <<: *hard
     image: ghcr.io/biolend83/tubehaus:latest
     cap_add: [NET_ADMIN]       # WARP sets up its own routing, inside this container only
-    init: true                 # reaps finished helper processes (socat, yt-dlp, ffmpeg)
+    init: true                 # reaps finished helper processes (yt-dlp, ffmpeg)
     environment:
-      HT_INVIDIOUS: http://invidious:3000
-      HT_COMPANION: http://companion:8282
       HT_PUBLIC_URL: ${TUBEHAUS_URL}
       HT_PUBLIC_MODE: "1"
       HT_ACCOUNTS: "1"
@@ -79,7 +77,7 @@ services:
     networks: [pub]
     cpus: 0.5
     mem_limit: 768m
-    pids_limit: 512            # one socat process per proxied connection (capped at 150)
+    pids_limit: 256
 
   bgutil:
     <<: *hard
@@ -88,75 +86,6 @@ services:
     cpus: 0.5
     mem_limit: 512m
     pids_limit: 256
-
-  invidious:
-    <<: *hard
-    image: quay.io/invidious/invidious:latest
-    environment:
-      INVIDIOUS_CONFIG: |
-        db:
-          dbname: invidious
-          user: kemal
-          password: ${POSTGRES_PASSWORD}
-          host: invidious-db
-          port: 5432
-        check_tables: true
-        domain: ${TUBEHAUS_DOMAIN}
-        https_only: true
-        external_port: 443
-        use_innertube_for_captions: true
-        registration_enabled: false
-        login_enabled: false
-        captcha_enabled: false
-        statistics_enabled: false
-        log_level: Error
-        invidious_companion:
-        - private_url: "http://tubehaus:3010/companion"
-          public_url: "${TUBEHAUS_URL}/companion"
-        invidious_companion_key: ${COMPANION_KEY}
-        hmac_key: ${INVIDIOUS_HMAC_KEY}
-    depends_on: [invidious-db]
-    networks: [pub]
-    cpus: 0.5
-    mem_limit: 512m
-    pids_limit: 256
-
-  companion:
-    <<: *hard
-    image: quay.io/invidious/invidious-companion:latest
-    environment:
-      - SERVER_SECRET_KEY=${COMPANION_KEY}
-      - PROXY=socks5://tubehaus:1080
-      - NETWORKING_FETCH_TIMEOUT_MS=15000
-      - NETWORKING_FETCH_RETRY_ENABLED=true
-      - NETWORKING_FETCH_RETRY_TIMES=3
-      - NETWORKING_FETCH_RETRY_INITIAL_DEBOUNCE=200
-      - NETWORKING_FETCH_RETRY_DEBOUNCE_MULTIPLIER=2
-      - "JOBS_YOUTUBE_SESSION_FREQUENCY=0 * * * *"
-    shm_size: 256mb
-    user: "10001:10001"
-    cap_drop: [ALL]
-    read_only: true
-    volumes:
-      - companion-cache:/var/tmp/youtubei.js:rw
-    networks: [pub]
-    cpus: 0.75
-    mem_limit: 1g
-    pids_limit: 256
-
-  invidious-db:
-    <<: *hard
-    image: docker.io/library/postgres:14
-    environment:
-      POSTGRES_DB: invidious
-      POSTGRES_USER: kemal
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - db:/var/lib/postgresql/data
-    networks: [pub]
-    cpus: 0.25
-    mem_limit: 256m
-    pids_limit: 128
 
 networks:
   pub:
@@ -172,5 +101,3 @@ volumes:
   caddy-config:
   data:
   warp:
-  companion-cache:
-  db:

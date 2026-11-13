@@ -4,7 +4,6 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![Check](https://github.com/biolend83/tubehaus/actions/workflows/check.yml/badge.svg)](https://github.com/biolend83/tubehaus/actions/workflows/check.yml)
 ![Docker: amd64 | arm64](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white)
-[![Built on Invidious](https://img.shields.io/badge/built%20on-Invidious-orange)](https://invidious.io)
 [![Featured in selfh.st Weekly](https://img.shields.io/badge/featured%20in-selfh.st%20weekly-2ea44f)](https://selfh.st/weekly/2026-10-23/)
 <a href="https://www.producthunt.com/products/tubehaus?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-tubehaus" target="_blank" rel="noopener noreferrer"><img alt="TubeHaus - Open-source YouTube client for TV, phone, desktop and iPad | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1300085&amp;theme=light&amp;t=1793523425652"></a>
 <a href="https://fazier.com" target="_blank"><img src="https://fazier.com/api/v1//public/badges/launch_badges.svg?badge_type=launched" width=120 alt="Fazier badge" /></a>
@@ -32,7 +31,7 @@ TubeHaus comes in two separate forms. They share the look and the name, but they
 |---|---|---|
 | **What you install** | A server: docker compose on a VPS, a home PC or a Raspberry Pi | An app on each device: Android (phones, tablets, Android TV / Google TV), Windows, macOS, Linux, or iPad/iPhone (installed with Sideloadly) |
 | **How you watch** | In any browser: phones, iPhone/iPad, PCs, TVs. Add it to the home screen to use it like an app | In the app on that device |
-| **Who talks to YouTube** | Your server, through Invidious and Cloudflare WARP. Your devices only ever talk to your server | The device itself, with the app's own YouTube engine. No Invidious and no TubeHaus server in between |
+| **Who talks to YouTube** | Your server, with its own YouTube engine, through Cloudflare WARP. Your devices only ever talk to your server | The device itself, with the app's own YouTube engine. No TubeHaus server in between |
 | **What YouTube sees** | A Cloudflare WARP address, not your home or your device | Your device's own internet address, like any YouTube app |
 | **Where your library lives** | On the server, shared by every device and person using it | On the device. Or connect the app to your TubeHaus server (0.5.4+) and share one library with it and your other devices |
 | **Only here** | Live captions (whisper.cpp), send to TV, full-quality downloads, TV mode, iPhone/iPad in the browser (no sideloading) | Offline downloads, background play and picture-in-picture (Android, iPad/iPhone), mpv player (desktop), recommendations learned on the device |
@@ -51,9 +50,10 @@ Want one library for the whole household, iPhone/iPad without sideloading, or to
   and your Apple ID; with a free Apple ID it is re-signed every 7 days. Step by step: [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). No sideloading wanted? Use the server version in Safari.
 - **🖥️ Run the server:** see [Quick start (Docker)](#quick-start-docker) below. The rest of this README is about the server version.
 
-The server version is built on top of [Invidious](https://invidious.io) and
-[invidious-companion](https://github.com/iv-org/invidious-companion), which do the hard work of talking to
-YouTube. TubeHaus adds its own front end and a small server next to them. All credit to the Invidious team.
+Since 1.6 the server version talks to YouTube itself, with a built-in engine that answers in
+[Invidious](https://invidious.io)' API format: no Invidious, no companion and no database to run next to it.
+Up to 1.5 it was built on Invidious and [invidious-companion](https://github.com/iv-org/invidious-companion),
+and much of what it knows about YouTube was learned from them. Thank you to the Invidious team.
 
 ![TubeHaus: Home, a search, a video and its "at a glance" panel](docs/tour.gif)
 
@@ -124,19 +124,23 @@ DeArrow's thumbnails come through the server, so DeArrow sees the server rather 
 ## How it fits together
 
 ```
-browser ──► Caddy ─┬─ /y/*, page navigations ─────────► web/ (the app)
-                   ├─ /api/p/*, /api/v1/videos/* ─────► TubeHaus server ──┐
-                   ├─ /companion/* ───────────────────► invidious-companion ─┤
-                   └─ everything else ────────────────► Invidious          │
-                                                                           ▼
-                                                          Cloudflare WARP (proxy mode)
-                                                                           │
-                                                                        YouTube
+browser ──► Caddy ─┬─ /y/*, page navigations ──► web/ (the app)
+                   └─ everything else ─────────► TubeHaus server
+                                                   │  library, live streams, captions, downloads,
+                                                   │  and its own YouTube engine (/api/v1/*,
+                                                   │  video streams, captions, pictures)
+                                                   ▼
+                                       Cloudflare WARP (proxy mode)
+                                                   │
+                                                YouTube
 ```
 
-TubeHaus uses [Invidious](https://github.com/iv-org/invidious) as its YouTube backend and adds its own server next to it. Invidious' companion `private_url` points at the TubeHaus server, which passes everything
-through and patches in what is missing (live HLS URLs, an empty `storyboards` key some old
-videos lack, WARP rotation when YouTube blocks).
+The server's engine asks YouTube the way YouTube's own apps do: lists (search, channels, playlists,
+comments) from the web client, the video streams from the visionOS client (plain addresses, no
+PO token), and the exact upload time and category from the web player. It answers in Invidious' API
+shapes (`/api/v1/videos`, `/api/v1/search`, ...), so tools that speak that API can use it too. The
+streams, captions and pictures come through the server, so the viewer's browser only ever talks to it.
+When YouTube walls the server off, it gets a fresh visitor identity, then a new WARP address.
 
 ## Requirements
 
@@ -148,12 +152,11 @@ videos lack, WARP rotation when YouTube blocks).
 ## Quick start (Docker)
 
 One command brings up everything: Caddy, the TubeHaus server with Cloudflare WARP built in,
-the PO-token provider for live streams, whisper.cpp for live captions, and the official
-Invidious + companion + PostgreSQL images. Works on x86-64 and ARM64.
+the PO-token provider for live streams and whisper.cpp for live captions. Works on x86-64 and ARM64.
 
 ```sh
 git clone https://github.com/biolend83/tubehaus && cd tubehaus
-cp .env.example .env        # set your domain and three secrets
+cp .env.example .env        # set your domain
 docker compose pull         # prebuilt images, amd64 and arm64
 docker compose up -d
 ```
@@ -163,7 +166,7 @@ docker compose up -d
 `$` as `$$`). Without it, everyone who opens the address shares the same library. Other options:
 [Add a login before you expose it](#add-a-login-before-you-expose-it).
 
-**Or with [Flisk](https://flisk.sh)** (optional; docker compose stays the main way). The same six
+**Or with [Flisk](https://flisk.sh)** (optional; docker compose stays the main way). The same three
 containers are also described for Flisk and read the same `.env`, so if you already use it:
 
 ```sh
@@ -180,7 +183,11 @@ To build the TubeHaus image yourself instead (for example after changing the cod
 `docker compose up -d --build`. The first build takes a few minutes because of whisper.cpp.
 
 Then open your domain. WARP registers itself on first start and keeps its registration in a
-volume; the companion reaches YouTube through it as well.
+volume.
+
+**Updating from 1.5 or older?** Invidious, its companion and PostgreSQL are no longer needed. After
+`git pull`, run `docker compose up -d --remove-orphans` to stop them; the secrets for them in `.env` can go.
+Your library is in the `tubehaus-data` volume and stays as it is.
 
 **No domain, or your own reverse proxy?** Caddy can serve plain HTTP on any port. In `.env`:
 
@@ -189,18 +196,12 @@ volume; the companion reaches YouTube through it as well.
 TUBEHAUS_SITE=:80
 TUBEHAUS_HTTP_BIND=8080
 TUBEHAUS_URL=http://192.168.1.10:8080
-TUBEHAUS_DOMAIN=192.168.1.10
-TUBEHAUS_HTTPS=false
-TUBEHAUS_EXTERNAL_PORT=8080
 
 # behind your own nginx, Traefik or Caddy, which handles HTTPS for tube.example.com
 TUBEHAUS_SITE=:80
 TUBEHAUS_HTTP_BIND=127.0.0.1:8080       # only your proxy reaches it
 TUBEHAUS_HTTPS_BIND=127.0.0.1:8443      # unused, kept off the public 443
 TUBEHAUS_URL=https://tube.example.com
-TUBEHAUS_DOMAIN=tube.example.com
-TUBEHAUS_HTTPS=true
-TUBEHAUS_EXTERNAL_PORT=443
 ```
 
 Then point your proxy at `http://127.0.0.1:8080` for everything, unbuffered (video and live streams), e.g. in nginx:
@@ -223,7 +224,7 @@ WireGuard. All three ways, step by step: [Opening TubeHaus to your household](do
 docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
 ```
 
-It tests WARP, YouTube, Invidious, a real video lookup and the optional tools, one line each.
+It tests WARP, YouTube, a search, a real video lookup with a few bytes of its stream, and the optional tools, one line each.
 If something fails, see [Troubleshooting](docs/TROUBLESHOOTING.md). To update or back up, see
 [Updating and backups](docs/UPGRADING.md).
 
@@ -233,11 +234,11 @@ There are **two TubeHaus images**. They aren't two editions to choose from: one 
 
 | Image | What it is | Ports |
 |---|---|---|
-| `ghcr.io/biolend83/tubehaus` | **The server.** Keeps the library (subscriptions, history, playlists, resume points), live captions, offline saves, watch-together rooms. No web pages of its own | 3010 (inside) |
-| `ghcr.io/biolend83/tubehaus-web` | **The web app and its front door.** The pages you open in the browser, plus Caddy, which sends every other request to the server, Invidious or the companion. The only port you open | 8080 |
+| `ghcr.io/biolend83/tubehaus` | **The server.** Talks to YouTube, keeps the library (subscriptions, history, playlists, resume points), live captions, offline saves, watch-together rooms. No web pages of its own | 3010 (inside) |
+| `ghcr.io/biolend83/tubehaus-web` | **The web app and its front door.** The pages you open in the browser, plus Caddy, which sends every other request to the server. The only port you open | 8080 |
 
 - **`docker compose up` from this repository** (above) uses only `tubehaus`: the web app comes from the `web/` folder of your clone, served by the plain `caddy` image. Nothing changes for existing setups.
-- **App stores** (Umbrel, CasaOS, TrueNAS) can't mount files from a clone, so they use `tubehaus-web`, which has the web app and the Caddy settings built in. You install one app; the store pulls both images (plus Invidious, the companion and PostgreSQL) and only port 8796 is opened.
+- **App stores** (Umbrel, CasaOS, TrueNAS) can't mount files from a clone, so they use `tubehaus-web`, which has the web app and the Caddy settings built in. You install one app; the store pulls both images and only port 8796 is opened.
 - **Unraid** has one container per template, so it shows two templates, **TubeHaus** and **TubeHaus-Web**. Install both, or the whole set at once with the Docker Compose Manager plugin and [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml).
 - **Your own home server without a clone:** [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml) is the same set as the stores use (one port, no WARP, no extra permissions).
 
@@ -245,7 +246,7 @@ Both images are published together on each server release, with the same version
 
 ## Manual setup
 
-You need a Linux server with Python 3.10+, [Caddy](https://caddyserver.com), and Docker for Invidious.
+You need a Linux server with Python 3.10+ and [Caddy](https://caddyserver.com) (or nginx). No Docker needed.
 
 ### 1. Cloudflare WARP in proxy mode
 
@@ -259,25 +260,9 @@ warp-cli --accept-tos connect
 curl -x http://127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace   # warp=on
 ```
 
-Containers can't reach 127.0.0.1 on the host, so re-expose it on the Docker bridge for the companion:
-
-```sh
-socat TCP-LISTEN:18080,bind=172.17.0.1,fork,reuseaddr TCP:127.0.0.1:40000   # run it as a service
-```
-
 (Unofficial WARP clients such as `wgcf` get rate-limited by Cloudflare; use the official one.)
 
-### 2. Invidious + companion
-
-Follow the [Invidious installation guide](https://docs.invidious.io/installation/) with
-[invidious-companion](https://github.com/iv-org/invidious-companion). Then:
-
-- companion: `PROXY=socks5://172.17.0.1:18080` (WARP) and publish it on `127.0.0.1:8282`
-- Invidious config: point the companion's `private_url` at TubeHaus, e.g.
-  `invidious_companion: [{ private_url: "http://172.17.0.1:3010/companion", public_url: "https://tube.example.com/companion" }]`
-  (then bind TubeHaus to an address the container can reach, e.g. `HT_BIND=172.17.0.1`)
-
-### 3. TubeHaus server
+### 2. TubeHaus server
 
 ```sh
 git clone https://github.com/biolend83/tubehaus /opt/tubehaus
@@ -291,9 +276,9 @@ Optional extras:
 - **Live captions:** build whisper.cpp and download `ggml-base-q5_1.bin`; set `HT_WHISPER_BIN` / `HT_WHISPER_MODEL`
 - **Offline save:** `ffmpeg`
 
-### 4. Reverse proxy: Caddy or nginx
+### 3. Reverse proxy: Caddy or nginx
 
-Copy `web/` to `/srv/tubehaus/web` and adapt [`deploy/Caddyfile.example`](deploy/Caddyfile.example) for Caddy. If you use nginx instead, start from [`deploy/nginx.conf.example`](deploy/nginx.conf.example) and replace the hostname, TLS certificate paths and upstream addresses for your setup. The nginx example keeps long-lived API, companion and download requests unbuffered with extended timeouts.
+Copy `web/` to `/srv/tubehaus/web` and adapt [`deploy/Caddyfile.example`](deploy/Caddyfile.example) for Caddy. If you use nginx instead, start from [`deploy/nginx.conf.example`](deploy/nginx.conf.example) and replace the hostname, TLS certificate paths and upstream addresses for your setup. The nginx example keeps video streams, long polls and downloads unbuffered with extended timeouts.
 
 **TubeHaus has no accounts.** Anyone who can open it shares the same library. Put your own
 login in front (Caddy `basic_auth`, or `forward_auth` to Authelia / Authentik / a passkey gate)
@@ -302,15 +287,13 @@ be sent to your login page.
 
 ## FAQ
 
-**Is this a replacement for Invidious?**
-No, it runs alongside it. Invidious and its companion fetch everything from YouTube; TubeHaus is a
-YouTube-style front end plus a server that adds live streams, live captions, a shared library, send to TV,
-downloads and WARP egress. The docker compose file runs the official Invidious images for you.
+**Do I still need Invidious?**
+No, not since 1.6: the server asks YouTube itself. It answers in Invidious' API format, so apps that can
+use an Invidious instance's API (Yattee, FreeTube's API mode, ...) may work with it too; the parts that need an
+Invidious account (its own subscriptions and login) aren't there.
 
-**Can I use my existing Invidious instance (or keep using Yattee, FreeTube, ...)?**
-Yes, follow *Manual setup* and point TubeHaus at it. Apps that talk to Invidious keep working, and if the
-companion goes out through WARP they benefit from it too. Live streams and WARP rotation work best when
-TubeHaus sits in front of the companion as described.
+**Can I keep my Invidious instance?**
+Yes, they don't get in each other's way, but TubeHaus no longer uses it.
 
 **Where does the content come from? Does it store videos?**
 Everything comes from YouTube. Nothing is stored except your library (subscriptions, history, playlists) and
@@ -322,7 +305,7 @@ get your subscriptions feed, trending and category tabs, and YouTube's per-video
 Google, since no Google account is involved.
 
 **Age-restricted videos?**
-They usually don't play, since there's no signed-in account to pass the age check. That is the same as Invidious.
+They usually don't play, since there's no signed-in account to pass the age check.
 
 **Can I bring my subscriptions in, and take my data out?**
 Yes. Under Settings → My data (or the subscriptions page), **Import from file** takes Google Takeout (the
@@ -331,7 +314,7 @@ subscriptions CSV and `watch-history.json`), Invidious, NewPipe and FreeTube exp
 Invidious-format file, a Takeout-style CSV, or OPML for any feed reader. Your data is never stuck here.
 
 **Does anything phone home?**
-No. There are no accounts and no telemetry. The only outside requests are YouTube (through Invidious and WARP),
+No. There are no accounts and no telemetry. The only outside requests are YouTube (from the server, through WARP),
 DeArrow's thumbnail server (from the server, for the optional DeArrow thumbnails) and, from the browser, the optional
 SponsorBlock, DeArrow and Return YouTube Dislike lookups.
 
@@ -374,7 +357,7 @@ above runs:
 - **Sign-up required** (`HT_ACCOUNTS=1`): a user name and a password, no e-mail or other personal details. Passwords are
   stored as PBKDF2 hashes (600,000 rounds); sessions are signed HttpOnly cookies; sign-ups and log-ins are rate-limited
   per network
-- Invidious' own accounts and admin pages switched off, only the player's reads allowed on the companion, load limits,
+- Load limits,
   memory/CPU caps, no access log
 
 ```sh
@@ -409,11 +392,11 @@ All settings are environment variables — see [`.env.example`](.env.example).
 |---|---|---|
 | `HT_BIND`, `HT_PORT` | `127.0.0.1`, `3010` | where the API listens |
 | `HT_STATE` | `./state` | library and subtitle cache |
-| `HT_INVIDIOUS` | `http://127.0.0.1:3000` | Invidious |
-| `HT_COMPANION` | `http://127.0.0.1:8282` | invidious-companion |
 | `HT_PUBLIC_URL` | `http://localhost:8080` | the address browsers use |
 | `HT_YT_PROXY` | `127.0.0.1:40000` | WARP proxy (empty = direct) |
 | `HT_WARP_ROTATE` | `1` | reconnect WARP when YouTube blocks |
+| `HT_REGION` | `US` | default region of searches and trending |
+| `HT_HL` | (English) | YouTube's language for its texts |
 | `HT_YTDLP` | `yt-dlp` | for live streams |
 | `HT_WHISPER_BIN`, `HT_WHISPER_MODEL`, `HT_WHISPER_LANG` | empty, empty, `auto` | live captions |
 | `HT_SUB_LANG`, `HT_LIBRETRANSLATE` | `en`, empty | default subtitle translation target (the app asks for its own language), optional fallback |
@@ -467,7 +450,7 @@ Opened a useful issue, sent a pull request or tested an app? You belong here too
 
 ## Credits
 
-- [Invidious](https://github.com/iv-org/invidious) and [invidious-companion](https://github.com/iv-org/invidious-companion) (AGPL-3.0) — the backend this sits on
+- [Invidious](https://github.com/iv-org/invidious) and [invidious-companion](https://github.com/iv-org/invidious-companion) (AGPL-3.0) — the backend this sat on until 1.5, and the API format it still answers in
 - [Shaka Player](https://github.com/shaka-project/shaka-player) (Apache-2.0) — bundled in `web/y/lib/`
 - Layout after [varun-jasti/Youtube-UI-UX](https://github.com/varun-jasti/Youtube-UI-UX) (MIT); progress bar and volume after [pncsoares/youtube-video-player-clone](https://github.com/pncsoares/youtube-video-player-clone) (MIT)
 - Icons: Material Symbols (Apache-2.0)
