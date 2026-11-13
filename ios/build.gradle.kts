@@ -14,8 +14,9 @@ dependencies {
 }
 
 kotlin {
-    // iosArm64: iPads and iPhones; iosX64: the simulator on an Intel Mac (the CI check)
-    listOf(iosArm64(), iosX64()).forEach {
+    // iosArm64: iPads and iPhones; iosSimulatorArm64: the simulator on an Apple Silicon Mac (the CI
+    // check); iosX64: the simulator on an Intel Mac
+    listOf(iosArm64(), iosSimulatorArm64(), iosX64()).forEach {
         it.binaries.framework {
             baseName = "TubeHausKit"
             isStatic = true

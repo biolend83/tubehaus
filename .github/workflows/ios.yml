@@ -14,12 +14,13 @@ permissions:
   contents: read
 
 env:
-  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx4g
+  # Apple Silicon runners (M1, 7 GB): Gradle and the Kotlin compiler share it
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx5g -Dkotlin.daemon.jvm.options=-Xmx2g
 
 jobs:
   ipa:
-    # Intel runners have twice the memory; linking Compose for iOS needs it
-    runs-on: macos-15-intel
+    # Apple Silicon (M1): faster than Intel
+    runs-on: macos-15
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +56,7 @@ jobs:
           if-no-files-found: error
 
   simulator:
-    runs-on: macos-15-intel
+    runs-on: macos-15
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -66,14 +67,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Kotlin → TubeHausKit.framework (simulator)
         run: |
-          ./gradlew :ios:linkDebugFrameworkIosX64 --no-configuration-cache --stacktrace
-          mkdir -p ios/build/kit && cp -R ios/build/bin/iosX64/debugFramework/TubeHausKit.framework ios/build/kit/
+          ./gradlew :ios:linkDebugFrameworkIosSimulatorArm64 --no-configuration-cache --stacktrace
+          mkdir -p ios/build/kit && cp -R ios/build/bin/iosSimulatorArm64/debugFramework/TubeHausKit.framework ios/build/kit/
       - name: Build for the simulator
         run: |
           brew install xcodegen
           (cd ios/app && xcodegen generate)
           xcodebuild -project ios/app/TubeHaus.xcodeproj -scheme TubeHaus -sdk iphonesimulator -configuration Debug \
-            -derivedDataPath build/xcode ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO build
+            -derivedDataPath build/xcode ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO build
       - name: Run it on an iPad
         # stopped here if it hangs, so the screenshots taken so far still get uploaded
         timeout-minutes: 25
