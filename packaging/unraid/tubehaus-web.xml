@@ -7,7 +7,9 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/biolend83/tubehaus/issues</Support>
   <Project>https://github.com/biolend83/tubehaus</Project>
-  <Overview>The TubeHaus web app: your own YouTube for the whole household, without ads or tracking. Open it in any browser, on a TV too. It routes to the TubeHaus server, Invidious and invidious-companion; install the TubeHaus template first and set their addresses below.</Overview>
+  <Overview>Part 2 of 2, install TubeHaus too: this container is the web app you open in the browser, and it needs the TubeHaus server.&#xD;
+&#xD;
+The TubeHaus web app: your own YouTube for the whole household, without ads or tracking. Open it in any browser, on a TV too. It routes to the TubeHaus server, Invidious and invidious-companion; install the TubeHaus template first and set their addresses below.</Overview>
   <Category>MediaApp:Video MediaServer:Video</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/biolend83/tubehaus/main/packaging/unraid/tubehaus-web.xml</TemplateURL>

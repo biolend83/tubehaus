@@ -170,6 +170,22 @@ WARP, 유튜브 연결, Invidious, 실제 영상 조회, 선택 기능(yt-dlp, f
 이미 쓰는 nginx나 Traefik 뒤에 두는 방법은 [docs/reverse-proxy.md](docs/reverse-proxy.md)(영어)에 있어요.
 직접 설치(Docker 없이)와 설정 항목 전체는 [영어 README](README.md#manual-setup)에 있어요.
 
+### 이미지 두 개: tubehaus와 tubehaus-web
+
+TubeHaus 이미지는 **두 개**예요. 둘 중에 고르는 판(에디션)이 아니라, 하나는 서버고 하나는 웹 화면이에요. 어떤 설치든 서버 하나에 웹 화면을 보여 주는 쪽이 하나 붙어요.
+
+| 이미지 | 하는 일 | 포트 |
+|---|---|---|
+| `ghcr.io/biolend83/tubehaus` | **서버.** 라이브러리(구독, 기록, 재생목록, 이어보기), 라이브 자막, 오프라인 저장, 같이 보기 방. 화면은 없어요 | 3010 (안쪽) |
+| `ghcr.io/biolend83/tubehaus-web` | **웹 화면과 출입구.** 브라우저에서 보는 화면과, 나머지 요청을 서버·Invidious·companion으로 보내는 Caddy. 밖으로 여는 포트는 이것 하나 | 8080 |
+
+- **이 저장소에서 `docker compose up`** 하는 방식(위)은 `tubehaus`만 써요. 화면은 받아 둔 저장소의 `web/` 폴더를 일반 `caddy` 이미지가 보여 줘요. 기존 설치는 바뀌는 게 없어요.
+- **앱 스토어**(Umbrel, CasaOS, TrueNAS)는 저장소 파일을 연결할 수 없어서, 화면과 Caddy 설정이 들어 있는 `tubehaus-web`을 써요. 앱은 하나로 보이고, 설치하면 이미지 둘(과 Invidious, companion, PostgreSQL)이 같이 깔리고 포트는 8796 하나만 열려요.
+- **Unraid**는 템플릿 하나에 컨테이너 하나라서 **TubeHaus**, **TubeHaus-Web** 템플릿 두 개로 보여요. 둘 다 설치하거나, Docker Compose Manager 플러그인과 [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml)로 한 번에 올리세요.
+- **저장소 없이 집 서버에 바로:** [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml)이 스토어와 같은 구성이에요(포트 하나, WARP 없음, 추가 권한 없음).
+
+두 이미지는 서버 릴리스마다 같은 버전 번호로 함께 나와요. 버전을 맞춰 쓰세요.
+
 ## 공개 서버로 열기
 
 설치 없이 써 보게 해 주고 싶다면 `.env`에 `TUBEHAUS_PUBLIC=1`을 넣으세요.

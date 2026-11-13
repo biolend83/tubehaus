@@ -227,6 +227,22 @@ It tests WARP, YouTube, Invidious, a real video lookup and the optional tools, o
 If something fails, see [Troubleshooting](docs/TROUBLESHOOTING.md). To update or back up, see
 [Updating and backups](docs/UPGRADING.md).
 
+### The two images: tubehaus and tubehaus-web
+
+There are **two TubeHaus images**. They aren't two editions to choose from: one is the server, the other is the web app, and a working setup always has the server plus one way of serving the web app.
+
+| Image | What it is | Ports |
+|---|---|---|
+| `ghcr.io/biolend83/tubehaus` | **The server.** Keeps the library (subscriptions, history, playlists, resume points), live captions, offline saves, watch-together rooms. No web pages of its own | 3010 (inside) |
+| `ghcr.io/biolend83/tubehaus-web` | **The web app and its front door.** The pages you open in the browser, plus Caddy, which sends every other request to the server, Invidious or the companion. The only port you open | 8080 |
+
+- **`docker compose up` from this repository** (above) uses only `tubehaus`: the web app comes from the `web/` folder of your clone, served by the plain `caddy` image. Nothing changes for existing setups.
+- **App stores** (Umbrel, CasaOS, TrueNAS) can't mount files from a clone, so they use `tubehaus-web`, which has the web app and the Caddy settings built in. You install one app; the store pulls both images (plus Invidious, the companion and PostgreSQL) and only port 8796 is opened.
+- **Unraid** has one container per template, so it shows two templates, **TubeHaus** and **TubeHaus-Web**. Install both, or the whole set at once with the Docker Compose Manager plugin and [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml).
+- **Your own home server without a clone:** [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml) is the same set as the stores use (one port, no WARP, no extra permissions).
+
+Both images are published together on each server release, with the same version number. Keep them on the same version.
+
 ## Manual setup
 
 You need a Linux server with Python 3.10+, [Caddy](https://caddyserver.com), and Docker for Invidious.

@@ -46,8 +46,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.description=TubeHaus web app with its Caddy front
+            org.opencontainers.image.description=The TubeHaus web app and its Caddy front door, the one port you open. Needs the tubehaus server image, Invidious and invidious-companion
             org.opencontainers.image.licenses=AGPL-3.0
+          annotations: |
+            index:org.opencontainers.image.description=The TubeHaus web app and its Caddy front door, the one port you open. Needs the tubehaus server image, Invidious and invidious-companion
+            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ github.event_name == 'release' && format('{0}:{1}', env.IMAGE, steps.v.outputs.v) || '' }}

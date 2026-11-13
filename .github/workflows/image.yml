@@ -44,7 +44,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.description=TubeHaus server with Cloudflare WARP, yt-dlp and whisper.cpp
+            org.opencontainers.image.description=The TubeHaus server (library, captions, offline saves). No web pages of its own: pair it with the tubehaus-web image (or Caddy and the web folder of the repository)
             org.opencontainers.image.licenses=AGPL-3.0
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.platform }}
@@ -94,6 +94,8 @@ jobs:
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create ${{ steps.tags.outputs.args }} \
+            --annotation "index:org.opencontainers.image.description=The TubeHaus server (library, captions, offline saves). No web pages of its own: pair it with the tubehaus-web image (or Caddy and the web folder of the repository)" \
+            --annotation "index:org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
             $(printf "$IMAGE@sha256:%s " *)
           docker buildx imagetools inspect "$IMAGE:latest"
 
