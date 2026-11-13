@@ -95,6 +95,14 @@ function back() {
 // the TubeHaus TV app (Android) calls this when the remote's Back is pressed
 window.__tvBack = back;
 
+// Samsung (Tizen) and LG (webOS) TV apps: the media keys reach a page only once asked for, and Back on
+// the first screen closes the app
+try { window.tizen?.tvinputdevice?.registerKeyBatch(["MediaPlayPause", "MediaPlay", "MediaPause", "MediaFastForward", "MediaRewind"]); } catch { }
+function tvExit() {
+  try { window.tizen?.application?.getCurrentApplication().exit(); return; } catch { }
+  if (window.webOSSystem || window.PalmSystem) { try { window.close(); } catch { } }
+}
+
 // ---- player control bar (settings, captions, fullscreen …): enter with down, pick with left/right, press with OK
 const bar = () => player.root.querySelector(".ytp-bar");
 const inBar = () => !!bar()?.contains(document.activeElement);
@@ -156,14 +164,20 @@ export function initTV() {
   addEventListener("keydown", (e) => {
     const k = e.key;
     const typing = e.target.closest?.("input,textarea,select");
-    // Back button (remotes deliver Back differently per browser)
-    if (k === "GoBack" || k === "BrowserBack" || k === "Escape" || (k === "Backspace" && !typing)) {
-      e.preventDefault(); e.stopImmediatePropagation(); back(); return;
+    // Back button (remotes deliver Back differently per browser; Samsung Tizen sends key code 10009, LG webOS 461)
+    if (k === "GoBack" || k === "BrowserBack" || k === "XF86Back" || k === "Escape" || (k === "Backspace" && !typing) || e.keyCode === 10009 || e.keyCode === 461) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      // nothing left to go back to: close the Samsung / LG TV app (the Android TV app asks __tvBack itself)
+      if (back() === "exit") tvExit();
+      return;
     }
     // media keys
+    // Samsung and LG remotes give their media keys as key codes
+    const byCode = { 415: "MediaPlay", 19: "MediaPause", 10252: "MediaPlayPause", 417: "MediaFastForward", 412: "MediaRewind" }[e.keyCode];
+    const mk = byCode || k;
     const media = { MediaPlayPause: () => player.toggle(), MediaPlay: () => player.play(), MediaPause: () => player.video.pause(),
       MediaFastForward: () => player.seek(10, true), MediaRewind: () => player.seek(-10, true),
-      MediaTrackNext: () => player.on.next?.(), MediaTrackPrevious: () => player.on.prev?.() }[k];
+      MediaTrackNext: () => player.on.next?.(), MediaTrackPrevious: () => player.on.prev?.() }[mk];
     if (media && player.info) { e.preventDefault(); e.stopImmediatePropagation(); media(); return; }
 
     const arrows = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };

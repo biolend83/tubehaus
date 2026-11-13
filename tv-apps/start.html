@@ -1,0 +1,77 @@
+<!doctype html>
+<!-- TubeHaus for Samsung (Tizen) and LG (webOS) TVs: remembers your server's address and opens it.
+     The TubeHaus web app turns on its TV mode by itself on these TVs (remote arrows, OK, Back, media keys). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920">
+<title>TubeHaus</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0d16; color: #e8eaf6; font: 32px/1.4 system-ui, sans-serif; }
+  main { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; }
+  h1 { margin: 0; font-size: 64px; letter-spacing: .5px; }
+  p { margin: 0; color: #aab0d0; max-width: 1200px; text-align: center; }
+  input { width: 1000px; font: inherit; padding: 18px 24px; border-radius: 14px; border: 3px solid #3b4170; background: #151830; color: inherit; }
+  button { font: inherit; padding: 16px 48px; border-radius: 40px; border: 3px solid transparent; background: #8c9eff; color: #0b0d16; }
+  input:focus, button:focus { outline: none; border-color: #fff; }
+  .err { color: #ff8a80; min-height: 1.4em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>TubeHaus</h1>
+  <p id="msg">The address of your TubeHaus, as you open it in a browser</p>
+  <input id="addr" type="url" placeholder="http://192.168.1.10:8796" autocomplete="off" spellcheck="false">
+  <button id="go">Open</button>
+  <p class="err" id="err"></p>
+</main>
+<script>
+(function () {
+  var KEY = "tubehaus.server";
+  var addr = document.getElementById("addr"), go = document.getElementById("go"), msg = document.getElementById("msg"), err = document.getElementById("err");
+  var saved = null, timer = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) { }
+  var ko = /^ko/i.test(navigator.language || "");
+  if (ko) { msg.textContent = "브라우저에서 여는 TubeHaus 주소를 넣어 주세요"; go.textContent = "열기"; }
+
+  function clean(v) {
+    v = (v || "").trim().replace(/\/+$/, "");
+    if (v && !/^https?:\/\//i.test(v)) v = "http://" + v;
+    return v;
+  }
+  function open(v) {
+    try { localStorage.setItem(KEY, v); } catch (e) { }
+    location.replace(v + "/");
+  }
+  function submit() {
+    var v = clean(addr.value);
+    if (!/^https?:\/\/[^\s\/]+(\/\S*)?$/i.test(v)) { err.textContent = ko ? "주소를 확인해 주세요" : "Please check the address"; addr.focus(); return; }
+    err.textContent = ko ? "여는 중…" : "Opening…";
+    open(v);
+  }
+  go.addEventListener("click", submit);
+  addr.addEventListener("keydown", function (e) { if (e.keyCode === 13) { e.preventDefault(); submit(); } });
+  // remote arrows: between the box and the button
+  document.addEventListener("keydown", function (e) {
+    if (timer) { clearTimeout(timer); timer = null; msg.textContent = ko ? "주소를 바꾸고 열기를 누르세요" : "Change the address, then press Open"; }
+    if (e.keyCode === 40 && document.activeElement === addr) { e.preventDefault(); go.focus(); }
+    else if (e.keyCode === 38 && document.activeElement === go) { e.preventDefault(); addr.focus(); }
+    else if (e.keyCode === 10009 || e.keyCode === 461) {
+      // Back on this screen closes the app
+      try { window.tizen.application.getCurrentApplication().exit(); } catch (x) { try { window.close(); } catch (y) { } }
+    }
+  });
+
+  if (saved) {
+    addr.value = saved;
+    // opens by itself; any key in the next 3 seconds stays here to change the address
+    msg.textContent = ko ? "잠시 후 열려요 · 주소를 바꾸려면 아무 버튼이나 누르세요" : "Opening in a moment · press any button to change the address";
+    go.focus();
+    timer = setTimeout(function () { open(saved); }, 3000);
+  } else {
+    addr.focus();
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "id": "io.github.biolend83.tubehaus",
+  "version": "1.5.0",
+  "vendor": "biolend83",
+  "type": "web",
+  "main": "index.html",
+  "title": "TubeHaus",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#0b0d16",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true
+}

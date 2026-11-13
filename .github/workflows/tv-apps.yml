@@ -1,0 +1,66 @@
+name: TV apps
+
+# Small Samsung (Tizen) and LG (webOS) apps that open your TubeHaus server (tv-apps/).
+# webOS: a ready .ipk, installed with the webOS developer tools on a TV in Developer Mode.
+# Tizen: a .wgt must be signed with a certificate made for your own TV in Tizen Studio, so the
+# project is attached as a zip to build and install from there (see tv-apps/README.md).
+on:
+  push:
+    branches: [main]
+    paths: [tv-apps/**, .github/workflows/tv-apps.yml]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tv:
+    # server releases (v1.5.0); app releases are app-v*
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then v="${{ github.event.release.tag_name }}"; v="${v#v}"
+          else v=$(sed -n 's/^## v\([0-9][0-9.]*\).*/\1/p' CHANGELOG.md | head -1); fi
+          echo "v=$v" >> "$GITHUB_OUTPUT"; echo "version $v"
+      - name: Put the apps together
+        run: |
+          v=${{ steps.v.outputs.v }}
+          sudo apt-get install -y -qq imagemagick libxml2-utils >/dev/null
+          mkdir -p out/webos out/tizen
+          cp tv-apps/start.html out/webos/index.html
+          cp tv-apps/start.html out/tizen/index.html
+          sed "s/\"version\": \"[^\"]*\"/\"version\": \"$v\"/" tv-apps/webos/appinfo.json > out/webos/appinfo.json
+          sed "s/ version=\"[0-9.]*\" viewmodes/ version=\"$v\" viewmodes/" tv-apps/tizen/config.xml > out/tizen/config.xml
+          convert web/y/icon-512.png -resize 80x80 out/webos/icon.png
+          convert web/y/icon-512.png -resize 130x130 out/webos/largeIcon.png
+          convert web/y/icon-512.png -resize 117x117 out/tizen/icon.png
+          cat out/webos/appinfo.json; grep version= out/tizen/config.xml
+          xmllint --noout out/tizen/config.xml
+      - name: webOS package (.ipk)
+        run: |
+          npm install -g --silent @webos-tools/cli
+          ares-package out/webos -o . --no-minify
+          f=$(ls *.ipk | head -1)
+          mv "$f" "TubeHaus-webOS-${{ steps.v.outputs.v }}.ipk"
+          ls -la *.ipk
+      - name: Tizen project (.zip)
+        run: |
+          (cd out/tizen && zip -qr "$GITHUB_WORKSPACE/TubeHaus-Tizen-project-${{ steps.v.outputs.v }}.zip" .)
+          unzip -l TubeHaus-Tizen-project-*.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tv-apps
+          path: |
+            TubeHaus-webOS-*.ipk
+            TubeHaus-Tizen-project-*.zip
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" TubeHaus-webOS-*.ipk TubeHaus-Tizen-project-*.zip --clobber
