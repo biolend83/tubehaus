@@ -543,14 +543,14 @@ export async function channelsMgr(page) {
       <div class="imp"><button class="pill ghost file">${$t("{0} 파일에서 가져오기", icon("upload"))}</button>
       <button class="pill ghost exp">${$t("{0} 내보내기", icon("download"))}</button>
       <button class="pill ghost inv">${$t("{0} Invidious 계정의 구독 가져오기", icon("download"))}</button>
-      <input type="file" class="impfile" hidden accept=".json,.csv,.opml,.xml,.db,.txt">
+      <input type="file" class="impfile" hidden multiple accept=".json,.csv,.opml,.xml,.db,.txt,.html">
       <form class="addch"><input placeholder="${$t("채널 주소나 @핸들 (예: @MBCNEWS11)")}"><button class="pill">${$t("추가")}</button></form></div>
       ${PUBLIC ? `<p class="sub pub-note">${$t("공개 서버예요. 구독과 기록은 이 브라우저에만 저장되고 서버에는 남지 않아요. 브라우저 데이터를 지우면 사라지니 가끔 내보내기로 백업해 두세요.")}</p>` : ""}
       <p class="sub imp-hint">${$t("구글 Takeout (구독 CSV, 시청 기록), Invidious, NewPipe, FreeTube, OPML, TubeHaus 백업 파일을 가져올 수 있어요")}</p>
       <div class="chlist">${subs.map(([id, s]) => `<div class="chrow"><a href="/channel/${esc(id)}" data-nav>${avatar(s.thumb, "md")}<span>${esc(s.name)}</span></a>${subBtn(id, s.name, s.thumb)}</div>`).join("") || `<p class='sub'>${$t("아직 없어요")}</p>`}</div></div>`;
     $(".inv", page).onclick = () => importInvidious(true).then(draw);
     $(".file", page).onclick = () => $(".impfile", page).click();
-    $(".impfile", page).onchange = async (e) => { if (await importFile(e.target.files[0])) draw(); };
+    $(".impfile", page).onchange = async (e) => { if (await importFiles(e.target.files)) draw(); };
     $(".exp", page).onclick = exportDialog;
     $(".addch", page).onsubmit = async (e) => {
       e.preventDefault();
@@ -590,16 +590,26 @@ export function exportDialog() {
     document.body.append(a); a.click(); a.remove();
   }));
 }
-export async function importFile(file) {
-  if (!file) return false;
-  try {
-    toast($t("가져오는 중..."));
-    const res = await lib("import", { method: "POST", body: { name: file.name, text: await file.text() } });
-    await loadLib();
-    dropCache("/yt/");
-    toast($t("가져왔어요: 구독 {0}개, 재생목록 {1}개, 시청 기록 {2}개", res.subs, res.playlists, res.hist));
-    return true;
-  } catch (e) { toast(e.message); return false; }
+export async function importFile(file) { return importFiles(file ? [file] : []); }
+// several at once: Takeout gives one CSV per playlist
+export async function importFiles(files) {
+  files = [...(files || [])];
+  if (!files.length) return false;
+  toast($t("가져오는 중..."));
+  const sum = { subs: 0, playlists: 0, hist: 0 };
+  let ok = 0, err = null;
+  for (const file of files) {
+    try {
+      const res = await lib("import", { method: "POST", body: { name: file.name, text: await file.text() } });
+      for (const k in sum) sum[k] += res[k] || 0;
+      ok++;
+    } catch (e) { err = e; }
+  }
+  if (!ok) { toast(err ? err.message : ""); return false; }
+  await loadLib();
+  dropCache("/yt/");
+  toast($t("가져왔어요: 구독 {0}개, 재생목록 {1}개, 시청 기록 {2}개", sum.subs, sum.playlists, sum.hist));
+  return true;
 }
 export async function importInvidious(loud) {
   try {
@@ -786,7 +796,7 @@ export function settingsPage(page) {
         ${tile("sexp", "download", plain($t("{0} 내보내기", "")))}
         ${tile("unhide", "replay", $t("'관심 없음' {0}개 되돌리기", state.hidden.size))}
         ${tile("keys", "keyboard", $t("단축키"))}
-      </div><input type="file" class="simpfile" hidden accept=".json,.csv,.opml,.xml,.db,.txt">`],
+      </div><input type="file" class="simpfile" hidden multiple accept=".json,.csv,.opml,.xml,.db,.txt,.html">`],
     ["about", "info", $t("면책 조항"), `
       <p class="sx-about">${esc($t("TubeHaus는 개인이 만든 무료 오픈소스 소프트웨어이고, 유튜브나 구글과 관계가 없어요. 영상을 저장하거나 배포하지 않고, 어떤 보증도 하지 않아요. 내려받은 영상은 본인이 보는 용도로만 쓰세요. 공유하거나 다시 올리는 건 그렇게 한 사람의 책임이에요. 사는 곳의 법과 연결하는 서비스의 약관에 맞게 써 주세요."))}
       <a href="https://github.com/biolend83/tubehaus#disclaimer" target="_blank" rel="noopener">${$t("전체 면책 조항 보기")}</a></p>`],
@@ -889,7 +899,7 @@ export function settingsPage(page) {
     };
   }).catch(() => { });
   $(".simp", page).onclick = () => $(".simpfile", page).click();
-  $(".simpfile", page).onchange = (e) => importFile(e.target.files[0]);
+  $(".simpfile", page).onchange = (e) => importFiles(e.target.files);
   $(".sexp", page).onclick = exportDialog;
   $(".keys", page).onclick = async () => (await import("./core.js")).keysDialog();
 }

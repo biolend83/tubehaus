@@ -210,8 +210,8 @@ class ImportExport(unittest.TestCase):
                 os.remove(f)
         ts._yt_import_fill = lambda *a: None          # no network in tests
 
-    def parse(self, text):
-        return ts.ytlib_parse_import(text)
+    def parse(self, text, name=""):
+        return ts.ytlib_parse_import(text, name)
 
     def test_takeout_csv(self):
         p = self.parse("﻿Channel Id,Channel Url,Channel Title\n"
@@ -245,6 +245,57 @@ class ImportExport(unittest.TestCase):
         p = self.parse("\n".join(lines))
         self.assertEqual(p["format"], "freetube")
         self.assertEqual(set(p["subs"]), {self.A, self.B})
+
+    def test_freetube_playlists(self):
+        import json
+        v = {"videoId": "dQw4w9WgXcQ", "title": "Never", "author": "Rick", "authorId": self.A,
+             "lengthSeconds": 213, "timeAdded": 1700000000000, "published": 1256000000000}
+        lines = [json.dumps({"playlistName": "Favorites", "videos": [v], "_id": "f"}),
+                 json.dumps({"playlistName": "Empty", "videos": [], "_id": "e"}),
+                 json.dumps({"$deleted": True, "_id": "x"})]
+        p = self.parse("\n".join(lines) + "\n")
+        self.assertEqual(p["format"], "freetube")
+        self.assertEqual([pl["title"] for pl in p["playlists"]], ["Favorites", "Empty"])
+        it = p["playlists"][0]["items"][0]
+        self.assertEqual((it["id"], it["at"], it["published"], it["authorId"]), ("dQw4w9WgXcQ", 1700000000, 1256000000, self.A))
+        # one playlist alone is one line without a newline; before 0.20 the file was a JSON array
+        self.assertEqual(self.parse(lines[0])["playlists"][0]["title"], "Favorites")
+        self.assertEqual(self.parse("[" + lines[0] + "]")["playlists"][0]["title"], "Favorites")
+
+    def test_freetube_history(self):
+        import json
+        lines = [json.dumps({"videoId": "dQw4w9WgXcQ", "title": "Never", "timeWatched": 1700000000000, "_id": "a"}),
+                 json.dumps({"videoId": "9bZkp7q19f0", "title": "Gangnam", "timeWatched": 1700000500000, "_id": "b"})]
+        p = self.parse("\n".join(lines))
+        self.assertEqual(p["format"], "freetube")
+        self.assertEqual([h["id"] for h in p["hist"]], ["9bZkp7q19f0", "dQw4w9WgXcQ"])
+        self.assertEqual(p["hist"][0]["at"], 1700000500)
+
+    def test_takeout_history_html(self):
+        cell = ('<div class="content-cell mdl-cell mdl-cell--6-col mdl-typography--body-1">Watched'
+                '<a href="https://www.youtube.com/watch?v={v}">{t}</a><br>{c}2024. 1. 2.<br></div>')
+        ch = f'<a href="https://www.youtube.com/channel/{self.A}">Rick &amp; Co</a><br>'
+        p = self.parse("<html><body>" + cell.format(v="dQw4w9WgXcQ", t="Never &amp; Gonna", c=ch)
+                       + cell.format(v="9bZkp7q19f0", t="Gangnam", c="") + "</body></html>")
+        self.assertEqual(p["format"], "takeout-history")
+        self.assertEqual([(h["id"], h["title"], h["author"]) for h in p["hist"]],
+                         [("dQw4w9WgXcQ", "Never & Gonna", "Rick & Co"), ("9bZkp7q19f0", "Gangnam", "")])
+        self.assertGreater(p["hist"][0]["at"], p["hist"][1]["at"])
+
+    def test_takeout_playlists(self):
+        new = "Video ID,Playlist Video Creation Timestamp\ndQw4w9WgXcQ,2024-01-02T03:04:05+00:00\n"
+        p = self.parse(new, "Cats-videos.csv")
+        self.assertEqual(p["format"], "takeout-playlist")
+        self.assertEqual(p["playlists"][0]["title"], "Cats")
+        self.assertEqual(p["playlists"][0]["items"][0]["at"], 1704164645)
+        self.assertEqual(len(self.parse(new, "좋아요 표시한 동영상-동영상.csv")["likes"]), 1)
+        self.assertEqual(len(self.parse(new, "Watch later-videos.csv")["wl"]), 1)
+        old = ("Playlist Id,Channel Id,Time Created,Time Updated,Title,Description,Visibility\n"
+               "PLabc,UCx,2020-01-01 00:00:00 UTC,2020-01-01 00:00:00 UTC,Road trip,,Private\n\n"
+               "Video Id,Time Added\ndQw4w9WgXcQ,2020-07-15 12:34:56 UTC\n")
+        p = self.parse(old, "whatever.csv")
+        self.assertEqual(p["playlists"][0]["title"], "Road trip")
+        self.assertEqual(p["playlists"][0]["items"][0]["at"], 1594816496)
 
     def test_opml(self):
         p = self.parse('<?xml version="1.0"?><opml version="1.1"><body><outline text="YouTube">'

@@ -1580,9 +1580,79 @@ def _yt_parse_ts(s):
         return 0
 
 
-def ytlib_parse_import(text):
-    """Turn an export file from TubeHaus, Invidious, NewPipe, FreeTube, Google Takeout (CSV
-    subscriptions or watch-history.json) or any OPML into one shape. Pure, so it can be tested."""
+_TAKEOUT_SUFFIXES = ("-videos", "-video", "-동영상", "-vidéos", "-vídeos", "-videó", "-動画", "-视频", "-影片", "-видео", "-filmy")
+_TAKEOUT_LIKED = {"liked videos", "좋아요 표시한 동영상", "vidéos j'aime", "videos que me gustan", "mag ich-videos", "高く評価した動画"}
+_TAKEOUT_LATER = {"watch later", "나중에 볼 동영상", "à regarder plus tard", "ver más tarde", "später ansehen", "後で見る"}
+
+
+def _freetube_meta(v, at_ms):
+    """A FreeTube playlist item or history entry; FreeTube keeps times in milliseconds."""
+    def sec(t):
+        try:
+            t = int(t or 0)
+        except Exception:
+            return 0
+        return t // 1000 if t > 100_000_000_000 else t
+    if not isinstance(v, dict):
+        return None
+    m = _yt_meta({"id": v.get("videoId"), "title": v.get("title"), "author": v.get("author"),
+                  "authorId": v.get("authorId") if UCID.fullmatch(str(v.get("authorId") or "")) else "",
+                  "len": v.get("lengthSeconds"), "published": sec(v.get("published")), "views": v.get("viewCount")})
+    if m:
+        m["at"] = sec(at_ms)
+    return m
+
+
+def _takeout_html(text):
+    """Takeout's watch-history.html: one cell per video, newest first (its dates are in the
+    account's language, so only the order is kept)."""
+    import html
+    now, out = int(time.time()), []
+    for cell in re.findall(r'<div class="content-cell[^"]*body-1">(.*?)</div>', text, re.S):
+        v = re.search(r'href="https://(?:www|music)\.youtube\.com/watch\?v=([\w-]{11})[^"]*">(.*?)</a>', cell, re.S)
+        if not v:
+            continue
+        ch = re.search(r'href="https://www\.youtube\.com/channel/(UC[\w-]{22})">(.*?)</a>', cell, re.S)
+        m = _yt_meta({"id": v.group(1), "title": html.unescape(v.group(2)).strip(),
+                      "author": html.unescape(ch.group(2)).strip() if ch else "", "authorId": ch.group(1) if ch else ""})
+        if m:
+            m["at"] = now - len(out)
+            out.append(m)
+        if len(out) >= 20000:
+            break
+    return out
+
+
+def _takeout_playlist(text, name):
+    """One Takeout playlist CSV (video ID, time added). The title is the older files' Title
+    column, else the file name without Takeout's "-videos"."""
+    import csv
+    import io
+    rows = list(csv.reader(io.StringIO(text)))
+    items = []
+    for r in rows:
+        if len(r) > 1 and VID.fullmatch(r[0].strip()) and re.match(r"\d{4}-\d{2}-\d{2}", r[1].strip()):
+            m = _yt_meta({"id": r[0].strip()})
+            when = r[1].strip()
+            m["at"] = _yt_parse_ts(when) or _yt_parse_ts(when.replace(" UTC", "+00:00").replace(" ", "T", 1))
+            items.append(m)
+    if not items:
+        return None
+    title = ""
+    head = [c.strip().lower() for c in rows[0]] if rows else []
+    if "title" in head and len(rows) > 1 and len(rows[1]) > head.index("title"):
+        title = rows[1][head.index("title")].strip()
+    if not title:
+        base = re.sub(r"\.[^.]*$", "", re.split(r"[\\/]", str(name or ""))[-1])
+        title = next((base[:-len(s)] for s in _TAKEOUT_SUFFIXES if base.lower().endswith(s)), base)
+    return title.strip()[:150], items
+
+
+def ytlib_parse_import(text, name=""):
+    """Turn an export file from TubeHaus, Invidious, NewPipe, FreeTube (profiles, playlists,
+    history), Google Takeout (CSV subscriptions, watch-history.json or .html, playlist CSVs) or
+    any OPML into one shape. [name], the file's name, only names a Takeout playlist. Pure, so it
+    can be tested."""
     out = {"format": None, "subs": {}, "hist": [], "playlists": [], "wl": [], "likes": [], "dislikes": [],
            "pos": {}, "shorts": None}
     text = text.lstrip("﻿").strip()
@@ -1599,19 +1669,40 @@ def ytlib_parse_import(text):
         data = json.loads(text)
     except Exception:
         pass
-    if data is None and text.startswith("{") and "\n" in text:
-        # FreeTube: one JSON object (profile) per line
+    # FreeTube's .db exports: one JSON object per line, each a profile (its subscriptions), a
+    # playlist or a watched video; playlists exported before 0.20 are one JSON array
+    rows = None
+    if data is None and text.startswith("{"):
         rows = []
         for line in text.splitlines():
             try:
                 rows.append(json.loads(line))
             except Exception:
                 pass
-        if rows:
-            out["format"] = "freetube"
-            for r in rows:
-                for s in r.get("subscriptions", []) if isinstance(r, dict) else []:
+    elif isinstance(data, dict) and ("playlistName" in data or "timeWatched" in data):
+        rows = [data]
+    elif isinstance(data, list) and data and isinstance(data[0], dict) and "playlistName" in data[0]:
+        rows = data
+    if rows:
+        for r in rows:
+            if not isinstance(r, dict) or r.get("$deleted"):
+                continue
+            for s in r.get("subscriptions") or []:
+                if isinstance(s, dict):
                     sub(s.get("id"), s.get("name"), s.get("thumbnail"))
+            if isinstance(r.get("playlistName"), str):
+                items = [m for m in (_freetube_meta(v, (v or {}).get("timeAdded") if isinstance(v, dict) else 0)
+                                     for v in r.get("videos") or []) if m]
+                out["playlists"].append({"title": r["playlistName"][:150], "items": items})
+            elif "timeWatched" in r:
+                m = _freetube_meta(r, r.get("timeWatched"))
+                if m:
+                    out["hist"].append(m)
+        if out["subs"] or out["playlists"] or out["hist"]:
+            out["format"] = "freetube"
+            seen = set()
+            out["hist"] = [h for h in sorted(out["hist"], key=lambda h: -h["at"])
+                           if not (h["id"] in seen or seen.add(h["id"]))][:20000]
             return out
     if isinstance(data, dict) and data.get("format") == "tubehaus-backup":
         out["format"] = "tubehaus"
@@ -1679,6 +1770,24 @@ def ytlib_parse_import(text):
         for s in data:
             sub(s.get("authorId") or s.get("id"), s.get("author") or s.get("name"))
         return out
+    if data is None and "content-cell" in text and "youtube.com/watch?v=" in text:
+        hist = _takeout_html(text)
+        if hist:
+            out["format"] = "takeout-history"
+            out["hist"] = hist
+            return out
+    if data is None and not UCID.search(text):
+        pl = _takeout_playlist(text, name)
+        if pl:
+            out["format"] = "takeout-playlist"
+            title, items = pl
+            if title.lower() in _TAKEOUT_LIKED:
+                out["likes"] = items
+            elif title.lower() in _TAKEOUT_LATER:
+                out["wl"] = items
+            else:
+                out["playlists"].append({"title": title, "items": items})
+            return out
     if "<opml" in text[:500].lower() or "<outline" in text:
         out["format"] = "opml"
         for tag in re.findall(r"<outline\b[^>]*>", text):
@@ -1707,7 +1816,7 @@ def ytlib_import(b):
     text = str(b.get("text") or "")
     if len(text) > 40_000_000:
         return 413, {"error": "This file is too big"}
-    p = ytlib_parse_import(text)
+    p = ytlib_parse_import(text, str(b.get("name") or ""))
     if not p["format"] or not any((p["subs"], p["hist"], p["playlists"], p["wl"], p["likes"])):
         return 400, {"error": "Couldn't find anything to import in this file"}
     if PUBLIC_MODE or b.get("dry"):
