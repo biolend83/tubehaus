@@ -7,11 +7,14 @@ Apple's own player (HLS), so the Siri Remote, subtitles and AirPlay work as in a
 - The same screens as the Android TV app: the TubeHaus bar along the top, the side menu (Home,
   Shorts, Subscriptions, Library, Resume, Settings), big cards two across with a teal frame on the
   one the remote is on; hold OK on a video for Watch later, Not interested or Don't recommend this channel
+- Home greets you and starts with **Continue watching** (videos you stopped part-way), as in TubeHaus 1.5
 - Home: recommendations worked out on the TV from what you watch and like (the same recommender as
   the Android app; nothing leaves the TV), the region to follow, and Discover for topics you don't
   usually watch. Library shows what it learned, and each score can be removed
 - A video plays on its own page with Up next or the comments beside it; OK opens it full screen in
   Apple's player (Siri Remote, AirPlay, audio tracks), Back returns to the page
+- **This video at a glance** under a video: the words it keeps coming back to and its key moments
+  (OK plays from there), made on the TV from the captions (Settings → Video at a glance)
 - Shorts, one at a time: up and down on the remote to go on
 - Import your subscriptions with your phone: scan the QR code and send a YouTube Takeout, NewPipe,
   FreeTube, Invidious, TubeHaus or OPML file (or paste channel links) over your home network

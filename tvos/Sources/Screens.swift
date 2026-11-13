@@ -34,10 +34,25 @@ struct HomeView: View {
                     if discover {
                         Text("Videos from topics you don't usually watch. Your likes aren't used here.")
                             .font(Fonts.bodySmall).foregroundStyle(Theme.sub)
+                    } else {
+                        // TubeHaus 1.5: Home greets you and puts what you stopped part-way at the top
+                        Text(greeting()).font(.system(size: 56, weight: .bold)).foregroundStyle(Theme.text)
+                            .padding(.top, 12)
                     }
                 }
                 .padding(.horizontal, 32).padding(.top, 28)
                 .focusSection()
+                if !discover && !library.continueWatching.isEmpty {
+                    SectionTitle("Continue watching")
+                    ScrollView(.horizontal) {
+                        LazyHStack(alignment: .top, spacing: 24) {
+                            ForEach(library.continueWatching.prefix(12)) { w in SmallCard(video: w.video) }
+                        }
+                        .padding(.horizontal, 32).padding(.vertical, 20)
+                    }
+                    .scrollClipDisabled()
+                    .focusSection()
+                }
                 if items.isEmpty {
                     Status(error: loading ? nil : (error ?? "Nothing to show yet. Search for something you like.")) {
                         Task { await load(refresh: true) }
@@ -91,6 +106,12 @@ struct HomeView: View {
         guard !Task.isCancelled else { return }
         items += got.filter { !skip.contains($0.id) }
     }
+}
+
+/// "Good morning" until noon, "Good afternoon" until six, then "Good evening"
+func greeting(_ now: Date = Date()) -> String {
+    let h = Calendar.current.component(.hour, from: now)
+    return h >= 5 && h < 12 ? "Good morning" : h >= 12 && h < 18 ? "Good afternoon" : "Good evening"
 }
 
 func regionName(_ code: String) -> String {
@@ -636,6 +657,7 @@ struct SettingsView: View {
     @State private var hideComments = Settings.hideComments
     @State private var hideRelated = Settings.hideRelated
     @State private var autoplay = Settings.autoplayNext
+    @State private var glance = Settings.glance
     @State private var captions = Settings.captions
     @State private var captionSize = Settings.captionSize
     @State private var language = UserDefaults.standard.string(forKey: "hl") ?? ""
@@ -668,6 +690,7 @@ struct SettingsView: View {
 
                 group("Playback")
                 toggle("Autoplay", "Play the next video when one ends", $autoplay) { Settings.autoplayNext = $0 }
+                toggle("Video at a glance", "Key words and moments under a video, made on this TV from its captions", $glance) { Settings.glance = $0 }
                 item("Captions", captions.isEmpty ? "Off" : name(language: captions)) { dialog = .captions }
                 item("Caption size", ["Small", "Medium", "Large"][max(0, min(2, captionSize))]) { dialog = .captionSize }
 

@@ -26,6 +26,8 @@ final class PlayerModel {
 
     private(set) var choices: [Subtitles.Choice] = []
     private(set) var choice: Subtitles.Choice?
+    /// "This video at a glance", once its captions are in (Glance.swift)
+    private(set) var glance: Glance.Result?
 
     @ObservationIgnored private var cues: [Subtitles.Cue] = []
     private let layers = NSHashTable<CaptionLayer>.weakObjects()
@@ -34,6 +36,7 @@ final class PlayerModel {
     @ObservationIgnored private var endObserver: NSObjectProtocol?
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var captionTask: Task<Void, Never>?
+    @ObservationIgnored private var glanceTask: Task<Void, Never>?
     @ObservationIgnored private var last: Double = 0
     @ObservationIgnored private var saved: Double = 0
     @ObservationIgnored private var keywords: [String] = []
@@ -165,7 +168,32 @@ final class PlayerModel {
         choices = Subtitles.choices(s.captions)
         choice = Subtitles.pick(choices, tracks: s.captions, lang: Settings.captions)
         loadCaptions()
+        loadGlance(s.captions, length: Double(v.lengthSec))
         menu()
+    }
+
+    /// the words and moments under the video, from a track in the TV's language (one made by people
+    /// first), else the first track; nothing when the video has no captions
+    private func loadGlance(_ tracks: [Caption], length: Double) {
+        glance = nil
+        glanceTask?.cancel()
+        guard Settings.glance, !tracks.isEmpty else { return }
+        let mine = String((Locale.preferredLanguages.first ?? "en").prefix(2))
+        let t = tracks.first { $0.lang.hasPrefix(mine) && !$0.auto } ?? tracks.first { $0.lang.hasPrefix(mine) }
+            ?? tracks.first { !$0.auto } ?? tracks[0]
+        let id = video?.id
+        glanceTask = Task { [weak self] in
+            let cues = await Subtitles.load(t.url + "&fmt=vtt")
+            guard !Task.isCancelled, let self, self.video?.id == id else { return }
+            self.glance = Glance.analyze(cues, length: length)
+        }
+    }
+
+    /// to `s` seconds and playing (a moment under the video)
+    func seek(_ s: Double) {
+        player.seek(to: CMTime(seconds: s, preferredTimescale: 600))
+        ended = false
+        player.play()
     }
 
     private func ticked(_ t: Double) {
@@ -211,6 +239,8 @@ final class PlayerModel {
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         endObserver = nil
         captionTask?.cancel()
+        glanceTask?.cancel()
+        glance = nil
         player.pause()
         player.replaceCurrentItem(with: nil)
         last = 0
@@ -507,8 +537,42 @@ struct WatchView: View {
             }
             .scrollClipDisabled()
             .focusSection()
+            if mine, let g = model.glance {
+                glanceBox(g)
+            }
         }
         .padding(.top, 24)
+    }
+
+    /// "This video at a glance": the words it keeps coming back to, then its key moments (OK plays from there)
+    private func glanceBox(_ g: Glance.Result) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles").font(.system(size: 28)).foregroundStyle(Theme.teal)
+                Text("This video at a glance").font(Fonts.titleSmall).foregroundStyle(Theme.text)
+            }
+            Text("Made on this TV from the captions").font(Fonts.bodySmall).foregroundStyle(Theme.sub)
+            if !g.keywords.isEmpty {
+                Text(g.keywords.map { "#" + $0 }.joined(separator: "   "))
+                    .font(Fonts.bodyMedium).foregroundStyle(Theme.text).lineLimit(2)
+            }
+            ForEach(g.moments) { m in
+                Button { model.seek(m.start) } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 20) {
+                        Text(duration(Int(m.start))).font(Fonts.labelLarge).foregroundStyle(Theme.teal)
+                            .frame(width: 110, alignment: .leading)
+                        Text(m.text).font(Fonts.bodySmall).foregroundStyle(Theme.text).lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.horizontal, 20).padding(.vertical, 14)
+                }
+                .buttonStyle(.glow(radius: 16))
+            }
+        }
+        .padding(24)
+        .background(Theme.chip.opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
+        .padding(.top, 8)
+        .focusSection()
     }
 
     private var likePill: some View {

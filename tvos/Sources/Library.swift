@@ -258,6 +258,12 @@ enum Settings {
         set { UserDefaults.standard.set(newValue, forKey: "autoplayNext") }
     }
 
+    /// "This video at a glance" under the video
+    static var glance: Bool {
+        get { UserDefaults.standard.object(forKey: "glance") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "glance") }
+    }
+
     /// the subtitle language turned on last ("" = off); the next video starts with it too
     static var captions: String {
         get { UserDefaults.standard.string(forKey: "captions") ?? "" }
