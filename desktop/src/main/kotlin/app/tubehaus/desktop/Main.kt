@@ -106,6 +106,11 @@ class DesktopPlatform : Platform {
         done(runCatching { File(d.directory, f).readText() }.getOrNull())
     }
 
+    override fun openTextFiles(done: (List<Pair<String, String>>) -> Unit) {
+        val d = FileDialog(frame, "Open", FileDialog.LOAD).apply { isMultipleMode = true; isVisible = true }
+        done(d.files.mapNotNull { f -> runCatching { f.name to f.readText() }.getOrNull() })
+    }
+
     override fun setFullscreen(on: Boolean) {
         // the title bar and borders come off and the window covers the monitor; Java's own full screen keeps the title bar
         val f = frame

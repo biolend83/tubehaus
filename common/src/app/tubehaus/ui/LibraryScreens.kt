@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.tubehaus.data.Transfer
+import app.tubehaus.data.ImportResult
 import app.tubehaus.data.SubGroup
 import androidx.compose.material3.HorizontalDivider
 import app.tubehaus.engine.Video
@@ -497,23 +498,35 @@ fun PlaylistPicker(v: Video, app: AppState, dismiss: () -> Unit) {
     if (making) NameDialog(tr("New playlist"), "", { making = false }) { app.store.newPlaylist(it, v) }
 }
 
-/** Asks for a file and merges whatever is in it into the library. */
+/**
+ * Asks for files (several at once: Takeout gives one CSV per playlist) and merges whatever is in
+ * them into the library.
+ */
 fun importFile(app: AppState, done: (Boolean) -> Unit = {}) {
-    app.platform.openTextFile { text ->
-        if (text == null) return@openTextFile done(false)
-        // a taste profile someone exported lands next to the other profiles
-        importProfile(app, text)?.let { return@openTextFile done(true) }
-        val p = Transfer.parse(text)
-        if (p.format == null || p.empty) {
-            app.toast(tr("Couldn't find anything to import in this file"))
-            return@openTextFile done(false)
+    app.platform.openTextFiles { files ->
+        if (files.isEmpty()) return@openTextFiles done(false)
+        var total: ImportResult? = null
+        val formats = LinkedHashSet<String>()
+        var profile = false
+        for ((name, text) in files) {
+            // a taste profile someone exported lands next to the other profiles
+            if (importProfile(app, text) != null) { profile = true; continue }
+            val p = Transfer.parse(text, name)
+            if (p.format == null || p.empty) continue
+            val r = Transfer.merge(app.store, p)
+            formats += r.format
+            total = total?.let { it.copy(subs = it.subs + r.subs, hist = it.hist + r.hist, playlists = it.playlists + r.playlists, videos = it.videos + r.videos) } ?: r
         }
-        val r = Transfer.merge(app.store, p)
+        val t = total
+        if (t == null) {
+            if (!profile) app.toast(tr("Couldn't find anything to import in this file"))
+            return@openTextFiles done(profile)
+        }
         app.fillSubInfo()
         app.sync.importedLocally()
         app.toast(
             tr("Imported from {f}: {s} subscriptions, {h} history, {p} playlists")
-                .replace("{f}", r.format).replace("{s}", "${r.subs}").replace("{h}", "${r.hist}").replace("{p}", "${r.playlists}"),
+                .replace("{f}", formats.joinToString(", ")).replace("{s}", "${t.subs}").replace("{h}", "${t.hist}").replace("{p}", "${t.playlists}"),
         )
         done(true)
     }
