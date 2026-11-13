@@ -35,6 +35,8 @@ interface Platform {
     fun saveFile(name: String, mime: String, bytes: ByteArray, done: (Boolean) -> Unit)
     /** lets the user pick a file; calls [done] with its text (null when cancelled) */
     fun openTextFile(done: (String?) -> Unit)
+    /** lets the user pick one file or several; calls [done] with each one's name and text (none when cancelled) */
+    fun openTextFiles(done: (List<Pair<String, String>>) -> Unit) = openTextFile { t -> done(if (t == null) emptyList() else listOf("" to t)) }
     fun setFullscreen(on: Boolean)
     /**
      * Downloads [url] (an app update) and opens the system installer; false when this platform

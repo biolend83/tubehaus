@@ -66,7 +66,8 @@ compose.desktop {
                 upgradeUuid = "6f1d1c8e-3c43-4a8e-9a55-1b6a8f2a7c11"
                 iconFile.set(project.layout.projectDirectory.file("icon.ico"))
             }
-            // macOS uses Homebrew's mpv; the app isn't signed or notarized (right-click → Open the first time)
+            // macOS: libmpv comes inside the app (resources/macos, filled by CI from Homebrew), else Homebrew's or
+            // MacPorts' mpv; the app isn't signed or notarized (right-click → Open the first time)
             macOS {
                 bundleID = "io.github.biolend83.tubehaus"
                 appCategory = "public.app-category.video"

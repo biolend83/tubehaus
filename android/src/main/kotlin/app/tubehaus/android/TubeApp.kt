@@ -135,6 +135,10 @@ class AndroidPlatform(private val app: Application) : Platform {
         activity?.openTextFile(done) ?: done(null)
     }
 
+    override fun openTextFiles(done: (List<Pair<String, String>>) -> Unit) {
+        activity?.openTextFiles(done) ?: done(emptyList())
+    }
+
     override fun setImmersive(on: Boolean) {
         activity?.setHideBars(on)
     }

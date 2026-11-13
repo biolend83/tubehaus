@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
 
     private var pendingSave: Pair<ByteArray, (Boolean) -> Unit>? = null
     private var pendingOpen: ((String?) -> Unit)? = null
+    private var pendingOpenMany: ((List<Pair<String, String>>) -> Unit)? = null
 
     private val saver = registerForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
         val (bytes, done) = pendingSave ?: return@registerForActivityResult
@@ -52,6 +53,17 @@ class MainActivity : ComponentActivity() {
         pendingOpen = null
         if (uri == null) return@registerForActivityResult done(null)
         done(runCatching { contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) } }.getOrNull())
+    }
+    private val openerMany = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        val done = pendingOpenMany ?: return@registerForActivityResult
+        pendingOpenMany = null
+        done(uris.mapNotNull { uri ->
+            runCatching {
+                val name = contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: ""
+                name to contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+            }.getOrNull()
+        })
     }
     private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
@@ -108,6 +120,11 @@ class MainActivity : ComponentActivity() {
     fun openTextFile(done: (String?) -> Unit) {
         pendingOpen = done
         opener.launch(arrayOf("*/*"))
+    }
+
+    fun openTextFiles(done: (List<Pair<String, String>>) -> Unit) {
+        pendingOpenMany = done
+        openerMany.launch(arrayOf("*/*"))
     }
 
     // Full screen the YouTube way: the button turns the screen and holds it there until the phone

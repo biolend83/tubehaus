@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.isWordChar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -68,12 +69,24 @@ object Smart {
     private val PARTICLES = listOf("에서", "으로", "에게", "까지", "부터", "처럼", "은", "는", "이", "가", "을", "를", "에", "의", "로", "도", "와", "과", "만")
 
     private fun words(text: String): List<String> =
-        text.lowercase().split(Regex("[^\\p{L}\\p{N}']+")).mapNotNull { w0 ->
+        splitWords(text.lowercase()).mapNotNull { w0 ->
             var w = w0.trim('\'')
             if (w.length < 2 || w.all { it.isDigit() }) return@mapNotNull null
             if (w.first() in '가'..'힣' && w.length >= 3) PARTICLES.firstOrNull { w.endsWith(it) && w.length - it.length >= 2 }?.let { w = w.dropLast(it.length) }
             if (w.length < 2 || w in STOP || (w.first() in 'a'..'z' && w.length < 3)) null else w
         }
+
+    // letters, digits, marks and ' make a word; no Regex \p{..} classes, which the iPhone and iPad's
+    // Kotlin (Kotlin/Native) doesn't have (it crashed there, #67)
+    private fun splitWords(s: String): List<String> {
+        val out = ArrayList<String>()
+        val b = StringBuilder()
+        for (c in s) {
+            if (c.isWordChar() || c == '\'') b.append(c) else if (b.isNotEmpty()) { out += b.toString(); b.clear() }
+        }
+        if (b.isNotEmpty()) out += b.toString()
+        return out
+    }
 
     private class Win(val start: Long, var end: Long, val text: StringBuilder = StringBuilder()) {
         var terms: List<String> = emptyList()
