@@ -1,0 +1,5 @@
+- iPhone and iPad: opening a video no longer closes the app (#67)
+- Mac: mpv now comes inside the app, nothing else to install (Intel Macs too)
+- Import FreeTube playlists and history, and Google Takeout history and playlists; pick several files at once
+- When YouTube says too many requests, the app waits a moment and tries again
+- Linux snap: the graphics libraries mpv needs are included
