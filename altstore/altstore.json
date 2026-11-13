@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.5.0",
+          "buildVersion": "44",
+          "date": "2026-11-13T05:45:16+00:00",
+          "localizedDescription": "1.5.0: the TubeHaus 1.5 design, a new Music home, video at a glance (key moments and chapters from the captions), nearby devices on your Wi-Fi, kids mode, and saving new videos of a channel automatically.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.5.0/TubeHaus-1.5.0-ipad.ipa",
+          "size": 21372237,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.0.6",
           "buildVersion": "43",
           "date": "2026-11-11T14:13:36+00:00",
@@ -194,11 +203,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.0.6",
-      "versionDate": "2026-11-11T14:13:36+00:00",
-      "versionDescription": "1.0.6: ...more under a video no longer closes the app, the full-screen button turns the iPhone picture sideways, Check for updates works, and the AirPlay button matches the others and lights up while playing on a TV.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.0.6/TubeHaus-1.0.6-ipad.ipa",
-      "size": 21003636
+      "version": "1.5.0",
+      "versionDate": "2026-11-13T05:45:16+00:00",
+      "versionDescription": "1.5.0: the TubeHaus 1.5 design, a new Music home, video at a glance (key moments and chapters from the captions), nearby devices on your Wi-Fi, kids mode, and saving new videos of a channel automatically.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.5.0/TubeHaus-1.5.0-ipad.ipa",
+      "size": 21372237
     }
   ],
   "news": [],
