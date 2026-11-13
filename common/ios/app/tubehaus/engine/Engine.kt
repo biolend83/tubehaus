@@ -155,7 +155,10 @@ object Engine {
         "reroll" -> buildJsonObject { put("value", InnerTube.reroll()) }.toString()
         "http" -> try {
             val headers = r.at("headers").obj?.mapValues { (_, v) -> v.str ?: "" } ?: emptyMap()
-            val (status, body) = Net.raw(r.at("method").str ?: "GET", r.at("url").str ?: "", headers, r.at("body").str)
+            val url = r.at("url").str ?: ""
+            val send: suspend () -> Pair<Int, String> = { Net.raw(r.at("method").str ?: "GET", url, headers, r.at("body").str) }
+            // YouTube's own API: wait and retry when it says "too many requests" (Backoff)
+            val (status, body) = if (url.startsWith("https://www.youtube.com/youtubei/")) Backoff.retryStatus(send) else send()
             buildJsonObject { put("status", status); put("body", body) }.toString()
         } catch (e: Exception) {
             buildJsonObject { put("error", e.message ?: "network error") }.toString()

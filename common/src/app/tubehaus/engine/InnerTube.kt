@@ -155,7 +155,7 @@ object InnerTube {
         }
         val headers = headers(client, visitor)
         val text = try {
-            Net.post("https://${client.host}/youtubei/v1/$endpoint?prettyPrint=false", payload.toString(), headers)
+            Backoff.retry { Net.post("https://${client.host}/youtubei/v1/$endpoint?prettyPrint=false", payload.toString(), headers) }
         } catch (e: HttpError) {
             throw YtError("YouTube answered ${e.code}", YtError.Kind.NETWORK)
         } catch (e: okio.IOException) {

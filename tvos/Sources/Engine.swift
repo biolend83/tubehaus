@@ -188,7 +188,22 @@ enum EngineHost {
         }
     }
 
+    /// YouTube's own API is retried when it says "too many requests" (429) or "busy" (503): the
+    /// same rule as the other apps' Backoff.kt (1-2 s, then 3-6 s, two retries, others wait too)
     static func http(_ method: String, _ url: String, _ headers: [String: String], _ body: String?) async throws -> (Int, String) {
+        let youtube = url.hasPrefix("https://www.youtube.com/youtubei/")
+        var attempt = 0
+        while true {
+            if youtube { await Backoff.shared.cool() }
+            let r = try await once(method, url, headers, body)
+            guard youtube, r.0 == 429 || r.0 == 503, attempt < 2 else { return r }
+            let p = await Backoff.shared.pause(attempt)
+            attempt += 1
+            try? await Task.sleep(nanoseconds: UInt64(p * 1_000_000_000))
+        }
+    }
+
+    private static func once(_ method: String, _ url: String, _ headers: [String: String], _ body: String?) async throws -> (Int, String) {
         guard let u = URL(string: url) else { throw URLError(.badURL) }
         var req = URLRequest(url: u, timeoutInterval: 20)
         req.httpMethod = method
@@ -200,6 +215,25 @@ enum EngineHost {
 
     static func json(_ o: Any) -> String {
         String(decoding: (try? JSONSerialization.data(withJSONObject: o)) ?? Data("{}".utf8), as: UTF8.self)
+    }
+}
+
+/// The pause after a "too many requests": every YouTube request waits it out
+actor Backoff {
+    static let shared = Backoff()
+    private var coolUntil = Date.distantPast
+
+    func cool() async {
+        let w = coolUntil.timeIntervalSinceNow
+        if w > 0 { try? await Task.sleep(nanoseconds: UInt64(min(w, 6) * 1_000_000_000)) }
+    }
+
+    /// how long to wait before retry number [attempt] + 1; the others wait that long too
+    func pause(_ attempt: Int) -> TimeInterval {
+        let base: TimeInterval = attempt == 0 ? 1 : 3
+        let p = base + Double.random(in: 0..<base)
+        coolUntil = max(coolUntil, Date().addingTimeInterval(p))
+        return p
     }
 }
 
