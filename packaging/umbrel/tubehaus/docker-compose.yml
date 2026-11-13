@@ -6,7 +6,7 @@ services:
 
   # the web app and its router (Caddy); the other containers are reached by their Umbrel names
   web:
-    image: ghcr.io/biolend83/tubehaus-web:1.5.0@sha256:216b3f9be4731bebe159b490364b052a299ee80683de63706270e25d2dc2a170
+    image: ghcr.io/biolend83/tubehaus-web:1.5.1@sha256:b8b03b7d8e844cac2d0aec4972c5951af4b37645ff68526ff2e82aae2eebf109
     restart: on-failure
     environment:
       TUBEHAUS_SITE: ":8080"
@@ -21,7 +21,7 @@ services:
   # the TubeHaus server: the shared library, live streams and captions, offline saves.
   # HT_WARP=0: on a home connection YouTube needs no detour, so no extra capabilities.
   server:
-    image: ghcr.io/biolend83/tubehaus:1.5.0@sha256:b910c6a0f31630f816a8bb764c939208072573bad9417fc8fd6120247d922742
+    image: ghcr.io/biolend83/tubehaus:1.5.1@sha256:75416e3efb2cb83305df09bcd2db794507328926512d7646285923db9c2fbc56
     restart: on-failure
     init: true
     stop_grace_period: 30s

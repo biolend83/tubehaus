@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>tubehaus</id>
-    <version>1.5.0</version>
+    <version>1.5.1</version>
     <title>TubeHaus</title>
     <authors>biolend83</authors>
     <owners>biolend83</owners>
@@ -11,7 +11,7 @@
     <projectSourceUrl>https://github.com/biolend83/tubehaus/tree/android-app</projectSourceUrl>
     <docsUrl>https://github.com/biolend83/tubehaus#readme</docsUrl>
     <bugTrackerUrl>https://github.com/biolend83/tubehaus/issues</bugTrackerUrl>
-    <releaseNotes>https://github.com/biolend83/tubehaus/releases/tag/app-v1.5.0</releaseNotes>
+    <releaseNotes>https://github.com/biolend83/tubehaus/releases/tag/app-v1.5.1</releaseNotes>
     <iconUrl>https://cdn.jsdelivr.net/gh/biolend83/tubehaus@main/web/y/icon-512.png</iconUrl>
     <licenseUrl>https://github.com/biolend83/tubehaus/blob/android-app/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
