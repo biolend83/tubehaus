@@ -32,7 +32,8 @@ jobs:
           test -d /Applications/TubeHaus.app
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" /Applications/TubeHaus.app/Contents/Info.plist
           ! xattr -r /Applications/TubeHaus.app | grep -q com.apple.quarantine
-          command -v mpv
+          # mpv comes inside the app since 1.5.1, not from Homebrew
+          find /Applications/TubeHaus.app -name 'libmpv*.dylib' | grep .
 
   scoop:
     runs-on: windows-latest
