@@ -81,15 +81,20 @@ val NOISE = setOf(
     "playerOverlays", "onResponseReceivedEndpoints_unused",
 )
 
+/** a letter, digit or combining mark (what Regex \p{L}\p{N}\p{M} would match; Kotlin/Native has no \p{..}) */
+fun Char.isWordChar(): Boolean = isLetterOrDigit() || category == CharCategory.NON_SPACING_MARK ||
+    category == CharCategory.COMBINING_SPACING_MARK || category == CharCategory.ENCLOSING_MARK
+
 /**
  * "1.2M views" / "1,234 views" / "12K" -> a number (0 when it is not one). Korean, Japanese and
  * Chinese counts too: "조회수 4,812만회", "1.3천만", "2억", "12万回", "3.4億".
  */
 fun countOf(s: String?): Long {
     if (s.isNullOrBlank()) return 0
-    // a unit must end its word: "12 mil" (es), "1,2 Mio." (de), "1.6 লাখ" (bn), but not the M of "12 members".
+    // a unit must end its word (a space, digit or punctuation after it; not \p{L}, which Kotlin/Native's
+    // Regex doesn't have, #67): "12 mil" (es), "1,2 Mio." (de), "1.6 লাখ" (bn), but not the M of "12 members".
     // Two letters mean another number in one language: B is a thousand in Turkish (bin), M a billion in Indonesian (miliar)
-    val m = Regex("""(\d(?:[\d.,]|[ \u00a0\u202f](?=\d{3}(?!\d)))*)[\s\u00a0\u202f]*(?:(mil[\s\u00a0\u202f]*M|mil|mi|bi|Mrd|Mio|Tsd|Md|Mn|Mr|rb|jt|тыс|млрд|млн|[KMB])(?![\p{L}\p{M}])|(हज़ार|हज़ार|लाख|करोड़|करोड़|क॰|হাজার|হাটি|লাখ|লাটি|কোটি|হা|লা|কো)(?![\p{L}\p{M}])|([천만억千万萬億亿]+))?""", RegexOption.IGNORE_CASE).find(s) ?: return 0
+    val m = Regex("""(\d(?:[\d.,]|[ \u00a0\u202f](?=\d{3}(?!\d)))*)[\s\u00a0\u202f]*(?:(mil[\s\u00a0\u202f]*M|mil|mi|bi|Mrd|Mio|Tsd|Md|Mn|Mr|rb|jt|тыс|млрд|млн|[KMB])(?=$|[\s\u00a0\u202f\d.,;:!?()\[\]"'/|·•-])|(हज़ार|हज़ार|लाख|करोड़|करोड़|क॰|হাজার|হাটি|লাখ|লাটি|কোটি|হা|লা|কো)(?=$|[\s\u00a0\u202f\d.,;:!?()\[\]"'/|·•-])|([천만억千万萬億亿]+))?""", RegexOption.IGNORE_CASE).find(s) ?: return 0
     val raw = m.groupValues[1].replace(Regex("[ \u00a0\u202f]"), "").trimEnd('.', ',')
     var mult = when (m.groupValues[2].lowercase().replace(Regex("[\\s\u00a0\u202f]"), "")) {
         "b" -> if (InnerTube.hl.startsWith("tr")) 1e3 else 1e9

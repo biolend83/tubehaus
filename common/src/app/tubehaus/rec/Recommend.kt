@@ -172,7 +172,9 @@ object Profiles {
     fun export(store: Store, name: String): Pair<String, ByteArray> {
         val t = if (name == active(store)) store.taste.value else store.profiles.value[name] ?: Taste()
         val clean = Taste(ch = t.ch, kw = t.kw, names = t.names.filterKeys { it in t.ch })
-        val slug = name.ifEmpty { "main" }.replace(Regex("[^\\p{L}\\p{N}_-]+"), "-").trim('-').ifEmpty { "profile" }
+        val slug = buildString {
+            for (c in name.ifEmpty { "main" }) if (c.isLetterOrDigit() || c == '_' || c == '-') append(c) else if (lastOrNull() != '-') append('-')
+        }.trim('-').ifEmpty { "profile" }
         val json = storeJson.encodeToString(ProfileFile.serializer(), ProfileFile("profile", 1, name, clean))
         return "tubehaus-profile-$slug.json" to json.encodeToByteArray()
     }
