@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.5.1",
+          "buildVersion": "45",
+          "date": "2026-11-13T14:38:53+00:00",
+          "localizedDescription": "1.5.1: opening a video no longer closes the app (#67), importing from FreeTube and Google Takeout (several files at once), and waiting and retrying when YouTube says too many requests.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.5.1/TubeHaus-1.5.1-ipad.ipa",
+          "size": 21395857,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.5.0",
           "buildVersion": "44",
           "date": "2026-11-13T05:45:16+00:00",
@@ -203,11 +212,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.5.0",
-      "versionDate": "2026-11-13T05:45:16+00:00",
-      "versionDescription": "1.5.0: the TubeHaus 1.5 design, a new Music home, video at a glance (key moments and chapters from the captions), nearby devices on your Wi-Fi, kids mode, and saving new videos of a channel automatically.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.5.0/TubeHaus-1.5.0-ipad.ipa",
-      "size": 21372237
+      "version": "1.5.1",
+      "versionDate": "2026-11-13T14:38:53+00:00",
+      "versionDescription": "1.5.1: opening a video no longer closes the app (#67), importing from FreeTube and Google Takeout (several files at once), and waiting and retrying when YouTube says too many requests.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.5.1/TubeHaus-1.5.1-ipad.ipa",
+      "size": 21395857
     }
   ],
   "news": [],
