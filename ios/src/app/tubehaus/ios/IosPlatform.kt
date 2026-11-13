@@ -58,6 +58,7 @@ class IosPlatform : Platform {
 
     // the document picker holds its delegate weakly: keep it alive while the picker is open
     private var picker: PickerDelegate? = null
+    private var pickerMany: ManyPickerDelegate? = null
 
     private fun folder(kind: ULong): Path =
         ((NSSearchPathForDirectoriesInDomains(kind, NSUserDomainMask, true).firstOrNull() as? String) ?: NSTemporaryDirectory()).toPath()
@@ -111,6 +112,19 @@ class IosPlatform : Platform {
         present(vc)
     }
 
+    override fun openTextFiles(done: (List<Pair<String, String>>) -> Unit) {
+        val vc = UIDocumentPickerViewController(forOpeningContentTypes = listOf(UTTypeItem), asCopy = true)
+        vc.allowsMultipleSelection = true
+        pickerMany = ManyPickerDelegate { urls ->
+            pickerMany = null
+            done(urls.mapNotNull { u ->
+                NSString.stringWithContentsOfURL(u, encoding = NSUTF8StringEncoding, error = null)?.let { (u.lastPathComponent ?: "") to it }
+            })
+        }
+        vc.delegate = pickerMany
+        present(vc)
+    }
+
     /** set by the Swift side (ios/app/App.swift): hides the status bar (clock, Wi-Fi, battery) and the home indicator */
     var hideBars: (Boolean) -> Unit = {}
 
@@ -126,6 +140,16 @@ class IosPlatform : Platform {
 
     override fun brightness(): Float = UIScreen.mainScreen.brightness.toFloat()
     override fun setBrightness(v: Float) { UIScreen.mainScreen.brightness = v.toDouble().coerceIn(0.0, 1.0) }
+}
+
+private class ManyPickerDelegate(val picked: (List<NSURL>) -> Unit) : NSObject(), UIDocumentPickerDelegateProtocol {
+    override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<*>) {
+        picked(didPickDocumentsAtURLs.filterIsInstance<NSURL>())
+    }
+
+    override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
+        picked(emptyList())
+    }
 }
 
 private class PickerDelegate(val picked: (NSURL?) -> Unit) : NSObject(), UIDocumentPickerDelegateProtocol {
