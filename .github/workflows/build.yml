@@ -164,7 +164,8 @@ jobs:
             TubeHaus-*.AppImage
 
   mac:
-    # mpv comes from Homebrew on the user's Mac (brew install mpv), nothing is bundled
+    # libmpv and the libraries it needs are copied into the app from Homebrew, rewired to load from there,
+    # so the Mac needs no mpv of its own. If that step fails the app still looks for Homebrew's or MacPorts' mpv.
     strategy:
       fail-fast: false
       matrix:
@@ -179,6 +180,36 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - name: Put libmpv inside the app
+        id: mpv
+        continue-on-error: true
+        run: |
+          brew install mpv dylibbundler
+          d=desktop/resources/macos
+          rm -rf $d && mkdir -p $d
+          cp "$(brew --prefix)/lib/libmpv.2.dylib" $d/ && chmod u+w $d/libmpv.2.dylib
+          # every library libmpv needs, copied next to it and pointed at @loader_path
+          dylibbundler -of -b -x $d/libmpv.2.dylib -d $d/ -p @loader_path/
+          install_name_tool -id @loader_path/libmpv.2.dylib $d/libmpv.2.dylib
+          chmod u+w $d/*.dylib
+          # changed files lose their signature, and Apple Silicon refuses unsigned code: sign them again (ad hoc)
+          for f in $d/*.dylib; do codesign --force --sign - "$f"; done
+          # nothing may still point at Homebrew
+          bad=0
+          for f in $d/*.dylib; do
+            if otool -L "$f" | tail -n +2 | awk '{print $1}' | grep -vE '^(@loader_path|@rpath|/usr/lib|/System)' ; then echo "still outside: $f"; bad=1; fi
+          done
+          test $bad = 0
+          # and it loads, with Homebrew's copies out of the way
+          mv "$(brew --prefix)/lib" "$(brew --prefix)/lib.off"
+          python3 -c "import ctypes,sys; m=ctypes.CDLL(sys.argv[1]); m.mpv_client_api_version.restype=ctypes.c_ulong; print('libmpv api', hex(m.mpv_client_api_version()))" $d/libmpv.2.dylib
+          mv "$(brew --prefix)/lib.off" "$(brew --prefix)/lib"
+          ls $d | wc -l; du -sh $d
+      - name: Without libmpv inside
+        if: steps.mpv.outcome != 'success'
+        run: |
+          rm -rf desktop/resources/macos
+          echo "::warning::libmpv could not be put inside the mac-${{ matrix.arch }} app; it will need Homebrew's or MacPorts' mpv"
       - name: Build .dmg and .zip
         run: |
           # the app icon as .icns, made from the PNG
