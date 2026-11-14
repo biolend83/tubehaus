@@ -263,7 +263,8 @@ class Recommender(private val store: Store, private val feed: Feed) {
         return t.kw.isEmpty() && (Profiles.active(store).isNotEmpty() && t.ch.isEmpty() || lib.hist.isEmpty() && lib.subs.isEmpty())
     }
 
-    suspend fun home(n: Int = 60, skip: Set<String> = emptySet()): List<Video> = coroutineScope {
+    // these gather and rank hundreds of videos: off the main thread, so a slow TV box stays responsive
+    suspend fun home(n: Int = 60, skip: Set<String> = emptySet()): List<Video> = withContext(Dispatchers.Default) {
         val t = store.taste.value
         val lib = store.lib.value
         val cands = ArrayList<Cand>()
@@ -297,14 +298,14 @@ class Recommender(private val store: Store, private val feed: Feed) {
      * Discover: what you'd never be shown otherwise. Popular videos from topics you haven't
      * shown interest in, ranked without your taste (only what you've watched is left out).
      */
-    suspend fun discover(n: Int = 40, skip: Set<String> = emptySet()): List<Video> = coroutineScope {
+    suspend fun discover(n: Int = 40, skip: Set<String> = emptySet()): List<Video> = withContext(Dispatchers.Default) {
         val liked = store.taste.value.kw.keys.map { it.lowercase() }.toSet()
         val fresh = topics.filter { it.lowercase() !in liked }.shuffled(rnd).take(6)
         val cands = fresh.map { q -> async { pool("disc:$q", 3600) { search(q, "pop", q, false) } } }.awaitAll().flatten()
         rank(cands, n, skip, Taste(), store.lib.value.hist.associate { it.id to it }, shorts = false)
     }
 
-    suspend fun shorts(n: Int = 10, skip: Set<String> = emptySet()): List<Video> = coroutineScope {
+    suspend fun shorts(n: Int = 10, skip: Set<String> = emptySet()): List<Video> = withContext(Dispatchers.Default) {
         val t = store.taste.value
         val lib = store.lib.value
         val cands = ArrayList<Cand>()

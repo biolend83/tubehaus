@@ -161,6 +161,8 @@ object InnerTube {
         } catch (e: okio.IOException) {
             throw YtError("No connection to YouTube", YtError.Kind.NETWORK)
         }
-        return parse(text)
+        // YouTube's answers run to hundreds of kilobytes: read them off the main thread, or a slow TV box
+        // freezes on every page (and Android closes the app as not responding)
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { parse(text) }
     }
 }
