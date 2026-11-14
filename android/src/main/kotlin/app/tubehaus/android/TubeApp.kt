@@ -13,6 +13,7 @@ import android.os.Looper
 import androidx.core.content.FileProvider
 import okhttp3.Request
 import app.tubehaus.engine.Net
+import app.tubehaus.engine.Cipher
 import android.app.Application
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -54,6 +55,9 @@ private const val RELEASE_KEY_SHA256 = "2d827d6ab148e56e3b45d6b84ec6e7cf8e36a4c6
 
 class AndroidPlatform(private val app: Application) : Platform {
     override val name = "android"
+
+    // the TV client's locked links (videos made for kids...): opened by yt-dlp's solver in a hidden WebView
+    init { Cipher.solver = WebSolver(app) }
 
     /** the certificate this copy is signed with is the release key's (its SHA-256, as apksigner prints it) */
     override val releaseKey: Boolean by lazy {

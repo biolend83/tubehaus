@@ -67,6 +67,15 @@ object Clients {
         mapOf("osName" to "Android", "osVersion" to "14", "androidSdkVersion" to 34),
         host = "music.youtube.com",
     )
+    /**
+     * A Samsung TV's YouTube: its links come locked (signature and n, solved by [Cipher]), but it
+     * still serves what the others call "not available" (videos made for kids, some labels)
+     */
+    val TV = Client(
+        "TVHTML5", "5.20260707", 7,
+        "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/2.4.0 TV Safari/538.1",
+        mapOf("osName" to "Tizen", "osVersion" to "2.4.0", "deviceMake" to "Samsung", "deviceModel" to "SmartTV"),
+    )
     /** in the order the player tries them; replaced by the list on GitHub when there is a newer one (Remote) */
     @Volatile var PLAYERS = listOf(VISIONOS, ANDROID_VR)
 }
