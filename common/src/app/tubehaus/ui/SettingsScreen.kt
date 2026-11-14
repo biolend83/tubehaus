@@ -465,6 +465,9 @@ private fun SettingsRows(
         if (touch) r.row("player", tr("Swipe for brightness and volume") + " gestures") {
             Toggle(tr("Swipe for brightness and volume"), tr("In full screen, swipe up or down on the left for brightness, on the right for volume"), s.swipeGestures) { b -> set { it.copy(swipeGestures = b) } }
         }
+        if (touch && !app.platform.tv) r.row("player", tr("Vibration") + " haptics vibrate") {
+            Toggle(tr("Vibration"), tr("A light buzz on gestures, skips and likes"), s.haptics) { b -> set { it.copy(haptics = b) } }
+        }
         if (touch && !app.platform.tv) r.row("player", tr("Full screen when turned sideways") + " rotate landscape") {
             Toggle(tr("Full screen when turned sideways"), tr("Turning the phone sideways while a video plays goes full screen"), s.rotateFull) { b -> set { it.copy(rotateFull = b) } }
         }
@@ -513,7 +516,7 @@ private fun SettingsRows(
             Toggle(tr("Sound only for music"), tr("Songs from the Music tab load only their sound, which saves data. \"Watch video\" brings the picture back."), s.musicAudioOnly) { b -> set { it.copy(musicAudioOnly = b) } }
         }
         r.row("music", tr("Lyrics") + " lyrics lrclib") {
-            Note(tr("Lyrics come from LRCLIB (lrclib.net), a free database of lyrics. The song's title and artist are sent to it when you open the lyrics."))
+            Note(tr("Lyrics are looked for first on YouTube Music (only the song's video id is sent), then on LRCLIB (lrclib.net), a free database of lyrics (the song's title and artist are sent). Only when you open the lyrics."))
         }
         r.row("music", tr("Clear music history") + " recent") {
             SItem(tr("Clear music history"), tr("Recently played songs, searches and opened albums")) {

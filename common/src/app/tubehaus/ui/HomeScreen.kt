@@ -94,6 +94,7 @@ fun HomeScreen(app: AppState) {
             HomeCache.items, app, loading = loading,
             onEnd = { load(true) },
             hero = LocalLook.current == 1 && !app.discover,
+            refresh = { app.rec.clearCache(); load(false) },
             header = {
                 // one row of chips as on YouTube: where the feed comes from, then All / Discover; the
                 // chip already chosen, tapped again, brings a fresh feed (as does the refresh at the end)

@@ -194,6 +194,8 @@ class AppState(val platform: Platform, val store: Store) {
 
     /** how the last page change went, for its animation: 1 forward, -1 back, 0 to a tab */
     var lastMove = 0
+    /** counts taps on the tab that is already open: its list goes back to the top (Refreshable) */
+    var reselect by androidx.compose.runtime.mutableIntStateOf(0)
         private set
 
     /** the pages Back left, newest last: Forward opens them again; going anywhere else forgets them */
@@ -216,6 +218,7 @@ class AppState(val platform: Platform, val store: Store) {
     fun go(s: Screen) {
         ahead.clear()
         if (s in TABS) {
+            if (stack.size == 1 && stack[0] == s) { reselect++; return }
             lastMove = 0
             stack.clear(); stack.add(s)
             return
@@ -230,8 +233,8 @@ class AppState(val platform: Platform, val store: Store) {
     /** the TV's pages: Back first moves to the menu, and on Home asks to be pressed again (TvApp) */
     var tvBack: (() -> Boolean)? = null
 
-    fun back(): Boolean {
-        tvBack?.let { if (it()) return true }
+    fun back(hooks: Boolean = true): Boolean {
+        if (hooks) tvBack?.let { if (it()) return true }
         if (fullscreen) { setFull(false); return true }
         if (stack.size > 1) { lastMove = -1; ahead.add(stack.removeAt(stack.size - 1)); return true }
         if (stack.last() != Screen.Home) { lastMove = 0; stack[0] = Screen.Home; return true }

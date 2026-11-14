@@ -9,7 +9,17 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -215,9 +225,12 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
     val full = s?.asVideo() ?: v
     val liked = lib.likes.any { it.id == v.id }
     val disliked = v.id in lib.dislikes
-    var hearts by remember { mutableIntStateOf(0) }
-    var heart by remember { mutableStateOf(false) }
-    LaunchedEffect(hearts) { if (hearts > 0) { heart = true; delay(650); heart = false } }
+    // a double tap's hearts, each where the finger was (a quick run of taps sends one each)
+    val hearts = remember { mutableStateListOf<Pair<Int, Offset>>() }
+    var heartNo by remember { mutableIntStateOf(0) }
+    // held down: twice the speed until let go
+    var fast by remember { mutableStateOf(false) }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val mine = active && st.videoId == v.id
     // the comments come with the watch page's details, asked for when the button is pressed
     var comments by remember { mutableStateOf(false) }
@@ -230,26 +243,66 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
             // the buttons and the title); wider screens: 9:16 in the middle
             (if (LocalCompact.current) Modifier.fillMaxSize() else Modifier.fillMaxHeight().aspectRatio(9f / 16f, matchHeightConstraintsFirst = true))
                 .pointerInput(v.id) {
-                    detectTapGestures(
-                        onTap = { if (player.state.value.playing) player.pause() else player.play() },
-                        // YouTube's double-tap like: it only ever likes, never unlikes
-                        onDoubleTap = {
-                            if (!app.store.inList("likes", v.id)) app.store.setInList("likes", full, true)
-                            hearts++
-                        },
-                    )
+                    // YouTube's double-tap like: it only ever likes, never unlikes; taps right after
+                    // it send more hearts
+                    var runUntil = 0L
+                    fun like(at: Offset, t: Long) {
+                        if (!app.store.inList("likes", v.id)) app.store.setInList("likes", full, true)
+                        hearts.add(heartNo++ to at)
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
+                        runUntil = t + 600
+                    }
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        if (down.uptimeMillis < runUntil) {
+                            val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+                            up.consume(); like(up.position, up.uptimeMillis)
+                            return@awaitEachGesture
+                        }
+                        var moved = false
+                        val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                            waitForUpOrCancellation().also { if (it == null) moved = true }
+                        }
+                        if (moved) return@awaitEachGesture
+                        if (up == null) {
+                            val before = player.state.value.speed
+                            if (!player.state.value.playing || before >= 2f) return@awaitEachGesture
+                            player.setSpeed(2f); fast = true
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            try {
+                                while (true) {
+                                    val e = awaitPointerEvent()
+                                    e.changes.forEach { if (it.pressed) it.consume() }
+                                    if (e.changes.none { it.pressed }) break
+                                }
+                            } finally { player.setSpeed(before); fast = false }
+                            return@awaitEachGesture
+                        }
+                        up.consume()
+                        val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) { awaitFirstDown() }
+                        if (second == null) { if (player.state.value.playing) player.pause() else player.play(); return@awaitEachGesture }
+                        like(second.position, second.uptimeMillis)
+                        waitForUpOrCancellation()?.consume()
+                    }
                 },
         ) {
             if (!app.store.settings.value.hideThumbs) Img(v.thumb, Modifier.fillMaxSize())
             if (mine) player.View(Modifier.fillMaxSize())
-            if (mine && !st.playing && !st.buffering) {
-                Icon(Sym.PlayArrow.fill, null, tint = Color.White, modifier = Modifier.size(72.dp).align(Alignment.Center))
+            // paused: a play sign that pops in (and shrinks away when it plays again)
+            AnimatedVisibility(mine && !st.playing && !st.buffering, Modifier.align(Alignment.Center),
+                enter = fadeIn(tween(Motion.SHORT)) + scaleIn(spring(dampingRatio = 0.55f, stiffness = 600f), initialScale = 1.4f),
+                exit = fadeOut(tween(Motion.SHORT)) + scaleOut(tween(Motion.SHORT), targetScale = 0.8f)) {
+                Box(Modifier.size(84.dp).background(Color(0x55000000), CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Sym.PlayArrow.fill, null, tint = Color.White, modifier = Modifier.size(56.dp))
+                }
             }
             if (active && st.buffering) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center).size(40.dp), color = Color.White, strokeWidth = 3.dp)
             }
-            AnimatedVisibility(heart, Modifier.align(Alignment.Center), enter = scaleIn(initialScale = 0.4f), exit = fadeOut()) {
-                Icon(Sym.Favorite.fill, null, tint = Color.White, modifier = Modifier.size(96.dp))
+            for ((n, at) in hearts.toList()) androidx.compose.runtime.key(n) { Heart(at, n) { hearts.removeAll { it.first == n } } }
+            AnimatedVisibility(fast, Modifier.align(Alignment.TopCenter).padding(top = 56.dp), enter = fadeIn(tween(Motion.SHORT)), exit = fadeOut(tween(Motion.SHORT))) {
+                Text("2x  ▸▸", color = Color.White, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.background(Color(0x99000000), androidx.compose.foundation.shape.RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 6.dp))
             }
             // the bottom: channel, title, and a seek bar you can drag
             // a soft shade up from the bottom, as YouTube's, so the white words read on any picture
@@ -276,8 +329,8 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
             // the buttons down the right, near the bottom, each with its word under it, as on YouTube
             Column(Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally) {
-                RoundAction(if (liked) Sym.ThumbUp.fill else Sym.ThumbUp.outline, tr("Like")) { app.store.setInList("likes", full, !liked) }
-                RoundAction(if (disliked) Sym.ThumbDown.fill else Sym.ThumbDown.outline, tr("Dislike")) { app.store.setInList("dislikes", full, !disliked) }
+                RoundAction(if (liked) Sym.ThumbUp.fill else Sym.ThumbUp.outline, tr("Like"), on = liked) { app.store.setInList("likes", full, !liked) }
+                RoundAction(if (disliked) Sym.ThumbDown.fill else Sym.ThumbDown.outline, tr("Dislike"), on = disliked) { app.store.setInList("dislikes", full, !disliked) }
                 if (!app.store.settings.value.hideComments) RoundAction(Sym.Comment.outline, tr("Comments")) { comments = true }
                 RoundAction(Sym.Share.outline, tr("Share")) { app.share(v.title, "https://youtube.com/shorts/${v.id}") }
             }
@@ -297,11 +350,39 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
 }
 
 @Composable
-private fun RoundAction(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun RoundAction(icon: ImageVector, label: String, on: Boolean = false, onClick: () -> Unit) {
+    // turned on: the button gives a little bounce, as YouTube's like does
+    val pop = remember { Animatable(1f) }
+    var was by remember { mutableStateOf(on) }
+    LaunchedEffect(on) {
+        if (on && !was) { pop.snapTo(0.7f); pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 500f)) }
+        was = on
+    }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        IconButton(onClick = onClick, modifier = Modifier.size(48.dp).background(Color(0x40FFFFFF), CircleShape)) {
+        IconButton(onClick = { haptic.performHapticFeedback(if (on) androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOff else androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn); onClick() }, modifier = Modifier.size(48.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value }.background(Color(0x40FFFFFF), CircleShape)) {
             Icon(icon, label, tint = Color.White, modifier = Modifier.size(26.dp))
         }
         Text(label, color = Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
     }
+}
+
+/** one heart of a double-tap like: pops up where the finger was, tilted a little, then floats up and fades */
+@Composable
+private fun Heart(at: Offset, n: Int, done: () -> Unit) {
+    val t = remember { Animatable(0f) }
+    val tilt = remember { listOf(-18f, 12f, -8f, 20f, -14f, 6f)[n % 6] }
+    LaunchedEffect(Unit) { t.animateTo(1f, tween(800, easing = androidx.compose.animation.core.LinearEasing)); done() }
+    val d = LocalDensity.current
+    val half = with(d) { 48.dp.toPx() }
+    Icon(Sym.Favorite.fill, null, tint = Red, modifier = Modifier.size(96.dp).graphicsLayer {
+        val p = t.value
+        // in: a spring-like overshoot in the first quarter; out: up and away
+        val grow = if (p < 0.25f) { val q = p / 0.25f; 0.4f + 0.8f * q - 0.2f * q * q } else 1f + (p - 0.25f) * 0.25f
+        scaleX = grow; scaleY = grow
+        rotationZ = tilt
+        translationX = at.x - half
+        translationY = at.y - half - (if (p > 0.35f) (p - 0.35f) * 260f else 0f)
+        alpha = if (p < 0.6f) 1f else (1f - (p - 0.6f) / 0.4f).coerceIn(0f, 1f)
+    })
 }

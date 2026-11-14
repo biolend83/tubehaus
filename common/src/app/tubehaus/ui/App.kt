@@ -138,8 +138,20 @@ fun App(app: AppState) {
             val bg = MaterialTheme.colorScheme.background
             LaunchedEffect(bg) { app.platform.titleBar(bg) }
             val tv = app.platform.tv
+            // every haptic in the app goes through here: off by the setting, else the platform's own motor
+            val host = androidx.compose.ui.platform.LocalHapticFeedback.current
+            val hapticsOn by androidx.compose.runtime.rememberUpdatedState(settings.haptics && !tv)
+            val haptic = remember(host) {
+                object : androidx.compose.ui.hapticfeedback.HapticFeedback {
+                    override fun performHapticFeedback(hapticFeedbackType: androidx.compose.ui.hapticfeedback.HapticFeedbackType) {
+                        if (!hapticsOn) return
+                        if (!app.platform.vibrate(hapticFeedbackType)) host.performHapticFeedback(hapticFeedbackType)
+                    }
+                }
+            }
             CompositionLocalProvider(
                 LocalPlatform provides app.platform,
+                androidx.compose.ui.platform.LocalHapticFeedback provides haptic,
                 // TV: buttons, tabs and menu rows the remote has selected glow teal, clearly enough for the sofa
                 LocalRippleConfiguration provides if (tv) RippleConfiguration(Teal, RippleAlpha(0.16f, 0.34f, 0.08f, 0.2f)) else LocalRippleConfiguration.current,
             ) {
@@ -234,9 +246,14 @@ private fun tabs(app: AppState, phone: Boolean): List<Tab> {
 
 @Composable
 private fun Shell(app: AppState) {
-    val cur = app.current
+    val now = app.current
     val compact = LocalCompact.current
     val root = app.stack.firstOrNull()
+    // phones: the video page is a sheet over the page it was opened from, which stays put under it
+    // and is what the rest of the shell lays out (WatchSheet)
+    val sheet = compact && app.platform.touch && !app.platform.tv && app.playback.video != null && app.playback.song == null
+    val cur = if (sheet && now is Screen.Watch) app.stack.lastOrNull { it !is Screen.Watch } ?: Screen.Home else now
+    var barPx by remember { mutableStateOf(0) }
     val showTop = cur !is Screen.Watch && cur !is Screen.Shorts && cur !is Screen.Search && cur !is Screen.NowPlaying
     // the desktop: while you browse, the video keeps playing in a small window at the bottom right
     val floating = !app.platform.touch && !app.platform.tv
@@ -267,24 +284,29 @@ private fun Shell(app: AppState) {
             }
         }
     }
-    LaunchedEffect(cur) {
+    LaunchedEffect(now) {
         navShown = true
         // Shorts has its own player; a video playing in the background stops
-        if (cur is Screen.Shorts) app.playback.close()
+        if (now is Screen.Shorts) app.playback.close()
     }
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
-        topBar = { if (showTop) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) { TopBar(app, if (railCollapsed) unfold else if (deskBar) fold else null) } },
+        topBar = { if (showTop) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) { TopBar(app, if (railCollapsed) unfold else if (deskBar) fold else null, page = cur, depth = if (sheet) app.stack.count { it !is Screen.Watch } else app.stack.size) } },
         bottomBar = {
             Column {
                 // the mini player rises from the bottom edge and sinks back into it (phones, tablets, TVs;
                 // the desktop has a floating one with the picture, below)
                 AnimatedVisibility(
-                    app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts && cur !is Screen.NowPlaying && !floating,
+                    app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts && cur !is Screen.NowPlaying && !floating && !sheet,
                     enter = slideInVertically(tween(Motion.MEDIUM, easing = Motion.emphasizedIn)) { it } + fadeIn(tween(Motion.SHORT)),
                     exit = slideOutVertically(tween(Motion.SHORT, easing = Motion.emphasizedOut)) { it } + fadeOut(tween(Motion.SHORT)),
                 ) { MiniPlayer(app) }
-                if (compact && cur !is Screen.Watch && cur !is Screen.NowPlaying) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) {
-                    PhoneBar(app, root)
+                // the sheet's mini player sits here, over this room
+                if (sheet && cur !is Screen.Shorts) Spacer(Modifier.height(60.dp))
+                Box(Modifier.onSizeChanged { barPx = it.height }) {
+                    if (compact && cur !is Screen.Watch && cur !is Screen.NowPlaying) androidx.compose.animation.AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) {
+                        PhoneBar(app, root)
+                    }
                 }
             }
         },
@@ -355,7 +377,8 @@ private fun Shell(app: AppState) {
                       val rest = 1f - shown.value
                       alpha = shown.value
                       when (move) {
-                          1 -> translationX = rest * 40.dp.toPx()
+                          // the music player rises from the mini player, as a sheet
+                          1 -> if (cur is Screen.NowPlaying) translationY = rest * 72.dp.toPx() else translationX = rest * 40.dp.toPx()
                           -1 -> translationX = -rest * 24.dp.toPx()
                           // a tab: the page rises in a little, as on the web
                           else -> translationY = rest * 10.dp.toPx()
@@ -397,6 +420,8 @@ private fun Shell(app: AppState) {
             }
         }
     }
+    if (sheet && cur !is Screen.Shorts) WatchSheet(app, expanded = now is Screen.Watch, barPx = barPx)
+    }
 }
 
 /** whether this tab is the open one: Home also for the pages of the top tabs that sit under it (Music, Live; Subscriptions on phones) */
@@ -435,6 +460,7 @@ private fun PhoneBar(app: AppState, root: Screen?) {
                 // springs back when let go
                 val touch = remember { MutableInteractionSource() }
                 val pressed by touch.collectIsPressedAsState()
+                val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
                 val dip by animateFloatAsState(if (pressed) 0.86f else 1f,
                     if (pressed) tween(Motion.SHORT) else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
                 val shade by animateFloatAsState(if (pressed) 0.12f else 0f, tween(if (pressed) 90 else Motion.LONG))
@@ -444,7 +470,7 @@ private fun PhoneBar(app: AppState, root: Screen?) {
                     if (sel) spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow) else tween(Motion.SHORT))
                 Column(
                     Modifier.weight(1f).fillMaxHeight()
-                        .selectable(sel, interactionSource = touch, indication = null, role = Role.Tab, onClick = { app.go(t.screen) }),
+                        .selectable(sel, interactionSource = touch, indication = null, role = Role.Tab, onClick = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick); app.go(t.screen) }),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
                 ) {
                     Box(
@@ -536,11 +562,13 @@ fun Logo(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null) {
+// page, depth: the page shown and how deep it is, without the watch sheet over it (so the bar under
+// the sheet is already what it will be when the video folds away)
+private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null, page: Screen = app.current, depth: Int = app.stack.size) {
     Column {
         Row(Modifier.fillMaxWidth().height(52.dp).padding(start = 14.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             if (onMenu != null) IconButton(onClick = onMenu) { Icon(Sym.Menu.fill, tr("Menu")) }
-            if (app.stack.size > 1) {
+            if (depth > 1) {
                 IconButton(onClick = { app.back() }) { Icon(Sym.ArrowBack.fill, tr("Back")) }
             }
             if (!app.store.settings.value.hideLogo) Logo(Modifier.clickable { app.go(Screen.Home) })
@@ -567,7 +595,7 @@ private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null) {
             if (LocalCompact.current || (onMenu != null && app.store.settings.value.railCollapsed)) IconButton(onClick = { app.go(Screen.Settings) }) { Icon(Sym.Settings.outline, tr("Settings")) }
         }
         // every device: Home, Subscriptions, Music, Live and More under the logo, on those pages themselves
-        if (app.stack.size == 1 && app.current.underHome()) TopTabs(app)
+        if (depth == 1 && page.underHome()) TopTabs(app)
     }
 }
 
@@ -674,9 +702,10 @@ private fun MiniPlayer(app: AppState) {
     val v = app.playback.video ?: return
     val song = app.playback.song
     val st by app.player.state.collectAsState()
-    // as YouTube's: swipe it up to open the video, sideways to close it (it follows the finger and
-    // fades as it goes; let go early and it slides back)
+    // as YouTube's: swipe it up to open the video, sideways to close it (a song: to the next or the last
+    // one); it follows the finger and fades as it goes, and let go early it slides back
     val scope = rememberCoroutineScope()
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val slide = remember(v.id) { Animatable(0f) }
     var wide by remember { mutableStateOf(1f) }
     Column(Modifier.fillMaxWidth().onSizeChanged { wide = it.width.toFloat().coerceAtLeast(1f) }
@@ -695,8 +724,15 @@ private fun MiniPlayer(app: AppState) {
                     scope.launch {
                         when {
                             kotlin.math.abs(slide.value) > wide * 0.35f -> {
-                                slide.animateTo(if (slide.value > 0) wide else -wide, tween(Motion.SHORT, easing = Motion.emphasizedOut))
-                                app.playback.close()
+                                val dir = if (slide.value > 0) 1f else -1f
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureThresholdActivate)
+                                slide.animateTo(dir * wide, tween(Motion.SHORT, easing = Motion.emphasizedOut))
+                                // a song: sideways is the next or the last one, as in YouTube Music
+                                if (app.playback.song != null) {
+                                    if (dir < 0) app.playback.skipNext() else app.playback.previous()
+                                    slide.snapTo(-dir * wide * 0.5f)
+                                    slide.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 420f))
+                                } else app.playback.close()
                             }
                             up < -40.dp.toPx() && kotlin.math.abs(slide.value) < 48.dp.toPx() -> {
                                 slide.snapTo(0f)
@@ -723,7 +759,8 @@ private fun MiniPlayer(app: AppState) {
             else Spacer(Modifier.width(4.dp))
             Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                 Text(v.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(v.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                if (song != null) MiniLyricLine(app, song, v.author)
+                else Text(v.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
             IconButton(onClick = { if (st.playing) app.player.pause() else app.player.play() }) {
                 Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"))

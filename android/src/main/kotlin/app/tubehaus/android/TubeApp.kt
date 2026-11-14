@@ -152,6 +152,9 @@ class AndroidPlatform(private val app: Application) : Platform {
     private val audio by lazy { app.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
     /** this window's brightness; until the gesture sets one it follows the system setting */
+    private val haptics by lazy { Haptics(app) }
+    override fun vibrate(type: androidx.compose.ui.hapticfeedback.HapticFeedbackType) = haptics.play(type)
+
     override fun brightness(): Float? {
         val w = activity?.window ?: return null
         val own = w.attributes.screenBrightness

@@ -56,6 +56,17 @@ object Clients {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
         host = "music.youtube.com",
     )
+    /**
+     * YouTube Music's Android app: the only client its lyrics come with times for (the web site gets
+     * the same lyrics as plain text). Asked for lyrics only, never for a video. No sign-in: lyrics
+     * come to signed-out requests in the countries where YouTube Music is free (not from Korea)
+     */
+    val MUSIC_ANDROID = Client(
+        "ANDROID_MUSIC", "7.21.50", 21,
+        "com.google.android.apps.youtube.music/7.21.50 (Linux; U; Android 14) gzip",
+        mapOf("osName" to "Android", "osVersion" to "14", "androidSdkVersion" to 34),
+        host = "music.youtube.com",
+    )
     /** in the order the player tries them; replaced by the list on GitHub when there is a newer one (Remote) */
     @Volatile var PLAYERS = listOf(VISIONOS, ANDROID_VR)
 }

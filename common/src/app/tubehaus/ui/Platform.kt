@@ -54,6 +54,8 @@ interface Platform {
     /** screen brightness for the player's swipe gesture, 0..1; null where there is none (the desktop) */
     fun brightness(): Float? = null
     fun setBrightness(v: Float) {}
+    /** plays a haptic on the vibration motor itself (Android: the system's own path is silent on many phones); false: not played */
+    fun vibrate(type: androidx.compose.ui.hapticfeedback.HapticFeedbackType): Boolean = false
     /** the system media volume, 0..1, for the other swipe gesture; null where the app has its own (the desktop) */
     fun mediaVolume(): Float? = null
     fun setMediaVolume(v: Float) {}
@@ -167,6 +169,8 @@ interface VideoPlayer {
     /** one of [PlayerState.audioTracks] for this video; every video starts in its original language */
     fun setAudioTrack(lang: String) {}
     fun setLoop(on: Boolean)
+    /** full screen on a phone: the picture fills the screen, its edges cut (a pinch out), or fits whole (a pinch in) */
+    fun setZoom(on: Boolean) {}
     /** read about 20 minutes ahead instead of 5 */
     fun setReadAhead(long: Boolean) {}
     /** Settings → captions: text size in %, the box behind them in % opacity (0 = an outline instead), 0 bottom / 1 higher / 2 top */

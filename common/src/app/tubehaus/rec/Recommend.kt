@@ -235,6 +235,13 @@ private data class Cand(val v: Video, val src: String, val tag: String? = null)
 
 class Recommender(private val store: Store, private val feed: Feed) {
     private val pools = Sys.concurrentMap<String, Pair<Long, List<Cand>>>()
+    /**
+     * How often each video was handed to Home this session without being opened (an idea from
+     * Flow's FlowNeuro engine, written anew): once a little lower, three times much lower, five
+     * times not again, so a pull to refresh brings different videos instead of the same ones.
+     */
+    private val impressions = Sys.concurrentMap<String, Int>()
+    private fun shown(list: List<Video>) { for (v in list) impressions[v.id] = (impressions[v.id] ?: 0) + 1 }
     private val rnd = Random(Sys.nowMs())
 
     private suspend fun pool(key: String, ttl: Long, fetch: suspend () -> List<Cand>): List<Cand> {
@@ -287,7 +294,7 @@ class Recommender(private val store: Store, private val feed: Feed) {
             cands += seeds.map { q -> async { pool("seed:$q", 3600) { search(q, "pop", q, false) } } }.awaitAll().flatten()
         }
         for (c in cands) if (c.v.id !in sources) sources[c.v.id] = c.src to (c.tag ?: "")
-        rank(cands, n, skip, t, lib.hist.associate { it.id to it }, shorts = false)
+        rank(cands, n, skip, t, lib.hist.associate { it.id to it }, shorts = false).also { shown(it) }
     }
 
     /** where Home's videos came from (subscriptions, related, a liked word...), for the 2.0 home's rows */
@@ -328,21 +335,30 @@ class Recommender(private val store: Store, private val feed: Feed) {
         val subBonus = if (Profiles.active(store).isEmpty()) 0.6 else 0.0
         val bonus = mapOf("sub" to subBonus, "rel" to 0.5, "chan" to 0.4, "kw" to 0.25, "pop" to 0.0)
         val best = HashMap<String, Pair<Double, Cand>>()
+        // momentum: a channel in two or more of the last ten videos watched is what you're into right now
+        val recent = lib.hist.take(10).groupingBy { it.authorId }.eachCount()
         for (c in items) {
             val v = c.v
             if (v.id in hiddenV || v.channelId in hiddenC) continue
+            var lower = 0.0
             if (!shorts) {
                 // already watched most of it
                 val p = lib.pos[v.id]
                 if (p != null && (p.getOrNull(1) ?: 0) > 0 && p[0] > (p[1] * 0.8)) continue
                 if (v.id in hist && p == null) continue
+                // opened and left early: a little lower, it can come back
+                if (p != null && (p.getOrNull(1) ?: 0) > 0 && p[0] > p[1] * 0.15) lower += 0.2
+                val n = impressions[v.id] ?: 0
+                if (n >= 5) continue
+                lower += when { n >= 3 -> 0.8; n >= 1 -> 0.3; else -> 0.0 }
             }
+            if (v.channelId.isNotEmpty() && (recent[v.channelId] ?: 0) >= 2) lower -= 0.15
             val toks = Learn.tokens(v.title, listOfNotNull(c.tag))
             val kw = if (toks.isEmpty()) 0.0 else toks.sumOf { t.kw[it] ?: 0.0 } / sqrt(toks.size.toDouble())
             val fresh = v.publishedAt > 0 && now() - v.publishedAt < 3 * 86400
             val s = (t.ch[v.channelId] ?: 0.0) * 0.5 + 0.6 * kw + (bonus[c.src] ?: 0.0) +
                 0.1 * log10(1.0 + v.views) / 7 + (if (fresh) 0.25 else 0.0) +
-                gauss() * 0.2
+                gauss() * 0.2 - lower
             val old = best[v.id]
             // the same video from several pools: keep the best score plus a little for each extra pool
             best[v.id] = if (old == null) s to c else (maxOf(old.first, s) + 0.15) to (if (s > old.first) c else old.second)
@@ -353,10 +369,21 @@ class Recommender(private val store: Store, private val feed: Feed) {
         val perCh = HashMap<String, Int>()
         val ids = HashSet<String>()
         val perChMax = if (shorts) 2 else 3
+        // titles nearly the same as one already taken (re-uploads, "part 2" of the same clip) are left out
+        val words = ArrayList<Set<String>>()
+        fun wordsOf(title: String) = title.lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter { it.length >= 2 }.toSet()
+        fun alike(a: Set<String>, b: Set<String>): Boolean {
+            if (a.size < 3 || b.size < 3) return false
+            val both = a.count { it in b }
+            return both.toDouble() / (a.size + b.size - both) >= 0.6
+        }
         fun take(c: Cand): Boolean {
             val v = c.v
             if (v.id in ids || (perCh[v.channelId] ?: 0) >= perChMax && v.channelId.isNotEmpty()) return false
             if ((t.ch[v.channelId] ?: 0.0) <= -3) return false       // channels you keep skipping
+            val w = wordsOf(v.title)
+            if (words.any { alike(it, w) }) return false
+            words += w
             out += v; ids += v.id
             perCh[v.channelId] = (perCh[v.channelId] ?: 0) + 1
             return true

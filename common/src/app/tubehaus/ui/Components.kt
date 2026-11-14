@@ -416,8 +416,10 @@ fun SubscribeButton(cid: String, name: String, thumb: String, app: AppState) {
     val fg by animateColorAsState(if (subbed) c.onSurface else c.onPrimary, tween(Motion.MEDIUM))
     val pop = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     Button(
         onClick = {
+            haptic.performHapticFeedback(if (subbed) androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOff else androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn)
             app.store.subscribe(cid, name, thumb, !subbed)
             if (!subbed) scope.launch { pop.snapTo(0.9f); pop.animateTo(1f, spring(0.4f, Spring.StiffnessMedium)) }
         },
@@ -505,6 +507,8 @@ fun ItemGrid(
     wideRows: Boolean = false,
     /** the cards look on Home: the first video large */
     hero: Boolean = false,
+    /** pulled down (touch), or its tab tapped again at the top: a fresh list */
+    refresh: (suspend () -> Unit)? = null,
 ) {
     val look = LocalLook.current
     val scope = rememberCoroutineScope()
@@ -527,6 +531,10 @@ fun ItemGrid(
     // the cards already shown: those arrive once, not again each time they scroll back into view
     val seen = remember { HashSet<Any>() }
     if (list.isEmpty() && loading && header == null) { Skeleton(rows, wideRows); return }
+    Refreshable(app, refresh, atTop = { state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0 }, toTop = {
+        if (state.firstVisibleItemIndex > 8) state.scrollToItem(8)
+        state.animateScrollToItem(0)
+    }) {
     androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     // the large rows' picture shrinks with the window, so a narrow one still leaves room for the title
     val bigThumb = when { maxWidth > 900.dp -> 360.dp; maxWidth > 640.dp -> 246.dp; else -> 168.dp }
@@ -558,6 +566,31 @@ fun ItemGrid(
         if (loading) item(span = { GridItemSpan(maxLineSpan) }) { Busy() }
     }
     }
+    }
+}
+
+/**
+ * A list that can be made fresh, as YouTube's: pulled down from the top on a touch screen it reloads
+ * (a spinner comes down with the finger); its tab tapped again glides it back to the top, or reloads
+ * it when it is already there.
+ */
+@Composable
+fun Refreshable(app: AppState, refresh: (suspend () -> Unit)?, atTop: () -> Boolean, toTop: suspend () -> Unit, content: @Composable () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val again: () -> Unit = {
+        if (refresh != null && !busy) {
+            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureThresholdActivate)
+            scope.launch { busy = true; try { refresh() } finally { busy = false } }
+        }
+    }
+    val tick = app.reselect
+    val start = remember { tick }
+    LaunchedEffect(tick) { if (tick != start) { if (atTop()) again() else toTop() } }
+    if (refresh != null && app.platform.touch && !app.platform.tv) {
+        androidx.compose.material3.pulltorefresh.PullToRefreshBox(busy, again, Modifier.fillMaxSize()) { content() }
+    } else content()
 }
 
 /**
@@ -606,6 +639,55 @@ fun Skeleton(rows: Boolean = false, wide: Boolean = false) {
                     }
                 }
             }
+        }
+    }
+}
+
+/** a grey stand-in with a light sweeping across it, for what is still loading (see [Skeleton]) */
+@Composable
+fun Modifier.bone(shape: Shape = RoundedCornerShape(6.dp)): Modifier {
+    val sweep by rememberInfiniteTransition().animateFloat(
+        0f, 1f, infiniteRepeatable(tween(1500, easing = LinearEasing), RepeatMode.Restart),
+    )
+    val grey = MaterialTheme.colorScheme.surfaceContainer
+    val light = MaterialTheme.colorScheme.surfaceContainerHighest
+    return this.clip(shape).background(grey).drawBehind {
+        val w = size.width
+        val x = -0.5f * w + sweep * 2f * w
+        drawRect(Brush.horizontalGradient(listOf(Color.Transparent, light, Color.Transparent), startX = x - w * 0.3f, endX = x + w * 0.3f))
+    }
+}
+
+/** a video still loading: a full-width card ([big], phones) or a row with a picture on the left */
+@Composable
+fun BoneVideo(big: Boolean, thumb: Dp = 168.dp) {
+    if (big) Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).bone(RoundedCornerShape(0.dp)))
+        Row(Modifier.padding(start = 12.dp, top = 12.dp, end = 12.dp)) {
+            Box(Modifier.size(36.dp).bone(CircleShape))
+            Column(Modifier.weight(1f).padding(start = 12.dp, top = 2.dp)) {
+                Box(Modifier.fillMaxWidth(0.9f).height(16.dp).bone())
+                Box(Modifier.padding(top = 8.dp).fillMaxWidth(0.6f).height(12.dp).bone())
+            }
+        }
+    } else Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Box(Modifier.width(thumb).aspectRatio(16f / 9f).bone(RoundedCornerShape(12.dp)))
+        Column(Modifier.weight(1f).padding(start = 12.dp, top = 2.dp)) {
+            Box(Modifier.fillMaxWidth(0.9f).height(14.dp).bone())
+            Box(Modifier.padding(top = 8.dp).fillMaxWidth(0.5f).height(11.dp).bone())
+        }
+    }
+}
+
+/** a comment still loading */
+@Composable
+fun BoneComment() {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Box(Modifier.size(32.dp).bone(CircleShape))
+        Column(Modifier.weight(1f).padding(start = 10.dp)) {
+            Box(Modifier.fillMaxWidth(0.35f).height(11.dp).bone())
+            Box(Modifier.padding(top = 8.dp).fillMaxWidth(0.95f).height(13.dp).bone())
+            Box(Modifier.padding(top = 6.dp).fillMaxWidth(0.7f).height(13.dp).bone())
         }
     }
 }
