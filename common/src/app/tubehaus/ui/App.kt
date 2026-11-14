@@ -37,6 +37,8 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.Canvas
@@ -65,6 +67,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -536,8 +539,26 @@ private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null) {
                 IconButton(onClick = { app.back() }) { Icon(Sym.ArrowBack.fill, tr("Back")) }
             }
             if (!app.store.settings.value.hideLogo) Logo(Modifier.clickable { app.go(Screen.Home) })
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = { app.go(Screen.Search()) }) { Icon(Sym.Search.outline, tr("Search")) }
+            // a computer: a search box in the middle of the bar, as on YouTube's website (a click opens search)
+            if (!LocalCompact.current && !app.platform.touch && !app.platform.tv) {
+                val c = MaterialTheme.colorScheme
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Row(
+                        Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 24.dp).height(40.dp)
+                            .clip(RoundedCornerShape(20.dp)).border(1.dp, c.outlineVariant, RoundedCornerShape(20.dp))
+                            .clickable { app.go(Screen.Search()) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(tr("Search"), Modifier.weight(1f).padding(start = 18.dp), color = c.onSurfaceVariant, maxLines = 1)
+                        Box(Modifier.fillMaxHeight().width(64.dp).background(c.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+                            Icon(Sym.Search.outline, tr("Search"), Modifier.size(22.dp))
+                        }
+                    }
+                }
+            } else {
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = { app.go(Screen.Search()) }) { Icon(Sym.Search.outline, tr("Search")) }
+            }
             if (LocalCompact.current || onMenu != null) IconButton(onClick = { app.go(Screen.Settings) }) { Icon(Sym.Settings.outline, tr("Settings")) }
         }
         // every device: Home, Subscriptions, Music, Live and More under the logo, on those pages themselves
@@ -648,7 +669,41 @@ private fun MiniPlayer(app: AppState) {
     val v = app.playback.video ?: return
     val song = app.playback.song
     val st by app.player.state.collectAsState()
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)) {
+    // as YouTube's: swipe it up to open the video, sideways to close it (it follows the finger and
+    // fades as it goes; let go early and it slides back)
+    val scope = rememberCoroutineScope()
+    val slide = remember(v.id) { Animatable(0f) }
+    var wide by remember { mutableStateOf(1f) }
+    Column(Modifier.fillMaxWidth().onSizeChanged { wide = it.width.toFloat().coerceAtLeast(1f) }
+        .graphicsLayer { translationX = slide.value; alpha = 1f - (kotlin.math.abs(slide.value) / wide).coerceIn(0f, 1f) * 0.9f }
+        .pointerInput(v.id) {
+            var up = 0f
+            detectDragGestures(
+                onDragStart = { up = 0f },
+                onDrag = { change, d ->
+                    change.consume()
+                    up += d.y
+                    scope.launch { slide.snapTo(slide.value + d.x) }
+                },
+                onDragCancel = { scope.launch { slide.animateTo(0f, tween(Motion.SHORT)) } },
+                onDragEnd = {
+                    scope.launch {
+                        when {
+                            kotlin.math.abs(slide.value) > wide * 0.35f -> {
+                                slide.animateTo(if (slide.value > 0) wide else -wide, tween(Motion.SHORT, easing = Motion.emphasizedOut))
+                                app.playback.close()
+                            }
+                            up < -40.dp.toPx() && kotlin.math.abs(slide.value) < 48.dp.toPx() -> {
+                                slide.snapTo(0f)
+                                if (app.playback.song != null) app.go(Screen.NowPlaying) else app.go(Screen.Watch(v.id))
+                            }
+                            else -> slide.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 600f))
+                        }
+                    }
+                },
+            )
+        }
+        .background(MaterialTheme.colorScheme.surfaceContainer)) {
         if (st.durationMs > 0) {
             Box(Modifier.fillMaxWidth().height(2.dp).background(MaterialTheme.colorScheme.outline)) {
                 Box(Modifier.fillMaxWidth((st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f)).height(2.dp).background(Red))

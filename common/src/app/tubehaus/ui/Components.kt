@@ -83,6 +83,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -745,8 +748,32 @@ fun SearchField(
 @Composable
 fun ListHeader(
     cover: String, title: String, line: String, enabled: Boolean, play: () -> Unit, shuffle: () -> Unit,
+    /** the panel down the left of a wide window (see [SplitList]) */
+    panel: Boolean = false,
     more: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
 ) {
+    if (panel) {
+        // as YouTube's website: a tall card with the cover's colours, soft, behind the cover and the words
+        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer)) {
+            Backdrop(cover.ifEmpty { null }, Modifier.matchParentSize())
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
+                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                    if (cover.isNotEmpty()) Img(cover, Modifier.fillMaxSize())
+                    else Icon(Sym.PlaylistPlay.outline, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 20.dp))
+                if (line.isNotEmpty()) Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PillButton(tr("Play all"), Sym.PlayArrow.fill, filled = true, enabled = enabled, modifier = Modifier.weight(1f), onClick = play)
+                    PillButton(tr("Shuffle"), Sym.Shuffle.fill, enabled = enabled, modifier = Modifier.weight(1f), onClick = shuffle)
+                }
+                androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { more() }
+            }
+        }
+        return
+    }
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().padding(16.dp)) {
         val wide = maxWidth > 700.dp
         val pic: @Composable (Modifier) -> Unit = { m ->
@@ -773,6 +800,22 @@ fun ListHeader(
             Spacer(Modifier.height(16.dp))
             words()
         }
+    }
+}
+
+/**
+ * A playlist's page: on a wide window the cover, title and buttons stay in a panel on the left while
+ * the videos scroll on the right, as on YouTube's website; narrower, the header scrolls away at the
+ * top of the list. [list] gets whether it should put the header in itself.
+ */
+@Composable
+fun SplitList(side: @Composable () -> Unit, list: @Composable (headerInList: Boolean) -> Unit) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        val w = maxWidth
+        if (w > 1000.dp && !LocalPlatform.current.tv) Row(Modifier.fillMaxSize()) {
+            Box(Modifier.width(minOf(400.dp, w * 0.34f)).fillMaxHeight().padding(start = 16.dp, top = 8.dp, bottom = 16.dp)) { side() }
+            Box(Modifier.weight(1f).fillMaxHeight()) { list(false) }
+        } else list(true)
     }
 }
 

@@ -420,20 +420,22 @@ fun LocalListScreen(app: AppState, key: String) {
     var rename by remember { mutableStateOf(false) }
     var delete by remember { mutableStateOf(false) }
     val videos = items.map { it.video() }
-    LazyColumn(Modifier.fillMaxSize()) {
-        item {
-            ListHeader(
-                cover = if (app.store.settings.value.hideThumbs) "" else videos.firstOrNull()?.thumb ?: "",
-                title = title, line = tr("{n} videos").replace("{n}", "${items.size}"), enabled = videos.isNotEmpty(),
-                play = { videos.firstOrNull()?.let { app.watch(it, videos.drop(1)) } },
-                shuffle = { videos.shuffled().let { s -> s.firstOrNull()?.let { app.watch(it, s.drop(1)) } } },
-            ) {
-                if (pl != null) {
-                    PillButton(tr("Rename"), height = 36.dp) { rename = true }
-                    PillButton(tr("Delete"), height = 36.dp) { delete = true }
-                }
+    val header: @Composable (Boolean) -> Unit = { panel ->
+        ListHeader(
+            cover = if (app.store.settings.value.hideThumbs) "" else videos.firstOrNull()?.thumb ?: "",
+            title = title, line = tr("{n} videos").replace("{n}", "${items.size}"), enabled = videos.isNotEmpty(),
+            play = { videos.firstOrNull()?.let { app.watch(it, videos.drop(1)) } },
+            shuffle = { videos.shuffled().let { s -> s.firstOrNull()?.let { app.watch(it, s.drop(1)) } } },
+            panel = panel,
+        ) {
+            if (pl != null) {
+                PillButton(tr("Rename"), height = 36.dp) { rename = true }
+                PillButton(tr("Delete"), height = 36.dp) { delete = true }
             }
         }
+    }
+    SplitList({ header(true) }) { inList -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = if (inList) 0.dp else 8.dp)) {
+        if (inList) item { header(false) }
         if (items.isEmpty()) item { Empty(tr("Nothing here")) }
         items(videos.withIndex().toList(), key = { it.value.id }) { (i, v) ->
             val extra = buildList {
@@ -443,7 +445,7 @@ fun LocalListScreen(app: AppState, key: String) {
             }
             VideoRow(v, app, extra = extra) { app.watch(v, videos.drop(i + 1)) }
         }
-    }
+    } }
     if (rename && pl != null) NameDialog(tr("Rename playlist"), pl.title, { rename = false }) { app.store.renamePlaylist(key, it) }
     if (delete && pl != null) AlertDialog(
         onDismissRequest = { delete = false },
