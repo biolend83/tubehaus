@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -245,7 +246,14 @@ fun titleOf(v: Video, app: AppState): String = branded(v, app)?.title?.ifEmpty {
 fun Thumb(v: Video, app: AppState, modifier: Modifier = Modifier, rounded: Int = 16) {
     val pos = app.store.lib.state.value.pos[v.id]
     Box(modifier.aspectRatio(16f / 9f).clip(RoundedCornerShape(rounded.dp))) {
-        Img(v.thumb, Modifier.fillMaxSize())
+        if (v.author.endsWith("- Topic") || v.author.endsWith("- 주제")) {
+            // a song's picture is its square cover in grey bars: the cover sharp in the middle, a blur of it behind
+            // (YouTube's 16:9 picture of it: the cover is its middle square; the 4:3 one has bars all round)
+            val art = "https://i.ytimg.com/vi/" + v.id + "/mqdefault.jpg"
+            Img(art, Modifier.fillMaxSize().graphicsLayer { scaleX = 2.2f; scaleY = 2.2f }.blur(28.dp))
+            Box(Modifier.fillMaxSize().background(Color(0x33000000)))
+            Img(art, Modifier.fillMaxHeight().aspectRatio(1f).align(Alignment.Center))
+        } else Img(v.thumb, Modifier.fillMaxSize())
         // DeArrow's frame laid over YouTube's picture: it shows once it has loaded, and not at all if it can't
         val sec = branded(v, app)?.timeSec?.takeIf { app.store.settings.value.dearrowThumbs && !v.live }
         if (sec != null) AsyncImage(DeArrow.thumbUrl(v.id, sec), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
