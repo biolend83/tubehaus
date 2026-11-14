@@ -105,6 +105,21 @@ val nowPlayingLib = tasks.register<Exec>("nowPlayingLib") {
 }
 sourceSets["main"].resources.srcDir(nowPlayingLib)
 
+// macOS: the comment translator (translate/Translate.swift, Apple's own translation, macOS 26+)
+// goes into the jar as /translate/translate-mac; elsewhere, or without swiftc, there is none
+// and the app hides the "Translate" links
+val translateHelper = tasks.register<Exec>("translateHelper") {
+    val src = layout.projectDirectory.file("translate/Translate.swift")
+    val out = layout.buildDirectory.dir("generated/translate")
+    val arch = if (System.getProperty("os.arch") == "aarch64") "arm64" else "x86_64"
+    inputs.file(src)
+    outputs.dir(out)
+    onlyIf { System.getProperty("os.name").startsWith("Mac") && File("/usr/bin/swiftc").exists() }
+    doFirst { out.get().dir("translate").asFile.mkdirs() }
+    commandLine("/usr/bin/swiftc", "-O", "-target", "$arch-apple-macos26", src.asFile.path, "-o", out.get().file("translate/translate-mac").asFile.path)
+}
+sourceSets["main"].resources.srcDir(translateHelper)
+
 // runs every engine call against YouTube: ./gradlew :desktop:engineCheck
 tasks.register<JavaExec>("engineCheck") {
     classpath = sourceSets["main"].runtimeClasspath
