@@ -27,6 +27,10 @@ targets:
     dependencies:
       - framework: ../build/kit/TubeHausKit.framework
         embed: false
+      # comment translation (iOS 18+): linked weakly so the app still opens on iOS 16 and 17,
+      # where this framework is missing or has no TranslationSession
+      - sdk: Translation.framework
+        weak: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.biolend83.tubehaus
