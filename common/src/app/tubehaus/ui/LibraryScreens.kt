@@ -112,6 +112,7 @@ fun SubsScreen(app: AppState) {
     val feed = if (group != null) groupFeed(base, lib.hist.mapTo(HashSet()) { it.id }) else base
     ItemGrid(
         feed.filter { v -> words.all { w -> w in v.title.lowercase() || w in v.author.lowercase() } }, app, loading = loading,
+        refresh = { load(true) },
         header = {
             Column {
                 if (lib.groups.isNotEmpty()) tabs()
