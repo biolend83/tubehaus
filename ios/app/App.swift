@@ -4,11 +4,13 @@ import TubeHausKit
 // The whole app is Kotlin + Compose (TubeHausKit); this only puts it in a window.
 @main
 struct TubeHausApp: App {
+    init() { setUpCommentTranslation() }
+
     @StateObject private var bars = Bars()
 
     var body: some Scene {
         WindowGroup {
-            ComposeView(bars: bars).ignoresSafeArea(.all)
+            ComposeView(bars: bars).ignoresSafeArea(.all).commentTranslation()
                 // in full screen: no clock, date, Wi-Fi and battery over the video, and the home bar fades away
                 .statusBarHidden(bars.hidden)
                 .persistentSystemOverlays(bars.hidden ? .hidden : .automatic)

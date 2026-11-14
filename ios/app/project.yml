@@ -11,6 +11,7 @@ targets:
     platform: iOS
     sources:
       - App.swift
+      - Translator.swift
       - Assets.xcassets
       # the YouTube engine, built in (a newer one may sit in Files → On My iPad → TubeHaus)
       - path: ../engine/engine.js
