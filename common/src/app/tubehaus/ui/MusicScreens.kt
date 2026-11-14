@@ -579,6 +579,8 @@ private fun NowTop(app: AppState, s: Song) {
                     onClick = { more = false; pb.showVideo() })
                 else DropdownMenuItem(text = { Text(tr("Open the video")) }, leadingIcon = { Icon(Sym.Fullscreen.outline, null) },
                     onClick = { more = false; app.go(Screen.Watch(s.id)) })
+                if (pb.withVideo) DropdownMenuItem(text = { Text(tr("Back to music")) }, leadingIcon = { Icon(Sym.Album.outline, null) },
+                    onClick = { more = false; pb.hideVideo() })
                 DropdownMenuItem(text = { Text(tr("Start radio")) }, leadingIcon = { Icon(Sym.Explore.outline, null) }, onClick = { more = false; pb.playRadio(s) })
                 if (s.albumId.isNotEmpty()) DropdownMenuItem(text = { Text(tr("Go to album")) }, leadingIcon = { Icon(Sym.Album.outline, null) },
                     onClick = { more = false; app.go(Screen.Album(s.albumId, s.album)) })
