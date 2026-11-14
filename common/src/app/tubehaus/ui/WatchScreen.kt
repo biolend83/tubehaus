@@ -967,14 +967,11 @@ private fun PhoneBody(app: AppState, v: Video, list: androidx.compose.foundation
         pb.transcriptAsked = false
         commentsOpen = false; transcriptOpen = true
     }
-    // Back closes an open panel before it folds the video away
-    androidx.compose.runtime.DisposableEffect(v.id) {
-        val hook: () -> Boolean = {
-            if (commentsOpen || transcriptOpen) { commentsOpen = false; transcriptOpen = false; true } else false
-        }
-        app.tvBack = hook
-        onDispose { if (app.tvBack === hook) app.tvBack = null }
-    }
+    // Back closes an open panel before it folds the video away; only while the video page is in
+    // front (folded into the mini player, its panels are put away and Back is the page's)
+    val front = app.current is Screen.Watch
+    LaunchedEffect(front) { if (!front) { commentsOpen = false; transcriptOpen = false } }
+    BackHook(app, front && (commentsOpen || transcriptOpen)) { commentsOpen = false; transcriptOpen = false }
     Box(Modifier.fillMaxSize().riseIn(v.id)) {
         LazyColumn(Modifier.fillMaxSize(), state = list) {
             item { PlayerNotes(app) }

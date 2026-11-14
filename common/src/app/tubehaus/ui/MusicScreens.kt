@@ -584,6 +584,9 @@ fun NowPlayingScreen(app: AppState) {
     // and the same tab again goes back to it
     var tab by rememberSaveable { mutableStateOf(0) }
     var panel by rememberSaveable { mutableStateOf(false) }
+    // Back (the gesture or the key) puts the lyrics or the queue away first, then leaves
+    var wideNow by remember { mutableStateOf(false) }
+    BackHook(app, panel && !wideNow && app.current is Screen.NowPlaying) { panel = false }
     val c = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
     val d = LocalDensity.current
@@ -606,7 +609,7 @@ fun NowPlayingScreen(app: AppState) {
         if (drop.value > tall * 0.2f || vy > fling) {
             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureEnd)
             drop.animateTo(tall, tween(Motion.SHORT + 50, easing = Motion.emphasizedOut), initialVelocity = vy)
-            app.back()
+            app.back(hooks = false)
         } else drop.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = 500f), initialVelocity = vy)
     }
     fun skipEnd(vx: Float) = scope.launch {
@@ -675,6 +678,7 @@ fun NowPlayingScreen(app: AppState) {
             NowTop(app, s, pullDown)
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val wide = maxWidth > 760.dp
+                androidx.compose.runtime.SideEffect { wideNow = wide }
                 if (wide) Row(Modifier.fillMaxSize().padding(start = 40.dp, end = 40.dp, bottom = 32.dp, top = 4.dp), horizontalArrangement = Arrangement.spacedBy(48.dp)) {
                     Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true, cover = coverDrag.then(coverLook)) }
                     Column(Modifier.weight(1f).widthIn(max = 470.dp).fillMaxHeight().clip(RoundedCornerShape(28.dp))
@@ -690,7 +694,7 @@ fun NowPlayingScreen(app: AppState) {
                                 androidx.compose.animation.fadeOut(tween(Motion.SHORT))
                         }, label = "now") { small ->
                         if (!small) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true, cover = coverDrag.then(coverLook)) }
-                        else SongPanel(app, s, big = false, cover = pullDown)
+                        else SongPanel(app, s, big = false, cover = pullDown.clickable(interactionSource = null, indication = null) { panel = false })
                     }
                     Box(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
                         NowTabs(if (panel) tab else -1) { t -> if (panel && t == tab) panel = false else { tab = t; panel = true } }
@@ -710,7 +714,7 @@ private fun NowTop(app: AppState, s: Song, drag: Modifier) {
     val pb = app.playback
     var more by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().then(drag).padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = { app.back() }) { Icon(Sym.KeyboardArrowDown.fill, tr("Close")) }
+        IconButton(onClick = { app.back(hooks = false) }) { Icon(Sym.KeyboardArrowDown.fill, tr("Close")) }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(tr("Now playing"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(s.album.ifEmpty { s.artist }, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)

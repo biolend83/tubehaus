@@ -182,6 +182,7 @@ class Playback(private val app: AppState) {
 
     private var job: Job? = null
     private var watchedMs = 0L          // the furthest point reached, for learning
+    private var prefetched = false      // the next video was asked for ahead (Streams)
     private var learned = false
     private var endHandled = false
     private var refreshed = false       // the streams were asked for again once after the player failed
@@ -197,6 +198,10 @@ class Playback(private val app: AppState) {
                 if (s.videoId != v.id) return@collectLatest
                 if (s.error != null && !refreshed) { refreshed = true; refresh(v, s.positionMs); return@collectLatest }
                 if (s.positionMs > watchedMs) watchedMs = s.positionMs
+                if (!prefetched && s.durationMs > 0 && s.positionMs > s.durationMs - 20_000 && !store.settings.value.calm) {
+                    prefetched = true
+                    next?.let { n -> if (!app.platform.metered() || queue.isNotEmpty() || music) Streams.prefetch(app.scope, n.id) }
+                }
                 sponsorCheck(s)
                 if (abB > 0 && s.playing && s.positionMs >= abB) player.seekTo(abA.coerceAtLeast(0))
                 val now = Sys.nowMs()
@@ -233,6 +238,7 @@ class Playback(private val app: AppState) {
         error = null; errorAge = false
         loading = true
         watchedMs = 0
+        prefetched = false
         learned = false
         endHandled = false
         refreshed = false
@@ -263,7 +269,7 @@ class Playback(private val app: AppState) {
             }
             try {
                 // a saved copy plays from the device, also without internet
-                val s = app.offline.stream(v.id) ?: YouTube.stream(v.id)
+                val s = app.offline.stream(v.id) ?: Streams.get(app.scope, v.id)
                 if (video?.id != v.id) return@launch
                 // kids mode: only the picked channels, and nothing once today's time is used up
                 val up = app.kidsTimeUp()
@@ -342,7 +348,7 @@ class Playback(private val app: AppState) {
             ?: list.firstOrNull { it.lang.substringBefore('-') == want }
             ?: list.firstOrNull { !it.auto } ?: list.firstOrNull()
 
-    fun retry() { video?.let { open(it, queue) } }
+    fun retry() { video?.let { Streams.forget(it.id); open(it, queue) } }
 
     /**
      * The player couldn't load the streams it was given: their addresses are tied to the network
@@ -386,6 +392,7 @@ class Playback(private val app: AppState) {
         upNextJob?.cancel()
         upNextJob = app.scope.launch {
             if (wait > 800L) upNext = n
+            Streams.prefetch(app.scope, n.id)
             delay(wait)
             upNext = null; upNextJob = null
             if (video?.id == v.id) goNext(n)
