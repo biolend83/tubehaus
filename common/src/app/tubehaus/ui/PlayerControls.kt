@@ -1031,8 +1031,10 @@ private fun SheetLine(onClick: () -> Unit, content: @Composable androidx.compose
 private fun SheetRow(icon: ImageVector, label: String, value: String, onClick: () -> Unit) {
     SheetLine(onClick) { focused ->
         Icon(icon, null)
-        Text(label, Modifier.weight(1f).padding(start = 20.dp), style = MaterialTheme.typography.bodyLarge)
-        Text(value, color = if (focused) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, Modifier.weight(1f).padding(start = 20.dp), style = MaterialTheme.typography.bodyLarge, maxLines = 1, softWrap = false)
+        // the value stays on one line and gives way first (a long audio track name squeezed the label, #70)
+        Text(value, Modifier.padding(start = 12.dp).widthIn(max = 170.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            color = if (focused) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
