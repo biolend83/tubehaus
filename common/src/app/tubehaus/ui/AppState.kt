@@ -232,9 +232,14 @@ class AppState(val platform: Platform, val store: Store) {
     /** false when there is nowhere to go back to (the app may close) */
     /** the TV's pages: Back first moves to the menu, and on Home asks to be pressed again (TvApp) */
     var tvBack: (() -> Boolean)? = null
+    /** what's open on the page in front (a panel, lyrics...): Back closes the newest one first; see BackHook */
+    val backHooks = mutableListOf<() -> Boolean>()
 
     fun back(hooks: Boolean = true): Boolean {
-        if (hooks) tvBack?.let { if (it()) return true }
+        if (hooks) {
+            for (h in backHooks.toList().asReversed()) if (h()) return true
+            tvBack?.let { if (it()) return true }
+        }
         if (fullscreen) { setFull(false); return true }
         if (stack.size > 1) { lastMove = -1; ahead.add(stack.removeAt(stack.size - 1)); return true }
         if (stack.last() != Screen.Home) { lastMove = 0; stack[0] = Screen.Home; return true }

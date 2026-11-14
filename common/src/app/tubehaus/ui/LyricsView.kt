@@ -47,6 +47,7 @@ import app.tubehaus.engine.Lyrics
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /*
@@ -122,12 +123,14 @@ fun SyncedLyrics(lines: List<Lyrics.Line>, now: () -> Long, seek: (Long) -> Unit
         // Korean and Japanese break between words (phrases), not in the middle of one
         lineBreak = androidx.compose.ui.text.style.LineBreak.Heading)
     val gapPx = with(androidx.compose.ui.platform.LocalDensity.current) { 14.dp.toPx() }
+    // read by hand (dragged): every line sharp, as Apple Music does; else the far ones go soft
+    val reading by remember(rows) { derivedStateOf { abs(user.value) > 2f } }
     Layout(
         content = {
             rows.forEachIndexed { i, r ->
                 val on = i == active
                 if (r.gap) Pause(r, on, now)
-                else Line(r, on, past = i < active, now = now, ink = c.onBackground, style = textStyle) {
+                else Line(r, on, past = i < active, now = now, ink = c.onBackground, style = textStyle, soft = if (reading) 0 else abs(i - active)) {
                     scope.launch { user.animateTo(0f, tween(Motion.MEDIUM)) }
                     userAt = 0L
                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick)
@@ -178,8 +181,11 @@ fun SyncedLyrics(lines: List<Lyrics.Line>, now: () -> Long, seek: (Long) -> Unit
 
 /** a sung line; the sung one fills from the left as the song goes */
 @Composable
-private fun Line(r: Row, on: Boolean, past: Boolean, now: () -> Long, ink: Color, style: androidx.compose.ui.text.TextStyle, tap: () -> Unit) {
+private fun Line(r: Row, on: Boolean, past: Boolean, now: () -> Long, ink: Color, style: androidx.compose.ui.text.TextStyle, soft: Int, tap: () -> Unit) {
     val lit by animateFloatAsState(if (on) 1f else 0f, tween(420, easing = Motion.standard))
+    // depth: the further a line is from the sung one, the softer (up to four lines away), eased in and out
+    val blurPx = with(androidx.compose.ui.platform.LocalDensity.current) { 0.9.dp.toPx() }
+    val blur by animateFloatAsState(soft.coerceAtMost(4) * blurPx, tween(600, easing = Motion.standard))
     val grow by animateFloatAsState(if (on) 1f else 0.94f, spring(dampingRatio = 0.75f, stiffness = 220f))
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     // how long the words take: guessed from the length, never past the next line
@@ -195,6 +201,9 @@ private fun Line(r: Row, on: Boolean, past: Boolean, now: () -> Long, ink: Color
                 scaleX = grow; scaleY = grow
                 transformOrigin = TransformOrigin(0f, 0.5f)
                 alpha = (if (past) 0.38f else 0.5f) + (1f - (if (past) 0.38f else 0.5f)) * lit
+                // whole pixels, so an easing blur reuses a few effects instead of one each frame
+                val b = blur.roundToInt()
+                renderEffect = if (b > 0) androidx.compose.ui.graphics.BlurEffect(b.toFloat(), b.toFloat(), androidx.compose.ui.graphics.TileMode.Decal) else null
             }
             .drawWithContent {
                 val tl = layout

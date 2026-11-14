@@ -1035,3 +1035,18 @@ fun ContinueRow(app: AppState, forYou: Boolean = true) {
         modifier = Modifier.padding(start = if (phone) 16.dp else 4.dp, bottom = 8.dp))
 }
 
+/**
+ * Back closes this first while [enabled] (a panel, the lyrics...), then goes back as usual. Hooks
+ * stack: the newest one gets Back first, and one that is off lets it through, so a panel left open
+ * on a page that is no longer in front never swallows a press.
+ */
+@Composable
+fun BackHook(app: AppState, enabled: Boolean, onBack: () -> Unit) {
+    val on by androidx.compose.runtime.rememberUpdatedState(enabled)
+    val act by androidx.compose.runtime.rememberUpdatedState(onBack)
+    androidx.compose.runtime.DisposableEffect(app) {
+        val h: () -> Boolean = { if (on) { act(); true } else false }
+        app.backHooks.add(h)
+        onDispose { app.backHooks.remove(h) }
+    }
+}
