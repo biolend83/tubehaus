@@ -528,6 +528,13 @@ class Playback(private val app: AppState) {
         replay(player.state.value.positionMs)
     }
 
+    /** music: back to the song alone after [showVideo], from where it is (the sound only when that is set) */
+    fun hideVideo() {
+        if (!music || !withVideo) return
+        withVideo = false
+        replay(player.state.value.positionMs, autoplay = player.state.value.playing)
+    }
+
     // ------------------------------------------------------------------ watch time
     private var countedStart = false
     private var lastTick = 0L
