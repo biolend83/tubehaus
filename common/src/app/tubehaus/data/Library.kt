@@ -65,6 +65,8 @@ data class Taste(
     /** "not interested": hidden videos and channels */
     val hiddenVideos: List<String> = emptyList(),
     val hiddenChannels: List<String> = emptyList(),
+    /** keyword -> affinity by the time it was watched ("wdm" weekday morning ... "wen" weekend night) */
+    val kwTime: Map<String, Map<String, Double>> = emptyMap(),
 )
 
 @Serializable
