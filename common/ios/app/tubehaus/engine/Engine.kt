@@ -153,6 +153,8 @@ object Engine {
     private suspend fun answer(r: JsonElement): String = when (r.at("kind").str) {
         "visitor" -> buildJsonObject { put("value", InnerTube.visitor()) }.toString()
         "reroll" -> buildJsonObject { put("value", InnerTube.reroll()) }.toString()
+        // the TV path waits out the start ad YouTube placed before its links play (engine 10)
+        "sleep" -> { kotlinx.coroutines.delay((r.at("ms").long ?: 0L).coerceIn(0L, 10_000L)); "{}" }
         "http" -> try {
             val headers = r.at("headers").obj?.mapValues { (_, v) -> v.str ?: "" } ?: emptyMap()
             val url = r.at("url").str ?: ""
