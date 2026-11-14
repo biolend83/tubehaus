@@ -665,6 +665,17 @@ class FeedFallback(unittest.TestCase):
 class Engine(unittest.TestCase):
     """The built-in YouTube engine's own reading of YouTube's texts and answers (no network)."""
 
+    def test_comments_token(self):
+        # the protobuf YouTube's page builds for a video's first comments page (one request instead of two)
+        self.assertEqual(ts._pb_varint(300), bytes([0xAC, 0x02]))
+        self.assertEqual(len(ts._pb_varint(-1)), 10)
+        self.assertEqual(ts._pb([(1, 1), (2, "ab"), (3, [(1, 2)])]), bytes([0x08, 1, 0x12, 2, 0x61, 0x62, 0x1A, 2, 0x08, 2]))
+        top, new = ts._comments_token("dQw4w9WgXcQ"), ts._comments_token("dQw4w9WgXcQ", newest=True)
+        raw = base64.urlsafe_b64decode(top)
+        self.assertEqual(raw.count(b"dQw4w9WgXcQ"), 2)
+        self.assertNotEqual(top, new)
+        self.assertTrue(raw.startswith(b"\x12"))
+
     def test_counts(self):
         for text, n in (("1.2M views", 1200000), ("조회수 79만회", 790000), ("1,234 views", 1234), ("12万回視聴", 120000),
                         ("No views", 0), ("조회수 1.5억회", 150000000), ("1,5 mil visualizações", 1500),

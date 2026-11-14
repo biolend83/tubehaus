@@ -2397,7 +2397,7 @@ def _first(o, key):
 # Every request carries a visitor identity, as a browser's cookie would; YouTube's bot wall is
 # tied to it, so when every player client is walled the identity is replaced once (at most twice
 # in six hours), then the WARP address.
-import math, random
+import gzip, math, random
 from concurrent.futures import ThreadPoolExecutor
 
 ENG_HL = env("HT_HL", "")                   # YouTube's language for texts ("3 days ago"); "" = the viewer's browser
@@ -2472,6 +2472,49 @@ def eng_reroll():
         return True
 
 
+_it_idle = queue.LifoQueue()      # open connections to www.youtube.com, reused: a new one costs a TLS handshake through WARP
+
+
+def _it_conn(timeout):
+    try:
+        c = _it_idle.get_nowait()
+        c.timeout = timeout
+        if c.sock:
+            c.sock.settimeout(timeout)
+        return c, True
+    except queue.Empty:
+        pass
+    if YT_PROXY:
+        host, _, port = YT_PROXY.rpartition(":")
+        c = http.client.HTTPSConnection(host, int(port), timeout=timeout)
+        c.set_tunnel("www.youtube.com", 443)
+    else:
+        c = http.client.HTTPSConnection("www.youtube.com", 443, timeout=timeout)
+    return c, False
+
+
+def _it_post(path, data, headers, timeout):
+    """POST to www.youtube.com on a kept-open connection, the answer gzip'd (about a tenth of the bytes);
+    returns (status, body)"""
+    for attempt in range(2):
+        c, reused = _it_conn(timeout)
+        try:
+            c.request("POST", path, body=data, headers=dict(headers, **{"Accept-Encoding": "gzip"}))
+            r = c.getresponse()
+            body, status, enc = r.read(), r.status, (r.getheader("Content-Encoding") or "").lower()
+        except (http.client.HTTPException, OSError):
+            c.close()
+            if reused and attempt == 0:      # YouTube closed it while it sat idle: once more on a new one
+                continue
+            raise
+        if r.will_close or _it_idle.qsize() >= 8:
+            c.close()
+        else:
+            _it_idle.put(c)
+        return status, gzip.decompress(body) if enc == "gzip" else body
+    raise OSError("no connection")
+
+
 def it_call(endpoint, body, client=None, cid=1, ua=BROWSER_UA, hl="en", gl="US", timeout=15, visitor=True):
     """one InnerTube request (YouTube's own JSON API) through YT_PROXY; 429/503 wait 1-2 s, then 3-6 s"""
     client = client or ENG_WEB
@@ -2485,21 +2528,26 @@ def it_call(endpoint, body, client=None, cid=1, ua=BROWSER_UA, hl="en", gl="US",
     if v:
         headers["X-Goog-Visitor-Id"] = v
     data = json.dumps({"context": {"client": ctx}, **{k: x for k, x in body.items() if x is not None}}).encode()
-    url = "https://www.youtube.com/youtubei/v1/%s?prettyPrint=false" % endpoint
+    path = "/youtubei/v1/%s?prettyPrint=false" % endpoint
     for attempt in range(3):
         try:
-            return json.loads(YT.open(urllib.request.Request(url, data=data, headers=headers), timeout=timeout).read())
-        except urllib.error.HTTPError as e:
-            if e.code in (429, 503) and attempt < 2:
-                time.sleep(random.uniform(1, 2) if attempt == 0 else random.uniform(3, 6))
-                continue
-            if e.code in (400, 404):
-                raise EngError("YouTube didn't find that", 404)
-            raise EngError("YouTube answered %d" % e.code, 502)
-        except (urllib.error.URLError, OSError) as e:
+            status, raw = _it_post(path, data, headers, timeout)
+        except (http.client.HTTPException, OSError) as e:
             if attempt < 1:
                 continue
             raise EngError("No connection to YouTube (%s)" % repr(e)[:80], 502)
+        if status in (429, 503) and attempt < 2:
+            time.sleep(random.uniform(1, 2) if attempt == 0 else random.uniform(3, 6))
+            continue
+        if status in (400, 404):
+            raise EngError("YouTube didn't find that", 404)
+        if status >= 300:
+            raise EngError("YouTube answered %d" % status, 502)
+        try:
+            return json.loads(raw)
+        except ValueError:
+            raise EngError("YouTube sent something that isn't JSON", 502)
+    raise EngError("YouTube is busy", 502)
 
 
 # ---- numbers and times in YouTube's texts, in the languages it writes them in ----
@@ -3070,11 +3118,16 @@ def eng_suggest(qs, hl, gl):
     q = qs.get("q") or ""
     if not q.strip():
         return {"query": q, "suggestions": []}
+    # client=youtube, as YouTube's own search box asks (client=firefox has answered 400 since November 2026);
+    # the answer is a script call: window.google.ac.h(["q", [["suggestion", 0, [...]], ...], {...}])
     url = "https://suggestqueries-clients6.youtube.com/complete/search?" + urllib.parse.urlencode(
-        {"client": "firefox", "ds": "yt", "hl": qs.get("hl") or hl, "gl": qs.get("gl") or gl, "q": q})
+        {"client": "youtube", "ds": "yt", "gs_ri": "youtube", "hl": qs.get("hl") or hl or "en", "gl": qs.get("gl") or gl or "US", "q": q})
     try:
-        d = json.loads(YT.open(urllib.request.Request(url, headers={"User-Agent": BROWSER_UA}), timeout=8).read().decode("utf-8", "replace"))
-        return {"query": q, "suggestions": [s for s in d[1] if isinstance(s, str)][:15]}
+        r = YT.open(urllib.request.Request(url, headers={"User-Agent": BROWSER_UA}), timeout=8)
+        t = r.read().decode(r.headers.get_content_charset() or "utf-8", "replace")     # EUC-KR for hl=ko, for one
+        d = json.loads(t[t.index("(") + 1:t.rindex(")")] if "(" in t[:40] else t)
+        out = [x[0] if isinstance(x, list) and x else x for x in d[1]]
+        return {"query": q, "suggestions": [x for x in out if isinstance(x, str)][:15]}
     except Exception as ex:
         log("engine", "suggest FAIL %s" % repr(ex)[:80])
         return {"query": q, "suggestions": []}
@@ -3386,10 +3439,56 @@ def _comment_page(d):
     return out, nxt
 
 
+def _pb_varint(n):
+    n &= (1 << 64) - 1
+    out = bytearray()
+    while True:
+        b, n = n & 0x7F, n >> 7
+        out.append(b | 0x80 if n else b)
+        if not n:
+            return bytes(out)
+
+
+def _pb(fields):
+    """a protobuf message from [(field, int | str | bytes | [nested fields])]"""
+    out = b""
+    for num, v in fields:
+        if isinstance(v, int):
+            out += _pb_varint(num << 3) + _pb_varint(v)
+            continue
+        v = _pb(v) if isinstance(v, list) else v.encode() if isinstance(v, str) else v
+        out += _pb_varint(num << 3 | 2) + _pb_varint(len(v)) + v
+    return out
+
+
+def _comments_token(vid, newest=False):
+    """the token of a video's first comments page, as YouTube's own page builds it, so no "next" call is needed
+    to find it (Invidious does the same)"""
+    msg = _pb([(2, [(2, vid), (25, 0), (28, 1), (36, [(5, -1), (8, 0)]), (40, [(1, 4), (3, "https://www.youtube.com"), (4, "")])]),
+               (3, 6), (6, [(1, ""), (4, [(4, vid), (6, 1 if newest else 0)]), (5, 20)])])
+    return base64.urlsafe_b64encode(msg).decode()
+
+
 def eng_comments(vid, qs, hl, gl):
     cont = qs.get("continuation")
     count = None
     if not cont:
+        newest = (qs.get("sort_by") or "").lower() in ("new", "newest")
+        try:
+            d = it_call("next", {"continuation": _comments_token(vid, newest)}, hl=hl, gl=gl)
+        except EngError:
+            d = {}
+        comments, nxt = _comment_page(d)
+        if comments:
+            out = {"videoId": vid, "comments": comments}
+            head = next((e for e in d.get("onResponseReceivedEndpoints") or []), {})
+            c = eng_count(_txt(_first(head, "countText")))
+            if c is not None:
+                out["commentCount"] = c
+            if nxt:
+                out["continuation"] = nxt
+            return out
+        # no comments that way (turned off, or YouTube changed the token): find the token on the watch page
         n = it_call("next", {"videoId": vid}, hl=hl, gl=gl)
         panel = next((_dig(p, "engagementPanelSectionListRenderer") for p in n.get("engagementPanels") or []
                       if _dig(p, "engagementPanelSectionListRenderer", "panelIdentifier") == "engagement-panel-comments-section"), None)

@@ -972,7 +972,10 @@ export class Player {
   }
   hideCtl() {
     if (this.menuOpen || this.scrubbing) return;
-    if (this.q(".ytp-bar").contains(document.activeElement)) return;
+    // keep it up while the keyboard or a TV remote is on its buttons, but not because a button was clicked
+    // (a clicked button, the fullscreen one say, keeps the focus and the bar never went away)
+    const a = document.activeElement;
+    if (this.q(".ytp-bar").contains(a) && a.matches?.(":focus-visible")) return;
     if (this.q(".ytp-bottom").matches(":hover") && !isTouch) return;
     this.root.classList.remove("ctl");
   }
