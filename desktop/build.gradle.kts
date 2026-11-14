@@ -114,9 +114,21 @@ val translateHelper = tasks.register<Exec>("translateHelper") {
     val arch = if (System.getProperty("os.arch") == "aarch64") "arm64" else "x86_64"
     inputs.file(src)
     outputs.dir(out)
-    onlyIf { System.getProperty("os.name").startsWith("Mac") && File("/usr/bin/swiftc").exists() }
+    onlyIf { System.getProperty("os.name").startsWith("Mac") && File("/usr/bin/xcrun").exists() }
+    // the macOS 26 SDK is needed; on a build machine whose default Xcode is older, a newer
+    // Xcode 26 next to it is used for this one step (the rest of the build keeps the default)
+    File("/Applications").listFiles { f -> f.name.matches(Regex("Xcode_2[6-9][0-9.]*\\.app")) }
+        ?.maxByOrNull { it.name }?.let { environment("DEVELOPER_DIR", "${it.path}/Contents/Developer") }
     doFirst { out.get().dir("translate").asFile.mkdirs() }
-    commandLine("/usr/bin/swiftc", "-O", "-target", "$arch-apple-macos26", src.asFile.path, "-o", out.get().file("translate/translate-mac").asFile.path)
+    commandLine("/usr/bin/xcrun", "swiftc", "-O", "-target", "$arch-apple-macos26", src.asFile.path, "-o", out.get().file("translate/translate-mac").asFile.path)
+    // no macOS 26 SDK at all: the app is built without the helper and hides the "Translate" links
+    isIgnoreExitValue = true
+    doLast {
+        if (executionResult.get().exitValue != 0) {
+            out.get().file("translate/translate-mac").asFile.delete()
+            logger.warn("translateHelper: no macOS 26 SDK here, the Mac app is built without comment translation")
+        }
+    }
 }
 sourceSets["main"].resources.srcDir(translateHelper)
 
