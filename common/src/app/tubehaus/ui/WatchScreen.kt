@@ -157,8 +157,30 @@ fun WatchScreen(app: AppState) {
                 }
             }
         } else {
-            Column(Modifier.fillMaxSize()) {
-                PlayerBox(app)
+            // phones: pull the video down and the whole page follows the finger, shrinking toward the
+            // corner as it goes, as YouTube's page folds into its mini player; let go past a quarter
+            // of the screen (or with a flick) and it drops into the mini player, otherwise it springs back
+            val scope = rememberCoroutineScope()
+            val pull = remember(v.id) { Animatable(0f) }
+            val tall = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+            Column(Modifier.fillMaxSize().graphicsLayer {
+                val f = (pull.value / tall).coerceIn(0f, 1f)
+                translationY = pull.value * 0.85f
+                val k = 1f - 0.45f * f
+                scaleX = k; scaleY = k
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.95f, 0f)
+                alpha = 1f - 0.7f * f
+            }) {
+                PlayerBox(app,
+                    onPull = { dy -> scope.launch { pull.snapTo((pull.value + dy).coerceAtLeast(0f)) } },
+                    onPullEnd = { speed ->
+                        scope.launch {
+                            if (pull.value > tall * 0.25f || (speed > 1200f && pull.value > 24f)) {
+                                pull.animateTo(tall, tween(Motion.SHORT + 40, easing = Motion.emphasizedOut))
+                                app.back()
+                            } else pull.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 500f))
+                        }
+                    })
                 Box(Modifier.fillMaxSize().riseIn(v.id)) {
                     LazyColumn(Modifier.fillMaxSize()) {
                         under(app, v)
@@ -197,7 +219,7 @@ fun WatchScreen(app: AppState) {
 }
 
 @Composable
-private fun PlayerBox(app: AppState, sideGestures: Boolean = false) {
+private fun PlayerBox(app: AppState, sideGestures: Boolean = false, onPull: ((Float) -> Unit)? = null, onPullEnd: ((Float) -> Unit)? = null) {
     val pb = app.playback
     val st by app.player.state.collectAsState()
     val touch = app.platform.touch
@@ -221,12 +243,27 @@ private fun PlayerBox(app: AppState, sideGestures: Boolean = false) {
             .pointerInput(touch) {
                 if (!touch) return@pointerInput
                 var pulled = 0f
+                // how fast the finger was moving when it let go (pixels a second), for a flick
+                var speed = 0f
+                var last = 0L
                 detectVerticalDragGestures(
-                    onDragStart = { pulled = 0f },
-                    onVerticalDrag = { change, dy -> change.consume(); pulled += dy },
+                    onDragStart = { pulled = 0f; speed = 0f; last = 0L },
+                    onVerticalDrag = { change, dy ->
+                        change.consume()
+                        val t = change.uptimeMillis
+                        if (last != 0L && t > last) speed = 0.6f * speed + 0.4f * (dy * 1000f / (t - last))
+                        last = t
+                        pulled += dy
+                        // the page follows the finger down (not up: up is full screen)
+                        if (onPull != null && (pulled > 0f || dy < 0f)) onPull(if (pulled > 0f) dy else 0f)
+                    },
+                    onDragCancel = { onPullEnd?.invoke(0f) },
                     onDragEnd = {
-                        if (pulled > 80.dp.toPx()) app.back()
-                        else if (pulled < -60.dp.toPx()) app.setFull(true)
+                        when {
+                            pulled < -60.dp.toPx() -> { onPull?.invoke(-10_000f); app.setFull(true) }
+                            onPullEnd != null -> onPullEnd(speed)
+                            pulled > 80.dp.toPx() -> app.back()
+                        }
                     },
                 )
             },
@@ -319,6 +356,7 @@ private fun Info(app: AppState, v: Video, flush: Boolean = false) {
     val hidden = app.store.settings.state.collectAsState().value.hideUnder
     fun has(part: String) = part !in hidden
     var sheet by remember(v.id) { mutableStateOf(false) }
+    var open by remember(v.id) { mutableStateOf(false) }
     val viewsText = d?.viewsText?.takeIf { it.isNotEmpty() } ?: v.views.takeIf { it > 0 }?.let { tr("{n} views").replace("{n}", compact(it)) } ?: ""
     val line = listOfNotNull(
         viewsText.takeIf { !calm && has("views") },
@@ -331,8 +369,10 @@ private fun Info(app: AppState, v: Video, flush: Boolean = false) {
     val desk = !LocalCompact.current && !app.platform.touch
     Column(Modifier.padding(horizontal = if (flush) 0.dp else 12.dp, vertical = 10.dp)) {
         if (desk) {
-            if (has("title")) Text(titleOf(v, app), fontSize = 21.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+            if (has("title")) SelectionContainer {
+                Text(titleOf(v, app), fontSize = 21.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+            }
         } else {
             // the title and one quiet line under it; either opens the description
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { sheet = true }) {
@@ -361,14 +401,28 @@ private fun Info(app: AppState, v: Video, flush: Boolean = false) {
             if (showSub) SubscribeButton(v.channelId, v.author, d?.avatar?.ifEmpty { null } ?: v.avatar, app)
         }
         Actions(app, v, ::has)
+        // a computer opens the description in place, as YouTube's website does (a sheet from the bottom
+        // in the middle of a wide window looked like a phone's); "Show less" folds it back
         if (desk && (line.isNotEmpty() || desc.isNotEmpty())) Column(
-            Modifier.fillMaxWidth().padding(top = 14.dp).clip(RoundedCornerShape(18.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainer).clickable { sheet = true }.padding(horizontal = 16.dp, vertical = 14.dp),
+            Modifier.fillMaxWidth().padding(top = 14.dp).clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .let { if (open) it else it.clickable { open = true } }
+                .animateContentSize(tween(Motion.MEDIUM, easing = Motion.standard))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
             if (line.isNotEmpty()) Text(line, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, maxLines = 1)
             if (desc.isNotEmpty()) {
-                Text(desc, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                Text(tr("...more"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+                if (!open) {
+                    Text(desc, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    Text(tr("...more"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+                } else {
+                    SelectionContainer {
+                        LinkedText(desc, app, Modifier.fillMaxWidth().padding(top = 2.dp), onTime = { s -> app.player.seekTo(s * 1000L) })
+                    }
+                    ChapterCards(app, Modifier.padding(top = 20.dp)) {}
+                    Text(tr("Show less"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 16.dp).clip(RoundedCornerShape(6.dp)).clickable { open = false }.padding(vertical = 2.dp))
+                }
             }
         }
     }
@@ -417,17 +471,24 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
                 }
             }
             // the chapters as cards in a row, as under YouTube's description; a tap jumps there
-            val chapters = app.playback.chapters
-            if (chapters.isNotEmpty()) item {
-                Text(tr("Chapters"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
-                LazyRow(Modifier.fillMaxWidth().padding(bottom = 32.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(chapters) { c ->
-                        Column(Modifier.width(160.dp).clip(RoundedCornerShape(8.dp)).clickable { app.player.seekTo(c.startMs); onClose() }) {
-                            if (c.thumb.isNotEmpty()) Img(c.thumb, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)))
-                            Text(c.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-                            Text(durationMs(c.startMs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
+            if (app.playback.chapters.isNotEmpty()) item { ChapterCards(app, Modifier.padding(bottom = 32.dp), onClose) }
+        }
+    }
+}
+
+/** The chapters as cards in a row, as under YouTube's description; a click jumps there. */
+@Composable
+private fun ChapterCards(app: AppState, modifier: Modifier, after: () -> Unit) {
+    val chapters = app.playback.chapters
+    if (chapters.isEmpty()) return
+    Column(modifier) {
+        Text(tr("Chapters"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+        LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(chapters) { c ->
+                Column(Modifier.width(160.dp).clip(RoundedCornerShape(8.dp)).clickable { app.player.seekTo(c.startMs); after() }) {
+                    if (c.thumb.isNotEmpty()) Img(c.thumb, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)))
+                    Text(c.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                    Text(durationMs(c.startMs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -647,9 +708,13 @@ private fun CommentView(app: AppState, c: Comment, reply: Boolean = false) {
             }
             val translated = app.translations.shownText(c.id)
             SelectionContainer { Text(translated ?: c.text, style = MaterialTheme.typography.bodyMedium) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val lang = L.lang
-                if (app.platform.canTranslate && remember(c.text, lang) { !needsNoTranslation(c.text, lang) }) {
+            // as YouTube: Translate and the likes right under the text, then the replies as a small blue
+            // button with an arrow that turns when they open (a full-height text button left a gap above)
+            val lang = L.lang
+            val canTr = app.platform.canTranslate && remember(c.text, lang) { !needsNoTranslation(c.text, lang) }
+            val likes = !calm && c.likes.isNotEmpty()
+            if (canTr || likes) Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (canTr) {
                     val scope = rememberCoroutineScope()
                     val busy = app.translations.busy(c.id)
                     // plain text, not a TextButton: its minimum width would push the word off the comment's left edge
@@ -658,17 +723,25 @@ private fun CommentView(app: AppState, c: Comment, reply: Boolean = false) {
                         style = MaterialTheme.typography.labelLarge, color = Blue,
                         modifier = Modifier
                             .clickable(enabled = !busy) { scope.launch { app.translations.toggle(app.platform, c.id, c.text, lang, app::toast) } }
-                            .padding(vertical = 12.dp),
+                            .padding(vertical = 4.dp),
                     )
-                    Spacer(Modifier.width(16.dp))
+                    if (likes) Spacer(Modifier.width(16.dp))
                 }
-                if (!calm && c.likes.isNotEmpty()) {
-                    Icon(Sym.ThumbUp.outline, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(c.likes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
-                    Spacer(Modifier.width(16.dp))
+                if (likes) {
+                    Icon(Sym.ThumbUp.outline, null, Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(c.likes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 6.dp))
                 }
-                if (c.replies > 0 && c.repliesToken != null) TextButton(onClick = { showReplies = !showReplies }, contentPadding = PaddingValues(0.dp)) {
-                    Text(tr("{n} replies").replace("{n}", "${c.replies}"), color = Blue)
+            }
+            if (c.replies > 0 && c.repliesToken != null) {
+                val turn by androidx.compose.animation.core.animateFloatAsState(if (showReplies) -90f else 90f, tween(Motion.SHORT))
+                Row(
+                    Modifier.padding(top = 4.dp).clip(RoundedCornerShape(18.dp)).clickable { showReplies = !showReplies }
+                        .padding(start = 4.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Sym.ChevronRight.outline, null, Modifier.size(18.dp).graphicsLayer { rotationZ = turn }, tint = Blue)
+                    Text(tr("{n} replies").replace("{n}", "${c.replies}"), color = Blue, style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(start = 6.dp))
                 }
             }
         }
