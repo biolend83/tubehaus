@@ -226,7 +226,9 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Box(
-            Modifier.fillMaxHeight().aspectRatio(9f / 16f, matchHeightConstraintsFirst = true)
+            // a phone: the whole screen, as YouTube (9:16 by the height was wider than a phone and cut off
+            // the buttons and the title); wider screens: 9:16 in the middle
+            (if (LocalCompact.current) Modifier.fillMaxSize() else Modifier.fillMaxHeight().aspectRatio(9f / 16f, matchHeightConstraintsFirst = true))
                 .pointerInput(v.id) {
                     detectTapGestures(
                         onTap = { if (player.state.value.playing) player.pause() else player.play() },
@@ -250,14 +252,18 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
                 Icon(Sym.Favorite.fill, null, tint = Color.White, modifier = Modifier.size(96.dp))
             }
             // the bottom: channel, title, and a seek bar you can drag
-            Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Color(0x55000000)).padding(horizontal = 12.dp).padding(top = 12.dp, bottom = 4.dp)) {
+            // a soft shade up from the bottom, as YouTube's, so the white words read on any picture
+            Column(Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color(0x99000000))))
+                .padding(start = 14.dp, end = 14.dp, top = 40.dp, bottom = 6.dp)) {
                 val author = s?.author ?: v.author
                 val cid = s?.channelId ?: v.channelId
                 if (author.isNotEmpty()) Text(
                     "@$author", color = Color.White, fontWeight = FontWeight.Medium,
                     modifier = Modifier.clickable { if (cid.isNotEmpty()) app.go(Screen.Channel(cid, author)) },
                 )
-                Text(s?.title ?: v.title, color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(s?.title ?: v.title, color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp, end = 64.dp))
                 if (mine && st.durationMs > 0) {
                     Track(
                         value = (st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f), color = Red,
@@ -267,7 +273,9 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
                     )
                 }
             }
-            Column(Modifier.align(Alignment.CenterEnd).padding(end = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // the buttons down the right, near the bottom, each with its word under it, as on YouTube
+            Column(Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally) {
                 RoundAction(if (liked) Sym.ThumbUp.fill else Sym.ThumbUp.outline, tr("Like")) { app.store.setInList("likes", full, !liked) }
                 RoundAction(if (disliked) Sym.ThumbDown.fill else Sym.ThumbDown.outline, tr("Dislike")) { app.store.setInList("dislikes", full, !disliked) }
                 if (!app.store.settings.value.hideComments) RoundAction(Sym.Comment.outline, tr("Comments")) { comments = true }
@@ -290,9 +298,10 @@ private fun ShortPage(app: AppState, v: Video, s: Stream?, active: Boolean) {
 
 @Composable
 private fun RoundAction(icon: ImageVector, label: String, onClick: () -> Unit) {
-    Row {
-        IconButton(onClick = onClick, modifier = Modifier.background(Color(0x55000000), CircleShape)) {
-            Icon(icon, label, tint = Color.White)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        IconButton(onClick = onClick, modifier = Modifier.size(48.dp).background(Color(0x40FFFFFF), CircleShape)) {
+            Icon(icon, label, tint = Color.White, modifier = Modifier.size(26.dp))
         }
+        Text(label, color = Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
     }
 }
