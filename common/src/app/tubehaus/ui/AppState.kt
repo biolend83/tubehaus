@@ -59,6 +59,7 @@ class AppState(val platform: Platform, val store: Store) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     val stack = mutableStateListOf<Screen>(Screen.Home)
     val current: Screen get() = stack.last()
+    val translations = CommentTranslations()
     init {
         // the YouTube visitor identity is kept with the app's data (never in backups or exports)
         InnerTube.identityFile = platform.dataDir / "identity.json"

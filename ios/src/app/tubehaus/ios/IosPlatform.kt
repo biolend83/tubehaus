@@ -81,6 +81,10 @@ class IosPlatform : Platform {
         host.presentViewController(vc, animated = true, completion = null)
     }
 
+    // comment translation: the Swift side's (App.swift), iOS 18+
+    override val canTranslate get() = CommentTranslation.translator != null
+    override suspend fun translate(text: String, target: String) = CommentTranslation.translate(text, target)
+
     override fun share(title: String, url: String): Boolean {
         present(UIActivityViewController(activityItems = listOf(url), applicationActivities = null))
         return true

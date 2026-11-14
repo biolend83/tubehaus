@@ -660,8 +660,23 @@ private fun CommentView(app: AppState, c: Comment, reply: Boolean = false) {
                 if (c.published.isNotEmpty()) Text(c.published, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
             }
-            SelectionContainer { Text(c.text, style = MaterialTheme.typography.bodyMedium) }
+            val translated = app.translations.shownText(c.id)
+            SelectionContainer { Text(translated ?: c.text, style = MaterialTheme.typography.bodyMedium) }
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val lang = L.lang
+                if (app.platform.canTranslate && remember(c.text, lang) { !needsNoTranslation(c.text, lang) }) {
+                    val scope = rememberCoroutineScope()
+                    val busy = app.translations.busy(c.id)
+                    // plain text, not a TextButton: its minimum width would push the word off the comment's left edge
+                    Text(
+                        tr(when { busy -> "Translating…"; translated != null -> "Show original"; else -> "Translate" }),
+                        style = MaterialTheme.typography.labelLarge, color = Blue,
+                        modifier = Modifier
+                            .clickable(enabled = !busy) { scope.launch { app.translations.toggle(app.platform, c.id, c.text, lang, app::toast) } }
+                            .padding(vertical = 12.dp),
+                    )
+                    Spacer(Modifier.width(16.dp))
+                }
                 if (!calm && c.likes.isNotEmpty()) {
                     Icon(Sym.ThumbUp.outline, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(c.likes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
