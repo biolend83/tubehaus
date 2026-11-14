@@ -943,8 +943,9 @@ fun ContinueRow(app: AppState, forYou: Boolean = true) {
             val v = left[i]
             Column(Modifier.width(220.dp).clip(RoundedCornerShape(18.dp)).tvClickable(RoundedCornerShape(18.dp)) { app.watch(v) }) {
                 Thumb(v, app, Modifier.fillMaxWidth(), rounded = 18)
+                // kept clear of the card's rounded bottom corners, which cut off the start of the last line
                 Text(titleOf(v, app), style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp))
+                    modifier = Modifier.padding(top = 6.dp, start = 4.dp, end = 4.dp, bottom = 10.dp))
             }
         }
     }

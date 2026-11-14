@@ -256,6 +256,9 @@ private fun Shell(app: AppState) {
     // the side menu folded away: a small menu button brings it back (in the top bar, or above the video)
     val railCollapsed = !compact && app.store.settings.state.collectAsState().value.railCollapsed
     val unfold = { app.store.settings.update { it.copy(railCollapsed = false) } }
+    // a computer: the menu button sits left of the logo in the top bar, as on YouTube's website
+    val deskBar = !compact && !app.platform.touch && !app.platform.tv
+    val fold = { app.store.settings.update { it.copy(railCollapsed = true) } }
     val navScroll = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
@@ -270,7 +273,7 @@ private fun Shell(app: AppState) {
         if (cur is Screen.Shorts) app.playback.close()
     }
     Scaffold(
-        topBar = { if (showTop) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) { TopBar(app, if (railCollapsed) unfold else null) } },
+        topBar = { if (showTop) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) { TopBar(app, if (railCollapsed) unfold else if (deskBar) fold else null) } },
         bottomBar = {
             Column {
                 // the mini player rises from the bottom edge and sinks back into it (phones, tablets, TVs;
@@ -293,7 +296,7 @@ private fun Shell(app: AppState) {
                 NavigationRail(
                     containerColor = MaterialTheme.colorScheme.background,
                     header = {
-                        IconButton(onClick = { app.store.settings.update { it.copy(railCollapsed = true) } }) {
+                        if (!(deskBar && showTop)) IconButton(onClick = { app.store.settings.update { it.copy(railCollapsed = true) } }) {
                             Icon(Sym.MenuOpen.fill, tr("Fold the menu"))
                         }
                         // the desktop: back and forward, like a browser's, out of the video page's way; dim when there is nowhere to go
@@ -415,10 +418,12 @@ private fun PhoneBar(app: AppState, root: Screen?) {
     val look = LocalLook.current
     val pillShape = RoundedCornerShape(30.dp)
     Column(Modifier.fillMaxWidth().background(c.background).windowInsetsPadding(NavigationBarDefaults.windowInsets)) {
+        // the 1.5 design: flat along the bottom with a hairline on top, as YouTube's
+        if (look == 3) HorizontalDivider(color = c.outline, thickness = 0.5.dp)
         val soft = accentSoft
         Row(
             Modifier.fillMaxWidth().let {
-                if (look == 0) it else it.padding(horizontal = 14.dp, vertical = 6.dp).clip(pillShape)
+                if (look == 0 || look == 3) it else it.padding(horizontal = 14.dp, vertical = 6.dp).clip(pillShape)
                     .background(c.surfaceContainerHigh)
                     .border(1.dp, if (look == 2) (if (c.background.luminance() < 0.5f) Color(0x1FFFFFFF) else Color.White) else Color.Transparent, pillShape)
             }.height(58.dp),
@@ -559,7 +564,7 @@ private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null) {
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { app.go(Screen.Search()) }) { Icon(Sym.Search.outline, tr("Search")) }
             }
-            if (LocalCompact.current || onMenu != null) IconButton(onClick = { app.go(Screen.Settings) }) { Icon(Sym.Settings.outline, tr("Settings")) }
+            if (LocalCompact.current || (onMenu != null && app.store.settings.value.railCollapsed)) IconButton(onClick = { app.go(Screen.Settings) }) { Icon(Sym.Settings.outline, tr("Settings")) }
         }
         // every device: Home, Subscriptions, Music, Live and More under the logo, on those pages themselves
         if (app.stack.size == 1 && app.current.underHome()) TopTabs(app)

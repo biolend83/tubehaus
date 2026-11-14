@@ -359,9 +359,9 @@ private fun ShelfRow(app: AppState, title: String, videos: List<Video>, edge: an
             Column(Modifier.width(cardW).clip(RoundedCornerShape(20.dp)).tvClickable(RoundedCornerShape(20.dp)) { app.watch(v) }) {
                 Thumb(v, app, Modifier.fillMaxWidth(), rounded = 20)
                 Text(titleOf(v, app), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 2,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp))
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp))
                 Text(v.details(app, calm), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp, end = 2.dp, top = 2.dp, bottom = 4.dp))
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 10.dp))
             }
         }
     }
