@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.6.0",
+          "buildVersion": "46",
+          "date": "2026-11-14T02:36:19+00:00",
+          "localizedDescription": "1.6.0: the same version as the TubeHaus server 1.6, \"Back to music\" in the music player, and small fixes.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.6.0/TubeHaus-1.6.0-ipad.ipa",
+          "size": 21394251,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.5.1",
           "buildVersion": "45",
           "date": "2026-11-13T14:38:53+00:00",
@@ -212,11 +221,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.5.1",
-      "versionDate": "2026-11-13T14:38:53+00:00",
-      "versionDescription": "1.5.1: opening a video no longer closes the app (#67), importing from FreeTube and Google Takeout (several files at once), and waiting and retrying when YouTube says too many requests.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.5.1/TubeHaus-1.5.1-ipad.ipa",
-      "size": 21395857
+      "version": "1.6.0",
+      "versionDate": "2026-11-14T02:36:19+00:00",
+      "versionDescription": "1.6.0: the same version as the TubeHaus server 1.6, \"Back to music\" in the music player, and small fixes.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.6.0/TubeHaus-1.6.0-ipad.ipa",
+      "size": 21394251
     }
   ],
   "news": [],
