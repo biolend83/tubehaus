@@ -1,0 +1,3 @@
+- Same version number as the TubeHaus server 1.6
+- Music: "Back to music" in the player menu after "Watch video" (#68, thanks @onedge)
+- PC: a long audio track name no longer squeezes the player settings menu (#70)
