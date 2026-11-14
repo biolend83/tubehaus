@@ -1,6 +1,6 @@
 pkgbase = tubehaus-bin
 	pkgdesc = Private YouTube client with no Google account, no ads and no tracking
-	pkgver = 1.5.1
+	pkgver = 1.6.0
 	pkgrel = 1
 	url = https://github.com/biolend83/tubehaus
 	arch = x86_64
@@ -19,12 +19,12 @@ pkgbase = tubehaus-bin
 	depends = xdg-utils
 	provides = tubehaus
 	conflicts = tubehaus
-	noextract = TubeHaus-1.5.1-linux-amd64.deb
-	noextract = TubeHaus-1.5.1-linux-arm64.deb
+	noextract = TubeHaus-1.6.0-linux-amd64.deb
+	noextract = TubeHaus-1.6.0-linux-arm64.deb
 	options = !strip
-	source_x86_64 = TubeHaus-1.5.1-linux-amd64.deb::https://github.com/biolend83/tubehaus/releases/download/app-v1.5.1/TubeHaus-1.5.1-linux-amd64.deb
-	sha256sums_x86_64 = 626d3b417aa93fbb9a13e45e69f79252954a905ee22557defa0ba03febf8c6f1
-	source_aarch64 = TubeHaus-1.5.1-linux-arm64.deb::https://github.com/biolend83/tubehaus/releases/download/app-v1.5.1/TubeHaus-1.5.1-linux-arm64.deb
-	sha256sums_aarch64 = 54b6a40937a4029ab551562cec0dbf5df3d7d016e208edac85c8e4bd6cad1dfc
+	source_x86_64 = TubeHaus-1.6.0-linux-amd64.deb::https://github.com/biolend83/tubehaus/releases/download/app-v1.6.0/TubeHaus-1.6.0-linux-amd64.deb
+	sha256sums_x86_64 = 9fd615e544b41eabccd08e926f253d1e3771c9a60d4c7c33c3875972de59f1c2
+	source_aarch64 = TubeHaus-1.6.0-linux-arm64.deb::https://github.com/biolend83/tubehaus/releases/download/app-v1.6.0/TubeHaus-1.6.0-linux-arm64.deb
+	sha256sums_aarch64 = 072db8b550d1bda139ed2496957a470ae5167ef7fc848701af288c3f05f385d5
 
 pkgname = tubehaus-bin
