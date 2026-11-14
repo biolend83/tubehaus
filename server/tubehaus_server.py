@@ -2858,6 +2858,138 @@ def eng_player(vid):
     return first or {}, None
 
 
+# ---- the TV client: what the others call "not available" (made for kids, some labels' music videos) ----
+# A Samsung TV's YouTube still serves those, but its links come locked: each one's signature and its
+# "n" parameter are challenges set by YouTube's player script. yt-dlp's EJS solver (server/ejs, run by
+# deno or node, both in the image for yt-dlp) answers them. The script changes every week or two; its
+# id is checked every six hours and a new one is read once (a second or two) and kept in STATE/ejs.
+EJS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ejs")
+TV_UA = "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/2.4.0 TV Safari/538.1"
+ENG_TV = ({"clientName": "TVHTML5", "clientVersion": "5.20260707", "deviceMake": "Samsung", "deviceModel": "SmartTV",
+           "osName": "Tizen", "osVersion": "2.4.0"}, 7, TV_UA)
+_ejs = {"player": None, "sts": 0, "at": 0, "pre": None}
+_ejs_lk = threading.Lock()
+
+
+def _js_runtime():
+    import shutil
+    for c in (env("HT_JS", ""), "deno", "/usr/local/bin/deno", "/root/.deno/bin/deno", "node"):
+        if c and shutil.which(c):
+            return shutil.which(c)
+    return None
+
+
+def _ejs_run(mode, payload, pre):
+    rt = _js_runtime()
+    if not rt:
+        raise RuntimeError("neither deno nor node is installed")
+    script = os.path.join(EJS_DIR, "solve.js")
+    deno = "deno" in os.path.basename(rt)
+    cmd = ([rt, "run", "-q", "--allow-read", "--allow-write", "--no-prompt", script] if deno else [rt, script]) + [EJS_DIR, mode, pre]
+    r = subprocess.run(cmd, input=payload, capture_output=True, text=True, timeout=90)
+    if r.returncode != 0:
+        raise RuntimeError("solver: " + ((r.stderr or "").strip().splitlines() or ["?"])[-1][:160])
+    return r.stdout.strip()
+
+
+def _ejs_ready():
+    """the player script's signature timestamp, its preprocessed form on disk; None when there is none"""
+    with _ejs_lk:
+        now = time.time()
+        if _ejs["player"] and now - _ejs["at"] < 6 * 3600:
+            return _ejs["sts"]
+        t0 = time.time()
+        try:
+            pid = re.search(r"player\\?/([0-9a-f]{8})", get("https://www.youtube.com/iframe_api").decode()).group(1)
+        except Exception:
+            return _ejs["sts"] if _ejs["player"] else None
+        _ejs["at"] = now
+        if pid == _ejs["player"]:
+            return _ejs["sts"]
+        d = os.path.join(STATE, "ejs")
+        os.makedirs(d, exist_ok=True)
+        pre, stsf = os.path.join(d, pid + ".pre.js"), os.path.join(d, pid + ".sts")
+        try:
+            if not (os.path.exists(pre) and os.path.exists(stsf)):
+                js = get("https://www.youtube.com/s/player/%s/player_ias.vflset/en_US/base.js" % pid, 30).decode()
+                sts = re.search(r"signatureTimestamp[=:](\d+)", js).group(1)
+                if _ejs_run("load", js, pre) != "ok":
+                    raise RuntimeError("the solver couldn't read player " + pid)
+                with open(stsf, "w") as f:
+                    f.write(sts)
+                for old in os.listdir(d):          # keep only this player's files
+                    if not old.startswith(pid):
+                        try:
+                            os.remove(os.path.join(d, old))
+                        except OSError:
+                            pass
+            with open(stsf) as f:
+                _ejs.update(player=pid, sts=int(f.read().strip()), pre=pre)
+            log("engine", "player script %s ready (sts %s)" % (pid, _ejs["sts"]), t0, every=0)
+        except Exception as ex:
+            log("engine", "player script %s FAIL %s" % (pid, repr(ex)[:160]), t0, every=0)
+            return _ejs["sts"] if _ejs["player"] else None
+        return _ejs["sts"]
+
+
+def eng_tv(vid):
+    """the TV client's player answer with its links unlocked, or None"""
+    sts = _ejs_ready()
+    if not sts:
+        return None
+    client, cid, ua = ENG_TV
+    d = it_call("player", {"videoId": vid, "contentCheckOk": True, "racyCheckOk": True,
+                           "playbackContext": {"contentPlaybackContext": {"signatureTimestamp": sts}}}, client, cid, ua, timeout=20)
+    answered = time.time()
+    if (d.get("playabilityStatus") or {}).get("status") != "OK":
+        return None
+    sd = d.get("streamingData") or {}
+    locked = []
+    for f in (sd.get("adaptiveFormats") or []) + (sd.get("formats") or []):
+        if f.get("url"):
+            locked.append((f, f["url"], None, None))
+            continue
+        q = urllib.parse.parse_qs(f.get("signatureCipher") or f.get("cipher") or "")
+        if q.get("url"):
+            locked.append((f, q["url"][0], (q.get("sp") or ["signature"])[0], (q.get("s") or [None])[0]))
+    ns = sorted({(urllib.parse.parse_qs(urllib.parse.urlsplit(b).query).get("n") or [None])[0] for _, b, _, _ in locked} - {None})
+    sigs = sorted({x for _, _, _, x in locked if x})
+    reqs = ([{"type": "n", "challenges": ns}] if ns else []) + ([{"type": "sig", "challenges": sigs}] if sigs else [])
+    ans = {}
+    if reqs:
+        out = json.loads(_ejs_run("solve", json.dumps(reqs), _ejs["pre"]))
+        for r, q in zip(out.get("responses") or [], reqs):
+            for k, v in (r.get("data") or {}).items():
+                ans[q["type"] + ":" + k] = v
+    for f, base, sp, sig in locked:
+        u = urllib.parse.urlsplit(base)
+        qs = urllib.parse.parse_qsl(u.query, keep_blank_values=True)
+        if sig:
+            if "sig:" + sig not in ans:
+                f.pop("url", None)
+                continue
+            qs.append((sp, ans["sig:" + sig]))
+        if any(k == "n" and "n:" + v not in ans for k, v in qs):
+            f.pop("url", None)
+            continue
+        f["url"] = urllib.parse.urlunsplit(u._replace(query=urllib.parse.urlencode([(k, ans["n:" + v] if k == "n" else v) for k, v in qs])))
+        f.pop("signatureCipher", None)
+        f.pop("cipher", None)
+    if not any(f.get("url") for f in sd.get("adaptiveFormats") or []):
+        return None
+    # YouTube holds the links back behind the start ad it placed, about 0.8 of its skip offset (Flow measured it)
+    wait = 0
+    for p in d.get("adPlacements") or []:
+        r = (p or {}).get("adPlacementRenderer") or {}
+        if _dig(r, "config", "adPlacementConfig", "kind") == "AD_PLACEMENT_KIND_START":
+            off = _dig(r, "renderer", "instreamVideoAdRenderer", "skipOffsetMilliseconds")
+            wait = max(wait, min(8.0, int(off) * 0.8 / 1000 if off else 8.0))
+    left = wait - (time.time() - answered)
+    if left > 0:
+        time.sleep(left)
+    return d
+
+
 def _fmt(f):
     """one streamingData format as Invidious lists it"""
     mime = f.get("mimeType") or ""
@@ -2923,9 +3055,23 @@ def eng_video(vid, hl="", gl=""):
     fn = ENG_POOL.submit(it_call, "next", {"videoId": vid}, None, 1, BROWSER_UA, hl, gl)
     d, client = fp.result()
     try:
-        meta = (fm.result().get("microformat") or {}).get("playerMicroformatRenderer") or {}
+        web = fm.result()
     except Exception:
-        meta = {}
+        web = {}
+    meta = (web.get("microformat") or {}).get("playerMicroformatRenderer") or {}
+    ps = d.get("playabilityStatus") or {}
+    reason = ps.get("reason") or ""
+    # "not available" to the token-free clients (made for kids, some labels): the TV client, unlocked
+    if not client and (ps.get("status") == "UNPLAYABLE" or ps.get("status") == "LOGIN_REQUIRED" and "age" not in reason.lower()):
+        try:
+            tv = eng_tv(vid)
+        except Exception as ex:
+            tv = None
+            log("engine", "video %s TV FAIL %s" % (vid, repr(ex)[:120]), t0, every=0)
+        if tv:
+            d, client = tv, "TVHTML5"
+            if not d.get("videoDetails") and web.get("videoDetails"):
+                d["videoDetails"] = web["videoDetails"]
     try:
         nx = fn.result()
     except Exception:
