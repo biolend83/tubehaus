@@ -52,6 +52,8 @@ Want one library for the whole household, iPhone/iPad without sideloading, or to
 
 Since 1.6 the server version talks to YouTube itself, with a built-in engine that answers in
 [Invidious](https://invidious.io)' API format: no Invidious, no companion and no database to run next to it.
+It is quicker too: measured side by side on one server, a video opens in 0.6 s instead of 1.3 s and a channel
+in 0.3 s instead of 0.7 s.
 Up to 1.5 it was built on Invidious and [invidious-companion](https://github.com/iv-org/invidious-companion),
 and much of what it knows about YouTube was learned from them. Thank you to the Invidious team.
 

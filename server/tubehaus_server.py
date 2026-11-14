@@ -3599,7 +3599,12 @@ def eng_api(path, qs, hl="", gl=""):
     try:
         m = re.fullmatch(r"/api/v1/videos/([\w-]{11})", p)
         if m:
-            return 200, _fields(eng_video(m.group(1), hl, gl), qs.get("fields"))
+            v = eng_video(m.group(1), hl, gl)
+            if (qs.get("local") or "").lower() in ("true", "1"):
+                # as Invidious' ?local=true: the streams through this server (other Invidious clients ask for it)
+                v = dict(v, **{k: [dict(x, url=_companion_url(x["url"])) if str(x.get("url", "")).startswith("http") else x
+                                   for x in v.get(k) or []] for k in ("adaptiveFormats", "formatStreams")})
+            return 200, _fields(v, qs.get("fields"))
         if p == "/api/v1/search":
             return 200, eng_search(qs, hl, gl)
         if p == "/api/v1/search/suggestions":

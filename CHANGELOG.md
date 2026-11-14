@@ -1,14 +1,21 @@
 # Changelog
 
-## Unreleased (1.6.0)
+## v1.6.0 — 2026-11-14
 
 TubeHaus' server now talks to YouTube itself. Invidious, invidious-companion and PostgreSQL are no longer part of it: three fewer containers to run and keep up to date, and an install that is just the TubeHaus server, Caddy and (for live streams) the PO token provider.
+
+It is also quicker. Side by side with Invidious on the same server, through the same WARP address (first visits, medians): opening a video 0.60 s (Invidious 1.29 s), a channel 0.27 s (0.66 s), its videos tab 0.21 s (0.61 s), comments 0.19 s (0.16 s), a search 0.63 s (0.56 s), and video streams about 10% faster.
 
 ### Changed
 - **A built-in YouTube engine** in the server, in place of Invidious and its companion. It asks YouTube the way the TubeHaus apps do (lists from the web client, streams from the visionOS client, the exact upload time from the web player) and answers in Invidious' API format, so the web app, the apps' server mode and other tools that speak that API keep working. Video streams, captions and pictures come through the server as before
 - **Updating:** after `git pull`, `docker compose up -d --remove-orphans` stops the old Invidious, companion and PostgreSQL containers; their volumes and the `COMPANION_KEY`, `INVIDIOUS_HMAC_KEY`, `POSTGRES_PASSWORD`, `TUBEHAUS_DOMAIN`, `TUBEHAUS_HTTPS` and `TUBEHAUS_EXTERNAL_PORT` settings can go (see [Updating](docs/UPGRADING.md)). The store packages (Umbrel, CasaOS, Unraid) are two containers now
 - New settings: `HT_REGION` (the default region of searches and trending) and `HT_HL` (YouTube's language for its texts)
 - `--doctor` checks a search, a video lookup and a few bytes of its stream instead of Invidious
+- Requests to YouTube reuse open connections and come gzip'd (about a tenth of the bytes); the first page of comments is one request instead of two
+- `?local=true` on `/api/v1/videos` works as in Invidious (the stream addresses point at this server), for other Invidious clients
+
+### Fixed
+- **The player's controls stayed up** for good after clicking one of its buttons (fullscreen, for one); they hide again after a few seconds, and only keyboard or TV remote focus keeps them up
 
 ### Removed
 - "Import subscriptions from your Invidious account" on the subscriptions page (there is no Invidious account any more; Invidious export files still import)

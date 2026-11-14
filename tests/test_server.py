@@ -665,6 +665,23 @@ class FeedFallback(unittest.TestCase):
 class Engine(unittest.TestCase):
     """The built-in YouTube engine's own reading of YouTube's texts and answers (no network)."""
 
+    def test_local_streams(self):
+        # ?local=true (Invidious clients): the stream addresses point at this server, the plain answer keeps YouTube's
+        fake = {"videoId": "dQw4w9WgXcQ", "formatStreams": [], "adaptiveFormats": [
+            {"itag": "140", "url": "https://rr1---sn-x.googlevideo.com/videoplayback?expire=1&itag=140"}]}
+        old = ts.eng_video
+        ts.eng_video = lambda vid, hl="", gl="": fake
+        try:
+            code, d = ts.eng_api("/api/v1/videos/dQw4w9WgXcQ", {"local": "true"})
+            self.assertEqual(code, 200)
+            self.assertEqual(d["adaptiveFormats"][0]["url"],
+                             "/companion/videoplayback?expire=1&itag=140&host=rr1---sn-x.googlevideo.com")
+            code, d = ts.eng_api("/api/v1/videos/dQw4w9WgXcQ", {})
+            self.assertTrue(d["adaptiveFormats"][0]["url"].startswith("https://"))
+            self.assertTrue(fake["adaptiveFormats"][0]["url"].startswith("https://"))     # the cached copy untouched
+        finally:
+            ts.eng_video = old
+
     def test_comments_token(self):
         # the protobuf YouTube's page builds for a video's first comments page (one request instead of two)
         self.assertEqual(ts._pb_varint(300), bytes([0xAC, 0x02]))

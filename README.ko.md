@@ -46,7 +46,8 @@ TubeHaus는 따로 동작하는 두 가지가 있어요. 이름과 생김새는 
 - **🖥️ 서버판 돌리기:** 아래 [빠른 설치 (Docker)](#빠른-설치-docker)를 보세요. 이 README의 나머지는 모두 서버판 이야기예요.
 
 1.6부터 서버판은 유튜브에 직접 물어봐요. 자체 엔진이 [Invidious](https://invidious.io) API와 같은 모양으로 답해서,
-옆에 Invidious, companion, 데이터베이스를 따로 띄울 필요가 없어요. 1.5까지는 Invidious와
+옆에 Invidious, companion, 데이터베이스를 따로 띄울 필요가 없어요. 더 빠르기도 해요. 같은 서버에서 나란히 재 보면
+영상은 1.3초 걸리던 게 0.6초에, 채널은 0.7초 걸리던 게 0.3초에 열려요. 1.5까지는 Invidious와
 [invidious-companion](https://github.com/iv-org/invidious-companion) 위에서 동작했고, 유튜브에 대해 아는 많은 것을 두 프로젝트에서 배웠어요.
 Invidious 팀에 감사드려요.
 
