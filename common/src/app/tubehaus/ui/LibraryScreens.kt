@@ -28,6 +28,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import app.tubehaus.data.Meta
+import app.tubehaus.engine.YouTube
+import kotlinx.coroutines.coroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -357,9 +361,28 @@ private fun LibRow(icon: ImageVector, label: String, count: String, onClick: () 
     }
 }
 
+/** Videos saved with only their id (a playlist or history imported from Google Takeout, Invidious and the
+ *  like) have no title or channel to show (#71): look those up once the list is open, a few at a time. */
+@Composable
+private fun FillMissingTitles(app: AppState, list: String, items: List<Meta>) {
+    val current by rememberUpdatedState(items)
+    LaunchedEffect(list) {
+        val missing = current.filter { it.title.isEmpty() }.map { it.id }.distinct().take(200)
+        for (part in missing.chunked(4)) coroutineScope {
+            for (id in part) launch {
+                try {
+                    val d = YouTube.details(id)
+                    app.store.fillMeta(id, d.title, d.author, d.channelId)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+}
+
 @Composable
 fun HistoryScreen(app: AppState) {
     val lib by app.store.lib.state.collectAsState()
+    FillMissingTitles(app, "hist", lib.hist)
     var q by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf(false) }
     val list = lib.hist.filter { q.isBlank() || (it.title + " " + it.author).contains(q, ignoreCase = true) }
@@ -393,6 +416,7 @@ fun LocalListScreen(app: AppState, key: String) {
         "likes" -> tr("Liked videos") to lib.likes
         else -> (pl?.title ?: "") to (pl?.items ?: emptyList())
     }
+    FillMissingTitles(app, key, items)
     var rename by remember { mutableStateOf(false) }
     var delete by remember { mutableStateOf(false) }
     val videos = items.map { it.video() }

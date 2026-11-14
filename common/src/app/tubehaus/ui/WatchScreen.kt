@@ -395,7 +395,8 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             item {
-                Text(v.title, style = MaterialTheme.typography.titleLarge)
+                // the title can be copied too, as the description under it (#72)
+                SelectableInSheet(app) { Text(v.title, style = MaterialTheme.typography.titleLarge) }
                 if (v.author.isNotEmpty()) Row(
                     Modifier.padding(vertical = 12.dp).clip(RoundedCornerShape(8.dp))
                         .clickable { onClose(); if (v.channelId.isNotEmpty()) app.go(Screen.Channel(v.channelId, v.author)) },
