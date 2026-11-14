@@ -86,6 +86,21 @@ interface Platform {
     fun pickFolder(start: String, done: (String?) -> Unit) { done(null) }
     /** desktop: shows a folder in the file manager */
     fun openFolder(path: String) {}
+
+    /** the device's own translation (iOS 18+, macOS 26+): a "Translate" link under each comment; false hides it */
+    val canTranslate: Boolean get() = false
+    /** translates [text] into [target] (e.g. "ko") on the device */
+    suspend fun translate(text: String, target: String): Translated = Translated.Failed
+}
+
+/** what came of [Platform.translate] */
+sealed interface Translated {
+    data class Text(val text: String) : Translated
+    /** the text is in [Platform.translate]'s language already */
+    data object SameLanguage : Translated
+    /** the language pair is known but its files aren't on the device yet (System Settings fetches them) */
+    data object NeedsDownload : Translated
+    data object Failed : Translated
 }
 
 data class PlayerState(
