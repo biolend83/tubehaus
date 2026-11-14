@@ -220,7 +220,16 @@ private fun Greeting(app: AppState, edge: androidx.compose.ui.unit.Dp) {
 @Composable
 private fun Words(app: AppState, edge: androidx.compose.ui.unit.Dp) {
     val taste by app.store.taste.state.collectAsState()
-    val words = remember(taste.kw) { taste.kw.entries.filter { it.value > 0.5 }.sortedByDescending { it.value }.map { it.key }.take(10) }
+    // the strongest first; one that only repeats a stronger one ("sports band" after "sports") is left out
+    val words = remember(taste.kw) {
+        val out = ArrayList<String>()
+        for (w in taste.kw.entries.filter { it.value > 0.5 }.sortedByDescending { it.value }.map { it.key }) {
+            if (out.any { o -> w.contains(o) || o.contains(w) }) continue
+            out += w
+            if (out.size == 8) break
+        }
+        out
+    }
     if (words.isEmpty()) return
     Heading(tr("Your interests"), edge)
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = edge), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

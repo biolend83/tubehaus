@@ -409,7 +409,7 @@ private fun Info(app: AppState, v: Video, flush: Boolean = false) {
             if (has("channel")) {
                 val open = { if (v.channelId.isNotEmpty()) app.go(Screen.Channel(v.channelId, v.author)) }
                 Avatar(d?.avatar?.ifEmpty { null } ?: v.avatar.ifEmpty { null } ?: lib.subs[v.channelId]?.thumb ?: "", if (desk) 40 else 36, Modifier.clickable { open() })
-                Column(Modifier.weight(1f, fill = false).padding(start = if (desk) 12.dp else 10.dp).clickable { open() }) {
+                Column(Modifier.weight(1f, fill = !desk).padding(start = if (desk) 12.dp else 10.dp).clickable { open() }) {
                     Text(v.author, style = if (desk) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (!calm && has("subscribers") && !d?.subsText.isNullOrEmpty())
                         Text(d!!.subsText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
@@ -567,9 +567,9 @@ private fun Actions(app: AppState, v: Video, has: (String) -> Boolean) {
             }
             // how many of the votes are likes: a thin line along the bottom of the pill, as YouTube once had
             val vt = votes?.takeIf { showVotes && it.likes + it.dislikes > 0 }
-            if (vt != null) Box(Modifier.matchParentSize().padding(horizontal = 14.dp), contentAlignment = Alignment.BottomStart) {
-                Box(Modifier.fillMaxWidth().height(2.dp).background(MaterialTheme.colorScheme.outline)) {
-                    Box(Modifier.fillMaxWidth(vt.likes.toFloat() / (vt.likes + vt.dislikes)).height(2.dp).background(MaterialTheme.colorScheme.onSurface))
+            if (vt != null) Box(Modifier.matchParentSize().padding(start = 16.dp, end = 16.dp, bottom = 4.dp), contentAlignment = Alignment.BottomStart) {
+                Box(Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))) {
+                    Box(Modifier.fillMaxWidth(vt.likes.toFloat() / (vt.likes + vt.dislikes)).height(2.dp).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)))
                 }
             }
           }

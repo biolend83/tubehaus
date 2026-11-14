@@ -113,7 +113,8 @@ fun HomeScreen(app: AppState) {
                     ProfilePicker(app) { HomeCache.items.clear(); app.rec.clearCache(); scope.launch { load(false) } }
                     Chip(!app.discover, onClick = { show(false) }, label = tr("All"))
                     Chip(app.discover, onClick = { show(true) }, label = tr("Discover"), icon = Sym.Explore.outline)
-                    Chip(false, onClick = fresh, label = tr("Refresh"), icon = Sym.Replay.outline)
+                    // a touch screen pulls the list down (or taps Home again) for a fresh one
+                    if (!app.platform.touch || app.platform.tv) Chip(false, onClick = fresh, label = tr("Refresh"), icon = Sym.Replay.outline)
                 }
                 if (app.discover) Text(tr("Videos from topics you don't usually watch. Your likes aren't used here."),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
