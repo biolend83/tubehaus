@@ -3,6 +3,8 @@ package app.tubehaus.desktop
 import app.tubehaus.ui.tr
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -238,7 +240,8 @@ private fun startApp() {
                     else -> when {
                         platform.tv -> false
                         state.current is Screen.Shorts -> state.shortsKeys?.invoke(e.key) ?: false
-                        state.fullscreen || state.current is Screen.Watch -> playerKey(state, e.key)
+                        state.fullscreen || state.current is Screen.Watch ->
+                            !e.isCtrlPressed && !e.isMetaPressed && !e.isAltPressed && playerKey(state, e.key, e.isShiftPressed)
                         else -> false
                     }
                 }
