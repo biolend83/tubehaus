@@ -23,7 +23,7 @@ import kotlin.concurrent.Volatile
  * Every request carries a visitor identity ("visitorData", what a browser keeps in a cookie).
  * Without one YouTube answers most player requests with "Sign in to confirm you're not a bot",
  * even from a home connection. Its bot wall is tied to the visitor, so when every client is
- * walled the identity is replaced once and the request retried (as Flow does).
+ * walled the identity is replaced once and the request retried.
  */
 data class Client(
     val name: String,

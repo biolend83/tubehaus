@@ -541,7 +541,7 @@ private var lyricsWanted by mutableStateOf(false)
 private var lyricsCached by mutableStateOf(0)
 
 /**
- * The music mini player's second line, as Flow's: the line being sung, sliding up as the next one
+ * The music mini player's second line: the line being sung, sliding up as the next one
  * comes; the artist when there are no timed lyrics (or lyrics were never opened, so nothing is asked
  * for that wasn't before).
  */
@@ -598,7 +598,7 @@ fun NowPlayingScreen(app: AppState) {
     val skip = remember { Animatable(0f) }
     var tall by remember { mutableStateOf(1f) }
     var wide by remember { mutableStateOf(1f) }
-    // the songs either side, drawn beside the cover so a swipe pulls the neighbour in (Flow's pager)
+    // the songs either side, drawn beside the cover so a swipe pulls the neighbour in
     val prevSong = pb.songs.getOrNull(pb.songAt - 1)
     val nextSong = pb.songs.getOrNull(pb.songAt + 1)
     LaunchedEffect(s.id) {

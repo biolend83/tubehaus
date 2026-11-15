@@ -384,7 +384,7 @@ fun ChannelRow(c: Channel, app: AppState) {
         Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(16.dp)) { app.go(Screen.Channel(c.id, c.name)) }.padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // the picture at the start, as in Flow's lists (it sat alone in the middle of a thumbnail's width)
+        // the picture at the start (it sat alone in the middle of a thumbnail's width)
         Avatar(c.avatar, if (LocalCompact.current) 56 else 88)
         Column(Modifier.weight(1f).padding(start = 14.dp, end = 8.dp)) {
             Text(c.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -759,7 +759,7 @@ fun RoundIcon(
 fun GroupLabel(text: String) = SectionLabel(text, Modifier.padding(start = 4.dp))
 
 /**
- * rows as one segmented group (Flow's lists): the group's outer corners large, each row its own
+ * rows as one segmented group: the group's outer corners large, each row its own
  * piece with small corners, 2 dp apart
  */
 @Composable
@@ -949,7 +949,7 @@ fun Narrow(content: @Composable () -> Unit) {
 /** Design 2 (glass): a small see-through card, two a row on a phone */
 @Composable
 fun GlassCard(v: Video, app: AppState, queue: List<Video> = emptyList(), solid: Boolean = false) {
-    // the opaque box around every video made the lists heavy: a plain card, as Flow's, on a phone
+    // the opaque box around every video made the lists heavy: a plain card on a phone
     if (solid && LocalCompact.current) { VideoCard(v, app, queue); return }
     if (!app.kidsAllow(v.channelId)) return
     val menu = remember { mutableStateOf(false) }
@@ -1067,7 +1067,7 @@ fun BackHook(app: AppState, enabled: Boolean, onBack: () -> Unit) {
 }
 
 /**
- * One piece of a segmented group (Flow's lists, Material 3 Expressive): rounded large at the group's
+ * One piece of a segmented group (Material 3 Expressive): rounded large at the group's
  * outer corners and small between pieces, 2 dp apart, on the raised surface colour.
  */
 @Composable
@@ -1078,7 +1078,7 @@ fun Segment(first: Boolean, last: Boolean, modifier: Modifier = Modifier, conten
     Box(modifier.fillMaxWidth().padding(top = if (first) 0.dp else 2.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceContainer)) { content() }
 }
 
-/** a section's name over its group: small, bold, in the accent colour (Flow's section headers) */
+/** a section's name over its group: small, bold, in the accent colour */
 @Composable
 fun SectionLabel(t: String, modifier: Modifier = Modifier) {
     Text(t, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = accent,
@@ -1086,7 +1086,7 @@ fun SectionLabel(t: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * Starts fetching a video's streams the moment a finger rests on its card (Flow's tap prefetch),
+ * Starts fetching a video's streams the moment a finger rests on its card,
  * so the player has them by the time the tap ends. A touch that turns into a scroll asks nothing:
  * the finger has to stay put for a moment first. Not on a metered connection.
  */

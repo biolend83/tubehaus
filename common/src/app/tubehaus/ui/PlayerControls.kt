@@ -346,7 +346,7 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
                 } else it }
                 .let { if (tv) it.onKeyEvent { e -> e.type == KeyEventType.KeyDown && remote(e.key) }.focusRequester(videoFocus).focusable() else it }
                 // swiped sideways: the whole width is a minute and a half (less in a short video), a tick
-                // every five seconds; it jumps there when the finger lifts (Flow's seek swipe)
+                // every five seconds; it jumps there when the finger lifts
                 .pointerInput(touch, st.durationMs > 0, app.playback.video?.live == true) {
                     if (!touch || app.playback.video?.live == true) return@pointerInput
                     var base = 0L; var travel = 0f; var lastTick = 0L
@@ -481,7 +481,7 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
                 },
         )
         // the level as a standing bar on the side away from the swiping thumb, so the hand does not
-        // cover the number it is aiming for (Flow's); it follows the finger on a spring and fades out
+        // cover the number it is aiming for; it follows the finger on a spring and fades out
         var lastGesture by remember { mutableStateOf("volume" to 0f) }
         gesture?.let { lastGesture = it }
         AnimatedVisibility(gesture != null, enter = fadeIn(tween(Motion.SHORT)), exit = fadeOut(tween(Motion.MEDIUM)),
@@ -679,10 +679,10 @@ private fun LevelHud(kind: String, level: Float, tall: Boolean) {
     }
 }
 
-/** what rests on the video: pills and round buttons (Flow's 40 % black) */
+/** what rests on the video: pills and round buttons (40 % black) */
 private val PILL = Color(0x66000000)
 
-/** shrinks a little while pressed and springs back, as Flow's buttons do */
+/** shrinks a little while pressed and springs back */
 @Composable
 private fun Modifier.squeeze(src: androidx.compose.foundation.interaction.MutableInteractionSource, to: Float): Modifier {
     val down by src.collectIsPressedAsState()
@@ -1281,7 +1281,7 @@ private fun SheetHeader(t: String) {
     else Text(t, Modifier.padding(start = 20.dp, top = 10.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-/** rows in a group: on a touch screen, Flow's segmented pieces; the desktop's menu and a TV keep plain rows */
+/** rows in a group: on a touch screen, segmented pieces; the desktop's menu and a TV keep plain rows */
 private val LocalSegmented = androidx.compose.runtime.compositionLocalOf { false }
 
 @Composable
@@ -1393,7 +1393,7 @@ private fun Arrows(dir: Int, modifier: Modifier, running: Boolean = false) {
 }
 
 /**
- * The countdown on a finished video, as Flow's and YouTube's: the next one's picture with a ring
+ * The countdown on a finished video, as YouTube's: the next one's picture with a ring
  * that fills over five seconds, its title, and Cancel / Play now. Taps elsewhere are swallowed.
  */
 @Composable
