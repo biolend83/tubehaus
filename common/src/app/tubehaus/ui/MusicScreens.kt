@@ -598,12 +598,12 @@ fun NowPlayingScreen(app: AppState) {
     val skip = remember { Animatable(0f) }
     var tall by remember { mutableStateOf(1f) }
     var wide by remember { mutableStateOf(1f) }
+    // the songs either side, drawn beside the cover so a swipe pulls the neighbour in (Flow's pager)
+    val prevSong = pb.songs.getOrNull(pb.songAt - 1)
+    val nextSong = pb.songs.getOrNull(pb.songAt + 1)
     LaunchedEffect(s.id) {
-        // the new cover comes in from the side the old one left by
-        if (kotlin.math.abs(skip.value) > 1f) {
-            skip.snapTo(-kotlin.math.sign(skip.value) * wide * 0.6f)
-            skip.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = 420f))
-        }
+        // the neighbour already sits in the middle: the new song's cover is the same picture
+        if (kotlin.math.abs(skip.value) > 1f) skip.snapTo(0f)
     }
     fun dropEnd(vy: Float) = scope.launch {
         if (drop.value > tall * 0.2f || vy > fling) {
@@ -614,11 +614,13 @@ fun NowPlayingScreen(app: AppState) {
     }
     fun skipEnd(vx: Float) = scope.launch {
         val dir = if (skip.value + vx * 0.1f < 0) -1 else 1
-        if (kotlin.math.abs(skip.value) > wide * 0.25f || kotlin.math.abs(vx) > fling) {
+        val there = if (dir < 0) nextSong != null || pb.next != null else prevSong != null
+        if (there && (kotlin.math.abs(skip.value) > wide * 0.3f || kotlin.math.abs(vx) > fling)) {
             val was = s.id
             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureThresholdActivate)
-            skip.animateTo(dir * wide, tween(Motion.SHORT, easing = Motion.emphasizedOut), initialVelocity = vx)
-            if (dir < 0) pb.skipNext() else pb.previous()
+            skip.animateTo(dir * wide, tween(220, easing = Motion.emphasizedOut), initialVelocity = vx)
+            // a swipe back is always the song before (the button restarts a song a few seconds in)
+            if (dir < 0) pb.skipNext() else pb.playSongAt(pb.songAt - 1)
             // nothing came (no next song): the cover comes back
             delay(700)
             if (pb.song?.id == was) skip.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = 420f))
@@ -648,7 +650,10 @@ fun NowPlayingScreen(app: AppState) {
                 if (sideways == null) sideways = kotlin.math.abs(acc.x) > kotlin.math.abs(acc.y)
                 track.addPosition(ch.uptimeMillis, acc)
                 scope.launch {
-                    if (sideways == true) skip.snapTo(skip.value + delta.x)
+                    // no song that way: the cover gives a little, then springs back
+                    val to = skip.value + delta.x
+                    val free = if (to < 0) nextSong != null || pb.next != null else prevSong != null
+                    if (sideways == true) skip.snapTo((skip.value + delta.x * (if (free) 1f else 0.3f)).coerceIn(-wide, wide))
                     else drop.snapTo((drop.value + delta.y).coerceAtLeast(0f))
                 }
             },
@@ -664,9 +669,11 @@ fun NowPlayingScreen(app: AppState) {
     val rest by animateFloatAsState(if (st.playing || st.buffering) 1f else 0.9f, spring(dampingRatio = 0.7f, stiffness = 300f))
     val coverLook = Modifier.graphicsLayer {
         translationX = skip.value
-        alpha = 1f - (kotlin.math.abs(skip.value) / wide).coerceIn(0f, 1f) * 0.8f
-        rotationZ = skip.value / wide * 4f
         scaleX = rest; scaleY = rest
+    }
+    val peek: @Composable (androidx.compose.ui.unit.Dp) -> Unit = { side ->
+        prevSong?.let { SongCover(it, Modifier.size(side).graphicsLayer { translationX = skip.value - wide; scaleX = rest; scaleY = rest }, round = 24) }
+        nextSong?.let { SongCover(it, Modifier.size(side).graphicsLayer { translationX = skip.value + wide; scaleX = rest; scaleY = rest }, round = 24) }
     }
     Box(Modifier.fillMaxSize().onSizeChanged { tall = it.height.toFloat().coerceAtLeast(1f); wide = it.width.toFloat().coerceAtLeast(1f) }
         .graphicsLayer {
@@ -680,7 +687,7 @@ fun NowPlayingScreen(app: AppState) {
                 val wide = maxWidth > 760.dp
                 androidx.compose.runtime.SideEffect { wideNow = wide }
                 if (wide) Row(Modifier.fillMaxSize().padding(start = 40.dp, end = 40.dp, bottom = 32.dp, top = 4.dp), horizontalArrangement = Arrangement.spacedBy(48.dp)) {
-                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true, cover = coverDrag.then(coverLook)) }
+                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true, cover = coverDrag.then(coverLook), peek = peek) }
                     Column(Modifier.weight(1f).widthIn(max = 470.dp).fillMaxHeight().clip(RoundedCornerShape(28.dp))
                         .background(c.background.copy(alpha = 0.55f)).padding(8.dp)) {
                         NowTabs(tab) { tab = it }
@@ -693,7 +700,7 @@ fun NowPlayingScreen(app: AppState) {
                             (androidx.compose.animation.fadeIn(tween(Motion.MEDIUM, delayMillis = 60)) + androidx.compose.animation.scaleIn(tween(Motion.MEDIUM, easing = Motion.emphasizedIn), initialScale = 0.94f)) togetherWith
                                 androidx.compose.animation.fadeOut(tween(Motion.SHORT))
                         }, label = "now") { small ->
-                        if (!small) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true, cover = coverDrag.then(coverLook)) }
+                        if (!small) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true, cover = coverDrag.then(coverLook), peek = peek) }
                         else SongPanel(app, s, big = false, cover = pullDown.clickable(interactionSource = null, indication = null) { panel = false })
                     }
                     Box(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
@@ -775,7 +782,7 @@ private fun NowTabs(at: Int, pick: (Int) -> Unit) {
 
 /** the cover, the title, the seek bar and the buttons; small: one line above the lyrics or the queue */
 @Composable
-private fun SongPanel(app: AppState, s: Song, big: Boolean, cover: Modifier = Modifier) {
+private fun SongPanel(app: AppState, s: Song, big: Boolean, cover: Modifier = Modifier, peek: (@Composable (androidx.compose.ui.unit.Dp) -> Unit)? = null) {
     val pb = app.playback
     val st by app.player.state.collectAsState()
     val c = MaterialTheme.colorScheme
@@ -810,7 +817,10 @@ private fun SongPanel(app: AppState, s: Song, big: Boolean, cover: Modifier = Mo
                 .tvClickable(RoundedCornerShape(12.dp)) { app.go(Screen.Watch(s.id)) }) {
                 if (st.videoId == s.id) app.player.View(Modifier.fillMaxSize())
             }
-        } else SongCover(s, Modifier.size(side).then(cover), round = 24)
+        } else Box(contentAlignment = Alignment.Center) {
+            peek?.invoke(side)
+            SongCover(s, Modifier.size(side).then(cover), round = 24)
+        }
         // the title on the left and the heart on the right, as music apps have it
         Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).padding(end = 12.dp)) {
