@@ -170,6 +170,7 @@ export class Player {
   <div class="ytp-bezel"></div>
   <div class="ytp-seekfx l"><b></b><span></span></div><div class="ytp-seekfx r"><b></b><span></span></div>
   <div class="ytp-flash"></div>
+  <div class="ytp-swipe"><b></b><span></span></div>
   <button class="ytp-skipbtn"></button>
   <button class="ytp-unmute">${icon("mute")}<span>${$t("소리 켜기")}</span></button>
   <div class="ytp-top"><div class="ytp-title"></div></div>
@@ -870,7 +871,12 @@ export class Player {
     const v = this.video;
     const playIc = this.ended ? "replay" : v.paused ? "play" : "pause";
     this.q(".b-play").innerHTML = icon(playIc);
-    this.q(".c-play").innerHTML = icon(playIc);
+    if (this._playIc !== playIc) {
+      const c = this.q(".c-play");
+      c.innerHTML = icon(playIc);
+      if (this._playIc) { c.classList.remove("pop"); void c.offsetWidth; c.classList.add("pop"); }
+      this._playIc = playIc;
+    }
     this.q(".b-play").title = this.ended ? $t("다시 보기") : v.paused ? $t("재생 (k)") : $t("일시중지 (k)");
     this.q(".b-mute").innerHTML = icon(v.muted || v.volume === 0 ? "mute" : v.volume < 0.5 ? "vollow" : "vol");
     const sl = this.q(".ytp-volbar input");
@@ -915,9 +921,52 @@ export class Player {
     sl.addEventListener("input", () => { v.volume = +sl.value; v.muted = +sl.value === 0; });
     sl.addEventListener("click", (e) => e.stopPropagation());
 
+    // swiped sideways on a touch screen: seeks, a minute and a half across the whole width; where it
+    // lands shows in the middle and it jumps there when the finger lifts
+    let sw = null, swallow = false;
+    if (isTouch) {
+      const box = this.q(".ytp-swipe");
+      r.addEventListener("touchstart", (e) => {
+        sw = null;
+        if (e.touches.length !== 1 || this.mode === "mini" || this.mode === "shorts" || this.live || !(v.duration > 0)) return;
+        if (e.target.closest(".ytp-bottom,.ytp-menu,.ytp-ctx,.ytp-end,.ytp-err,.ytp-skipbtn,.ytp-top")) return;
+        const t = e.touches[0];
+        sw = { x: t.clientX, y: t.clientY, on: false, base: v.currentTime, to: v.currentTime, tick: v.currentTime };
+      }, { passive: true });
+      r.addEventListener("touchmove", (e) => {
+        if (!sw) return;
+        const t = e.touches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+        if (!sw.on) {
+          if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }
+          if (Math.abs(dx) < 16) return;
+          sw.on = true; sw.x = t.clientX;
+          this.root.classList.add("swiping");
+        }
+        e.preventDefault();
+        const span = Math.min(90, v.duration);
+        const w = r.getBoundingClientRect().width || 1;
+        sw.to = Math.max(0, Math.min(v.duration - 0.5, sw.base + (t.clientX - sw.x) / w * span));
+        const by = sw.to - sw.base;
+        box.querySelector("b").textContent = fmtTime(sw.to);
+        box.querySelector("span").textContent = (by < 0 ? "-" : "+") + fmtTime(Math.abs(by));
+        if (Math.abs(sw.to - sw.tick) >= 5) { sw.tick = sw.to; navigator.vibrate?.(6); }
+      }, { passive: false });
+      const end = () => {
+        if (sw?.on) {
+          this.root.classList.remove("swiping");
+          if (Math.abs(sw.to - sw.base) > 0.3) this.seek(sw.to);
+          swallow = true; setTimeout(() => { swallow = false; }, 400);
+        }
+        sw = null;
+      };
+      r.addEventListener("touchend", end);
+      r.addEventListener("touchcancel", () => { this.root.classList.remove("swiping"); sw = null; });
+    }
+
     // click / tap
     let lastTap = 0, tapT, taps = 0, tapSide = 0;
     r.addEventListener("click", (e) => {
+      if (swallow) { swallow = false; return; }
       if (e.target.closest(".ytp-bottom,.ytp-menu,.ytp-ctx,.ytp-end,.ytp-err,.ytp-center button,.ytp-skipbtn,.ytp-top")) return;
       if (this.menuOpen || this.ctxOpen) { this.closeMenu(); this.closeCtx(); return; }
       if (this.autoMuted) { this.unmute(); return; }

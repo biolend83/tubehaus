@@ -1737,3 +1737,50 @@ html.tv .sx-nav { display: none; }
 
 /* medium player: a shorter chapter name, so it never runs under the buttons beside it */
 @container (max-width: 820px) { .ytp-chap { max-width: 150px; } }
+
+/* ------------------------------------------------ segmented lists (the apps' 1.6.1, after Flow's)
+   Each row of a settings card is a rounded piece of its own, 2px from the next: the group's outer
+   corners large, the inner ones small, no lines between. The card's title sits above the pieces. */
+html:not(.tv) .sx-card { background: none; padding: 0; border-radius: 0; }
+html:not(.tv) .settings .sx-card h3 { margin: 6px 0 10px; padding: 0 6px; }
+html:not(.tv) .sx-rows { display: flex; flex-direction: column; gap: 2px; border-radius: 24px; overflow: hidden; }
+html:not(.tv) .sx-rows > * { background: var(--box); padding-left: 20px; padding-right: 20px; border-radius: 6px; border-top: 0 !important; }
+html:not(.tv) .sx-rows > [hidden] { display: none; }
+html:not(.tv) .sx-rows > .sx-note { margin: 0; }
+html:not(.tv) .sx-rows > .sx-tiles, html:not(.tv) .sx-rows > .sx-cats { padding-top: 14px; }
+html:not(.tv) .sx-seg, html:not(.tv) .sx-sel select, html:not(.tv) .sx-in { background: var(--box2, var(--bg)); }
+html:not(.tv) .sx-seg { background: color-mix(in srgb, var(--fg) 7%, var(--box)); }
+@media (max-width: 640px) { html:not(.tv) .sx-rows > * { padding-left: 16px; padding-right: 16px; } html:not(.tv) .sx-rows { border-radius: 20px; } }
+
+/* ------------------------------------------------ the player on a touch screen (the apps' 1.6.1, after Flow's)
+   a light dim with darker edges, previous and next as bare icons, play in a round button that squeezes
+   under the finger and pops its icon, the time in a small dark pill, the seek bar easing thicker */
+@media (pointer: coarse) {
+  .ytp-center { background: rgba(0,0,0,.22); gap: 12%; }
+  .ytp-center::before, .ytp-center::after { content: ""; position: absolute; left: 0; right: 0; height: 72px; pointer-events: none; }
+  .ytp-center::before { top: 0; background: linear-gradient(rgba(0,0,0,.5), transparent); }
+  .ytp-center::after { bottom: 0; background: linear-gradient(transparent, rgba(0,0,0,.5)); }
+  .ytp-center button { position: relative; z-index: 1; width: 52px; height: 52px; background: none; transition: transform .28s cubic-bezier(.3, 1.6, .5, 1); }
+  .ytp-center button:active { transform: scale(.82); transition-duration: .08s; }
+  .ytp-center .ic { width: 36px; height: 36px; }
+  .ytp-center .c-play { width: 66px; height: 66px; background: rgba(0,0,0,.4); }
+  .ytp-center .c-play:active { transform: scale(.88); }
+  .ytp-center .c-play.pop .ic { animation: ytpPop .32s cubic-bezier(.3, 1.5, .5, 1); }
+  .ytp-time { height: 28px; display: inline-flex; align-items: center; padding: 0 12px; margin-left: 4px; border-radius: 14px; background: rgba(0,0,0,.4); font-size: 12px; font-weight: 700; text-shadow: none; }
+  .ytp-time .t-sep, .ytp-time .t-dur { font-weight: 400; opacity: .72; }
+  .ytp-time .t-sep { padding: 0 3px; }
+  .ytp-segs, .ytp-sbmarks { transition: height .22s cubic-bezier(.2, 0, 0, 1); }
+  .ytp-scrub { transition: transform .25s cubic-bezier(.3, 1.5, .5, 1); }
+}
+@keyframes ytpPop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+.ytp-swipe { position: absolute; left: 50%; top: 50%; z-index: 12; display: flex; flex-direction: column; align-items: center; padding: 12px 22px; border-radius: 20px;
+  background: rgba(0,0,0,.56); color: #fff; pointer-events: none; opacity: 0; transform: translate(-50%, -50%) scale(.92); transition: opacity .15s, transform .2s cubic-bezier(.2, 0, 0, 1); }
+.ytp-swipe b { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ytp-swipe span { font-size: 13px; font-weight: 650; color: var(--acc, #8fa6ff); }
+.ytp.swiping .ytp-swipe { opacity: 1; transform: translate(-50%, -50%); }
+.ytp.swiping .ytp-center { opacity: 0 !important; }
+/* the "You" page's lists as segmented groups too: a piece per row, the icon in the accent colour, no circle */
+html:not(.tv) .rgroup { background: none; padding: 0; display: flex; flex-direction: column; gap: 2px; border-radius: 24px; overflow: hidden; }
+html:not(.tv) .rgroup > .grow { background: var(--box); border-radius: 6px; padding: 14px 18px; }
+html:not(.tv) .rgroup > .grow:hover { background: color-mix(in srgb, var(--fg) 5%, var(--box)); }
+html:not(.tv) .grow .gic { background: none; width: 26px; height: 26px; color: var(--acc, var(--fg)); }
