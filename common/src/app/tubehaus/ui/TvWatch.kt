@@ -403,7 +403,7 @@ fun TvWatch(app: AppState) {
 }
 
 /** captions on or off: the track in your language, or YouTube's translation of one */
-private fun toggleCaptions(app: AppState, st: PlayerState) {
+fun toggleCaptions(app: AppState, st: PlayerState) {
     val player = app.player
     if (st.captions != null) {
         player.setCaptions(null, null); app.store.settings.update { it.copy(captions = false) }

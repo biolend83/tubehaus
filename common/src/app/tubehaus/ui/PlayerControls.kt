@@ -135,7 +135,7 @@ fun VideoArea(app: AppState, modifier: Modifier = Modifier, fullscreen: Boolean 
 }
 
 /** Keyboard shortcuts while a video is on screen (YouTube's). True when the key was used. */
-fun playerKey(app: AppState, key: Key): Boolean {
+fun playerKey(app: AppState, key: Key, shift: Boolean = false): Boolean {
     val player = app.player
     val st = player.state.value
     if (st.videoId == null) return false
@@ -146,7 +146,28 @@ fun playerKey(app: AppState, key: Key): Boolean {
         // a TV's volume while casting is the TV's own, not the one this device remembers
         if (app.casting.link == null) app.store.settings.update { it.copy(volume = v) }
     }
+    fun speedStep(d: Int) {
+        val i = SPEEDS.indexOfFirst { it >= st.speed - 0.01f }.let { if (it < 0) SPEEDS.size - 1 else it }
+        val x = SPEEDS[(i + d).coerceIn(0, SPEEDS.size - 1)]
+        app.playback.setSpeed(x); app.toast(if (x == 1f) tr("Normal") else "${x}x")
+    }
+    if (shift) when (key) {
+        // YouTube's: Shift+N the next video, Shift+P the one before, < and > the speed
+        Key.N -> { if (app.playback.next != null || app.playback.music) app.playback.skipNext() else return false; return true }
+        Key.P -> { app.playback.previous(); return true }
+        Key.Comma -> { speedStep(-1); return true }
+        Key.Period -> { speedStep(1); return true }
+        else -> {}
+    }
     when (key) {
+        Key.C -> toggleCaptions(app, st)
+        // 1 to 9: that tenth of the video
+        Key.One, Key.Two, Key.Three, Key.Four, Key.Five, Key.Six, Key.Seven, Key.Eight, Key.Nine -> {
+            val n = listOf(Key.One, Key.Two, Key.Three, Key.Four, Key.Five, Key.Six, Key.Seven, Key.Eight, Key.Nine).indexOf(key) + 1
+            if (st.durationMs <= 0) return false
+            player.seekTo(st.durationMs * n / 10)
+        }
+        Key.MediaPrevious -> app.playback.previous()
         Key.Spacebar, Key.K -> if (st.playing) player.pause() else player.play()
         Key.DirectionLeft -> seekBy(-5)
         Key.DirectionRight -> seekBy(5)
@@ -168,6 +189,9 @@ fun playerKey(app: AppState, key: Key): Boolean {
     }
     return true
 }
+
+/** the speeds the player offers */
+val SPEEDS = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 
 /** brightness the swipe works in (what the eye sees, gamma 2.2) and the screen's own value */
 private fun perceived(b: Float) = b.coerceIn(0f, 1f).toDouble().pow(1 / 2.2).toFloat()
@@ -1222,7 +1246,7 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
         "a" -> for ((lang, name) in st.audioTracks) {
             Pick(name, st.audioTrack == lang) { player.setAudioTrack(lang); dismiss() }
         }
-        "s" -> for (x in listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)) {
+        "s" -> for (x in SPEEDS) {
             Pick(if (x == 1f) tr("Normal") else "${x}x", st.speed == x) {
                 app.playback.setSpeed(x); dismiss()
             }
