@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.6.1 — 2026-11-15
+
+### Fixed
+- **Videos made for kids and some labels' music videos** ("This video is not available", #76): the server now asks for these through YouTube's TV client and opens their locked stream links with yt-dlp's EJS solver (bundled in `server/ejs`, run by deno or node). They take a few seconds longer to start, as YouTube holds the links back behind the start ad it placed
+
+### Changed
+- **Settings and the "You" page** are grouped lists: each row a rounded piece of its own, a small gap between them instead of a line
+- **The player on phones and tablets:** a lighter dim with darker edges, previous and next as plain icons beside a round play button that squeezes under the finger, the time in a small pill, and a seek bar that eases thicker. **Swipe sideways over the video to seek** (the whole width is a minute and a half); where it lands shows in the middle
+
 ## v1.6.0 — 2026-11-14
 
 TubeHaus' server now talks to YouTube itself. Invidious, invidious-companion and PostgreSQL are no longer part of it: three fewer containers to run and keep up to date, and an install that is just the TubeHaus server, Caddy and (for live streams) the PO token provider.
