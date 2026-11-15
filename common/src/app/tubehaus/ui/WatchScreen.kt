@@ -7,6 +7,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.input.pointer.pointerInput
@@ -474,17 +475,23 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
                     (if (v.views > 0) compact(v.views) else viewsText).takeIf { it.isNotEmpty() && !calm }?.let { it to tr("Views") },
                     d?.publishedText?.takeIf { it.isNotEmpty() }?.let { it to tr("Uploaded") },
                 )
-                if (stats.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    for ((big, small) in stats) Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(big, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
-                        Text(small, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // each in a card of its own, side by side as one segmented group (Flow's description sheet)
+                if (stats.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).height(IntrinsicSize.Min).clip(RoundedCornerShape(20.dp)),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    for ((big, small) in stats) Column(
+                        Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .padding(horizontal = 8.dp, vertical = 14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(big, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(small, style = MaterialTheme.typography.labelMedium, color = accent, maxLines = 1)
                     }
                 }
                 // links open, #tags search, and a time like 3:25 jumps there in the video
                 if (desc.isNotEmpty()) SelectableInSheet(app) {
                     LinkedText(desc, app,
                         Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 32.dp)
-                            .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(18.dp)).padding(14.dp),
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(20.dp)).padding(16.dp),
                         onTime = { s -> app.player.seekTo(s * 1000L); onClose() })
                 }
             }
