@@ -806,6 +806,10 @@ private fun CommentView(app: AppState, c: Comment, reply: Boolean = false) {
 // ---------------------------------------------------------------------- the phone's watch sheet
 
 private val MINI_H = 60.dp
+/** the mini player floats: this far in from the sides and up from the tabs, its corners this round */
+private val MINI_SIDE = 8.dp
+private val MINI_GAP = 6.dp
+private val MINI_R = 14.dp
 
 /**
  * Phones: the video page as a sheet over the app, as in YouTube's app (and Flow's). The page under it
@@ -840,7 +844,9 @@ fun WatchSheet(app: AppState, expanded: Boolean, barPx: Int) {
         val miniH = with(d) { MINI_H.toPx() }
         val miniW = miniH * 16f / 9f
         val videoH = w * 9f / 16f
-        val miniTop = constraints.maxHeight - maxOf(barPx, nav) - miniH
+        val side = with(d) { MINI_SIDE.toPx() }
+        val radius = with(d) { MINI_R.toPx() }
+        val miniTop = constraints.maxHeight - maxOf(barPx, nav) - miniH - with(d) { MINI_GAP.toPx() }
         val range = (miniTop - top).coerceAtLeast(1f)
         val fling = with(d) { 900.dp.toPx() }
 
@@ -918,13 +924,15 @@ fun WatchSheet(app: AppState, expanded: Boolean, barPx: Int) {
         ) { PhoneBody(app, v, list) }
         // the mini player's bar; the video sits on its left end
         if (!full) Column(
-            Modifier.fillMaxWidth().height(MINI_H)
+            Modifier.fillMaxWidth().padding(horizontal = MINI_SIDE).height(MINI_H)
                 .graphicsLayer {
                     translationY = miniTop
                     translationX = swipe.value
                     alpha = ((f.value - 0.6f) / 0.4f).coerceIn(0f, 1f) * fade()
+                    shadowElevation = 6.dp.toPx() * alpha
+                    shape = RoundedCornerShape(MINI_R); clip = true
                 }
-                .background(c.surfaceContainer)
+                .background(c.surfaceContainerHigh)
                 .drag().clickable(enabled = mini) { app.go(Screen.Watch(v.id)) },
         ) {
             val st by app.player.state.collectAsState()
@@ -949,7 +957,11 @@ fun WatchSheet(app: AppState, expanded: Boolean, barPx: Int) {
             val bh = (videoH + (miniH - 2.dp.toPx() - videoH) * k).toInt().coerceAtLeast(1)
             val p = m.measure(androidx.compose.ui.unit.Constraints.fixed(bw, bh))
             layout(p.width, p.height) {
-                p.placeWithLayer(0, (top + (miniTop - top) * k).toInt()) { translationX = swipe.value; alpha = fade() }
+                // in from the side and its left corners rounding as it folds into the floating card
+                p.placeWithLayer((side * k).toInt(), (top + (miniTop - top) * k).toInt()) {
+                    translationX = swipe.value; alpha = fade()
+                    if (k > 0f) { shape = RoundedCornerShape(topStart = radius * k, bottomStart = radius * k); clip = true }
+                }
             }
         }
         Box(box.drag()) {

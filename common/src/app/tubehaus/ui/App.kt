@@ -103,6 +103,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -302,7 +303,7 @@ private fun Shell(app: AppState) {
                     exit = slideOutVertically(tween(Motion.SHORT, easing = Motion.emphasizedOut)) { it } + fadeOut(tween(Motion.SHORT)),
                 ) { MiniPlayer(app) }
                 // the sheet's mini player sits here, over this room
-                if (sheet && cur !is Screen.Shorts) Spacer(Modifier.height(60.dp))
+                if (sheet && cur !is Screen.Shorts) Spacer(Modifier.height(66.dp))
                 Box(Modifier.onSizeChanged { barPx = it.height }) {
                     if (compact && cur !is Screen.Watch && cur !is Screen.NowPlaying) androidx.compose.animation.AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) {
                         PhoneBar(app, root)
@@ -744,18 +745,17 @@ private fun MiniPlayer(app: AppState) {
                 },
             )
         }
-        .background(MaterialTheme.colorScheme.surfaceContainer)) {
-        if (st.durationMs > 0) {
-            Box(Modifier.fillMaxWidth().height(2.dp).background(MaterialTheme.colorScheme.outline)) {
-                Box(Modifier.fillMaxWidth((st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f)).height(2.dp).background(Red))
-            }
-        }
+        // a card floating over the tabs, as the video's mini player
+        .padding(start = 8.dp, end = 8.dp, bottom = 6.dp)
+        .shadow(6.dp, RoundedCornerShape(14.dp))
+        .clip(RoundedCornerShape(14.dp))
+        .background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Row(
             Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(0.dp)) { if (song != null) app.go(Screen.NowPlaying) else app.go(Screen.Watch(v.id)) }.padding(end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (song != null) SongCover(song, Modifier.padding(6.dp).size(44.dp))
-            else if (!app.store.settings.value.hideThumbs) Img(v.thumb, Modifier.width(96.dp).aspectRatio(16f / 9f))
+            if (song != null) SongCover(song, Modifier.padding(8.dp).size(44.dp).clip(RoundedCornerShape(8.dp)))
+            else if (!app.store.settings.value.hideThumbs) Img(v.thumb, Modifier.width(100.dp).aspectRatio(16f / 9f))
             else Spacer(Modifier.width(4.dp))
             Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                 Text(v.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -767,6 +767,11 @@ private fun MiniPlayer(app: AppState) {
             }
             if (song != null) IconButton(onClick = { app.playback.skipNext() }) { Icon(Sym.SkipNext.fill, tr("Next")) }
             IconButton(onClick = { app.playback.close() }) { Icon(Sym.Close.fill, tr("Close")) }
+        }
+        if (st.durationMs > 0) {
+            Box(Modifier.fillMaxWidth().height(2.dp).background(MaterialTheme.colorScheme.outline)) {
+                Box(Modifier.fillMaxWidth((st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f)).height(2.dp).background(if (song != null) accent else Red))
+            }
         }
     }
 }
