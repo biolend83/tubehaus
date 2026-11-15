@@ -31,8 +31,13 @@ import kotlin.random.Random
 // it learned and can wipe it.
 //
 // Home is built from candidate pools (videos related to what you watched, new uploads from
-// your subscriptions, searches for the words you like, topics you picked) ranked by those
-// scores, with a few slots kept for something new so the feed doesn't collapse into one topic.
+// your subscriptions, searches for the words you like, topics you picked, channels that keep
+// showing up beside yours) ranked by those scores, with a few slots kept for something new so
+// the feed doesn't collapse into one topic.
+//
+// It also learns title words as well as tags, tastes by the time of day and week, a rotating choice of
+// which interests to search, neighbour channels, searches as a light signal, a limit per topic,
+// a relevance floor once the profile knows enough, and fatigue after a binge of one channel.
 
 private const val DECAY = 0.98          // per day: old tastes fade
 private const val CAP = 10.0
@@ -49,6 +54,57 @@ object Learn {
         val tags = Regex("#([^\\s#]{2,40})").findAll(title).map { it.groupValues[1] }.toList()
         return (keywords.take(15) + tags).map { it.trim().lowercase().removePrefix("#") }
             .filter { it.length in 2..40 && it !in STOP }.distinct().take(20)
+    }
+
+    /** words every kind of title uses: never a taste of their own */
+    private val GENERIC = setOf(
+        "the", "and", "for", "with", "you", "your", "this", "that", "from", "are", "was", "how", "what", "why", "who", "when",
+        "best", "top", "full", "part", "episode", "ep", "vs", "feat", "ft", "live", "music", "mv", "lyrics", "lyric", "audio",
+        "hd", "4k", "1080p", "2024", "2025", "2026", "2027", "day", "time", "first", "last", "most", "ever", "all", "can", "will",
+        "about", "just", "out", "not", "but", "one", "two", "my", "me", "we", "our", "his", "her", "they", "it", "is", "in", "on",
+        "of", "to", "a", "an", "at", "by", "or", "be", "do", "so", "no", "up", "if", "as",
+        "공식", "영상", "라이브", "풀버전", "하이라이트", "모음", "최신", "오늘", "이번", "그리고", "진짜", "너무", "정말", "가장",
+        "하는", "있는", "없는", "되는", "하기", "보기", "합니다", "입니다", "ㅋㅋ", "ㅋㅋㅋ", "eng", "sub", "kor",
+    )
+    /** Korean particles: "아이유의", "아이유를" are "아이유" */
+    private val PARTICLES = listOf("에서", "으로", "까지", "부터", "에게", "한테", "의", "를", "을", "이", "가", "은", "는", "에", "와", "과", "도", "로")
+
+    /** A title's own words, for the videos without tags: lower case, particles and everyday words left out. */
+    fun words(title: String): List<String> =
+        title.lowercase().replace(Regex("#[^\\s#]+"), " ").split(Regex("[^\\p{L}\\p{N}]+")).asSequence()
+            .map { w ->
+                val hangul = w.any { it in '\uAC00'..'\uD7A3' }
+                if (!hangul) w else PARTICLES.firstOrNull { w.length > it.length + 1 && w.endsWith(it) }?.let { w.dropLast(it.length) } ?: w
+            }
+            .filter { it.length >= 2 && it !in GENERIC && it !in STOP && !it.all(Char::isDigit) }
+            .distinct().take(12).toList()
+
+    /** the part of the week now: weekday or weekend, morning, afternoon, evening or night */
+    fun bucket(): String {
+        val h = Sys.hour()
+        val d = Sys.today().split('-').mapNotNull { it.toIntOrNull() }
+        val dow = if (d.size == 3) {
+            // Sakamoto's method: 0 Sunday .. 6 Saturday
+            val t = intArrayOf(0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4)
+            val y = if (d[1] < 3) d[0] - 1 else d[0]
+            (y + y / 4 - y / 100 + y / 400 + t[d[1] - 1] + d[2]) % 7
+        } else 1
+        val part = when (h) { in 6..11 -> "m"; in 12..17 -> "a"; in 18..23 -> "e"; else -> "n" }
+        return (if (dow == 0 || dow == 6) "we" else "wd") + part
+    }
+
+    /** A search: its words count a little as an interest, now and at this time of day. */
+    fun searched(store: Store, q: String) {
+        val ws = words(q).take(5)
+        if (ws.isEmpty()) return
+        val b = bucket()
+        store.taste.update { t ->
+            val kw = t.kw.toMutableMap()
+            for (w in ws) kw[w] = minOf(4.0, maxOf(0.0, kw[w] ?: 0.0) + 0.6)
+            val bt = (t.kwTime[b] ?: emptyMap()).toMutableMap()
+            for (w in ws) bt[w] = minOf(4.0, (bt[w] ?: 0.0) + 0.4)
+            t.copy(kw = kw, kwTime = t.kwTime + (b to bt))
+        }
     }
 
     /** How much one viewing says you liked it: skipped < 0 < watched < finished < replayed < liked. */
@@ -72,7 +128,7 @@ object Learn {
         if (days < 0.25) return if (t.decayed == 0L) t.copy(decayed = now()) else t
         val f = DECAY.pow(days)
         fun m(x: Map<String, Double>) = x.mapValues { it.value * f }.filterValues { abs(it) >= 0.05 }
-        return t.copy(ch = m(t.ch), kw = m(t.kw), decayed = now())
+        return t.copy(ch = m(t.ch), kw = m(t.kw), kwTime = t.kwTime.mapValues { m(it.value) }, decayed = now())
     }
 
     /** Learn from one viewing. [short]: also remember it as seen so it doesn't come back. */
@@ -80,6 +136,9 @@ object Learn {
               liked: Boolean = false, disliked: Boolean = false, short: Boolean = false) {
         val e = engagement(watched, length, liked, disliked)
         val toks = tokens(v.title, keywords)
+        // the title's words count too, less than the tags (most videos found in lists have no tags)
+        val ws = words(v.title).filter { it !in toks }
+        val b = bucket()
         store.taste.update { t0 ->
             val t = decayed(t0)
             val ch = t.ch.toMutableMap()
@@ -90,13 +149,18 @@ object Learn {
             }
             val kw = t.kw.toMutableMap()
             for (k in toks) kw[k] = ((kw[k] ?: 0.0) + e * 0.5).coerceIn(-CAP, CAP)
+            for (k in ws) kw[k] = ((kw[k] ?: 0.0) + e * 0.2).coerceIn(-CAP, CAP)
+            // the same words by the time of the week: what you watch on weekday mornings, on weekend nights...
+            val bt = (t.kwTime[b] ?: emptyMap()).toMutableMap()
+            for (k in toks + ws) bt[k] = ((bt[k] ?: 0.0) + e * 0.4).coerceIn(-CAP, CAP)
             val seen = if (short) (t.seen + (v.id to now())).let { s ->
                 if (s.size > 3000) s.entries.sortedByDescending { it.value }.take(3000).associate { it.key to it.value } else s
             } else t.seen
             fun trim(x: Map<String, Double>, keep: Int) =
                 if (x.size > keep) x.entries.sortedByDescending { abs(it.value) }.take(keep).associate { it.key to it.value } else x
             val chT = trim(ch, 400)
-            t.copy(ch = chT, kw = trim(kw, 600), seen = seen, names = names.filterKeys { it in chT })
+            t.copy(ch = chT, kw = trim(kw, 900), seen = seen, names = names.filterKeys { it in chT },
+                kwTime = t.kwTime + (b to trim(bt, 150)))
         }
     }
 
@@ -235,6 +299,12 @@ private data class Cand(val v: Video, val src: String, val tag: String? = null)
 
 class Recommender(private val store: Store, private val feed: Feed) {
     private val pools = Sys.concurrentMap<String, Pair<Long, List<Cand>>>()
+    /**
+     * How often each video was handed to Home this session without being opened: once a little lower, three times much lower, five
+     * times not again, so a pull to refresh brings different videos instead of the same ones.
+     */
+    private val impressions = Sys.concurrentMap<String, Int>()
+    private fun shown(list: List<Video>) { for (v in list) impressions[v.id] = (impressions[v.id] ?: 0) + 1 }
     private val rnd = Random(Sys.nowMs())
 
     private suspend fun pool(key: String, ttl: Long, fetch: suspend () -> List<Cand>): List<Cand> {
@@ -263,7 +333,8 @@ class Recommender(private val store: Store, private val feed: Feed) {
         return t.kw.isEmpty() && (Profiles.active(store).isNotEmpty() && t.ch.isEmpty() || lib.hist.isEmpty() && lib.subs.isEmpty())
     }
 
-    suspend fun home(n: Int = 60, skip: Set<String> = emptySet()): List<Video> = coroutineScope {
+    // these gather and rank hundreds of videos: off the main thread, so a slow TV box stays responsive
+    suspend fun home(n: Int = 60, skip: Set<String> = emptySet()): List<Video> = withContext(Dispatchers.Default) {
         val t = store.taste.value
         val lib = store.lib.value
         val cands = ArrayList<Cand>()
@@ -272,13 +343,36 @@ class Recommender(private val store: Store, private val feed: Feed) {
         // subscriptions: the last two weeks
         val subs = (feed.cached().ifEmpty { feed.all() }).filter { !it.short && now() - it.publishedAt < 14 * 86400 }
         cands += subs.map { Cand(it, "sub") }
-        // the words you like
-        val liked = t.kw.entries.sortedByDescending { it.value }.filter { it.value > 0.5 }.map { it.key }.take(5)
+        // the words you like: five of your top fifteen, drawn at random by weight (the square root,
+        // so the strongest doesn't win every time), so each refresh searches a different mix; and
+        // the two you favour at this time of the week
+        val top = t.kw.entries.filter { it.value > 0.5 }.sortedByDescending { it.value }.take(15).toMutableList()
+        val drawn = ArrayList<String>()
+        while (drawn.size < 5 && top.isNotEmpty()) {
+            var r = rnd.nextDouble() * top.sumOf { sqrt(it.value) }
+            val i = top.indexOfFirst { r -= sqrt(it.value); r <= 0 }.let { if (it < 0) top.size - 1 else it }
+            drawn += top.removeAt(i).key
+        }
+        val now = t.kwTime[Learn.bucket()].orEmpty().entries.filter { it.value > 0.8 && it.key !in drawn }
+            .sortedByDescending { it.value }.take(2).map { it.key }
+        val liked = drawn + now
         val kwPools = liked.map { kw -> async { pool("kw:$kw", 3600) { search(kw, "kw", kw, false) } } }
         // channels you like but aren't subscribed to
         val likedCh = t.ch.entries.sortedByDescending { it.value }.filter { it.value > 1.5 && it.key !in lib.subs }.map { it.key }.take(4)
         val chPools = likedCh.map { cid -> async { pool("ch:$cid", 3600) { feed.channel(cid, 3600).filter { !it.short }.map { Cand(it, "chan") } } } }
-        cands += kwPools.awaitAll().flatten() + chPools.awaitAll().flatten()
+        // neighbour channels: ones YouTube lists beside the videos of two or more different channels you
+        // watched (several of your channels agreeing on one is "made for the same audience")
+        val watchedCh = lib.hist.take(300).associate { it.id to it.authorId }
+        val near = HashMap<String, MutableSet<String>>()
+        for ((vid, list) in t.related) {
+            val src = watchedCh[vid]?.takeIf { it.isNotEmpty() } ?: continue
+            for (m in list) if (m.authorId.isNotEmpty() && m.authorId != src) near.getOrPut(m.authorId) { HashSet() } += src
+        }
+        val neighbours = near.entries.filter { (cid, from) ->
+            from.size >= 2 && cid !in lib.subs && cid !in likedCh && cid !in t.hiddenChannels && (t.ch[cid] ?: 0.0) > -1.0
+        }.sortedByDescending { it.value.size }.take(3).map { it.key }
+        val nearPools = neighbours.map { cid -> async { pool("near:$cid", 3600) { feed.channel(cid, 3600).filter { !it.short }.take(6).map { Cand(it, "near") } } } }
+        cands += kwPools.awaitAll().flatten() + chPools.awaitAll().flatten() + nearPools.awaitAll().flatten()
         if (cands.size < 30) {
             // a profile of its own stays on its words; the main one may wander into any topic
             val any = Profiles.active(store).isEmpty() || liked.isEmpty()
@@ -286,7 +380,7 @@ class Recommender(private val store: Store, private val feed: Feed) {
             cands += seeds.map { q -> async { pool("seed:$q", 3600) { search(q, "pop", q, false) } } }.awaitAll().flatten()
         }
         for (c in cands) if (c.v.id !in sources) sources[c.v.id] = c.src to (c.tag ?: "")
-        rank(cands, n, skip, t, lib.hist.associate { it.id to it }, shorts = false)
+        rank(cands, n, skip, t, lib.hist.associate { it.id to it }, shorts = false).also { shown(it) }
     }
 
     /** where Home's videos came from (subscriptions, related, a liked word...), for the 2.0 home's rows */
@@ -297,14 +391,14 @@ class Recommender(private val store: Store, private val feed: Feed) {
      * Discover: what you'd never be shown otherwise. Popular videos from topics you haven't
      * shown interest in, ranked without your taste (only what you've watched is left out).
      */
-    suspend fun discover(n: Int = 40, skip: Set<String> = emptySet()): List<Video> = coroutineScope {
+    suspend fun discover(n: Int = 40, skip: Set<String> = emptySet()): List<Video> = withContext(Dispatchers.Default) {
         val liked = store.taste.value.kw.keys.map { it.lowercase() }.toSet()
         val fresh = topics.filter { it.lowercase() !in liked }.shuffled(rnd).take(6)
         val cands = fresh.map { q -> async { pool("disc:$q", 3600) { search(q, "pop", q, false) } } }.awaitAll().flatten()
         rank(cands, n, skip, Taste(), store.lib.value.hist.associate { it.id to it }, shorts = false)
     }
 
-    suspend fun shorts(n: Int = 10, skip: Set<String> = emptySet()): List<Video> = coroutineScope {
+    suspend fun shorts(n: Int = 10, skip: Set<String> = emptySet()): List<Video> = withContext(Dispatchers.Default) {
         val t = store.taste.value
         val lib = store.lib.value
         val cands = ArrayList<Cand>()
@@ -325,23 +419,46 @@ class Recommender(private val store: Store, private val feed: Feed) {
         val hiddenC = t.hiddenChannels.toSet()
         // in a profile of its own, a subscription counts only as much as the profile likes its channel
         val subBonus = if (Profiles.active(store).isEmpty()) 0.6 else 0.0
-        val bonus = mapOf("sub" to subBonus, "rel" to 0.5, "chan" to 0.4, "kw" to 0.25, "pop" to 0.0)
+        val bonus = mapOf("sub" to subBonus, "rel" to 0.5, "chan" to 0.4, "near" to 0.35, "kw" to 0.25, "pop" to 0.0)
+        // the words you favour at this time of the week
+        val nowKw = t.kwTime[Learn.bucket()].orEmpty()
+        // enough watched to know: popular videos with nothing to do with you sink (subscriptions never)
+        val mature = lib.hist.size >= 80
+        val topicOf = HashMap<String, String?>()
         val best = HashMap<String, Pair<Double, Cand>>()
+        // momentum: a channel in two or more of the last ten videos watched is what you're into right now
+        val recent = lib.hist.take(10).groupingBy { it.authorId }.eachCount()
         for (c in items) {
             val v = c.v
             if (v.id in hiddenV || v.channelId in hiddenC) continue
+            var lower = 0.0
             if (!shorts) {
                 // already watched most of it
                 val p = lib.pos[v.id]
                 if (p != null && (p.getOrNull(1) ?: 0) > 0 && p[0] > (p[1] * 0.8)) continue
                 if (v.id in hist && p == null) continue
+                // opened and left early: a little lower, it can come back
+                if (p != null && (p.getOrNull(1) ?: 0) > 0 && p[0] > p[1] * 0.15) lower += 0.2
+                val n = impressions[v.id] ?: 0
+                if (n >= 5) continue
+                lower += when { n >= 3 -> 0.8; n >= 1 -> 0.3; else -> 0.0 }
             }
+            // momentum, but a binge of one channel (5 of the last 10) gets tired instead
+            val rc = recent[v.channelId] ?: 0
+            if (v.channelId.isNotEmpty()) { if (rc >= 5) lower += 0.1 else if (rc >= 2) lower -= 0.15 }
             val toks = Learn.tokens(v.title, listOfNotNull(c.tag))
-            val kw = if (toks.isEmpty()) 0.0 else toks.sumOf { t.kw[it] ?: 0.0 } / sqrt(toks.size.toDouble())
+            val ws = Learn.words(v.title).filter { it !in toks }
+            val n = (toks.size + ws.size).coerceAtLeast(1).toDouble()
+            // tags count fully, the title's words half
+            val kw = (toks.sumOf { t.kw[it] ?: 0.0 } + 0.5 * ws.sumOf { t.kw[it] ?: 0.0 }) / sqrt(n)
+            val ctx = (toks + ws).sumOf { nowKw[it] ?: 0.0 } / sqrt(n)
+            if (mature && c.src == "pop" && kw <= 0.05 && (t.ch[v.channelId] ?: 0.0) <= 0.0) lower += 0.35
+            // its topic, for the limit per topic: the search word that found it, else its strongest liked word
+            topicOf[v.id] = c.tag?.lowercase() ?: (toks + ws).filter { (t.kw[it] ?: 0.0) > 0.5 }.maxByOrNull { t.kw[it] ?: 0.0 }
             val fresh = v.publishedAt > 0 && now() - v.publishedAt < 3 * 86400
-            val s = (t.ch[v.channelId] ?: 0.0) * 0.5 + 0.6 * kw + (bonus[c.src] ?: 0.0) +
+            val s = (t.ch[v.channelId] ?: 0.0) * 0.5 + 0.6 * kw + 0.3 * ctx.coerceIn(-2.0, 3.0) + (bonus[c.src] ?: 0.0) +
                 0.1 * log10(1.0 + v.views) / 7 + (if (fresh) 0.25 else 0.0) +
-                gauss() * 0.2
+                gauss() * 0.2 - lower
             val old = best[v.id]
             // the same video from several pools: keep the best score plus a little for each extra pool
             best[v.id] = if (old == null) s to c else (maxOf(old.first, s) + 0.15) to (if (s > old.first) c else old.second)
@@ -352,10 +469,26 @@ class Recommender(private val store: Store, private val feed: Feed) {
         val perCh = HashMap<String, Int>()
         val ids = HashSet<String>()
         val perChMax = if (shorts) 2 else 3
+        // titles nearly the same as one already taken (re-uploads, "part 2" of the same clip) are left out
+        val words = ArrayList<Set<String>>()
+        val perTopic = HashMap<String, Int>()
+        fun wordsOf(title: String) = title.lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter { it.length >= 2 }.toSet()
+        fun alike(a: Set<String>, b: Set<String>): Boolean {
+            if (a.size < 3 || b.size < 3) return false
+            val both = a.count { it in b }
+            return both.toDouble() / (a.size + b.size - both) >= 0.6
+        }
         fun take(c: Cand): Boolean {
             val v = c.v
             if (v.id in ids || (perCh[v.channelId] ?: 0) >= perChMax && v.channelId.isNotEmpty()) return false
             if ((t.ch[v.channelId] ?: 0.0) <= -3) return false       // channels you keep skipping
+            val w = wordsOf(v.title)
+            if (words.any { alike(it, w) }) return false
+            // at most three of one topic in the first twenty, so one interest can't fill the page
+            val topic = topicOf[v.id]
+            if (topic != null && out.size < 20 && (perTopic[topic] ?: 0) >= 3) return false
+            if (topic != null) perTopic[topic] = (perTopic[topic] ?: 0) + 1
+            words += w
             out += v; ids += v.id
             perCh[v.channelId] = (perCh[v.channelId] ?: 0) + 1
             return true

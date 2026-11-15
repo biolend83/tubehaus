@@ -77,6 +77,26 @@ import app.tubehaus.engine.MusicCard
 import app.tubehaus.engine.MusicResults
 import app.tubehaus.engine.Song
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 
 // ---------------------------------------------------------------------------------------------- pieces
 
@@ -516,6 +536,37 @@ fun ArtistScreen(app: AppState, id: String, name: String) {
 
 /** the lyrics of the songs heard this session (LRCLIB is asked once per song) */
 private val lyricsCache = HashMap<String, Lyrics.Found?>()
+/** lyrics were opened this session: from then on the next songs' are looked up too, for the mini player's line */
+private var lyricsWanted by mutableStateOf(false)
+private var lyricsCached by mutableStateOf(0)
+
+/**
+ * The music mini player's second line: the line being sung, sliding up as the next one
+ * comes; the artist when there are no timed lyrics (or lyrics were never opened, so nothing is asked
+ * for that wasn't before).
+ */
+@Composable
+fun MiniLyricLine(app: AppState, s: Song, fallback: String, modifier: Modifier = Modifier) {
+    LaunchedEffect(s.id, lyricsWanted) {
+        if (!lyricsWanted || lyricsCache.containsKey(s.id)) return@LaunchedEffect
+        lyricsCache[s.id] = runCatching { Lyrics.find(s) }.getOrNull(); lyricsCached++
+    }
+    val f = remember(s.id, lyricsCached) { lyricsCache[s.id]?.takeIf { it.synced } }
+    val st by app.player.state.collectAsState()
+    val clock = rememberSongClock(st.positionMs, st.playing, st.speed)
+    val line by remember(f) { androidx.compose.runtime.derivedStateOf {
+        val l = f?.lines ?: return@derivedStateOf ""
+        val t = clock()
+        l.lastOrNull { it.ms <= t + 150 }?.text?.trim().orEmpty()
+    } }
+    val shown = line.ifEmpty { fallback }
+    androidx.compose.animation.AnimatedContent(shown, modifier, transitionSpec = {
+        (androidx.compose.animation.slideInVertically(tween(Motion.MEDIUM, easing = Motion.standard)) { it } + androidx.compose.animation.fadeIn(tween(Motion.MEDIUM))) togetherWith
+            (androidx.compose.animation.slideOutVertically(tween(Motion.MEDIUM, easing = Motion.standard)) { -it } + androidx.compose.animation.fadeOut(tween(Motion.SHORT)))
+    }, label = "mini lyric") { t ->
+        Text(t, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
 
 /** What plays as music: the cover (or the video), the controls, the lyrics and what comes next. */
 @Composable
@@ -533,28 +584,131 @@ fun NowPlayingScreen(app: AppState) {
     // and the same tab again goes back to it
     var tab by rememberSaveable { mutableStateOf(0) }
     var panel by rememberSaveable { mutableStateOf(false) }
+    // Back (the gesture or the key) puts the lyrics or the queue away first, then leaves
+    var wideNow by remember { mutableStateOf(false) }
+    BackHook(app, panel && !wideNow && app.current is Screen.NowPlaying) { panel = false }
     val c = MaterialTheme.colorScheme
-    Box(Modifier.fillMaxSize()) {
+    val scope = rememberCoroutineScope()
+    val d = LocalDensity.current
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val fling = with(d) { 900.dp.toPx() }
+    // pulled down: the page follows the finger and leaves past a fifth of the screen (or flung)
+    val drop = remember { Animatable(0f) }
+    // the cover swiped sideways: the next song from the right, the last one from the left
+    val skip = remember { Animatable(0f) }
+    var tall by remember { mutableStateOf(1f) }
+    var wide by remember { mutableStateOf(1f) }
+    // the songs either side, drawn beside the cover so a swipe pulls the neighbour in
+    val prevSong = pb.songs.getOrNull(pb.songAt - 1)
+    val nextSong = pb.songs.getOrNull(pb.songAt + 1)
+    LaunchedEffect(s.id) {
+        // the neighbour already sits in the middle: the new song's cover is the same picture
+        if (kotlin.math.abs(skip.value) > 1f) skip.snapTo(0f)
+    }
+    fun dropEnd(vy: Float) = scope.launch {
+        if (drop.value > tall * 0.2f || vy > fling) {
+            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureEnd)
+            drop.animateTo(tall, tween(Motion.SHORT + 50, easing = Motion.emphasizedOut), initialVelocity = vy)
+            app.back(hooks = false)
+        } else drop.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = 500f), initialVelocity = vy)
+    }
+    fun skipEnd(vx: Float) = scope.launch {
+        val dir = if (skip.value + vx * 0.1f < 0) -1 else 1
+        val there = if (dir < 0) nextSong != null || pb.next != null else prevSong != null
+        if (there && (kotlin.math.abs(skip.value) > wide * 0.3f || kotlin.math.abs(vx) > fling)) {
+            val was = s.id
+            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureThresholdActivate)
+            skip.animateTo(dir * wide, tween(220, easing = Motion.emphasizedOut), initialVelocity = vx)
+            // a swipe back is always the song before (the button restarts a song a few seconds in)
+            if (dir < 0) pb.skipNext() else pb.playSongAt(pb.songAt - 1)
+            // nothing came (no next song): the cover comes back
+            delay(700)
+            if (pb.song?.id == was) skip.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = 420f))
+        } else skip.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 600f), initialVelocity = vx)
+    }
+    val pullDown = Modifier.pointerInput(Unit) {
+        val track = VelocityTracker()
+        var acc = 0f
+        detectVerticalDragGestures(
+            onDragStart = { acc = 0f; track.resetTracking() },
+            onVerticalDrag = { ch, dy ->
+                ch.consume(); acc += dy; track.addPosition(ch.uptimeMillis, Offset(0f, acc))
+                scope.launch { drop.snapTo((drop.value + dy).coerceAtLeast(0f)) }
+            },
+            onDragCancel = { dropEnd(0f) },
+            onDragEnd = { dropEnd(track.calculateVelocity().y) },
+        )
+    }
+    val coverDrag = Modifier.pointerInput(s.id) {
+        val track = VelocityTracker()
+        var acc = Offset.Zero
+        var sideways: Boolean? = null
+        detectDragGestures(
+            onDragStart = { acc = Offset.Zero; sideways = null; track.resetTracking() },
+            onDrag = { ch, delta ->
+                ch.consume(); acc += delta
+                if (sideways == null) sideways = kotlin.math.abs(acc.x) > kotlin.math.abs(acc.y)
+                track.addPosition(ch.uptimeMillis, acc)
+                scope.launch {
+                    // no song that way: the cover gives a little, then springs back
+                    val to = skip.value + delta.x
+                    val free = if (to < 0) nextSong != null || pb.next != null else prevSong != null
+                    if (sideways == true) skip.snapTo((skip.value + delta.x * (if (free) 1f else 0.3f)).coerceIn(-wide, wide))
+                    else drop.snapTo((drop.value + delta.y).coerceAtLeast(0f))
+                }
+            },
+            onDragCancel = { if (sideways == true) skipEnd(0f) else dropEnd(0f) },
+            onDragEnd = {
+                val v = track.calculateVelocity()
+                if (sideways == true) skipEnd(v.x) else dropEnd(v.y)
+            },
+        )
+    }
+    val st by app.player.state.collectAsState()
+    // paused: the cover sinks back a little, as music apps do
+    val rest by animateFloatAsState(if (st.playing || st.buffering) 1f else 0.9f, spring(dampingRatio = 0.7f, stiffness = 300f))
+    val coverLook = Modifier.graphicsLayer {
+        translationX = skip.value
+        scaleX = rest; scaleY = rest
+    }
+    val peek: @Composable (androidx.compose.ui.unit.Dp) -> Unit = { side ->
+        prevSong?.let { SongCover(it, Modifier.size(side).graphicsLayer { translationX = skip.value - wide; scaleX = rest; scaleY = rest }, round = 24) }
+        nextSong?.let { SongCover(it, Modifier.size(side).graphicsLayer { translationX = skip.value + wide; scaleX = rest; scaleY = rest }, round = 24) }
+    }
+    Box(Modifier.fillMaxSize().onSizeChanged { tall = it.height.toFloat().coerceAtLeast(1f); wide = it.width.toFloat().coerceAtLeast(1f) }
+        .graphicsLayer {
+            translationY = drop.value
+            alpha = 1f - (drop.value / tall).coerceIn(0f, 1f) * 0.6f
+        }) {
         CoverGlow(s)
         Column(Modifier.fillMaxSize()) {
-            NowTop(app, s)
+            NowTop(app, s, pullDown)
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val wide = maxWidth > 760.dp
+                androidx.compose.runtime.SideEffect { wideNow = wide }
                 if (wide) Row(Modifier.fillMaxSize().padding(start = 40.dp, end = 40.dp, bottom = 32.dp, top = 4.dp), horizontalArrangement = Arrangement.spacedBy(48.dp)) {
-                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true) }
+                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true, cover = coverDrag.then(coverLook), peek = peek) }
                     Column(Modifier.weight(1f).widthIn(max = 470.dp).fillMaxHeight().clip(RoundedCornerShape(28.dp))
                         .background(c.background.copy(alpha = 0.55f)).padding(8.dp)) {
                         NowTabs(tab) { tab = it }
                         Box(Modifier.weight(1f)) { if (tab == 0) QueuePanel(app) else LyricsPanel(app, s) }
                     }
                 } else Column(Modifier.fillMaxSize().padding(bottom = 10.dp)) {
-                    if (!panel) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true) }
-                    else SongPanel(app, s, big = false)
+                    // the cover and the one-line song trade places with a short fade
+                    androidx.compose.animation.AnimatedContent(panel, Modifier.let { if (!panel) it.weight(1f) else it }.fillMaxWidth(),
+                        transitionSpec = {
+                            (androidx.compose.animation.fadeIn(tween(Motion.MEDIUM, delayMillis = 60)) + androidx.compose.animation.scaleIn(tween(Motion.MEDIUM, easing = Motion.emphasizedIn), initialScale = 0.94f)) togetherWith
+                                androidx.compose.animation.fadeOut(tween(Motion.SHORT))
+                        }, label = "now") { small ->
+                        if (!small) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { SongPanel(app, s, big = true, cover = coverDrag.then(coverLook), peek = peek) }
+                        else SongPanel(app, s, big = false, cover = pullDown.clickable(interactionSource = null, indication = null) { panel = false })
+                    }
                     Box(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
                         NowTabs(if (panel) tab else -1) { t -> if (panel && t == tab) panel = false else { tab = t; panel = true } }
                     }
+                    // the lyrics straight on the page, as music apps show them; the queue in a soft card
                     if (panel) Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(RoundedCornerShape(24.dp))
-                        .background(c.background.copy(alpha = 0.55f)).padding(6.dp)) { if (tab == 0) QueuePanel(app) else LyricsPanel(app, s) }
+                        .background(if (tab == 0) c.background.copy(alpha = 0.55f) else Color.Transparent).padding(6.dp)) { if (tab == 0) QueuePanel(app) else LyricsPanel(app, s) }
                 }
             }
         }
@@ -563,11 +717,11 @@ fun NowPlayingScreen(app: AppState) {
 
 /** the player's top: down to leave, "Now playing" and where it came from, and the menu */
 @Composable
-private fun NowTop(app: AppState, s: Song) {
+private fun NowTop(app: AppState, s: Song, drag: Modifier) {
     val pb = app.playback
     var more by remember { mutableStateOf(false) }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = { app.back() }) { Icon(Sym.KeyboardArrowDown.fill, tr("Close")) }
+    Row(Modifier.fillMaxWidth().then(drag).padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = { app.back(hooks = false) }) { Icon(Sym.KeyboardArrowDown.fill, tr("Close")) }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(tr("Now playing"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(s.album.ifEmpty { s.artist }, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -628,17 +782,19 @@ private fun NowTabs(at: Int, pick: (Int) -> Unit) {
 
 /** the cover, the title, the seek bar and the buttons; small: one line above the lyrics or the queue */
 @Composable
-private fun SongPanel(app: AppState, s: Song, big: Boolean) {
+private fun SongPanel(app: AppState, s: Song, big: Boolean, cover: Modifier = Modifier, peek: (@Composable (androidx.compose.ui.unit.Dp) -> Unit)? = null) {
     val pb = app.playback
     val st by app.player.state.collectAsState()
     val c = MaterialTheme.colorScheme
     val liked = app.store.lib.state.collectAsState().value.likes.any { it.id == s.id }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     fun like() {
+        haptic.performHapticFeedback(if (liked) androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOff else androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn)
         app.store.setInList("likes", s.video(), !liked)
         app.store.likeSong(s.meta(), !liked)
     }
     if (!big) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().then(cover).padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             SongCover(s, Modifier.size(52.dp))
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(s.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -657,11 +813,14 @@ private fun SongPanel(app: AppState, s: Song, big: Boolean) {
     val side = minOf(maxWidth - 48.dp, maxHeight - 340.dp, 400.dp).coerceAtLeast(140.dp)
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         if (pb.withVideo) {
-            Box(Modifier.widthIn(max = side * 16f / 9f).fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(androidx.compose.ui.graphics.Color.Black)
+            Box(Modifier.widthIn(max = side * 16f / 9f).fillMaxWidth().aspectRatio(16f / 9f).then(cover).clip(RoundedCornerShape(12.dp)).background(androidx.compose.ui.graphics.Color.Black)
                 .tvClickable(RoundedCornerShape(12.dp)) { app.go(Screen.Watch(s.id)) }) {
                 if (st.videoId == s.id) app.player.View(Modifier.fillMaxSize())
             }
-        } else SongCover(s, Modifier.size(side), round = 24)
+        } else Box(contentAlignment = Alignment.Center) {
+            peek?.invoke(side)
+            SongCover(s, Modifier.size(side).then(cover), round = 24)
+        }
         // the title on the left and the heart on the right, as music apps have it
         Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).padding(end = 12.dp)) {
@@ -674,14 +833,15 @@ private fun SongPanel(app: AppState, s: Song, big: Boolean) {
         // seek bar: dragging moves the thumb; the song jumps when it is let go
         var drag by remember { mutableStateOf<Float?>(null) }
         val dur = st.durationMs.coerceAtLeast(1)
-        Slider(
-            value = drag ?: (st.positionMs.toFloat() / dur).coerceIn(0f, 1f),
-            onValueChange = { drag = it },
-            onValueChangeFinished = { drag?.let { app.player.seekTo((it * dur).toLong()) }; drag = null },
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            // white on the dark page (black on the light one), the rest a faint line
-            colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = c.onBackground, activeTrackColor = c.onBackground,
-                inactiveTrackColor = c.onBackground.copy(alpha = 0.18f)),
+        // a thin line with a round handle that grows while held, as YouTube Music's (Material's new
+        // slider, with its tall bar of a handle and a gap in the line, looked out of place here);
+        // white on the dark page (black on the light one), the rest a faint line
+        Track(
+            value = (st.positionMs.toFloat() / dur).coerceIn(0f, 1f), color = c.onBackground,
+            onDrag = { drag = it }, onDone = { app.player.seekTo((it * dur).toLong()); drag = null },
+            modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 4.dp),
+            rail = c.onBackground.copy(alpha = 0.18f), rounded = true,
+            label = tr("Seek bar"), state = tr("{a} of {b}").replace("{a}", durationMs(st.positionMs)).replace("{b}", durationMs(st.durationMs)),
         )
         Row(Modifier.fillMaxWidth()) {
             Text(durationMs(drag?.let { (it * dur).toLong() } ?: st.positionMs), style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
@@ -693,8 +853,11 @@ private fun SongPanel(app: AppState, s: Song, big: Boolean) {
             verticalAlignment = Alignment.CenterVertically) {
             RoundIcon(Sym.Shuffle.fill, tr("Shuffle"), on = pb.shuffle) { pb.toggleShuffle() }
             RoundIcon(Sym.SkipPrevious.fill, tr("Previous"), 56.dp) { pb.previous() }
-            Box(Modifier.size(76.dp).clip(CircleShape).background(c.onBackground)
-                .tvClickable(CircleShape) { if (st.playing) app.player.pause() else app.player.play() }, contentAlignment = Alignment.Center) {
+            val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            val down by press.collectIsPressedAsState()
+            val dip by animateFloatAsState(if (down) 0.9f else 1f, if (down) tween(90) else spring(dampingRatio = 0.5f, stiffness = 500f))
+            Box(Modifier.size(76.dp).graphicsLayer { scaleX = dip; scaleY = dip }.clip(CircleShape).background(c.onBackground)
+                .clickable(interactionSource = press, indication = androidx.compose.material3.ripple()) { if (st.playing) app.player.pause() else app.player.play() }, contentAlignment = Alignment.Center) {
                 if (st.buffering && !st.playing) CircularProgressIndicator(Modifier.size(30.dp), color = c.background, strokeWidth = 3.dp)
                 else Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"), Modifier.size(40.dp), tint = c.background)
             }
@@ -713,9 +876,10 @@ private fun LyricsPanel(app: AppState, s: Song) {
     var found by remember(s.id) { mutableStateOf(lyricsCache[s.id]) }
     var done by remember(s.id) { mutableStateOf(lyricsCache.containsKey(s.id)) }
     LaunchedEffect(s.id) {
+        lyricsWanted = true
         if (done) return@LaunchedEffect
         val f = runCatching { Lyrics.find(s) }.getOrNull()
-        lyricsCache[s.id] = f
+        lyricsCache[s.id] = f; lyricsCached++
         found = f; done = true
     }
     val f = found
@@ -727,24 +891,46 @@ private fun LyricsPanel(app: AppState, s: Song) {
         }
         else -> {
             val st by app.player.state.collectAsState()
+            if (f.synced) {
+                val clock = rememberSongClock(st.positionMs, st.playing, st.speed)
+                SyncedLyrics(f.lines, clock, { app.player.seekTo(it) }, tr(if (f.youTube) "Lyrics from YouTube Music" else "Lyrics come from LRCLIB"), Modifier.fillMaxSize())
+                return
+            }
             val list = rememberLazyListState()
             val cur = if (!f.synced) -1 else f.lines.indexOfLast { it.ms <= st.positionMs + 300 }
-            LaunchedEffect(cur) { if (cur >= 0) list.animateScrollToItem((cur - 2).coerceAtLeast(0)) }
+            var readAt by remember { mutableStateOf(0L) }
+            LaunchedEffect(list) {
+                list.interactionSource.interactions.collect { if (it is DragInteraction.Start || it is DragInteraction.Stop) readAt = Sys.nowMs() }
+            }
+            LaunchedEffect(cur) {
+                if (cur < 0 || Sys.nowMs() - readAt < 3500) return@LaunchedEffect
+                val h = list.layoutInfo.viewportSize.height
+                val seen = list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == cur }
+                if (seen != null) list.animateScrollBy(seen.offset - h * 0.3f, tween(650, easing = Motion.standard))
+                else list.animateScrollToItem((cur - 2).coerceAtLeast(0))
+            }
             val c = MaterialTheme.colorScheme
-            LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 120.dp)) {
+            LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 200.dp)) {
                 itemsIndexed(f.lines) { i, l ->
-                    val now = i == cur
+                    val lit by animateFloatAsState(if (i == cur) 1f else 0f, tween(380, easing = Motion.standard))
+                    val dim = c.onSurfaceVariant.copy(alpha = if (i < cur) 0.45f else 0.7f)
                     Text(
                         l.text.ifEmpty { "♪" },
-                        Modifier.fillMaxWidth().then(if (f.synced) Modifier.tvClickable(RoundedCornerShape(8.dp)) { app.player.seekTo(l.ms) } else Modifier)
-                            .padding(vertical = if (f.synced) 6.dp else 2.dp, horizontal = 4.dp),
+                        Modifier.fillMaxWidth().then(if (f.synced) Modifier.tvClickable(RoundedCornerShape(8.dp)) { readAt = 0L; app.player.seekTo(l.ms) } else Modifier)
+                            .padding(vertical = if (f.synced) 7.dp else 2.dp, horizontal = 4.dp)
+                            .graphicsLayer {
+                                val k = 1f + 0.06f * lit
+                                scaleX = k; scaleY = k
+                                transformOrigin = TransformOrigin(0f, 0.5f)
+                            },
                         style = if (f.synced) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (now) FontWeight.Bold else null,
-                        color = if (!f.synced || now) c.onBackground else c.onSurfaceVariant.copy(alpha = if (i < cur) 0.55f else 0.8f),
+                        fontWeight = if (f.synced) FontWeight.Bold else null,
+                        color = if (!f.synced) c.onBackground else lerp(dim, c.onBackground, lit),
                     )
                 }
                 item {
-                    Text(tr("Lyrics come from LRCLIB"), Modifier.padding(top = 20.dp), style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
+                    Text(tr(if (f.youTube) "Lyrics from YouTube Music" else "Lyrics come from LRCLIB"), Modifier.padding(top = 20.dp),
+                        style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
                 }
             }
         }

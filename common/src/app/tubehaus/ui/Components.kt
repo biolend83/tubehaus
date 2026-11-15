@@ -1,5 +1,11 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.ui.input.pointer.pointerInput
+
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -83,6 +89,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -242,7 +251,14 @@ fun titleOf(v: Video, app: AppState): String = branded(v, app)?.title?.ifEmpty {
 fun Thumb(v: Video, app: AppState, modifier: Modifier = Modifier, rounded: Int = 16) {
     val pos = app.store.lib.state.value.pos[v.id]
     Box(modifier.aspectRatio(16f / 9f).clip(RoundedCornerShape(rounded.dp))) {
-        Img(v.thumb, Modifier.fillMaxSize())
+        if (v.author.endsWith("- Topic") || v.author.endsWith("- 주제")) {
+            // a song's picture is its square cover in grey bars: the cover sharp in the middle, a blur of it behind
+            // (YouTube's 16:9 picture of it: the cover is its middle square; the 4:3 one has bars all round)
+            val art = "https://i.ytimg.com/vi/" + v.id + "/mqdefault.jpg"
+            Img(art, Modifier.fillMaxSize().graphicsLayer { scaleX = 2.2f; scaleY = 2.2f }.blur(28.dp))
+            Box(Modifier.fillMaxSize().background(Color(0x33000000)))
+            Img(art, Modifier.fillMaxHeight().aspectRatio(1f).align(Alignment.Center))
+        } else Img(v.thumb, Modifier.fillMaxSize())
         // DeArrow's frame laid over YouTube's picture: it shows once it has loaded, and not at all if it can't
         val sec = branded(v, app)?.timeSec?.takeIf { app.store.settings.value.dearrowThumbs && !v.live }
         if (sec != null) AsyncImage(DeArrow.thumbUrl(v.id, sec), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -321,7 +337,7 @@ fun VideoCard(v: Video, app: AppState, queue: List<Video> = emptyList()) {
     // one video per row), the avatar lined up with its edge, a bold title, the rows well apart
     val phone = LocalCompact.current
     Column(Modifier.fillMaxWidth().padding(horizontal = if (phone) 12.dp else 0.dp)
-        .tvClickable(RoundedCornerShape(18.dp), onLongClick = { menu.value = true }) { app.watch(v, queue) }.padding(bottom = if (phone) 22.dp else 32.dp)) {
+        .warmOnPress(app, v).tvClickable(RoundedCornerShape(18.dp), onLongClick = { menu.value = true }) { app.watch(v, queue) }.padding(bottom = if (phone) 22.dp else 32.dp)) {
         if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.fillMaxWidth(), rounded = 16)
         Row(Modifier.padding(top = if (phone) 10.dp else 12.dp)) {
             if (v.channelId.isNotEmpty()) {
@@ -347,7 +363,7 @@ fun VideoRow(v: Video, app: AppState, queue: List<Video> = emptyList(), extra: L
     val calm = app.store.settings.value.calm
     val menu = remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(16.dp), onLongClick = { menu.value = true }) { if (onClick != null) onClick() else app.watch(v, queue) }.padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().let { if (onClick == null) it.warmOnPress(app, v) else it }.tvClickable(RoundedCornerShape(16.dp), onLongClick = { menu.value = true }) { if (onClick != null) onClick() else app.watch(v, queue) }.padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         // big: YouTube's search results on a computer, a large picture and a larger title beside it
         if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.width(thumbWidth), rounded = if (big) 18 else 12)
@@ -368,11 +384,12 @@ fun ChannelRow(c: Channel, app: AppState) {
         Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(16.dp)) { app.go(Screen.Channel(c.id, c.name)) }.padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.width(168.dp), contentAlignment = Alignment.Center) { Avatar(c.avatar, 88) }
-        Column(Modifier.weight(1f).padding(start = 10.dp)) {
-            Text(c.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(listOf(c.handle, c.subsText).filter { it.isNotEmpty() }.joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // the picture at the start (it sat alone in the middle of a thumbnail's width)
+        Avatar(c.avatar, if (LocalCompact.current) 56 else 88)
+        Column(Modifier.weight(1f).padding(start = 14.dp, end = 8.dp)) {
+            Text(c.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (c.handle.isNotEmpty()) Text(c.handle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (c.subsText.isNotEmpty()) Text(c.subsText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
         SubscribeButton(c.id, c.name, c.avatar, app)
     }
@@ -413,8 +430,10 @@ fun SubscribeButton(cid: String, name: String, thumb: String, app: AppState) {
     val fg by animateColorAsState(if (subbed) c.onSurface else c.onPrimary, tween(Motion.MEDIUM))
     val pop = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     Button(
         onClick = {
+            haptic.performHapticFeedback(if (subbed) androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOff else androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn)
             app.store.subscribe(cid, name, thumb, !subbed)
             if (!subbed) scope.launch { pop.snapTo(0.9f); pop.animateTo(1f, spring(0.4f, Spring.StiffnessMedium)) }
         },
@@ -502,6 +521,8 @@ fun ItemGrid(
     wideRows: Boolean = false,
     /** the cards look on Home: the first video large */
     hero: Boolean = false,
+    /** pulled down (touch), or its tab tapped again at the top: a fresh list */
+    refresh: (suspend () -> Unit)? = null,
 ) {
     val look = LocalLook.current
     val scope = rememberCoroutineScope()
@@ -524,6 +545,10 @@ fun ItemGrid(
     // the cards already shown: those arrive once, not again each time they scroll back into view
     val seen = remember { HashSet<Any>() }
     if (list.isEmpty() && loading && header == null) { Skeleton(rows, wideRows); return }
+    Refreshable(app, refresh, atTop = { state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0 }, toTop = {
+        if (state.firstVisibleItemIndex > 8) state.scrollToItem(8)
+        state.animateScrollToItem(0)
+    }) {
     androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     // the large rows' picture shrinks with the window, so a narrow one still leaves room for the title
     val bigThumb = when { maxWidth > 900.dp -> 360.dp; maxWidth > 640.dp -> 246.dp; else -> 168.dp }
@@ -555,6 +580,31 @@ fun ItemGrid(
         if (loading) item(span = { GridItemSpan(maxLineSpan) }) { Busy() }
     }
     }
+    }
+}
+
+/**
+ * A list that can be made fresh, as YouTube's: pulled down from the top on a touch screen it reloads
+ * (a spinner comes down with the finger); its tab tapped again glides it back to the top, or reloads
+ * it when it is already there.
+ */
+@Composable
+fun Refreshable(app: AppState, refresh: (suspend () -> Unit)?, atTop: () -> Boolean, toTop: suspend () -> Unit, content: @Composable () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val again: () -> Unit = {
+        if (refresh != null && !busy) {
+            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureThresholdActivate)
+            scope.launch { busy = true; try { refresh() } finally { busy = false } }
+        }
+    }
+    val tick = app.reselect
+    val start = remember { tick }
+    LaunchedEffect(tick) { if (tick != start) { if (atTop()) again() else toTop() } }
+    if (refresh != null && app.platform.touch && !app.platform.tv) {
+        androidx.compose.material3.pulltorefresh.PullToRefreshBox(busy, again, Modifier.fillMaxSize()) { content() }
+    } else content()
 }
 
 /**
@@ -607,6 +657,55 @@ fun Skeleton(rows: Boolean = false, wide: Boolean = false) {
     }
 }
 
+/** a grey stand-in with a light sweeping across it, for what is still loading (see [Skeleton]) */
+@Composable
+fun Modifier.bone(shape: Shape = RoundedCornerShape(6.dp)): Modifier {
+    val sweep by rememberInfiniteTransition().animateFloat(
+        0f, 1f, infiniteRepeatable(tween(1500, easing = LinearEasing), RepeatMode.Restart),
+    )
+    val grey = MaterialTheme.colorScheme.surfaceContainer
+    val light = MaterialTheme.colorScheme.surfaceContainerHighest
+    return this.clip(shape).background(grey).drawBehind {
+        val w = size.width
+        val x = -0.5f * w + sweep * 2f * w
+        drawRect(Brush.horizontalGradient(listOf(Color.Transparent, light, Color.Transparent), startX = x - w * 0.3f, endX = x + w * 0.3f))
+    }
+}
+
+/** a video still loading: a full-width card ([big], phones) or a row with a picture on the left */
+@Composable
+fun BoneVideo(big: Boolean, thumb: Dp = 168.dp) {
+    if (big) Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).bone(RoundedCornerShape(0.dp)))
+        Row(Modifier.padding(start = 12.dp, top = 12.dp, end = 12.dp)) {
+            Box(Modifier.size(36.dp).bone(CircleShape))
+            Column(Modifier.weight(1f).padding(start = 12.dp, top = 2.dp)) {
+                Box(Modifier.fillMaxWidth(0.9f).height(16.dp).bone())
+                Box(Modifier.padding(top = 8.dp).fillMaxWidth(0.6f).height(12.dp).bone())
+            }
+        }
+    } else Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Box(Modifier.width(thumb).aspectRatio(16f / 9f).bone(RoundedCornerShape(12.dp)))
+        Column(Modifier.weight(1f).padding(start = 12.dp, top = 2.dp)) {
+            Box(Modifier.fillMaxWidth(0.9f).height(14.dp).bone())
+            Box(Modifier.padding(top = 8.dp).fillMaxWidth(0.5f).height(11.dp).bone())
+        }
+    }
+}
+
+/** a comment still loading */
+@Composable
+fun BoneComment() {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Box(Modifier.size(32.dp).bone(CircleShape))
+        Column(Modifier.weight(1f).padding(start = 10.dp)) {
+            Box(Modifier.fillMaxWidth(0.35f).height(11.dp).bone())
+            Box(Modifier.padding(top = 8.dp).fillMaxWidth(0.95f).height(13.dp).bone())
+            Box(Modifier.padding(top = 6.dp).fillMaxWidth(0.7f).height(13.dp).bone())
+        }
+    }
+}
+
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(text, style = MaterialTheme.typography.titleLarge, modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp))
@@ -655,24 +754,24 @@ fun RoundIcon(
     }
 }
 
-/** a small grey label above a group of rows ("Your content", "Playlists") */
+/** a small label in the accent colour above a group of rows ("Your content", "Playlists") */
 @Composable
-fun GroupLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 28.dp, end = 16.dp, top = 18.dp, bottom = 4.dp))
-}
+fun GroupLabel(text: String) = SectionLabel(text, Modifier.padding(start = 4.dp))
 
-/** rows in one rounded grey box */
+/**
+ * rows as one segmented group: the group's outer corners large, each row its own
+ * piece with small corners, 2 dp apart
+ */
 @Composable
 fun RowGroup(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     Column(
-        modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().clip(RoundedCornerShape(22.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer).padding(vertical = 4.dp),
+        modifier.padding(horizontal = 12.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp)),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
         content = content,
     )
 }
 
-/** a row of a [RowGroup]: the icon in a circle, a title, a line under it, a count, an arrow */
+/** a row of a [RowGroup]: the icon, a title, a line under it, a count, an arrow */
 @Composable
 fun GroupRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, sub: String = "", trailing: String = "",
@@ -680,13 +779,12 @@ fun GroupRow(
 ) {
     val c = MaterialTheme.colorScheme
     Row(
-        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(16.dp), onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(c.surfaceContainer)
+            .tvClickable(RoundedCornerShape(6.dp), onClick = onClick).padding(horizontal = 18.dp, vertical = if (sub.isEmpty()) 18.dp else 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(40.dp).clip(CircleShape).background(c.surfaceContainerHigh), contentAlignment = Alignment.Center) {
-            Icon(icon, null, Modifier.size(22.dp))
-        }
-        Column(Modifier.weight(1f).padding(start = 14.dp, end = 8.dp)) {
+        Icon(icon, null, Modifier.size(24.dp), tint = accent)
+        Column(Modifier.weight(1f).padding(start = 18.dp, end = 8.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -745,8 +843,32 @@ fun SearchField(
 @Composable
 fun ListHeader(
     cover: String, title: String, line: String, enabled: Boolean, play: () -> Unit, shuffle: () -> Unit,
+    /** the panel down the left of a wide window (see [SplitList]) */
+    panel: Boolean = false,
     more: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
 ) {
+    if (panel) {
+        // as YouTube's website: a tall card with the cover's colours, soft, behind the cover and the words
+        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer)) {
+            Backdrop(cover.ifEmpty { null }, Modifier.matchParentSize())
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
+                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                    if (cover.isNotEmpty()) Img(cover, Modifier.fillMaxSize())
+                    else Icon(Sym.PlaylistPlay.outline, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 20.dp))
+                if (line.isNotEmpty()) Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PillButton(tr("Play all"), Sym.PlayArrow.fill, filled = true, enabled = enabled, modifier = Modifier.weight(1f), onClick = play)
+                    PillButton(tr("Shuffle"), Sym.Shuffle.fill, enabled = enabled, modifier = Modifier.weight(1f), onClick = shuffle)
+                }
+                androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { more() }
+            }
+        }
+        return
+    }
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().padding(16.dp)) {
         val wide = maxWidth > 700.dp
         val pic: @Composable (Modifier) -> Unit = { m ->
@@ -773,6 +895,22 @@ fun ListHeader(
             Spacer(Modifier.height(16.dp))
             words()
         }
+    }
+}
+
+/**
+ * A playlist's page: on a wide window the cover, title and buttons stay in a panel on the left while
+ * the videos scroll on the right, as on YouTube's website; narrower, the header scrolls away at the
+ * top of the list. [list] gets whether it should put the header in itself.
+ */
+@Composable
+fun SplitList(side: @Composable () -> Unit, list: @Composable (headerInList: Boolean) -> Unit) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        val w = maxWidth
+        if (w > 1000.dp && !LocalPlatform.current.tv) Row(Modifier.fillMaxSize()) {
+            Box(Modifier.width(minOf(400.dp, w * 0.34f)).fillMaxHeight().padding(start = 16.dp, top = 8.dp, bottom = 16.dp)) { side() }
+            Box(Modifier.weight(1f).fillMaxHeight()) { list(false) }
+        } else list(true)
     }
 }
 
@@ -811,6 +949,8 @@ fun Narrow(content: @Composable () -> Unit) {
 /** Design 2 (glass): a small see-through card, two a row on a phone */
 @Composable
 fun GlassCard(v: Video, app: AppState, queue: List<Video> = emptyList(), solid: Boolean = false) {
+    // the opaque box around every video made the lists heavy: a plain card on a phone
+    if (solid && LocalCompact.current) { VideoCard(v, app, queue); return }
     if (!app.kidsAllow(v.channelId)) return
     val menu = remember { mutableStateOf(false) }
     // solid: the big cards look, an opaque rounded box with the channel's picture; else see-through glass
@@ -900,8 +1040,9 @@ fun ContinueRow(app: AppState, forYou: Boolean = true) {
             val v = left[i]
             Column(Modifier.width(220.dp).clip(RoundedCornerShape(18.dp)).tvClickable(RoundedCornerShape(18.dp)) { app.watch(v) }) {
                 Thumb(v, app, Modifier.fillMaxWidth(), rounded = 18)
+                // kept clear of the card's rounded bottom corners, which cut off the start of the last line
                 Text(titleOf(v, app), style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp))
+                    modifier = Modifier.padding(top = 6.dp, start = 4.dp, end = 4.dp, bottom = 10.dp))
             }
         }
     }
@@ -909,3 +1050,61 @@ fun ContinueRow(app: AppState, forYou: Boolean = true) {
         modifier = Modifier.padding(start = if (phone) 16.dp else 4.dp, bottom = 8.dp))
 }
 
+/**
+ * Back closes this first while [enabled] (a panel, the lyrics...), then goes back as usual. Hooks
+ * stack: the newest one gets Back first, and one that is off lets it through, so a panel left open
+ * on a page that is no longer in front never swallows a press.
+ */
+@Composable
+fun BackHook(app: AppState, enabled: Boolean, onBack: () -> Unit) {
+    val on by androidx.compose.runtime.rememberUpdatedState(enabled)
+    val act by androidx.compose.runtime.rememberUpdatedState(onBack)
+    androidx.compose.runtime.DisposableEffect(app) {
+        val h: () -> Boolean = { if (on) { act(); true } else false }
+        app.backHooks.add(h)
+        onDispose { app.backHooks.remove(h) }
+    }
+}
+
+/**
+ * One piece of a segmented group (Material 3 Expressive): rounded large at the group's
+ * outer corners and small between pieces, 2 dp apart, on the raised surface colour.
+ */
+@Composable
+fun Segment(first: Boolean, last: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val big = 24.dp
+    val small = 6.dp
+    val shape = RoundedCornerShape(if (first) big else small, if (first) big else small, if (last) big else small, if (last) big else small)
+    Box(modifier.fillMaxWidth().padding(top = if (first) 0.dp else 2.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceContainer)) { content() }
+}
+
+/** a section's name over its group: small, bold, in the accent colour */
+@Composable
+fun SectionLabel(t: String, modifier: Modifier = Modifier) {
+    Text(t, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = accent,
+        modifier = modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 8.dp))
+}
+
+/**
+ * Starts fetching a video's streams the moment a finger rests on its card,
+ * so the player has them by the time the tap ends. A touch that turns into a scroll asks nothing:
+ * the finger has to stay put for a moment first. Not on a metered connection.
+ */
+@Composable
+fun Modifier.warmOnPress(app: AppState, v: Video): Modifier {
+    if (v.live || v.short || v.id.isEmpty()) return this
+    return pointerInput(v.id) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+            val still = withTimeoutOrNull(90L) {
+                while (true) {
+                    val e = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    val c = e.changes.firstOrNull { it.id == down.id } ?: return@withTimeoutOrNull false
+                    if (!c.pressed || (c.position - down.position).getDistance() > viewConfiguration.touchSlop) return@withTimeoutOrNull false
+                }
+                @Suppress("UNREACHABLE_CODE") false
+            } ?: true
+            if (still && !app.platform.metered()) Streams.prefetch(app.scope, v.id)
+        }
+    }
+}

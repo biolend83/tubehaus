@@ -37,6 +37,8 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.Canvas
@@ -65,6 +67,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -100,6 +103,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -135,8 +139,20 @@ fun App(app: AppState) {
             val bg = MaterialTheme.colorScheme.background
             LaunchedEffect(bg) { app.platform.titleBar(bg) }
             val tv = app.platform.tv
+            // every haptic in the app goes through here: off by the setting, else the platform's own motor
+            val host = androidx.compose.ui.platform.LocalHapticFeedback.current
+            val hapticsOn by androidx.compose.runtime.rememberUpdatedState(settings.haptics && !tv)
+            val haptic = remember(host) {
+                object : androidx.compose.ui.hapticfeedback.HapticFeedback {
+                    override fun performHapticFeedback(hapticFeedbackType: androidx.compose.ui.hapticfeedback.HapticFeedbackType) {
+                        if (!hapticsOn) return
+                        if (!app.platform.vibrate(hapticFeedbackType)) host.performHapticFeedback(hapticFeedbackType)
+                    }
+                }
+            }
             CompositionLocalProvider(
                 LocalPlatform provides app.platform,
+                androidx.compose.ui.platform.LocalHapticFeedback provides haptic,
                 // TV: buttons, tabs and menu rows the remote has selected glow teal, clearly enough for the sofa
                 LocalRippleConfiguration provides if (tv) RippleConfiguration(Teal, RippleAlpha(0.16f, 0.34f, 0.08f, 0.2f)) else LocalRippleConfiguration.current,
             ) {
@@ -231,9 +247,14 @@ private fun tabs(app: AppState, phone: Boolean): List<Tab> {
 
 @Composable
 private fun Shell(app: AppState) {
-    val cur = app.current
+    val now = app.current
     val compact = LocalCompact.current
     val root = app.stack.firstOrNull()
+    // phones: the video page is a sheet over the page it was opened from, which stays put under it
+    // and is what the rest of the shell lays out (WatchSheet)
+    val sheet = compact && app.platform.touch && !app.platform.tv && app.playback.video != null && app.playback.song == null
+    val cur = if (sheet && now is Screen.Watch) app.stack.lastOrNull { it !is Screen.Watch } ?: Screen.Home else now
+    var barPx by remember { mutableStateOf(0) }
     val showTop = cur !is Screen.Watch && cur !is Screen.Shorts && cur !is Screen.Search && cur !is Screen.NowPlaying
     // the desktop: while you browse, the video keeps playing in a small window at the bottom right
     val floating = !app.platform.touch && !app.platform.tv
@@ -253,6 +274,9 @@ private fun Shell(app: AppState) {
     // the side menu folded away: a small menu button brings it back (in the top bar, or above the video)
     val railCollapsed = !compact && app.store.settings.state.collectAsState().value.railCollapsed
     val unfold = { app.store.settings.update { it.copy(railCollapsed = false) } }
+    // a computer: the menu button sits left of the logo in the top bar, as on YouTube's website
+    val deskBar = !compact && !app.platform.touch && !app.platform.tv
+    val fold = { app.store.settings.update { it.copy(railCollapsed = true) } }
     val navScroll = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
@@ -261,24 +285,29 @@ private fun Shell(app: AppState) {
             }
         }
     }
-    LaunchedEffect(cur) {
+    LaunchedEffect(now) {
         navShown = true
         // Shorts has its own player; a video playing in the background stops
-        if (cur is Screen.Shorts) app.playback.close()
+        if (now is Screen.Shorts) app.playback.close()
     }
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
-        topBar = { if (showTop) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) { TopBar(app, if (railCollapsed) unfold else null) } },
+        topBar = { if (showTop) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) { TopBar(app, if (railCollapsed) unfold else if (deskBar) fold else null, page = cur, depth = if (sheet) app.stack.count { it !is Screen.Watch } else app.stack.size) } },
         bottomBar = {
             Column {
                 // the mini player rises from the bottom edge and sinks back into it (phones, tablets, TVs;
                 // the desktop has a floating one with the picture, below)
                 AnimatedVisibility(
-                    app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts && cur !is Screen.NowPlaying && !floating,
+                    app.playback.video != null && cur !is Screen.Watch && cur !is Screen.Shorts && cur !is Screen.NowPlaying && !floating && !sheet,
                     enter = slideInVertically(tween(Motion.MEDIUM, easing = Motion.emphasizedIn)) { it } + fadeIn(tween(Motion.SHORT)),
                     exit = slideOutVertically(tween(Motion.SHORT, easing = Motion.emphasizedOut)) { it } + fadeOut(tween(Motion.SHORT)),
                 ) { MiniPlayer(app) }
-                if (compact && cur !is Screen.Watch && cur !is Screen.NowPlaying) AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) {
-                    PhoneBar(app, root)
+                // the sheet's mini player sits here, over this room
+                if (sheet && cur !is Screen.Shorts) Spacer(Modifier.height(66.dp))
+                Box(Modifier.onSizeChanged { barPx = it.height }) {
+                    if (compact && cur !is Screen.Watch && cur !is Screen.NowPlaying) androidx.compose.animation.AnimatedVisibility(navShown || !autoHide, enter = expandVertically(), exit = shrinkVertically()) {
+                        PhoneBar(app, root)
+                    }
                 }
             }
         },
@@ -290,7 +319,7 @@ private fun Shell(app: AppState) {
                 NavigationRail(
                     containerColor = MaterialTheme.colorScheme.background,
                     header = {
-                        IconButton(onClick = { app.store.settings.update { it.copy(railCollapsed = true) } }) {
+                        if (!(deskBar && showTop)) IconButton(onClick = { app.store.settings.update { it.copy(railCollapsed = true) } }) {
                             Icon(Sym.MenuOpen.fill, tr("Fold the menu"))
                         }
                         // the desktop: back and forward, like a browser's, out of the video page's way; dim when there is nowhere to go
@@ -349,7 +378,8 @@ private fun Shell(app: AppState) {
                       val rest = 1f - shown.value
                       alpha = shown.value
                       when (move) {
-                          1 -> translationX = rest * 40.dp.toPx()
+                          // the music player rises from the mini player, as a sheet
+                          1 -> if (cur is Screen.NowPlaying) translationY = rest * 72.dp.toPx() else translationX = rest * 40.dp.toPx()
                           -1 -> translationX = -rest * 24.dp.toPx()
                           // a tab: the page rises in a little, as on the web
                           else -> translationY = rest * 10.dp.toPx()
@@ -391,6 +421,8 @@ private fun Shell(app: AppState) {
             }
         }
     }
+    if (sheet && cur !is Screen.Shorts) WatchSheet(app, expanded = now is Screen.Watch, barPx = barPx)
+    }
 }
 
 /** whether this tab is the open one: Home also for the pages of the top tabs that sit under it (Music, Live; Subscriptions on phones) */
@@ -412,10 +444,12 @@ private fun PhoneBar(app: AppState, root: Screen?) {
     val look = LocalLook.current
     val pillShape = RoundedCornerShape(30.dp)
     Column(Modifier.fillMaxWidth().background(c.background).windowInsetsPadding(NavigationBarDefaults.windowInsets)) {
+        // the 1.5 design: flat along the bottom with a hairline on top, as YouTube's
+        if (look == 3) HorizontalDivider(color = c.outline, thickness = 0.5.dp)
         val soft = accentSoft
         Row(
             Modifier.fillMaxWidth().let {
-                if (look == 0) it else it.padding(horizontal = 14.dp, vertical = 6.dp).clip(pillShape)
+                if (look == 0 || look == 3) it else it.padding(horizontal = 14.dp, vertical = 6.dp).clip(pillShape)
                     .background(c.surfaceContainerHigh)
                     .border(1.dp, if (look == 2) (if (c.background.luminance() < 0.5f) Color(0x1FFFFFFF) else Color.White) else Color.Transparent, pillShape)
             }.height(58.dp),
@@ -427,6 +461,7 @@ private fun PhoneBar(app: AppState, root: Screen?) {
                 // springs back when let go
                 val touch = remember { MutableInteractionSource() }
                 val pressed by touch.collectIsPressedAsState()
+                val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
                 val dip by animateFloatAsState(if (pressed) 0.86f else 1f,
                     if (pressed) tween(Motion.SHORT) else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
                 val shade by animateFloatAsState(if (pressed) 0.12f else 0f, tween(if (pressed) 90 else Motion.LONG))
@@ -436,7 +471,7 @@ private fun PhoneBar(app: AppState, root: Screen?) {
                     if (sel) spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow) else tween(Motion.SHORT))
                 Column(
                     Modifier.weight(1f).fillMaxHeight()
-                        .selectable(sel, interactionSource = touch, indication = null, role = Role.Tab, onClick = { app.go(t.screen) }),
+                        .selectable(sel, interactionSource = touch, indication = null, role = Role.Tab, onClick = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick); app.go(t.screen) }),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
                 ) {
                     Box(
@@ -528,20 +563,40 @@ fun Logo(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null) {
+// page, depth: the page shown and how deep it is, without the watch sheet over it (so the bar under
+// the sheet is already what it will be when the video folds away)
+private fun TopBar(app: AppState, onMenu: (() -> Unit)? = null, page: Screen = app.current, depth: Int = app.stack.size) {
     Column {
         Row(Modifier.fillMaxWidth().height(52.dp).padding(start = 14.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             if (onMenu != null) IconButton(onClick = onMenu) { Icon(Sym.Menu.fill, tr("Menu")) }
-            if (app.stack.size > 1) {
+            if (depth > 1) {
                 IconButton(onClick = { app.back() }) { Icon(Sym.ArrowBack.fill, tr("Back")) }
             }
             if (!app.store.settings.value.hideLogo) Logo(Modifier.clickable { app.go(Screen.Home) })
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = { app.go(Screen.Search()) }) { Icon(Sym.Search.outline, tr("Search")) }
-            if (LocalCompact.current || onMenu != null) IconButton(onClick = { app.go(Screen.Settings) }) { Icon(Sym.Settings.outline, tr("Settings")) }
+            // a computer: a search box in the middle of the bar, as on YouTube's website (a click opens search)
+            if (!LocalCompact.current && !app.platform.touch && !app.platform.tv) {
+                val c = MaterialTheme.colorScheme
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Row(
+                        Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 24.dp).height(40.dp)
+                            .clip(RoundedCornerShape(20.dp)).border(1.dp, c.outlineVariant, RoundedCornerShape(20.dp))
+                            .clickable { app.go(Screen.Search()) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(tr("Search"), Modifier.weight(1f).padding(start = 18.dp), color = c.onSurfaceVariant, maxLines = 1)
+                        Box(Modifier.fillMaxHeight().width(64.dp).background(c.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+                            Icon(Sym.Search.outline, tr("Search"), Modifier.size(22.dp))
+                        }
+                    }
+                }
+            } else {
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = { app.go(Screen.Search()) }) { Icon(Sym.Search.outline, tr("Search")) }
+            }
+            if (LocalCompact.current || (onMenu != null && app.store.settings.value.railCollapsed)) IconButton(onClick = { app.go(Screen.Settings) }) { Icon(Sym.Settings.outline, tr("Settings")) }
         }
         // every device: Home, Subscriptions, Music, Live and More under the logo, on those pages themselves
-        if (app.stack.size == 1 && app.current.underHome()) TopTabs(app)
+        if (depth == 1 && page.underHome()) TopTabs(app)
     }
 }
 
@@ -648,28 +703,75 @@ private fun MiniPlayer(app: AppState) {
     val v = app.playback.video ?: return
     val song = app.playback.song
     val st by app.player.state.collectAsState()
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)) {
-        if (st.durationMs > 0) {
-            Box(Modifier.fillMaxWidth().height(2.dp).background(MaterialTheme.colorScheme.outline)) {
-                Box(Modifier.fillMaxWidth((st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f)).height(2.dp).background(Red))
-            }
+    // as YouTube's: swipe it up to open the video, sideways to close it (a song: to the next or the last
+    // one); it follows the finger and fades as it goes, and let go early it slides back
+    val scope = rememberCoroutineScope()
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val slide = remember(v.id) { Animatable(0f) }
+    var wide by remember { mutableStateOf(1f) }
+    Column(Modifier.fillMaxWidth().onSizeChanged { wide = it.width.toFloat().coerceAtLeast(1f) }
+        .graphicsLayer { translationX = slide.value; alpha = 1f - (kotlin.math.abs(slide.value) / wide).coerceIn(0f, 1f) * 0.9f }
+        .pointerInput(v.id) {
+            var up = 0f
+            detectDragGestures(
+                onDragStart = { up = 0f },
+                onDrag = { change, d ->
+                    change.consume()
+                    up += d.y
+                    scope.launch { slide.snapTo(slide.value + d.x) }
+                },
+                onDragCancel = { scope.launch { slide.animateTo(0f, tween(Motion.SHORT)) } },
+                onDragEnd = {
+                    scope.launch {
+                        when {
+                            kotlin.math.abs(slide.value) > wide * 0.35f -> {
+                                val dir = if (slide.value > 0) 1f else -1f
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureThresholdActivate)
+                                slide.animateTo(dir * wide, tween(Motion.SHORT, easing = Motion.emphasizedOut))
+                                // a song: sideways is the next or the last one, as in YouTube Music
+                                if (app.playback.song != null) {
+                                    if (dir < 0) app.playback.skipNext() else app.playback.previous()
+                                    slide.snapTo(-dir * wide * 0.5f)
+                                    slide.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 420f))
+                                } else app.playback.close()
+                            }
+                            up < -40.dp.toPx() && kotlin.math.abs(slide.value) < 48.dp.toPx() -> {
+                                slide.snapTo(0f)
+                                if (app.playback.song != null) app.go(Screen.NowPlaying) else app.go(Screen.Watch(v.id))
+                            }
+                            else -> slide.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 600f))
+                        }
+                    }
+                },
+            )
         }
+        // a card floating over the tabs, as the video's mini player
+        .padding(start = 8.dp, end = 8.dp, bottom = 6.dp)
+        .shadow(6.dp, RoundedCornerShape(14.dp))
+        .clip(RoundedCornerShape(14.dp))
+        .background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Row(
             Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(0.dp)) { if (song != null) app.go(Screen.NowPlaying) else app.go(Screen.Watch(v.id)) }.padding(end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (song != null) SongCover(song, Modifier.padding(6.dp).size(44.dp))
-            else if (!app.store.settings.value.hideThumbs) Img(v.thumb, Modifier.width(96.dp).aspectRatio(16f / 9f))
+            if (song != null) SongCover(song, Modifier.padding(8.dp).size(44.dp).clip(RoundedCornerShape(8.dp)))
+            else if (!app.store.settings.value.hideThumbs) Img(v.thumb, Modifier.width(100.dp).aspectRatio(16f / 9f))
             else Spacer(Modifier.width(4.dp))
             Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                 Text(v.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(v.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                if (song != null) MiniLyricLine(app, song, v.author)
+                else Text(v.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
             IconButton(onClick = { if (st.playing) app.player.pause() else app.player.play() }) {
                 Icon(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"))
             }
             if (song != null) IconButton(onClick = { app.playback.skipNext() }) { Icon(Sym.SkipNext.fill, tr("Next")) }
             IconButton(onClick = { app.playback.close() }) { Icon(Sym.Close.fill, tr("Close")) }
+        }
+        if (st.durationMs > 0) {
+            Box(Modifier.fillMaxWidth().height(2.dp).background(MaterialTheme.colorScheme.outline)) {
+                Box(Modifier.fillMaxWidth((st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f)).height(2.dp).background(if (song != null) accent else Red))
+            }
         }
     }
 }
