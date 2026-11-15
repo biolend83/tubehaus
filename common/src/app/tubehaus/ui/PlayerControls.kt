@@ -13,6 +13,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.foundation.layout.requiredHeight
@@ -183,6 +188,8 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
     // held down: playing at twice the speed until let go (the speed it had before)
     var fast by remember { mutableStateOf<Float?>(null) }
     var settings by remember { mutableStateOf(false) }
+    // a sideways swipe over the picture: where it will land and how far that is from where it started
+    var scrub by remember { mutableStateOf<Pair<Long, Long>?>(null) }
     var gesture by remember { mutableStateOf<Pair<String, Float>?>(null) }   // "brightness"/"volume", level
     // TV: the video itself holds the remote's focus (OK, left/right); up or down moves it onto the buttons
     val tv = app.platform.tv
@@ -335,6 +342,34 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
                     }
                 } else it }
                 .let { if (tv) it.onKeyEvent { e -> e.type == KeyEventType.KeyDown && remote(e.key) }.focusRequester(videoFocus).focusable() else it }
+                // swiped sideways: the whole width is a minute and a half (less in a short video), a tick
+                // every five seconds; it jumps there when the finger lifts (Flow's seek swipe)
+                .pointerInput(touch, st.durationMs > 0, app.playback.video?.live == true) {
+                    if (!touch || app.playback.video?.live == true) return@pointerInput
+                    var base = 0L; var travel = 0f; var lastTick = 0L
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            base = player.state.value.positionMs; travel = 0f; lastTick = base
+                            scrub = base to 0L
+                        },
+                        onDragEnd = {
+                            scrub?.let { (to, by) -> if (by != 0L) player.seekTo(to) }
+                            scrub = null
+                        },
+                        onDragCancel = { scrub = null },
+                    ) { c, dx ->
+                        c.consume()
+                        val dur = player.state.value.durationMs
+                        if (dur <= 0 || size.width <= 0) return@detectHorizontalDragGestures
+                        val span = minOf(90_000L, dur)
+                        travel += dx
+                        val raw = base + (travel / size.width * span).toLong()
+                        val to = raw.coerceIn(0L, maxOf(0L, dur - 500))
+                        if (to != raw) travel = (to - base).toFloat() / span * size.width
+                        scrub = to to (to - base)
+                        if (abs(to - lastTick) >= 5_000L) { lastTick = to; haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentFrequentTick) }
+                    }
+                }
                 .pointerInput(touch, st.durationMs, w, dtap) {
                     if (!touch) {
                         detectTapGestures(onTap = { toggle() }, onDoubleTap = { app.setFull(!fullscreen) })
@@ -442,31 +477,29 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
                     }
                 },
         )
-        // a small round meter on the side being swiped, out of the middle of the picture
-        gesture?.let { (kind, level) ->
-            Column(
-                Modifier.align(if (kind == "brightness") Alignment.CenterStart else Alignment.CenterEnd).padding(horizontal = 40.dp)
-                    .background(Color(0x80000000), RoundedCornerShape(36.dp)).padding(10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                val icon = when {
-                    kind == "brightness" -> Sym.BrightnessMedium.fill
-                    level == 0f -> Sym.VolumeOff.fill
-                    else -> Sym.VolumeUp.fill
-                }
-                Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(
-                        progress = { level }, color = Color.White, trackColor = Color(0x40FFFFFF), strokeWidth = 4.dp,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    Icon(icon, null, tint = Color.White, modifier = Modifier.size(22.dp))
-                }
-                Text("${(level * 100).toInt()}", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-            }
+        // the level as a standing bar on the side away from the swiping thumb, so the hand does not
+        // cover the number it is aiming for (Flow's); it follows the finger on a spring and fades out
+        var lastGesture by remember { mutableStateOf("volume" to 0f) }
+        gesture?.let { lastGesture = it }
+        AnimatedVisibility(gesture != null, enter = fadeIn(tween(Motion.SHORT)), exit = fadeOut(tween(Motion.MEDIUM)),
+            modifier = Modifier.align(if (lastGesture.first == "brightness") Alignment.CenterEnd else Alignment.CenterStart).padding(horizontal = 24.dp)) {
+            LevelHud(lastGesture.first, lastGesture.second, tall = fullscreen)
         }
         // a double tap's jump, as YouTube's app shows it: a light half-moon on that side, a ripple
         // from the finger, arrows running the way of the jump and the seconds jumped so far
         jump?.let { (side, secs) -> JumpRipple(side, secs, jumpAt, jumpTick, w) }
+        // the seek swipe's read-out in the middle of the picture
+        var lastScrub by remember { mutableStateOf(0L to 0L) }
+        scrub?.let { lastScrub = it }
+        AnimatedVisibility(scrub != null, enter = fadeIn(tween(Motion.SHORT)) + androidx.compose.animation.scaleIn(initialScale = 0.92f),
+            exit = fadeOut(tween(Motion.SHORT)) + androidx.compose.animation.scaleOut(targetScale = 0.94f), modifier = Modifier.align(Alignment.Center)) {
+            val (to, by) = lastScrub
+            Column(Modifier.clip(RoundedCornerShape(20.dp)).background(Color(0x8F000000)).padding(horizontal = 22.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(durationMs(to), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text((if (by < 0) "-" else "+") + durationMs(abs(by)), color = accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
         // held down: "2x" at the top while the finger stays
         AnimatedVisibility(fast != null, enter = fadeIn(tween(Motion.SHORT)), exit = fadeOut(tween(Motion.SHORT)),
             modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp)) {
@@ -525,7 +558,17 @@ private fun TouchOverlay(
     onDrag: (Float) -> Unit, onDragEnd: () -> Unit, seekBy: (Int) -> Unit, poke: () -> Unit, openSettings: () -> Unit,
 ) {
     val player = app.player
-    Box(Modifier.fillMaxSize().background(Color(0x66000000))) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var remaining by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize().background(Color(0x3D000000)).drawWithCache {
+        val edge = (if (fullscreen) 120.dp else 72.dp).toPx().coerceAtMost(size.height / 2)
+        val top = Brush.verticalGradient(listOf(Color(0x8C000000), Color.Transparent), endY = edge)
+        val bottom = Brush.verticalGradient(listOf(Color.Transparent, Color(0x8C000000)), startY = size.height - edge, endY = size.height)
+        onDrawBehind {
+            drawRect(top, size = Size(size.width, edge))
+            drawRect(bottom, topLeft = Offset(0f, size.height - edge), size = Size(size.width, edge))
+        }
+    }) {
         // top: a chevron that folds the video into the mini player (in full screen: back out of it),
         // the title and channel in full screen; captions and settings on the right
         Row(
@@ -545,28 +588,28 @@ private fun TouchOverlay(
             IconButton(onClick = openSettings) { Icon(Sym.Settings.outline, tr("Settings"), tint = Color.White) }
         }
         // centre: back 10s, play/pause, forward 10s (or next when it has ended)
-        Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (fullscreen) 56.dp else 32.dp)) {
-            CenterButton(Sym.SkipPrevious.fill, tr("Previous"), 48) { app.playback.previous(); poke() }
-            Box(Modifier.size(64.dp), contentAlignment = Alignment.Center) {
+        Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (fullscreen) 56.dp else 28.dp)) {
+            SkipButton(Sym.SkipPrevious.fill, tr("Previous")) { app.playback.previous(); poke() }
+            PlayButton(st) {
                 when {
-                    st.buffering && !st.ended -> CircularProgressIndicator(Modifier.size(48.dp), color = Color.White, strokeWidth = 3.dp)
-                    st.ended -> CenterButton(Sym.Replay.fill, tr("Replay"), 64) { player.seekTo(0); player.play() }
-                    else -> CenterButton(if (st.playing) Sym.Pause.fill else Sym.PlayArrow.fill, tr(if (st.playing) "Pause" else "Play"), 64) {
-                        if (st.playing) player.pause() else player.play(); poke()
-                    }
+                    st.ended -> { player.seekTo(0); player.play() }
+                    st.playing -> { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOff); player.pause() }
+                    else -> { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn); player.play() }
                 }
+                poke()
             }
-            CenterButton(Sym.SkipNext.fill, tr("Next"), 48, enabled = app.playback.next != null) { app.playback.skipNext() }
+            SkipButton(Sym.SkipNext.fill, tr("Next"), enabled = app.playback.next != null) { app.playback.skipNext() }
         }
         // bottom: time, full screen, seek bar
         Column(
             Modifier.align(Alignment.BottomStart).fillMaxWidth()
                 .let { if (fullscreen) it.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp) else it },
         ) {
-            Row(Modifier.fillMaxWidth().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                TimeText(app, st, dragging)
+            Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                TimePills(app, st, dragging, remaining) { remaining = !remaining; poke() }
                 Spacer(Modifier.weight(1f))
-                if (st.speed != 1f) Text("${st.speed}x", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(end = 4.dp))
+                if (st.speed != 1f) Text("${st.speed}x", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = 6.dp).height(28.dp).clip(CircleShape).background(PILL).clickable(onClick = openSettings).wrapContentHeight().padding(horizontal = 12.dp))
                 FullscreenButton(app, fullscreen)
             }
             // outside full screen the bar ran to the video's edges and the handle stuck out past them (#56)
@@ -600,6 +643,106 @@ private fun FullscreenActions(app: AppState, poke: () -> Unit) {
         Bar(if (saved) Sym.WatchLater.fill else Sym.WatchLater.outline, tr("Watch later")) { app.store.setInList("wl", v, !saved); poke() }
         Bar(Sym.Share.outline, tr("Share")) { app.share(v.title, "https://youtu.be/${v.id}") }
     }
+}
+
+/** brightness or volume while it is swiped: the number, a bar that fills upward, the icon */
+@Composable
+private fun LevelHud(kind: String, level: Float, tall: Boolean) {
+    val shown by animateFloatAsState(level, androidx.compose.animation.core.spring(stiffness = 1400f))
+    val icon = when {
+        kind == "brightness" -> Sym.BrightnessMedium.fill
+        level == 0f -> Sym.VolumeOff.fill
+        else -> Sym.VolumeUp.fill
+    }
+    Column(
+        Modifier.width(52.dp).clip(RoundedCornerShape(26.dp)).background(Color(0x8A000000)).padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("${(level * 100).toInt()}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Box(Modifier.padding(vertical = 12.dp).width(8.dp).height(if (tall) 150.dp else 84.dp).clip(CircleShape).background(Color(0x40FFFFFF)), contentAlignment = Alignment.BottomCenter) {
+            Box(Modifier.fillMaxWidth().fillMaxHeight(shown.coerceIn(0f, 1f)).clip(CircleShape).background(Color.White))
+        }
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(22.dp))
+    }
+}
+
+/** what rests on the video: pills and round buttons (Flow's 40 % black) */
+private val PILL = Color(0x66000000)
+
+/** shrinks a little while pressed and springs back, as Flow's buttons do */
+@Composable
+private fun Modifier.squeeze(src: androidx.compose.foundation.interaction.MutableInteractionSource, to: Float): Modifier {
+    val down by src.collectIsPressedAsState()
+    val s by animateFloatAsState(if (down) to else 1f, androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 700f))
+    return graphicsLayer { scaleX = s; scaleY = s }
+}
+
+/** previous and next: a white icon with no circle, dimmed when there is nowhere to go */
+@Composable
+private fun SkipButton(icon: ImageVector, label: String, enabled: Boolean = true, onClick: () -> Unit) {
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    Box(
+        Modifier.size(52.dp).squeeze(src, 0.82f).clip(CircleShape)
+            .clickable(src, androidx.compose.foundation.LocalIndication.current, enabled = enabled) {
+                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); onClick()
+            },
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, label, tint = if (enabled) Color.White else Color(0x4DFFFFFF), modifier = Modifier.size(36.dp)) }
+}
+
+/** play, pause, replay or the loading ring, in one round button; the icon pops from one to the next */
+@Composable
+private fun PlayButton(st: PlayerState, onClick: () -> Unit) {
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val what = when { st.buffering && !st.ended -> 0; st.ended -> 1; st.playing -> 2; else -> 3 }
+    Box(
+        Modifier.size(66.dp).squeeze(src, 0.88f).clip(CircleShape).background(PILL)
+            .clickable(src, androidx.compose.foundation.LocalIndication.current, enabled = what != 0, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.animation.AnimatedContent(what, transitionSpec = {
+            val sp = androidx.compose.animation.core.spring<Float>(dampingRatio = 0.7f, stiffness = 900f)
+            (androidx.compose.animation.scaleIn(sp, initialScale = 0.6f) + fadeIn(tween(120))) togetherWith
+                (androidx.compose.animation.scaleOut(sp, targetScale = 0.6f) + fadeOut(tween(90)))
+        }, contentAlignment = Alignment.Center) { w ->
+            when (w) {
+                0 -> CircularProgressIndicator(Modifier.size(40.dp), color = Color.White, strokeWidth = 3.dp)
+                1 -> Icon(Sym.Replay.fill, tr("Replay"), tint = Color.White, modifier = Modifier.size(44.dp))
+                2 -> Icon(Sym.Pause.fill, tr("Pause"), tint = Color.White, modifier = Modifier.size(44.dp))
+                else -> Icon(Sym.PlayArrow.fill, tr("Play"), tint = Color.White, modifier = Modifier.size(48.dp))
+            }
+        }
+    }
+}
+
+/** the time in a pill (a tap: what is left instead), and the chapter playing in another, which opens the list */
+@Composable
+private fun TimePills(app: AppState, st: PlayerState, dragging: Float?, remaining: Boolean, onTime: () -> Unit) {
+    val pos = dragging?.let { (it * st.durationMs).toLong() } ?: st.positionMs
+    var list by remember { mutableStateOf(false) }
+    val chapter = app.playback.chapters.lastOrNull { it.startMs <= pos }
+    val live = app.playback.video?.live == true
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.height(28.dp).clip(CircleShape).background(PILL).clickable(enabled = !live, onClick = onTime).padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            if (live) {
+                Box(Modifier.size(8.dp).background(Red, CircleShape))
+                Text(tr("LIVE"), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, modifier = Modifier.padding(start = 6.dp))
+            } else {
+                Text(if (remaining) "-" + durationMs(maxOf(0L, st.durationMs - pos)) else durationMs(pos), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(" / " + durationMs(st.durationMs), color = Color(0xB3FFFFFF), fontSize = 12.sp)
+            }
+        }
+        if (chapter != null && chapter.title.isNotEmpty()) Row(
+            Modifier.height(28.dp).clip(CircleShape).background(PILL).clickable { list = true }.padding(start = 12.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(chapter.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
+            Icon(Sym.ChevronRight.outline, null, tint = Color(0xB3FFFFFF), modifier = Modifier.size(16.dp))
+        }
+    }
+    if (list) ChaptersSheet(app) { list = false }
 }
 
 @Composable
@@ -892,7 +1035,7 @@ internal fun Track(
             },
         contentAlignment = Alignment.CenterStart,
     ) {
-        val thick = if (active) 5.dp else 3.dp
+        val thick by androidx.compose.animation.core.animateDpAsState(if (active) 5.dp else 3.dp, androidx.compose.animation.core.spring(stiffness = 600f))
         val wide = maxWidth
         // "Most replayed": YouTube's wave standing on the bar while the pointer is on it or a finger drags
         if (heat.size >= 2) {
@@ -918,7 +1061,7 @@ internal fun Track(
             layout(0, 0) { p.place((full * h - p.width / 2f).toInt().coerceIn(0, maxOf(0, full - p.width)), -p.height - 16.dp.roundToPx()) }
         }) { above(h) }
         // the handle: 12dp, 20dp while dragging (YouTube's sizes)
-        val knob = if (held != null) 20.dp else if (active) 14.dp else 12.dp
+        val knob by androidx.compose.animation.core.animateDpAsState(if (held != null) 20.dp else if (active) 14.dp else 12.dp, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 700f))
         Box(Modifier.offset(x = maxWidth * shown - knob / 2).size(knob).background(color, CircleShape))
     }
 }
