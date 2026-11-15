@@ -985,6 +985,7 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
             val codec = app.store.settings.state.collectAsState().value.codec
             val families = pb.stream?.video?.map { it.codecFamily }?.distinct().orEmpty()
             SheetHeader(tr("Video"))
+            SheetGroup(app) {
             SheetRow(Sym.HighQuality.outline, tr("Quality"), (if (st.height > 0) "${st.height}p" else tr("Auto")) + codecName(codec).let { if (it.isEmpty()) "" else " · $it" }) { page = "q" }
             if (families.size > 1) SheetRow(Sym.Tune.outline, tr("Video codec"), codecName(codec).ifEmpty { tr("Auto") }) { page = "k" }
             if (st.audioTracks.size > 1) {
@@ -1000,7 +1001,9 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
                 SheetRow(Sym.ClosedCaption.fill, tr("Captions"), st.captions?.let { c -> st.captionsTranslated?.let { l -> tr("Auto-translate") + " (" + langName(l) + ")" } ?: c.name } ?: tr("Off")) { page = "c" }
                 if (!pb.music && !app.platform.tv) SheetRow(Sym.Transcript.outline, tr("Transcript"), "") { pb.transcriptAsked = true; dismiss() }
             }
+            }
             SheetHeader(tr("Playback"))
+            SheetGroup(app) {
             SheetRow(Sym.Speed.outline, tr("Speed"), if (st.speed == 1f) tr("Normal") else "${st.speed}x") { page = "s" }
             SheetRow(Sym.Replay.outline, tr("Loop video"), tr(if (pb.loop) "On" else "Off")) { pb.loopVideo(!pb.loop); dismiss() }
             SheetRow(Sym.SwapVert.outline, tr("A-B repeat"), when {
@@ -1013,8 +1016,12 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
                 pb.sleepAt > 0 -> tr("{n} min left").replace("{n}", "${((pb.sleepAt - Sys.nowMs()) / 60_000 + 1)}")
                 else -> tr("Off")
             }) { page = "t" }
+            }
             SheetHeader(tr("More"))
+            SheetGroup(app) {
             SheetRow(Sym.Bolt.outline, tr("Stats for nerds"), "") { page = "n" }
+            }
+            Spacer(Modifier.height(8.dp))
         }
         "k" -> {
             val now = app.store.settings.value.codec
@@ -1110,10 +1117,22 @@ private fun setCodec(app: AppState, c: String) {
     app.playback.replay(app.player.state.value.positionMs)
 }
 
-/** a small grey heading between the groups of the sheet */
+/** a small heading in the accent colour between the groups of the sheet */
 @Composable
 private fun SheetHeader(t: String) {
-    Text(t, Modifier.padding(start = 20.dp, top = 10.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (LocalSegmented.current || LocalCompact.current) SectionLabel(t, Modifier.padding(start = 0.dp))
+    else Text(t, Modifier.padding(start = 20.dp, top = 10.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/** rows in a group: on a touch screen, Flow's segmented pieces; the desktop's menu and a TV keep plain rows */
+private val LocalSegmented = androidx.compose.runtime.compositionLocalOf { false }
+
+@Composable
+private fun SheetGroup(app: AppState, content: @Composable () -> Unit) {
+    if (!app.platform.touch || app.platform.tv) { content(); return }
+    Column(Modifier.padding(horizontal = 12.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp)), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalSegmented provides true) { content() }
+    }
 }
 
 /** a row of the settings sheet; with a remote or keyboard the focused one turns solid, so you can see where you are */
@@ -1122,10 +1141,11 @@ private fun SheetLine(onClick: () -> Unit, content: @Composable androidx.compose
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val focused by src.collectIsFocusedAsState()
     val cs = MaterialTheme.colorScheme
+    val seg = LocalSegmented.current
     androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides if (focused) cs.surface else androidx.compose.material3.LocalContentColor.current) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp).clip(RoundedCornerShape(12.dp))
-                .background(if (focused) cs.onSurface else Color.Transparent)
+            Modifier.fillMaxWidth().then(if (seg) Modifier.clip(RoundedCornerShape(6.dp)) else Modifier.padding(horizontal = 8.dp).clip(RoundedCornerShape(12.dp)))
+                .background(if (focused) cs.onSurface else if (seg) cs.surfaceContainerHigh else Color.Transparent)
                 .clickable(src, androidx.compose.foundation.LocalIndication.current, onClick = onClick)
                 .padding(horizontal = 12.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1136,7 +1156,7 @@ private fun SheetLine(onClick: () -> Unit, content: @Composable androidx.compose
 @Composable
 private fun SheetRow(icon: ImageVector, label: String, value: String, onClick: () -> Unit) {
     SheetLine(onClick) { focused ->
-        Icon(icon, null)
+        Icon(icon, null, tint = if (LocalSegmented.current && !focused) accent else androidx.compose.material3.LocalContentColor.current)
         Text(label, Modifier.weight(1f).padding(start = 20.dp), style = MaterialTheme.typography.bodyLarge, maxLines = 1, softWrap = false)
         // the value stays on one line and gives way first (a long audio track name squeezed the label, #70)
         Text(value, Modifier.padding(start = 12.dp).widthIn(max = 170.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
