@@ -65,6 +65,8 @@ data class Taste(
     /** "not interested": hidden videos and channels */
     val hiddenVideos: List<String> = emptyList(),
     val hiddenChannels: List<String> = emptyList(),
+    /** keyword -> affinity by the time it was watched ("wdm" weekday morning ... "wen" weekend night) */
+    val kwTime: Map<String, Map<String, Double>> = emptyMap(),
 )
 
 @Serializable
@@ -86,6 +88,8 @@ data class Settings(
     /** player gestures on touch screens, each its own switch (#57): double-tap the sides to skip 10 s; swipe for brightness and volume */
     val doubleTapSeek: Boolean = true,
     val swipeGestures: Boolean = true,
+    /** touch screens: a small vibration on gestures and toggles (jumps, likes, the player sheet landing) */
+    val haptics: Boolean = true,
     /** phones: turning sideways while a video plays goes full screen, upright leaves it (#58) */
     val rotateFull: Boolean = true,
     /** hidden by choice (#57): the Music tab, the AirPlay/cast button on the player, the logo in the top bar */

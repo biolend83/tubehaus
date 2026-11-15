@@ -127,6 +127,11 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
     private var car = false
     /** the view on screen, for [frame] */
     private var view: PlayerView? = null
+    private var zoomed = false
+    override fun setZoom(on: Boolean) {
+        zoomed = on
+        view?.resizeMode = if (on) AspectRatioFrameLayout.RESIZE_MODE_ZOOM else AspectRatioFrameLayout.RESIZE_MODE_FIT
+    }
     /** the captions, drawn by a view of ours over the video in place of the PlayerView's own (see [youTubeLook]) */
     private var captions: SubtitleView? = null
 
@@ -437,13 +442,18 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         val s by state.collectAsState()
         AndroidView(
             factory = { c ->
-                PlayerView(c).apply {
+                // Android 14+: a SurfaceView, which follows the page's moves and scale there (and is
+                // the lighter one); older: a TextureView, as a SurfaceView would stay put while the
+                // player folds into the mini player
+                val made = if (android.os.Build.VERSION.SDK_INT >= 34) PlayerView(c)
+                    else android.view.LayoutInflater.from(c).inflate(R.layout.player_texture, null) as PlayerView
+                made.apply {
                     layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                     setShowNextButton(false)
                     setShowPreviousButton(false)
                     setShowSubtitleButton(true)
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)   // the thumbnail shows until the first frame
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    resizeMode = if (zoomed) AspectRatioFrameLayout.RESIZE_MODE_ZOOM else AspectRatioFrameLayout.RESIZE_MODE_FIT
                     player = exo
                     subtitleView?.visibility = View.GONE
                     val subs = SubtitleView(c).apply {

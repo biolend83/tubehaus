@@ -481,9 +481,7 @@ fun PlaylistScreen(app: AppState, id: String, title: String) {
         Problem(pager.error!!) { scope.launch { pager.load() } }
         return
     }
-    ItemGrid(
-        pager.items, app, loading = pager.loading, onEnd = { pager.loadMore() }, rows = true,
-        header = {
+    val header: @Composable (Boolean) -> Unit = { panel ->
             ListHeader(
                 cover = if (app.store.settings.value.hideThumbs) "" else videos.firstOrNull()?.thumb ?: "",
                 title = head?.title ?: title,
@@ -491,6 +489,7 @@ fun PlaylistScreen(app: AppState, id: String, title: String) {
                 enabled = videos.isNotEmpty(),
                 play = { videos.firstOrNull()?.let { app.watch(it, videos.drop(1)) } },
                 shuffle = { val s = videos.shuffled(); app.watch(s[0], s.drop(1)) },
+                panel = panel,
             ) {
                     PillButton(tr("Save to library"), Sym.LibraryAdd.outline, height = 36.dp, enabled = videos.isNotEmpty()) {
                         // keep a copy on this device (the playlist on YouTube may change or vanish)
@@ -503,6 +502,9 @@ fun PlaylistScreen(app: AppState, id: String, title: String) {
                     }
                     PillButton(tr("Share"), Sym.Share.outline, height = 36.dp) { app.share(head?.title ?: title, "https://www.youtube.com/playlist?list=$id") }
             }
-        },
-    )
+    }
+    SplitList({ header(true) }) { inList ->
+        ItemGrid(pager.items, app, loading = pager.loading, onEnd = { pager.loadMore() }, rows = true,
+            header = if (inList) ({ header(false) }) else null)
+    }
 }

@@ -23,7 +23,7 @@ import kotlin.concurrent.Volatile
  * Every request carries a visitor identity ("visitorData", what a browser keeps in a cookie).
  * Without one YouTube answers most player requests with "Sign in to confirm you're not a bot",
  * even from a home connection. Its bot wall is tied to the visitor, so when every client is
- * walled the identity is replaced once and the request retried (as Flow does).
+ * walled the identity is replaced once and the request retried.
  */
 data class Client(
     val name: String,
@@ -55,6 +55,26 @@ object Clients {
         "WEB_REMIX", "1.20261104.00.00", 67,
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
         host = "music.youtube.com",
+    )
+    /**
+     * YouTube Music's Android app: the only client its lyrics come with times for (the web site gets
+     * the same lyrics as plain text). Asked for lyrics only, never for a video. No sign-in: lyrics
+     * come to signed-out requests in the countries where YouTube Music is free (not from Korea)
+     */
+    val MUSIC_ANDROID = Client(
+        "ANDROID_MUSIC", "7.21.50", 21,
+        "com.google.android.apps.youtube.music/7.21.50 (Linux; U; Android 14) gzip",
+        mapOf("osName" to "Android", "osVersion" to "14", "androidSdkVersion" to 34),
+        host = "music.youtube.com",
+    )
+    /**
+     * A Samsung TV's YouTube: its links come locked (signature and n, solved by [Cipher]), but it
+     * still serves what the others call "not available" (videos made for kids, some labels)
+     */
+    val TV = Client(
+        "TVHTML5", "5.20260707", 7,
+        "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/2.4.0 TV Safari/538.1",
+        mapOf("osName" to "Tizen", "osVersion" to "2.4.0", "deviceMake" to "Samsung", "deviceModel" to "SmartTV"),
     )
     /** in the order the player tries them; replaced by the list on GitHub when there is a newer one (Remote) */
     @Volatile var PLAYERS = listOf(VISIONOS, ANDROID_VR)
@@ -161,6 +181,8 @@ object InnerTube {
         } catch (e: okio.IOException) {
             throw YtError("No connection to YouTube", YtError.Kind.NETWORK)
         }
-        return parse(text)
+        // YouTube's answers run to hundreds of kilobytes: read them off the main thread, or a slow TV box
+        // freezes on every page (and Android closes the app as not responding)
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { parse(text) }
     }
 }

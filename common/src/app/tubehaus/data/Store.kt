@@ -206,6 +206,19 @@ class Store(dir: Path) {
         for (cid in all) push("/yt/sub", "sub:$cid") { put("id", cid); put("on", false) }
     }
 
+    /** Gives a saved video that came in with only its id (an imported playlist or history) its title and
+     *  channel, wherever it is saved (#71). Only on this device; nothing is sent to the server. */
+    fun fillMeta(id: String, title: String, author: String, authorId: String) {
+        if (title.isEmpty()) return
+        fun List<Meta>.fill() = map {
+            if (it.id == id && it.title.isEmpty()) it.copy(title = title, author = it.author.ifEmpty { author }, authorId = it.authorId.ifEmpty { authorId }) else it
+        }
+        lib.update { l ->
+            l.copy(hist = l.hist.fill(), wl = l.wl.fill(), likes = l.likes.fill(),
+                playlists = l.playlists.mapValues { (_, p) -> if (p.items.any { it.id == id }) p.copy(items = p.items.fill()) else p })
+        }
+    }
+
     // ---------------------------------------------------------- history and resume points
     fun savePosition(v: Video, seconds: Long, length: Long) {
         if (settings.value.historyOff) return

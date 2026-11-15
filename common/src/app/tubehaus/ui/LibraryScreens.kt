@@ -28,6 +28,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import app.tubehaus.data.Meta
+import app.tubehaus.engine.YouTube
+import kotlinx.coroutines.coroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -108,6 +112,7 @@ fun SubsScreen(app: AppState) {
     val feed = if (group != null) groupFeed(base, lib.hist.mapTo(HashSet()) { it.id }) else base
     ItemGrid(
         feed.filter { v -> words.all { w -> w in v.title.lowercase() || w in v.author.lowercase() } }, app, loading = loading,
+        refresh = { load(true) },
         header = {
             Column {
                 if (lib.groups.isNotEmpty()) tabs()
@@ -357,9 +362,28 @@ private fun LibRow(icon: ImageVector, label: String, count: String, onClick: () 
     }
 }
 
+/** Videos saved with only their id (a playlist or history imported from Google Takeout, Invidious and the
+ *  like) have no title or channel to show (#71): look those up once the list is open, a few at a time. */
+@Composable
+private fun FillMissingTitles(app: AppState, list: String, items: List<Meta>) {
+    val current by rememberUpdatedState(items)
+    LaunchedEffect(list) {
+        val missing = current.filter { it.title.isEmpty() }.map { it.id }.distinct().take(200)
+        for (part in missing.chunked(4)) coroutineScope {
+            for (id in part) launch {
+                try {
+                    val d = YouTube.details(id)
+                    app.store.fillMeta(id, d.title, d.author, d.channelId)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+}
+
 @Composable
 fun HistoryScreen(app: AppState) {
     val lib by app.store.lib.state.collectAsState()
+    FillMissingTitles(app, "hist", lib.hist)
     var q by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf(false) }
     val list = lib.hist.filter { q.isBlank() || (it.title + " " + it.author).contains(q, ignoreCase = true) }
@@ -393,23 +417,26 @@ fun LocalListScreen(app: AppState, key: String) {
         "likes" -> tr("Liked videos") to lib.likes
         else -> (pl?.title ?: "") to (pl?.items ?: emptyList())
     }
+    FillMissingTitles(app, key, items)
     var rename by remember { mutableStateOf(false) }
     var delete by remember { mutableStateOf(false) }
     val videos = items.map { it.video() }
-    LazyColumn(Modifier.fillMaxSize()) {
-        item {
-            ListHeader(
-                cover = if (app.store.settings.value.hideThumbs) "" else videos.firstOrNull()?.thumb ?: "",
-                title = title, line = tr("{n} videos").replace("{n}", "${items.size}"), enabled = videos.isNotEmpty(),
-                play = { videos.firstOrNull()?.let { app.watch(it, videos.drop(1)) } },
-                shuffle = { videos.shuffled().let { s -> s.firstOrNull()?.let { app.watch(it, s.drop(1)) } } },
-            ) {
-                if (pl != null) {
-                    PillButton(tr("Rename"), height = 36.dp) { rename = true }
-                    PillButton(tr("Delete"), height = 36.dp) { delete = true }
-                }
+    val header: @Composable (Boolean) -> Unit = { panel ->
+        ListHeader(
+            cover = if (app.store.settings.value.hideThumbs) "" else videos.firstOrNull()?.thumb ?: "",
+            title = title, line = tr("{n} videos").replace("{n}", "${items.size}"), enabled = videos.isNotEmpty(),
+            play = { videos.firstOrNull()?.let { app.watch(it, videos.drop(1)) } },
+            shuffle = { videos.shuffled().let { s -> s.firstOrNull()?.let { app.watch(it, s.drop(1)) } } },
+            panel = panel,
+        ) {
+            if (pl != null) {
+                PillButton(tr("Rename"), height = 36.dp) { rename = true }
+                PillButton(tr("Delete"), height = 36.dp) { delete = true }
             }
         }
+    }
+    SplitList({ header(true) }) { inList -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = if (inList) 0.dp else 8.dp)) {
+        if (inList) item { header(false) }
         if (items.isEmpty()) item { Empty(tr("Nothing here")) }
         items(videos.withIndex().toList(), key = { it.value.id }) { (i, v) ->
             val extra = buildList {
@@ -419,7 +446,7 @@ fun LocalListScreen(app: AppState, key: String) {
             }
             VideoRow(v, app, extra = extra) { app.watch(v, videos.drop(i + 1)) }
         }
-    }
+    } }
     if (rename && pl != null) NameDialog(tr("Rename playlist"), pl.title, { rename = false }) { app.store.renamePlaylist(key, it) }
     if (delete && pl != null) AlertDialog(
         onDismissRequest = { delete = false },

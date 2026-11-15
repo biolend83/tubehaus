@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.rec.Learn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.style.TextOverflow
@@ -81,6 +82,8 @@ fun SearchScreen(app: AppState, initial: String) {
         }
         query = t
         app.stack[app.stack.size - 1] = Screen.Search(t)
+        // what you search for is a light signal for Home (not with history off)
+        if (!app.store.settings.value.historyOff) Learn.searched(app.store, t)
         if (!app.store.settings.value.historyOff) app.store.settings.update { s ->
             s.copy(recentSearches = (listOf(t) + s.recentSearches.filter { !it.equals(t, true) }).take(30))
         }
@@ -99,18 +102,9 @@ fun SearchScreen(app: AppState, initial: String) {
     fun SearchBox(modifier: Modifier = Modifier) {
         Row(modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { app.back() }) { Icon(Sym.ArrowBack.fill, tr("Back")) }
-            OutlinedTextField(
-                text, { text = it },
-                Modifier.weight(1f).focusRequester(focus),
-                placeholder = { Text(tr("Search YouTube")) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { submit(text) }),
-                trailingIcon = {
-                    if (text.isNotEmpty()) IconButton(onClick = { text = ""; runCatching { focus.requestFocus() } }) { Icon(Sym.Close.outline, tr("Clear")) }
-                },
-            )
-            IconButton(onClick = { submit(text) }) { Icon(Sym.Search.outline, tr("Search")) }
+            // a round, filled field (Material 3's search bar), not a boxed outline
+            SearchField(text, { text = it; if (it.isEmpty()) runCatching { focus.requestFocus() } }, tr("Search YouTube"),
+                Modifier.weight(1f).padding(end = 8.dp).focusRequester(focus), onSearch = { submit(text) })
         }
     }
 

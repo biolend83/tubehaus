@@ -50,6 +50,13 @@ private object HomeCache {
     var at = 0L
 }
 
+/** what the chips over the home feed (drawn with the top tabs, one row) ask the feed to do */
+object HomeCtl {
+    var show: (Boolean) -> Unit = {}
+    var fresh: () -> Unit = {}
+    var changed: () -> Unit = {}
+}
+
 @Composable
 fun HomeScreen(app: AppState) {
     // kids mode: the new videos of the picked channels
@@ -86,6 +93,13 @@ fun HomeScreen(app: AppState) {
     LaunchedEffect(Unit) {
         if (HomeCache.items.isEmpty() || Sys.nowMs() - HomeCache.at > 30 * 60_000) load(false)
     }
+    // the chip already chosen, tapped again, brings a fresh feed (as does the refresh at the end)
+    HomeCtl.fresh = { app.rec.clearCache(); scope.launch { load(false) }; Unit }
+    HomeCtl.show = { discover ->
+        if (app.discover == discover) HomeCtl.fresh()
+        else { app.discover = discover; HomeCache.items.clear(); scope.launch { load(false) } }
+    }
+    HomeCtl.changed = { HomeCache.items.clear(); app.rec.clearCache(); scope.launch { load(false) } }
     when {
         HomeCache.items.isEmpty() && loading -> Skeleton()
         HomeCache.items.isEmpty() && error != null -> Problem(error!!) { scope.launch { load(false) } }
@@ -94,26 +108,9 @@ fun HomeScreen(app: AppState) {
             HomeCache.items, app, loading = loading,
             onEnd = { load(true) },
             hero = LocalLook.current == 1 && !app.discover,
+            refresh = { app.rec.clearCache(); load(false) },
             header = {
-                // one row of chips as on YouTube: where the feed comes from, then All / Discover; the
-                // chip already chosen, tapped again, brings a fresh feed (as does the refresh at the end)
-                val fresh = { app.rec.clearCache(); scope.launch { load(false) }; Unit }
-                fun show(discover: Boolean) {
-                    if (app.discover == discover) fresh()
-                    else { app.discover = discover; HomeCache.items.clear(); scope.launch { load(false) } }
-                }
-                Row(
-                    // on a wide screen the cards already sit inside the grid's margin, so the chips line up with them
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                        .padding(horizontal = if (LocalCompact.current) 12.dp else 0.dp, vertical = if (LocalCompact.current) 8.dp else 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(if (LocalCompact.current) 8.dp else 12.dp), verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RegionPicker(app) { HomeCache.items.clear(); app.rec.clearCache(); scope.launch { load(false) } }
-                    ProfilePicker(app) { HomeCache.items.clear(); app.rec.clearCache(); scope.launch { load(false) } }
-                    Chip(!app.discover, onClick = { show(false) }, label = tr("All"))
-                    Chip(app.discover, onClick = { show(true) }, label = tr("Discover"), icon = Sym.Explore.outline)
-                    Chip(false, onClick = fresh, label = tr("Refresh"), icon = Sym.Replay.outline)
-                }
+                // the chips (All, Discover, the region...) are in the one row of tabs above the page
                 if (app.discover) Text(tr("Videos from topics you don't usually watch. Your likes aren't used here."),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
@@ -168,7 +165,7 @@ fun ProfilePicker(app: AppState, changed: () -> Unit) {
 
 /** The region the feeds come from, switched from Home: a few common ones, or any two letters in Settings. */
 @Composable
-private fun RegionPicker(app: AppState, changed: () -> Unit) {
+fun RegionPicker(app: AppState, changed: () -> Unit) {
     val s by app.store.settings.state.collectAsState()
     var open by remember { mutableStateOf(false) }
     val now = s.region.ifEmpty { app.platform.deviceRegion() }.uppercase()

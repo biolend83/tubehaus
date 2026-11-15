@@ -1,5 +1,9 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
@@ -83,19 +87,27 @@ fun TopicScreen(app: AppState, key: String) {
 fun TopTabs(app: AppState) {
     val root = app.stack.firstOrNull() ?: Screen.Home
     val discover = !app.store.settings.value.homeOff
+    // on Home itself one row for everything, as YouTube's: All and Discover (the feed),
+    // then the other pages, then where the feed comes from (region, taste profile)
+    val onHome = root == Screen.Home && discover && !app.store.settings.value.kids
     val screens = buildList<Pair<Screen, String>> {
-        add(Screen.Home to tr("Home"))
+        if (!onHome) add(Screen.Home to tr("Home"))
         add(Screen.Subs to tr("Subscriptions"))
         if (discover) for (k in TOP_TOPICS) add(Screen.Topic(k) to tr(k))
     }
     var more by remember { mutableStateOf(false) }
-    val open = screens.indexOfFirst { it.first == root }.coerceAtLeast(0)
+    val open = screens.indexOfFirst { it.first == root }.let { if (onHome) -1 else it.coerceAtLeast(0) }
     // pills in a row that scrolls sideways, the open one filled (the web 1.0's tabs)
     androidx.compose.foundation.layout.Row(
         Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState())
             .padding(horizontal = if (LocalCompact.current) 12.dp else 16.dp, vertical = 6.dp),
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
     ) {
+        if (onHome) {
+            Chip(!app.discover, onClick = { HomeCtl.show(false) }, label = tr("All"))
+            Chip(app.discover, onClick = { HomeCtl.show(true) }, label = tr("Discover"), icon = Sym.Explore.outline)
+        }
         screens.forEachIndexed { i, (s, label) -> TopTab(i == open, label) { app.go(s) } }
         if (discover) Box {
             TopTab(false, tr("More")) { more = true }
@@ -106,6 +118,14 @@ fun TopTabs(app: AppState) {
                     modifier = Modifier.padding(end = 24.dp),
                 )
             }
+        }
+        if (onHome) {
+            // a thin line between the pages and the feed's own settings
+            Box(Modifier.width(1.dp).height(22.dp).background(MaterialTheme.colorScheme.outline))
+            RegionPicker(app) { HomeCtl.changed() }
+            ProfilePicker(app) { HomeCtl.changed() }
+            // a touch screen pulls the list down (or taps Home again) for a fresh one
+            if (!app.platform.touch || app.platform.tv) Chip(false, onClick = { HomeCtl.fresh() }, label = tr("Refresh"), icon = Sym.Replay.outline)
         }
     }
 }

@@ -46,6 +46,17 @@ class Playback(private val app: AppState) {
     /** videos to play after this one (a playlist you started) */
     var queue by mutableStateOf<List<Video>>(emptyList())
         private set
+    /** a video ended on its own: the one about to start, counted down on the player (5 s) */
+    var upNext by mutableStateOf<Video?>(null)
+    private var upNextJob: Job? = null
+    /** the countdown's "Cancel": the video stays at its end */
+    fun cancelUpNext() { upNextJob?.cancel(); upNextJob = null; upNext = null }
+    /** "Play now" */
+    fun playUpNext() { val n = upNext ?: return; cancelUpNext(); goNext(n) }
+    private fun goNext(n: Video) {
+        open(n, queue.drop(if (queue.firstOrNull()?.id == n.id) 1 else 0))
+        if (app.current is Screen.Watch) app.stack[app.stack.size - 1] = Screen.Watch(n.id)
+    }
     /** "Up next" when there is no queue */
     val next: Video?
         get() = if (music) (songs.getOrNull(songAt + 1) ?: songs.firstOrNull()?.takeIf { repeat == 1 })?.video() else queue.firstOrNull() ?: details?.related?.filterIsInstance<Video>()?.firstOrNull { !it.live && !it.short }
@@ -171,6 +182,7 @@ class Playback(private val app: AppState) {
 
     private var job: Job? = null
     private var watchedMs = 0L          // the furthest point reached, for learning
+    private var prefetched = false      // the next video was asked for ahead (Streams)
     private var learned = false
     private var endHandled = false
     private val player get() = app.player
@@ -184,6 +196,10 @@ class Playback(private val app: AppState) {
                 val v = video ?: return@collectLatest
                 if (s.videoId != v.id) return@collectLatest
                 if (s.positionMs > watchedMs) watchedMs = s.positionMs
+                if (!prefetched && s.durationMs > 0 && s.positionMs > s.durationMs - 20_000 && !store.settings.value.calm) {
+                    prefetched = true
+                    next?.let { n -> if (!app.platform.metered() || queue.isNotEmpty() || music) Streams.prefetch(app.scope, n.id) }
+                }
                 sponsorCheck(s)
                 if (abB > 0 && s.playing && s.positionMs >= abB) player.seekTo(abA.coerceAtLeast(0))
                 val now = Sys.nowMs()
@@ -202,6 +218,8 @@ class Playback(private val app: AppState) {
     }
 
     private fun openVideo(v: Video, newQueue: List<Video>, startSec: Long?, asSong: Boolean) {
+        if (upNextJob?.isActive == true && upNext?.id != v.id) cancelUpNext()
+        upNext = null
         finishCurrent()
         if (!asSong) { music = false; songs = emptyList(); songAt = 0; radio = false }
         withVideo = false
@@ -218,6 +236,7 @@ class Playback(private val app: AppState) {
         error = null; errorAge = false
         loading = true
         watchedMs = 0
+        prefetched = false
         learned = false
         endHandled = false
         loop = false
@@ -247,7 +266,7 @@ class Playback(private val app: AppState) {
             }
             try {
                 // a saved copy plays from the device, also without internet
-                val s = app.offline.stream(v.id) ?: YouTube.stream(v.id)
+                val s = app.offline.stream(v.id) ?: Streams.get(app.scope, v.id)
                 if (video?.id != v.id) return@launch
                 // kids mode: only the picked channels, and nothing once today's time is used up
                 val up = app.kidsTimeUp()
@@ -326,7 +345,7 @@ class Playback(private val app: AppState) {
             ?: list.firstOrNull { it.lang.substringBefore('-') == want }
             ?: list.firstOrNull { !it.auto } ?: list.firstOrNull()
 
-    fun retry() { video?.let { open(it, queue) } }
+    fun retry() { video?.let { Streams.forget(it.id); open(it, queue) } }
 
     private fun onEnded() {
         val v = video ?: return
@@ -348,14 +367,15 @@ class Playback(private val app: AppState) {
         if (app.store.settings.value.calm) return       // calm mode: nothing starts by itself
         if (!app.store.settings.value.autoplay && queue.isEmpty()) return
         val n = next ?: return
-        app.scope.launch {
-            delay(800)
-            if (video?.id == v.id) {
-                open(n, queue.drop(if (queue.firstOrNull()?.id == n.id) 1 else 0))
-                if (app.current is Screen.Watch) {
-                    app.stack[app.stack.size - 1] = Screen.Watch(n.id)
-                }
-            }
+        // a playlist goes straight on; a suggestion is counted down first, so it can be stopped
+        val wait = if (queue.isNotEmpty() || app.platform.tv) 800L else UP_NEXT_MS
+        upNextJob?.cancel()
+        upNextJob = app.scope.launch {
+            if (wait > 800L) upNext = n
+            Streams.prefetch(app.scope, n.id)
+            delay(wait)
+            upNext = null; upNextJob = null
+            if (video?.id == v.id) goNext(n)
         }
     }
 
@@ -379,6 +399,7 @@ class Playback(private val app: AppState) {
 
     /** close the video entirely */
     fun close() {
+        cancelUpNext()
         finishCurrent()
         job?.cancel()
         player.stop()
@@ -578,3 +599,6 @@ class Playback(private val app: AppState) {
 
 fun Song.meta() = SongMeta(id, title, artist, artistId, album, albumId, lengthSec, art)
 fun SongMeta.song() = Song(id, title, artist, artistId, album, albumId, len, art)
+
+/** how long a suggested next video is counted down on the player before it starts */
+const val UP_NEXT_MS = 5000L

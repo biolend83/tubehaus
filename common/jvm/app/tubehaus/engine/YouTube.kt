@@ -79,6 +79,11 @@ object YouTube {
                     if (e.kind != YtError.Kind.LOGIN) walled = false
                 }
             }
+            // the token-free clients said "not available" (made for kids, some labels) or are walled:
+            // the TV client, with its links unlocked, still serves those
+            if (attempt == 0 && first?.kind != YtError.Kind.AGE && Cipher.available) {
+                try { return tv(id) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
+            }
             // every client asked to sign in: the wall is on this visitor identity, so try a new one
             if (!walled || attempt == 1 || !InnerTube.reroll()) break
             first = null
@@ -86,11 +91,34 @@ object YouTube {
         throw first ?: YtError("This video can't be played")
     }
 
+    /** the TV client's answer, its locked links opened by [Cipher] */
+    private suspend fun tv(id: String): Stream {
+        val sts = Cipher.ready() ?: throw YtError("No player script", YtError.Kind.UNAVAILABLE)
+        val ctx = kotlinx.serialization.json.buildJsonObject {
+            put("contentPlaybackContext", kotlinx.serialization.json.buildJsonObject { put("signatureTimestamp", kotlinx.serialization.json.JsonPrimitive(sts)) })
+        }
+        val d = InnerTube.call("player", mapOf("videoId" to id, "contentCheckOk" to true, "racyCheckOk" to true, "playbackContext" to ctx), Clients.TV)
+        val answeredAt = Sys.nowMs()
+        val raw = d.at("streamingData.adaptiveFormats").arr
+        val urls = Cipher.urls(raw)
+        val s = parse(id, d, Clients.TV) { i -> urls[i] }
+        if (s.video.isEmpty() || s.audio.isEmpty()) throw YtError("No playable streams", YtError.Kind.UNAVAILABLE)
+        // YouTube holds the links back behind the start ad it placed: wait it out (a few seconds)
+        val wait = Cipher.prerollMs(d) - (Sys.nowMs() - answeredAt)
+        if (wait > 0) kotlinx.coroutines.delay(wait)
+        return s
+    }
+
     /** one client's answer for a video, as it is: for the engine check and repair tools (the app goes through [stream]) */
     suspend fun playerWith(id: String, c: Client): Stream = player(id, c)
 
     private suspend fun player(id: String, c: Client): Stream {
         val d = InnerTube.call("player", mapOf("videoId" to id, "contentCheckOk" to true, "racyCheckOk" to true), c)
+        return parse(id, d, c) { null }
+    }
+
+    /** a player answer as a Stream; [unlocked] gives a format's URL by its index when it came locked */
+    private fun parse(id: String, d: JsonElement, c: Client, unlocked: (Int) -> String?): Stream {
         val ps = d.at("playabilityStatus")
         val status = ps.at("status").str ?: "ERROR"
         if (status != "OK") {
@@ -104,7 +132,7 @@ object YouTube {
         }
         val vd = d.at("videoDetails")
         val sd = d.at("streamingData")
-        val formats = sd.at("adaptiveFormats").arr.mapNotNull(::format).filter { !it.drc }
+        val formats = sd.at("adaptiveFormats").arr.mapIndexedNotNull { i, f -> format(f, unlocked(i)) }.filter { !it.drc }
         val hls = sd.at("hlsManifestUrl").str
         if (formats.isEmpty() && hls == null) throw YtError("No playable streams", YtError.Kind.UNAVAILABLE)
         val caps = d.at("captions.playerCaptionsTracklistRenderer.captionTracks").arr.mapNotNull { t ->
@@ -137,8 +165,8 @@ object YouTube {
         return s..t
     }
 
-    private fun format(f: JsonElement): Format? {
-        val url = f.at("url").str ?: return null           // ciphered formats need the web player's JS: skipped
+    private fun format(f: JsonElement, unlocked: String? = null): Format? {
+        val url = unlocked ?: f.at("url").str ?: return null     // a locked one only when Cipher opened it
         val mimeFull = f.at("mimeType").str ?: return null
         val mime = mimeFull.substringBefore(';').trim()
         val codecs = mimeFull.substringAfter("codecs=\"", "").substringBefore('"')
