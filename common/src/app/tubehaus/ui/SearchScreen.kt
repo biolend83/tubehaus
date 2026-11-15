@@ -59,6 +59,8 @@ fun SearchScreen(app: AppState, initial: String) {
     var filters by remember { mutableStateOf(false) }
     var suggestions by remember { mutableStateOf<List<String>>(emptyList()) }
     val focus = remember { FocusRequester() }
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     // read as state, so switching list/grid or moving the box redraws at once
     val prefs by app.store.settings.state.collectAsState()
@@ -67,6 +69,10 @@ fun SearchScreen(app: AppState, initial: String) {
         val t = q.trim()
         if (t.isEmpty()) return
         suggestions = emptyList()
+        // the box lets go of the keyboard before this screen is replaced: on the iPhone and iPad the keyboard
+        // otherwise stays tied to the old box, and nothing typed from the second search on arrived
+        keyboard?.hide()
+        focusManager.clearFocus(force = true)
         // a pasted link opens what it points to
         if (t.startsWith("http") || t.startsWith("@") || t.contains("youtu")) {
             scope.launch {
