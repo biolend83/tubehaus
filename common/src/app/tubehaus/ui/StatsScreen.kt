@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.layout.heightIn
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -111,16 +113,16 @@ fun StatsScreen(app: AppState) {
     val c = MaterialTheme.colorScheme
     Narrow {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
-            item { SectionTitle(tr("Watch time"), Modifier.padding(start = 0.dp)) }
+            item { Text(tr("Watch time"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 4.dp, top = 20.dp, bottom = 10.dp)) }
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp, 20.dp, 6.dp, 6.dp)), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     StatTile(tr("Today"), hm(st.days[today]?.total() ?: 0), Modifier.weight(1f))
                     StatTile(tr("Last 7 days"), hm(week), Modifier.weight(1f))
                     StatTile(tr("A day on average"), hm(week / 7), Modifier.weight(1f))
                 }
             }
             item {
-                Column(Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.surfaceContainer).padding(12.dp)) {
+                Column(Modifier.padding(top = 2.dp).fillMaxWidth().clip(RoundedCornerShape(6.dp, 6.dp, 20.dp, 20.dp)).background(c.surfaceContainer).padding(14.dp)) {
                     Text(tr("The last two weeks"), style = MaterialTheme.typography.titleSmall)
                     val max = last14.maxOf { st.days[it]?.total() ?: 0 }.coerceAtLeast(60)
                     Row(Modifier.fillMaxWidth().height(140.dp).padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
@@ -129,12 +131,17 @@ fun StatsScreen(app: AppState) {
                             Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally) {
                                 val m = (d?.music ?: 0).toFloat() / max
                                 val v = (d?.video ?: 0).toFloat() / max
-                                if (m > 0) Box(Modifier.fillMaxWidth().weight(m.coerceAtLeast(0.001f), fill = true).clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)).background(Teal))
-                                if (v > 0) Box(Modifier.fillMaxWidth().weight(v.coerceAtLeast(0.001f), fill = true)
-                                    .clip(if (m > 0) RoundedCornerShape(0.dp) else RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)).background(Red))
-                                val rest = 1f - m - v
-                                if (rest > 0.001f) Spacer(Modifier.weight(rest))
-                                if (m + v == 0f) Box(Modifier.fillMaxWidth().height(2.dp).background(c.outlineVariant))
+                                // the bar stands on the bottom line (the room left over was put under it, so the bars hung
+                                // from the top); a minute or two still shows as a short stub
+                                val total = (m + v).coerceIn(0f, 1f)
+                                if (total > 0f) Column(
+                                    Modifier.fillMaxWidth().fillMaxHeight(total).heightIn(min = 4.dp)
+                                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)),
+                                ) {
+                                    if (m > 0) Box(Modifier.fillMaxWidth().weight(m).background(Teal))
+                                    if (v > 0) Box(Modifier.fillMaxWidth().weight(v).background(Red))
+                                }
+                                else Box(Modifier.fillMaxWidth().height(2.dp).background(c.outlineVariant))
                             }
                         }
                     }
@@ -150,20 +157,20 @@ fun StatsScreen(app: AppState) {
                 }
             }
             if (ch.isNotEmpty()) {
-                item { SectionTitle(tr("Channels you watched most (30 days)"), Modifier.padding(start = 0.dp)) }
+                item { Text(tr("Channels you watched most (30 days)"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 4.dp, top = 20.dp, bottom = 10.dp)) }
                 val top = ch.entries.sortedByDescending { it.value }.take(5)
                 items(top, key = { "c" + it.key }) { (id, sec) ->
                     TopLine(st.names[id] ?: id, sec, top.first().value) { app.go(Screen.Channel(id, st.names[id] ?: "")) }
                 }
             }
             if (art.isNotEmpty()) {
-                item { SectionTitle(tr("Artists you listened to most (30 days)"), Modifier.padding(start = 0.dp)) }
+                item { Text(tr("Artists you listened to most (30 days)"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 4.dp, top = 20.dp, bottom = 10.dp)) }
                 val top = art.entries.sortedByDescending { it.value }.take(5)
                 items(top, key = { "a" + it.key }) { (name, sec) -> TopLine(name, sec, top.first().value, Teal) {} }
             }
             val months = monthSums(st)
             if (months.isNotEmpty()) {
-                item { SectionTitle(tr("Recap"), Modifier.padding(start = 0.dp)) }
+                item { Text(tr("Recap"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 4.dp, top = 20.dp, bottom = 10.dp)) }
                 items(months.take(12), key = { "m" + it.month }) { m -> MonthCard(m, st) }
             }
             if (st.days.isEmpty()) item { Empty(tr("Nothing counted yet. Watch time shows up here as you watch and listen.")) }
@@ -178,9 +185,9 @@ fun StatsScreen(app: AppState) {
 
 @Composable
 private fun StatTile(label: String, value: String, modifier: Modifier) {
-    Column(modifier.clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(12.dp)) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    Column(modifier.clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 14.dp, vertical = 14.dp)) {
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = accent, maxLines = 1)
     }
 }
 

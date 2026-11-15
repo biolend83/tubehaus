@@ -72,7 +72,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         tube.platform.activity = this
         if (Build.VERSION.SDK_INT >= 31) lifecycleScope.launch {
-            state.player.state.map { it.playing }.distinctUntilChanged().collect { runCatching { setPictureInPictureParams(pipParams()) } }
+            // the window's "go small on Home" follows what plays: a video yes, music (only sound) no
+            kotlinx.coroutines.flow.combine(
+                state.player.state.map { it.playing }.distinctUntilChanged(),
+                androidx.compose.runtime.snapshotFlow { listOf(state.playback.video?.id, state.playback.music, state.playback.withVideo, state.casting.link != null) },
+            ) { _, _ -> }.collect { runCatching { setPictureInPictureParams(pipParams()) } }
         }
         setContent {
             Box(Modifier.fillMaxSize().let { if (state.fullscreen || state.pip) it else it.safeDrawingPadding() }) { App(state) }
@@ -223,7 +227,10 @@ class MainActivity : ComponentActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    private fun watchingVideo() = state.playback.video != null && state.casting.link == null && state.player.state.value.playing
+    /** a video on screen and playing; a song from the Music tab is only sound and keeps playing behind
+     *  other apps (a black picture-in-picture window for it was no use), unless its video is shown */
+    private fun watchingVideo() = state.playback.video != null && state.casting.link == null && state.player.state.value.playing &&
+        (!state.playback.music || state.playback.withVideo)
 
     private fun pipParams(): PictureInPictureParams {
         val b = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9))
@@ -248,7 +255,8 @@ class MainActivity : ComponentActivity() {
         super.onStop()
         state.store.flush()
         // background play is off: pause when the app goes away (but not into picture-in-picture)
-        if (!state.store.settings.value.backgroundPlay && !state.pip) state.platform.player.pause()
+        // (music always keeps playing, as a music app does)
+        if (!state.store.settings.value.backgroundPlay && !state.pip && !state.playback.music) state.platform.player.pause()
     }
 
     override fun onDestroy() {

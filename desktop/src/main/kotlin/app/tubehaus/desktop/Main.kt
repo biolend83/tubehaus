@@ -135,6 +135,10 @@ class DesktopPlatform : Platform {
         }
     }
 
+    private val translator = Translator(File(cacheDir.toString(), "translate"))
+    override val canTranslate get() = translator.available
+    override suspend fun translate(text: String, target: String) = translator.translate(text, target)
+
     // an invisible pointer while the video plays with its controls hidden
     override val blankPointer = PointerIcon(
         Toolkit.getDefaultToolkit().createCustomCursor(BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB), Point(0, 0), "none"),

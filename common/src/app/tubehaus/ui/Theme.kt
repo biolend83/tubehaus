@@ -30,7 +30,7 @@ val Teal = Color(0xFF2DD4BF)
 /** the teal of "you are here" and of switches that are on: deeper on a light page, as on the web (--acc) */
 val accent: Color
     @Composable @ReadOnlyComposable get() = when {
-        LocalLook.current == 3 -> if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF8FB2FF) else Color(0xFF3F5BD8)
+        LocalLook.current == 3 -> if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF3EA6FF) else Color(0xFF065FD4)
         LocalLook.current != 0 -> if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFFB7A9FF) else Color(0xFF6750A4)
         MaterialTheme.colorScheme.background.luminance() < 0.5f -> Teal
         else -> Color(0xFF0D9488)
@@ -39,7 +39,7 @@ val accent: Color
 /** the soft teal behind the open tab and the chosen section (--acc-soft) */
 val accentSoft: Color
     @Composable @ReadOnlyComposable get() = when {
-        LocalLook.current == 3 -> if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF8FB2FF).copy(alpha = 0.2f) else Color(0xFF3F5BD8).copy(alpha = 0.13f)
+        LocalLook.current == 3 -> if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.07f)
         LocalLook.current != 0 -> if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFFB7A9FF).copy(alpha = 0.2f) else Color(0xFF6750A4).copy(alpha = 0.14f)
         MaterialTheme.colorScheme.background.luminance() < 0.5f -> Teal.copy(alpha = 0.18f)
         else -> Color(0xFF14B8A6).copy(alpha = 0.16f)
@@ -62,20 +62,21 @@ private val cardsLight by lazy { light.copy(
     surfaceContainerHighest = Color(0xFFE4DEEE), surfaceVariant = Color(0xFFECE6F4), onSurfaceVariant = Color(0xFF5E5869),
     outline = Color(0xFFE4DEEE), outlineVariant = Color(0xFFE4DEEE), secondaryContainer = Color(0x296750A4),
 ) }
-// TubeHaus 1.5: a deep blue night (dark) or a cool paper white (light), periwinkle for "you are here"
+// TubeHaus 1.5: YouTube's own greys, a near-black night (dark) or plain white (light), with YouTube's
+// blue for "you are here" (it was a blue-tinted night with periwinkle, which looked unlike YouTube)
 private val auroraDark by lazy { dark.copy(
-    background = Color(0xFF0B0D16), surface = Color(0xFF0B0D16), surfaceContainerLowest = Color(0xFF0B0D16),
-    surfaceContainerLow = Color(0xFF11141F), surfaceContainer = Color(0xFF161A28), surfaceContainerHigh = Color(0xFF1F2436),
-    surfaceContainerHighest = Color(0xFF283048), surfaceVariant = Color(0xFF1C2132), onSurfaceVariant = Color(0xFFA9B1C9),
-    outline = Color(0xFF242A3D), outlineVariant = Color(0xFF242A3D), secondaryContainer = Color(0x338FB2FF),
-    secondary = Color(0xFF8FB2FF),
+    background = Color(0xFF0F0F0F), surface = Color(0xFF0F0F0F), surfaceContainerLowest = Color(0xFF0F0F0F),
+    surfaceContainerLow = Color(0xFF161616), surfaceContainer = Color(0xFF1E1E1E), surfaceContainerHigh = Color(0xFF272727),
+    surfaceContainerHighest = Color(0xFF3A3A3A), surfaceVariant = Color(0xFF272727), onSurfaceVariant = Color(0xFFAAAAAA),
+    outline = Color(0xFF303030), outlineVariant = Color(0xFF303030), secondaryContainer = Color(0x333EA6FF),
+    secondary = Color(0xFF3EA6FF),
 ) }
 private val auroraLight by lazy { light.copy(
-    background = Color(0xFFF7F8FC), surface = Color(0xFFF7F8FC), surfaceContainerLowest = Color(0xFFF7F8FC),
-    surfaceContainerLow = Color(0xFFF0F2F9), surfaceContainer = Color(0xFFEBEEF7), surfaceContainerHigh = Color.White,
-    surfaceContainerHighest = Color(0xFFDDE2F0), surfaceVariant = Color(0xFFE5E9F4), onSurfaceVariant = Color(0xFF59607A),
-    outline = Color(0xFFDDE2F0), outlineVariant = Color(0xFFDDE2F0), secondaryContainer = Color(0x293F5BD8),
-    secondary = Color(0xFF3F5BD8),
+    background = Color.White, surface = Color.White, surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Color(0xFFF9F9F9), surfaceContainer = Color(0xFFF2F2F2), surfaceContainerHigh = Color.White,
+    surfaceContainerHighest = Color(0xFFE5E5E5), surfaceVariant = Color(0xFFF2F2F2), onSurfaceVariant = Color(0xFF606060),
+    outline = Color(0xFFE5E5E5), outlineVariant = Color(0xFFE5E5E5), secondaryContainer = Color(0x29065FD4),
+    secondary = Color(0xFF065FD4),
 ) }
 private val glassDark by lazy { cardsDark.copy(
     background = Color(0xFF121118), surface = Color(0xFF121118), surfaceContainerLowest = Color(0xFF121118),

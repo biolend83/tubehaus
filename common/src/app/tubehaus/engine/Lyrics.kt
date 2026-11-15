@@ -1,15 +1,15 @@
 package app.tubehaus.engine
 
 /**
- * Song lyrics from LRCLIB (lrclib.net), a free, open database of lyrics timed to the music: no
- * account, no key. Looked up only when the lyrics are opened, at most three requests a song, and
- * kept for the rest of the session.
+ * Song lyrics: YouTube Music's own first (timed where it has the times), else LRCLIB (lrclib.net),
+ * a free, open database of lyrics timed to the music. No account, no key. Looked up only when the
+ * lyrics are opened, and kept for the rest of the session.
  */
 object Lyrics {
     data class Line(val ms: Long, val text: String)
 
     /** [lines] carry times when [synced]; else they are the plain lyrics, one line each with time 0 */
-    data class Found(val lines: List<Line>, val synced: Boolean)
+    data class Found(val lines: List<Line>, val synced: Boolean, val youTube: Boolean = false)
 
     // only touched from the main thread (the lyrics view asks)
     private val cache = HashMap<String, Found>()
@@ -20,6 +20,16 @@ object Lyrics {
     suspend fun find(s: Song): Found? {
         cache[s.id]?.let { return it }
         if (missing[s.id] == true) return null
+        // YouTube Music's own first: asked for by video id, so they can't belong to another song.
+        // Its plain text (no times) only if LRCLIB has nothing better
+        val yt = youTube(s.id)
+        if (yt != null && yt.synced) { cache[s.id] = yt; return yt }
+        lrclib(s)?.let { if (it.synced || yt == null) { cache[s.id] = it; return it } }
+        if (yt != null) { cache[s.id] = yt; return yt }
+        return null
+    }
+
+    private suspend fun lrclib(s: Song): Found? {
         var failed = false
         for (q in queries(s.title, s.artist).take(3)) {
             val list = try {
@@ -39,6 +49,31 @@ object Lyrics {
         if (!failed) missing[s.id] = true
         return null
     }
+
+    /**
+     * YouTube Music's lyrics for [videoId], as Flow (Flow-Tube/Flow) found them: the lyrics tab of
+     * the song's "next" page (a browse id starting MPLY), asked for as YouTube Music's Android app,
+     * comes with a start time per line; asked for as the web site, the same lyrics come as plain
+     * text. Only songs (not music videos) have times. Two or three requests; none when YouTube
+     * Music isn't free where this device is (Korea): it answers "not available" and LRCLIB takes over.
+     */
+    private suspend fun youTube(videoId: String): Found? = runCatching {
+        val next = InnerTube.call("next", mapOf("videoId" to videoId), Clients.MUSIC)
+        val tab = next.findAll("browseEndpoint").firstOrNull { it.at("browseId").str?.startsWith("MPLY") == true } ?: return null
+        val body = mapOf("browseId" to tab.at("browseId").str, "params" to tab.at("params").str)
+        val timed = InnerTube.call("browse", body, Clients.MUSIC_ANDROID)
+            .findAll("timedLyricsData").firstOrNull().arr
+            .mapNotNull { l ->
+                val ms = l.at("cueRange.startTimeMilliseconds").str?.toLongOrNull() ?: return@mapNotNull null
+                // a ♪ line only marks a gap between sung lines: kept, it shows as a pause
+                Line(ms, (l.at("lyricLine").str ?: "").trim())
+            }
+        if (timed.count { it.text.isNotEmpty() && it.text.any { c -> c != '♪' && !c.isWhitespace() } } >= 2) return Found(timed, true, youTube = true)
+        val plain = InnerTube.call("browse", body, Clients.MUSIC)
+            .findAll("musicDescriptionShelfRenderer").firstOrNull()
+            ?.at("description.runs")?.arr?.joinToString("") { it.at("text").str ?: "" }.orEmpty()
+        if (plain.isBlank()) null else Found(plain.lines().map { Line(0, it.trim()) }, false, youTube = true)
+    }.getOrNull()
 
     /** the result whose length matches the song's (within 5 seconds), timed lyrics first */
     private fun choose(list: List<kotlinx.serialization.json.JsonElement>, len: Int): kotlinx.serialization.json.JsonElement? {

@@ -85,10 +85,10 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeFeed(
     items: List<Item>, app: AppState, loading: Boolean, onEnd: suspend () -> Unit,
-    hero: Boolean, header: @Composable () -> Unit,
+    hero: Boolean, header: @Composable () -> Unit, refresh: (suspend () -> Unit)? = null,
 ) {
-    if (LocalLook.current == 3 && !app.discover && !app.platform.tv) Home2(app, items, loading, onEnd, header)
-    else ItemGrid(items, app, loading = loading, onEnd = onEnd, hero = hero, header = header)
+    if (LocalLook.current == 3 && !app.discover && !app.platform.tv) Home2(app, items, loading, onEnd, header, refresh)
+    else ItemGrid(items, app, loading = loading, onEnd = onEnd, hero = hero, header = header, refresh = refresh)
 }
 
 /** the colours of a picture, blurred, behind the top of a page; it fades to the page's background below */
@@ -130,7 +130,7 @@ private fun shelfTitle(src: String, tag: String?): String = when (src) {
 }
 
 @Composable
-private fun Home2(app: AppState, items: List<Item>, loading: Boolean, onEnd: suspend () -> Unit, header: @Composable () -> Unit) {
+private fun Home2(app: AppState, items: List<Item>, loading: Boolean, onEnd: suspend () -> Unit, header: @Composable () -> Unit, refresh: (suspend () -> Unit)? = null) {
     val videos = items.filterIsInstance<Video>().filter { app.kidsAllow(it.channelId) }.distinctBy { it.id }
     val heroes = videos.take(5)
     // rows from the first batch only, so they keep their places while more arrives below
@@ -162,6 +162,10 @@ private fun Home2(app: AppState, items: List<Item>, loading: Boolean, onEnd: sus
     }
     // the rows already shown arrive once, not again each time they scroll back into view
     val seen = remember { HashSet<Any>() }
+    Refreshable(app, refresh, atTop = { list.firstVisibleItemIndex == 0 && list.firstVisibleItemScrollOffset == 0 }, toTop = {
+        if (list.firstVisibleItemIndex > 6) list.scrollToItem(6)
+        list.animateScrollToItem(0)
+    }) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val edge = if (phone) 16.dp else 28.dp
         val cols = if (phone) 1 else ((maxWidth - edge * 2) / 320.dp).toInt().coerceAtLeast(1)
@@ -189,6 +193,7 @@ private fun Home2(app: AppState, items: List<Item>, loading: Boolean, onEnd: sus
             if (loading) item(key = "busy") { Busy() }
         }
     }
+    }
 }
 
 /** good morning (afternoon, evening), and how long you watched today */
@@ -215,7 +220,16 @@ private fun Greeting(app: AppState, edge: androidx.compose.ui.unit.Dp) {
 @Composable
 private fun Words(app: AppState, edge: androidx.compose.ui.unit.Dp) {
     val taste by app.store.taste.state.collectAsState()
-    val words = remember(taste.kw) { taste.kw.entries.filter { it.value > 0.5 }.sortedByDescending { it.value }.map { it.key }.take(10) }
+    // the strongest first; one that only repeats a stronger one ("sports band" after "sports") is left out
+    val words = remember(taste.kw) {
+        val out = ArrayList<String>()
+        for (w in taste.kw.entries.filter { it.value > 0.5 }.sortedByDescending { it.value }.map { it.key }) {
+            if (out.any { o -> w.contains(o) || o.contains(w) }) continue
+            out += w
+            if (out.size == 8) break
+        }
+        out
+    }
     if (words.isEmpty()) return
     Heading(tr("Your interests"), edge)
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = edge), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -359,9 +373,9 @@ private fun ShelfRow(app: AppState, title: String, videos: List<Video>, edge: an
             Column(Modifier.width(cardW).clip(RoundedCornerShape(20.dp)).tvClickable(RoundedCornerShape(20.dp)) { app.watch(v) }) {
                 Thumb(v, app, Modifier.fillMaxWidth(), rounded = 20)
                 Text(titleOf(v, app), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 2,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp))
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp))
                 Text(v.details(app, calm), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp, end = 2.dp, top = 2.dp, bottom = 4.dp))
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 10.dp))
             }
         }
     }
