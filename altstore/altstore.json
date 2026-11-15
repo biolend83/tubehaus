@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.6.1",
+          "buildVersion": "47",
+          "date": "2026-11-15T01:16:26+00:00",
+          "localizedDescription": "1.6.1: grouped lists and a new player, swipe to seek, kids' videos play again, music keeps playing on Home.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.6.1/TubeHaus-1.6.1-ipad.ipa",
+          "size": 21956207,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.6.0",
           "buildVersion": "46",
           "date": "2026-11-14T02:36:19+00:00",
@@ -221,11 +230,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.6.0",
-      "versionDate": "2026-11-14T02:36:19+00:00",
-      "versionDescription": "1.6.0: the same version as the TubeHaus server 1.6, \"Back to music\" in the music player, and small fixes.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.6.0/TubeHaus-1.6.0-ipad.ipa",
-      "size": 21394251
+      "version": "1.6.1",
+      "versionDate": "2026-11-15T01:16:26+00:00",
+      "versionDescription": "1.6.1: grouped lists and a new player, swipe to seek, kids' videos play again, music keeps playing on Home.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.6.1/TubeHaus-1.6.1-ipad.ipa",
+      "size": 21956207
     }
   ],
   "news": [],
