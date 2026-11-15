@@ -311,12 +311,16 @@ private class Rows(val scope: LazyListScope, val cat: String?, val q: String, va
     init { starts?.clear() }
     private fun add(content: @Composable () -> Unit) {
         val k = card; val i = k.size++
-        val line = i > 0 && !afterHead
         afterHead = false
         n++
-        scope.item { Piece(tv, i == 0, i == k.size - 1, line, content) }
+        scope.item { Piece(tv, i == 0, i == k.size - 1, content) }
     }
-    private fun head(content: @Composable () -> Unit) { add(content); afterHead = true }
+    /** a title above a group (Flow's and Material 3's segmented lists): outside the cards, and the rows after it a group of their own */
+    private fun head(content: @Composable () -> Unit) {
+        n++
+        scope.item { content() }
+        card = Card(); afterHead = true
+    }
     /** every category shown (the settings page, or a search): each starts with its name */
     private fun enter(c: String) {
         if (cat != null || c == lastCat) return
@@ -327,8 +331,6 @@ private class Rows(val scope: LazyListScope, val cat: String?, val q: String, va
     fun group(c: String, title: String) {
         if (q.isNotEmpty() || (cat != null && c != cat)) return
         enter(c)
-        // a part of a category: a card of its own, unless it is the first thing in the category's card
-        if (!tv && !(afterHead && card.size == 1)) card = Card()
         head { Group(title) }
     }
     fun row(c: String, words: String, content: @Composable () -> Unit) {
@@ -341,29 +343,20 @@ private class Rows(val scope: LazyListScope, val cat: String?, val q: String, va
 }
 
 /**
- * One piece of a card: the card's colour behind it, the top corners round on the first piece and the
- * bottom ones on the last, a hairline between rows (as the web's .sx-card and .sx-rows). A TV: the row alone.
+ * One row of a group, as Flow's settings and Material 3's segmented lists: each row its own rounded
+ * piece, the group's outer corners large and the inner ones small, a 2 dp gap between them instead
+ * of a line. A TV: the row alone.
  */
 @Composable
-private fun Piece(tv: Boolean, first: Boolean, last: Boolean, line: Boolean, content: @Composable () -> Unit) {
+private fun Piece(tv: Boolean, first: Boolean, last: Boolean, content: @Composable () -> Unit) {
     if (tv) { content(); return }
-    val c = MaterialTheme.colorScheme
-    val r = 24.dp
-    val shape = RoundedCornerShape(if (first) r else 0.dp, if (first) r else 0.dp, if (last) r else 0.dp, if (last) r else 0.dp)
-    val phone = LocalCompact.current
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = if (phone) 12.dp else 16.dp).padding(top = if (first) (if (phone) 14.dp else 20.dp) else 0.dp)
-            .clip(shape).background(c.surfaceContainer).padding(horizontal = 6.dp).padding(top = if (first) 6.dp else 0.dp, bottom = if (last) 8.dp else 0.dp),
-    ) {
-        if (line) HorizontalDivider(Modifier.padding(horizontal = 16.dp), thickness = 1.dp, color = c.outline.copy(alpha = 0.8f))
-        content()
-    }
+    Segment(first, last, Modifier.padding(horizontal = if (LocalCompact.current) 12.dp else 16.dp)) { content() }
 }
 
 /** a category's name at the top of its card, with its icon in a small rounded square */
 @Composable
 private fun CatHead(icon: Symbol, title: String) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
             Icon(icon.outline, null, Modifier.size(20.dp), tint = accent)
         }
@@ -800,7 +793,7 @@ private fun PasswordField(app: AppState, value: String, onChange: (String) -> Un
 @Composable
 private fun Group(t: String) {
     if (LocalPlatform.current.tv) Text(t, style = MaterialTheme.typography.titleSmall, color = Blue, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp))
-    else Text(t, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.3).sp, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp))
+    else SectionLabel(t)
 }
 
 /** a setting's name in bold and what it does in grey under it (the web's .sx-tx) */
