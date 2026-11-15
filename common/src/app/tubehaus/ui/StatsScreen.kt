@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.layout.heightIn
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -129,12 +131,17 @@ fun StatsScreen(app: AppState) {
                             Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally) {
                                 val m = (d?.music ?: 0).toFloat() / max
                                 val v = (d?.video ?: 0).toFloat() / max
-                                if (m > 0) Box(Modifier.fillMaxWidth().weight(m.coerceAtLeast(0.001f), fill = true).clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)).background(Teal))
-                                if (v > 0) Box(Modifier.fillMaxWidth().weight(v.coerceAtLeast(0.001f), fill = true)
-                                    .clip(if (m > 0) RoundedCornerShape(0.dp) else RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)).background(Red))
-                                val rest = 1f - m - v
-                                if (rest > 0.001f) Spacer(Modifier.weight(rest))
-                                if (m + v == 0f) Box(Modifier.fillMaxWidth().height(2.dp).background(c.outlineVariant))
+                                // the bar stands on the bottom line (the room left over was put under it, so the bars hung
+                                // from the top); a minute or two still shows as a short stub
+                                val total = (m + v).coerceIn(0f, 1f)
+                                if (total > 0f) Column(
+                                    Modifier.fillMaxWidth().fillMaxHeight(total).heightIn(min = 4.dp)
+                                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)),
+                                ) {
+                                    if (m > 0) Box(Modifier.fillMaxWidth().weight(m).background(Teal))
+                                    if (v > 0) Box(Modifier.fillMaxWidth().weight(v).background(Red))
+                                }
+                                else Box(Modifier.fillMaxWidth().height(2.dp).background(c.outlineVariant))
                             }
                         }
                     }
