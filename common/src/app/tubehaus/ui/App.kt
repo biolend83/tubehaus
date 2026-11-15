@@ -135,7 +135,7 @@ fun App(app: AppState) {
             .build()
     }
     key(lang, settings.tvMode) {
-        TubeTheme(settings.dark, app.platform::wallpaperColors, app.platform.font, look = if (app.platform.tv) 0 else settings.look) {
+        TubeTheme(settings.dark, app.platform::wallpaperColors, app.platform.font, look = if (app.platform.tv) 0 else settings.look, night = settings.nightTheme) {
             val bg = MaterialTheme.colorScheme.background
             LaunchedEffect(bg) { app.platform.titleBar(bg) }
             val tv = app.platform.tv

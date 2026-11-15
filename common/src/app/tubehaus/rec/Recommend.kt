@@ -69,9 +69,21 @@ object Learn {
     /** Korean particles: "아이유의", "아이유를" are "아이유" */
     private val PARTICLES = listOf("에서", "으로", "까지", "부터", "에게", "한테", "의", "를", "을", "이", "가", "은", "는", "에", "와", "과", "도", "로")
 
+    /**
+     * The runs of letters and digits in [s]. Not a Regex with p{L} classes: Kotlin/Native (the iPhone
+     * and iPad app) has none and throws "No such character class" (#79, as #67 before it).
+     */
+    fun letterRuns(s: String): List<String> {
+        val out = ArrayList<String>()
+        val b = StringBuilder()
+        for (c in s) if (c.isLetterOrDigit()) b.append(c) else if (b.isNotEmpty()) { out += b.toString(); b.clear() }
+        if (b.isNotEmpty()) out += b.toString()
+        return out
+    }
+
     /** A title's own words, for the videos without tags: lower case, particles and everyday words left out. */
     fun words(title: String): List<String> =
-        title.lowercase().replace(Regex("#[^\\s#]+"), " ").split(Regex("[^\\p{L}\\p{N}]+")).asSequence()
+        title.lowercase().replace(Regex("#[^\\s#]+"), " ").let(::letterRuns).asSequence()
             .map { w ->
                 val hangul = w.any { it in '\uAC00'..'\uD7A3' }
                 if (!hangul) w else PARTICLES.firstOrNull { w.length > it.length + 1 && w.endsWith(it) }?.let { w.dropLast(it.length) } ?: w
@@ -472,7 +484,7 @@ class Recommender(private val store: Store, private val feed: Feed) {
         // titles nearly the same as one already taken (re-uploads, "part 2" of the same clip) are left out
         val words = ArrayList<Set<String>>()
         val perTopic = HashMap<String, Int>()
-        fun wordsOf(title: String) = title.lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter { it.length >= 2 }.toSet()
+        fun wordsOf(title: String) = Learn.letterRuns(title.lowercase()).filter { it.length >= 2 }.toSet()
         fun alike(a: Set<String>, b: Set<String>): Boolean {
             if (a.size < 3 || b.size < 3) return false
             val both = a.count { it in b }

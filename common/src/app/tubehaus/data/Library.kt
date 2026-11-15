@@ -101,6 +101,8 @@ data class Settings(
     /** calm mode: no view counts, no Shorts tab, no autoplay of the next video */
     val calm: Boolean = false,
     val dark: Int = 0,            // 0 follow system, 1 light, 2 dark
+    /** following the system: the dark theme it switches to, 2 dark or 3 black (#78) */
+    val nightTheme: Int = 2,
     val historyOff: Boolean = false,
     /** the taste profile in use (rec/Profiles): "" = the main one */
     val profile: String = "",
