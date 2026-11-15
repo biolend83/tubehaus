@@ -42,6 +42,8 @@ import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.setActive
 import platform.AVFoundation.AVLayerVideoGravityResizeAspect
 import platform.AVKit.AVPictureInPictureController
+import platform.AVFoundation.AVMediaCharacteristicAudible
+import platform.AVFoundation.AVMediaSelectionOption
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
 import platform.AVFoundation.AVURLAsset
@@ -50,6 +52,8 @@ import platform.AVFoundation.AVPlayerItemStatusReadyToPlay
 import platform.AVFoundation.AVPlayerLayer
 import platform.AVFoundation.AVPlayerTimeControlStatusPlaying
 import platform.AVFoundation.AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate
+import platform.AVFoundation.appliesMediaSelectionCriteriaAutomatically
+import platform.AVFoundation.asset
 import platform.AVFoundation.currentItem
 import platform.AVFoundation.currentTime
 import platform.AVFoundation.duration
@@ -59,7 +63,9 @@ import platform.AVFoundation.preferredForwardBufferDuration
 import platform.AVFoundation.preferredMaximumResolution
 import platform.AVFoundation.rate
 import platform.AVFoundation.replaceCurrentItemWithPlayerItem
+import platform.AVFoundation.mediaSelectionGroupForMediaCharacteristic
 import platform.AVFoundation.seekToTime
+import platform.AVFoundation.selectMediaOption
 import platform.AVFoundation.timeControlStatus
 import platform.CoreGraphics.CGRectEqualToRect
 import platform.CoreGraphics.CGRectMake
@@ -87,6 +93,8 @@ class IosPlayer : VideoPlayer {
     private var opts = PlayOptions()
     /** where to start once the item is ready (AVPlayer ignores a seek before that); -1 = done */
     private var startAt = -1L
+    /** the original audio is chosen once per video, as soon as AVPlayer has read the list */
+    private var audioPicked = false
     private var heightsJob: Job? = null
     private var capsJob: Job? = null
     private var cues by mutableStateOf<List<Cue>>(emptyList())
@@ -122,6 +130,8 @@ class IosPlayer : VideoPlayer {
         // sound even with the silent switch on, and the audio keeps playing with the screen locked
         AVAudioSession.sharedInstance().setCategory(AVAudioSessionCategoryPlayback, error = null)
         AVAudioSession.sharedInstance().setActive(true, error = null)
+        // AVPlayer would pick the audio track in the device's language (an auto-dub in Dutch, say) over the original
+        av.appliesMediaSelectionCriteriaAutomatically = false
         scope.launch {
             while (true) {
                 tick()
@@ -137,6 +147,10 @@ class IosPlayer : VideoPlayer {
         if (startAt >= 0 && item.status == AVPlayerItemStatusReadyToPlay) {
             if (startAt > 0) av.seekToTime(CMTimeMake(startAt, 1000))
             startAt = -1
+        }
+        if (!audioPicked && item.status == AVPlayerItemStatusReadyToPlay) {
+            audioPicked = true
+            pickOriginalAudio(item)
         }
         val dur = secs(item.duration)
         val pos = secs(av.currentTime())
@@ -175,6 +189,7 @@ class IosPlayer : VideoPlayer {
         limit(item, o.maxHeight)
         if (readAhead) item.preferredForwardBufferDuration = 1200.0
         av.replaceCurrentItemWithPlayerItem(item)
+        audioPicked = false
         startAt = o.startMs
         st.value = PlayerState(videoId = s.id, buffering = true, positionMs = o.startMs, durationMs = s.lengthSec * 1000L,
             speed = o.speed, captions = o.captions)
@@ -188,6 +203,19 @@ class IosPlayer : VideoPlayer {
         }
         val translate = if (o.captions != null && o.captionLang != null && o.captions.lang.substringBefore('-') != o.captionLang) o.captionLang else null
         captions(o.captions, translate)
+    }
+
+    /** the original language's audio track (from the stream's formats), else the list's default */
+    private fun pickOriginalAudio(item: AVPlayerItem) {
+        val group = item.asset.mediaSelectionGroupForMediaCharacteristic(AVMediaCharacteristicAudible) ?: return
+        val options = group.options.filterIsInstance<AVMediaSelectionOption>()
+        if (options.size < 2) return
+        val audio = stream?.audio.orEmpty()
+        val lang = (audio.firstOrNull { it.audioContent == "original" } ?: audio.firstOrNull { it.audioDefault && it.audioLang != null })
+            ?.audioLang?.substringBefore('-')?.lowercase()
+        val pick = lang?.let { l -> options.firstOrNull { it.extendedLanguageTag?.substringBefore('-')?.lowercase() == l } }
+            ?: group.defaultOption ?: return
+        item.selectMediaOption(pick, inMediaSelectionGroup = group)
     }
 
     /** the highest quality AVPlayer may pick; 0 = no limit (it adapts to the connection) */
