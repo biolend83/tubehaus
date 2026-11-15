@@ -102,18 +102,9 @@ fun SearchScreen(app: AppState, initial: String) {
     fun SearchBox(modifier: Modifier = Modifier) {
         Row(modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { app.back() }) { Icon(Sym.ArrowBack.fill, tr("Back")) }
-            OutlinedTextField(
-                text, { text = it },
-                Modifier.weight(1f).focusRequester(focus),
-                placeholder = { Text(tr("Search YouTube")) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { submit(text) }),
-                trailingIcon = {
-                    if (text.isNotEmpty()) IconButton(onClick = { text = ""; runCatching { focus.requestFocus() } }) { Icon(Sym.Close.outline, tr("Clear")) }
-                },
-            )
-            IconButton(onClick = { submit(text) }) { Icon(Sym.Search.outline, tr("Search")) }
+            // a round, filled field (Flow's and Material 3's search bar), not a boxed outline
+            SearchField(text, { text = it; if (it.isEmpty()) runCatching { focus.requestFocus() } }, tr("Search YouTube"),
+                Modifier.weight(1f).padding(end = 8.dp).focusRequester(focus), onSearch = { submit(text) })
         }
     }
 
