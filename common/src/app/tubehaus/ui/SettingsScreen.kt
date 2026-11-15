@@ -315,7 +315,7 @@ private class Rows(val scope: LazyListScope, val cat: String?, val q: String, va
         n++
         scope.item { Piece(tv, i == 0, i == k.size - 1, content) }
     }
-    /** a title above a group (Flow's and Material 3's segmented lists): outside the cards, and the rows after it a group of their own */
+    /** a title above a group (Material 3's segmented lists): outside the cards, and the rows after it a group of their own */
     private fun head(content: @Composable () -> Unit) {
         n++
         scope.item { content() }
@@ -343,7 +343,7 @@ private class Rows(val scope: LazyListScope, val cat: String?, val q: String, va
 }
 
 /**
- * One row of a group, as Flow's settings and Material 3's segmented lists: each row its own rounded
+ * One row of a group, as Material 3's segmented lists: each row its own rounded
  * piece, the group's outer corners large and the inner ones small, a 2 dp gap between them instead
  * of a line. A TV: the row alone.
  */

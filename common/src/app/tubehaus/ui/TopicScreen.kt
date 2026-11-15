@@ -87,7 +87,7 @@ fun TopicScreen(app: AppState, key: String) {
 fun TopTabs(app: AppState) {
     val root = app.stack.firstOrNull() ?: Screen.Home
     val discover = !app.store.settings.value.homeOff
-    // on Home itself one row for everything, as Flow's and YouTube's: All and Discover (the feed),
+    // on Home itself one row for everything, as YouTube's: All and Discover (the feed),
     // then the other pages, then where the feed comes from (region, taste profile)
     val onHome = root == Screen.Home && discover && !app.store.settings.value.kids
     val screens = buildList<Pair<Screen, String>> {

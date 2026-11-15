@@ -23,7 +23,7 @@ interface JsSolver {
  * hours and a new one is loaded when it appears.
  *
  * Needed by the TV client only, which is the one that still serves what the token-free clients
- * call "not available": videos made for kids, and some labels' music videos (found in Flow's
+ * call "not available": videos made for kids, and some labels' music videos (found in a
  * extractor, which uses the same client for them).
  */
 object Cipher {
@@ -86,7 +86,7 @@ object Cipher {
         return out
     }
 
-    /** how long the link waits behind the start ad the answer placed (YouTube refuses it until then; Flow measured ~0.8 of the skip offset) */
+    /** how long the link waits behind the start ad the answer placed (YouTube refuses it until then; about 0.8 of the skip offset) */
     fun prerollMs(d: kotlinx.serialization.json.JsonElement?): Long =
         d.at("adPlacements").arr.filter { it.at("adPlacementRenderer.config.adPlacementConfig.kind").str == "AD_PLACEMENT_KIND_START" }
             .maxOfOrNull { p -> (p.at("adPlacementRenderer.renderer.instreamVideoAdRenderer.skipOffsetMilliseconds").str?.toLongOrNull()?.let { it * 8 / 10 } ?: 8000L) }

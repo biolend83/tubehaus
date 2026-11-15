@@ -475,7 +475,7 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
                     (if (v.views > 0) compact(v.views) else viewsText).takeIf { it.isNotEmpty() && !calm }?.let { it to tr("Views") },
                     d?.publishedText?.takeIf { it.isNotEmpty() }?.let { it to tr("Uploaded") },
                 )
-                // each in a card of its own, side by side as one segmented group (Flow's description sheet)
+                // each in a card of its own, side by side as one segmented group
                 if (stats.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).height(IntrinsicSize.Min).clip(RoundedCornerShape(20.dp)),
                     horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     for ((big, small) in stats) Column(
@@ -796,7 +796,7 @@ private val MINI_GAP = 6.dp
 private val MINI_R = 14.dp
 
 /**
- * Phones: the video page as a sheet over the app, as in YouTube's app (and Flow's). The page under it
+ * Phones: the video page as a sheet over the app, as in YouTube's app. The page under it
  * stays where it was. Pull the video down and it shrinks toward the bottom, following the finger, into
  * the mini player above the tabs; let go and it settles the way it was flung. Tap the mini player or
  * pull it up and it grows back; swipe it sideways and it closes.

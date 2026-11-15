@@ -35,8 +35,7 @@ import kotlin.random.Random
 // showing up beside yours) ranked by those scores, with a few slots kept for something new so
 // the feed doesn't collapse into one topic.
 //
-// Several of its ideas come from reading Flow's FlowNeuro engine (GPL-3.0), written anew and much
-// smaller: title words as well as tags, tastes by the time of day and week, a rotating choice of
+// It also learns title words as well as tags, tastes by the time of day and week, a rotating choice of
 // which interests to search, neighbour channels, searches as a light signal, a limit per topic,
 // a relevance floor once the profile knows enough, and fatigue after a binge of one channel.
 
@@ -80,7 +79,7 @@ object Learn {
             .filter { it.length >= 2 && it !in GENERIC && it !in STOP && !it.all(Char::isDigit) }
             .distinct().take(12).toList()
 
-    /** the part of the week now: weekday or weekend, morning, afternoon, evening or night (what Flow calls a time bucket) */
+    /** the part of the week now: weekday or weekend, morning, afternoon, evening or night */
     fun bucket(): String {
         val h = Sys.hour()
         val d = Sys.today().split('-').mapNotNull { it.toIntOrNull() }
@@ -301,8 +300,7 @@ private data class Cand(val v: Video, val src: String, val tag: String? = null)
 class Recommender(private val store: Store, private val feed: Feed) {
     private val pools = Sys.concurrentMap<String, Pair<Long, List<Cand>>>()
     /**
-     * How often each video was handed to Home this session without being opened (an idea from
-     * Flow's FlowNeuro engine, written anew): once a little lower, three times much lower, five
+     * How often each video was handed to Home this session without being opened: once a little lower, three times much lower, five
      * times not again, so a pull to refresh brings different videos instead of the same ones.
      */
     private val impressions = Sys.concurrentMap<String, Int>()
@@ -363,7 +361,7 @@ class Recommender(private val store: Store, private val feed: Feed) {
         val likedCh = t.ch.entries.sortedByDescending { it.value }.filter { it.value > 1.5 && it.key !in lib.subs }.map { it.key }.take(4)
         val chPools = likedCh.map { cid -> async { pool("ch:$cid", 3600) { feed.channel(cid, 3600).filter { !it.short }.map { Cand(it, "chan") } } } }
         // neighbour channels: ones YouTube lists beside the videos of two or more different channels you
-        // watched (Flow's idea: several of your channels agreeing on one is "made for the same audience")
+        // watched (several of your channels agreeing on one is "made for the same audience")
         val watchedCh = lib.hist.take(300).associate { it.id to it.authorId }
         val near = HashMap<String, MutableSet<String>>()
         for ((vid, list) in t.related) {

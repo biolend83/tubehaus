@@ -8,7 +8,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 
 /**
- * The player's way to a video's streams, quicker (ideas from Flow's extractor, written anew):
+ * The player's way to a video's streams, quicker:
  * - the next video is asked for before it is needed (near the end of this one, during the "Up
  *   next" countdown), so it starts at once;
  * - a request already on its way is joined rather than sent again;
