@@ -740,6 +740,8 @@ export function settingsPage(page) {
     ["look", "dark", $t("모양"), `
       ${row(langLabel(), sel("lang", [["auto", $t("자동 (브라우저 언어)")], ...LANGS]))}
       ${row($t("테마"), seg("theme", [["system", $t("기기 테마 사용"), "tune"], ["light", $t("밝은 테마"), "sun"], ["dark", $t("어두운 테마"), "dark"], ["spatial", $t("유리 테마"), "sparkle"], ["spatial-light", $t("밝은 유리 테마"), "sparkle"]]), "", "wide")}
+      ${row($t("밝을 때"), seg("themeLight", [["light", $t("밝은 테마"), "sun"], ["spatial-light", $t("밝은 유리 테마"), "sparkle"]]), "", "wide sx-systh" + (S.theme === "system" ? "" : " off"))}
+      ${row($t("어두울 때"), seg("themeDark", [["dark", $t("어두운 테마"), "dark"], ["spatial", $t("유리 테마"), "sparkle"]]), "", "wide sx-systh" + (S.theme === "system" ? "" : " off"))}
       ${row($t("디자인"), seg("look", [["2", "TubeHaus 1.5", "sparkle"], ["1", $t("기본"), "tune"]]), $t("유리 테마에서는 기본 디자인이에요"), "wide")}
       ${tog("smart", $t("이 영상 한눈에"), $t("영상 아래에 자주 나오는 말과 중요한 순간 · 이 브라우저에서 자막으로 만들어요"))}
       ${tog("ambient", $t("앰비언트 모드"), $t("영상 색이 플레이어 뒤로 은은하게 번져요 (어두운 테마)"))}
@@ -841,6 +843,7 @@ export function settingsPage(page) {
     S[k] = t.type === "checkbox" ? t.checked : /^\d+$/.test(t.value) && k !== "quality" ? +t.value : t.value;
     if (k === "rememberSpeed" && S.rememberSpeed) S.speed = +sessionStorage.getItem("yt.speed") || 1;
     if (k === "sponsor") $(".sx-cats", page).classList.toggle("off", !t.checked);
+    if (k === "theme") page.querySelectorAll(".sx-systh").forEach((r) => r.classList.toggle("off", S.theme !== "system"));
     if (k === "lang" || k === "calm") return location.reload();     // the whole interface changes
     toast($t("저장됨"));
   });

@@ -75,11 +75,14 @@ routes.push(
 
 // ---------------------------------------------------------------- theme
 function applyTheme() {
-  const glass = settings.theme === "spatial" || settings.theme === "spatial-light";   // spatial.css on the dark or light colours
-  const t = settings.theme === "system" ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
-    : glass ? (settings.theme === "spatial" ? "dark" : "light") : settings.theme;
+  // following the system: the light or dark theme picked for it (#78)
+  const th = settings.theme === "system"
+    ? (matchMedia("(prefers-color-scheme: light)").matches ? settings.themeLight || "light" : settings.themeDark || "dark")
+    : settings.theme;
+  const glass = th === "spatial" || th === "spatial-light";   // spatial.css on the dark or light colours
+  const t = glass ? (th === "spatial" ? "dark" : "light") : th;
   document.documentElement.classList.toggle("spatial", glass);
-  document.documentElement.classList.toggle("spatial-light", settings.theme === "spatial-light");
+  document.documentElement.classList.toggle("spatial-light", th === "spatial-light");
   document.documentElement.dataset.theme = t;
   const two = !glass && String(settings.look) !== "1";
   document.documentElement.dataset.look = two ? "2" : "1";
@@ -87,7 +90,7 @@ function applyTheme() {
 }
 applyTheme();
 matchMedia("(prefers-color-scheme: light)").addEventListener("change", applyTheme);
-addEventListener("settings", (e) => { if (e.detail === "theme" || e.detail === "look") applyTheme(); });
+addEventListener("settings", (e) => { if (e.detail === "theme" || e.detail === "themeLight" || e.detail === "themeDark" || e.detail === "look") applyTheme(); });
 
 // ---------------------------------------------------------------- link interception (no page reloads)
 document.addEventListener("click", (e) => {

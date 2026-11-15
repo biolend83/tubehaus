@@ -562,6 +562,8 @@ export default {
  "자동": "Auto",
  "유리 테마": "Verre",
  "밝은 유리 테마": "Verre clair",
+ "밝을 때": "En mode clair",
+ "어두울 때": "En mode sombre",
  "비밀번호 바꾸기": "Changer le mot de passe",
  "지금 비밀번호": "Mot de passe actuel",
  "새 비밀번호": "Nouveau mot de passe",

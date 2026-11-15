@@ -562,6 +562,8 @@ export default {
  "자동": "Otomatik",
  "유리 테마": "Cam",
  "밝은 유리 테마": "Açık cam",
+ "밝을 때": "Aydınlıkken",
+ "어두울 때": "Karanlıkken",
  "비밀번호 바꾸기": "Şifreyi değiştir",
  "지금 비밀번호": "Mevcut şifre",
  "새 비밀번호": "Yeni şifre",

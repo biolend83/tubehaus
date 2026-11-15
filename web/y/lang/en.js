@@ -562,6 +562,8 @@ export default {
  "자동": "Auto",
  "유리 테마": "Glass",
  "밝은 유리 테마": "Light glass",
+ "밝을 때": "When it's light",
+ "어두울 때": "When it's dark",
  "비밀번호 바꾸기": "Change password",
  "지금 비밀번호": "Current password",
  "새 비밀번호": "New password",

@@ -562,6 +562,8 @@ export default {
  "자동": "Otomatis",
  "유리 테마": "Kaca",
  "밝은 유리 테마": "Kaca terang",
+ "밝을 때": "Saat terang",
+ "어두울 때": "Saat gelap",
  "비밀번호 바꾸기": "Ubah kata sandi",
  "지금 비밀번호": "Kata sandi saat ini",
  "새 비밀번호": "Kata sandi baru",

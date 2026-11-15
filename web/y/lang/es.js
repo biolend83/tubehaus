@@ -562,6 +562,8 @@ export default {
  "자동": "Automático",
  "유리 테마": "Cristal",
  "밝은 유리 테마": "Cristal claro",
+ "밝을 때": "Cuando está claro",
+ "어두울 때": "Cuando está oscuro",
  "비밀번호 바꾸기": "Cambiar contraseña",
  "지금 비밀번호": "Contraseña actual",
  "새 비밀번호": "Contraseña nueva",

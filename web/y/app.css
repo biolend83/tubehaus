@@ -1599,6 +1599,7 @@ label.sx-row { cursor: pointer; }
 .sx-seg input:focus-visible + span { outline: 2px solid var(--acc, var(--blue)); }
 .sx-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; padding: 4px 0 16px; transition: opacity .2s; }
 .sx-cats.off { opacity: .45; }
+.sx-row.sx-systh.off { display: none; }
 .sx-rows > .sx-cats { border-top: 0; }
 .sx-cat { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--box2, var(--bg)); cursor: pointer; font-size: 13px; font-weight: 600; }
 .sx-cat input { position: absolute; opacity: 0; pointer-events: none; }
