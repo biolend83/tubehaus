@@ -748,24 +748,24 @@ fun RoundIcon(
     }
 }
 
-/** a small grey label above a group of rows ("Your content", "Playlists") */
+/** a small label in the accent colour above a group of rows ("Your content", "Playlists") */
 @Composable
-fun GroupLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 28.dp, end = 16.dp, top = 18.dp, bottom = 4.dp))
-}
+fun GroupLabel(text: String) = SectionLabel(text, Modifier.padding(start = 4.dp))
 
-/** rows in one rounded grey box */
+/**
+ * rows as one segmented group (Flow's lists): the group's outer corners large, each row its own
+ * piece with small corners, 2 dp apart
+ */
 @Composable
 fun RowGroup(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     Column(
-        modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().clip(RoundedCornerShape(22.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer).padding(vertical = 4.dp),
+        modifier.padding(horizontal = 12.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp)),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
         content = content,
     )
 }
 
-/** a row of a [RowGroup]: the icon in a circle, a title, a line under it, a count, an arrow */
+/** a row of a [RowGroup]: the icon, a title, a line under it, a count, an arrow */
 @Composable
 fun GroupRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, sub: String = "", trailing: String = "",
@@ -773,13 +773,12 @@ fun GroupRow(
 ) {
     val c = MaterialTheme.colorScheme
     Row(
-        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(16.dp), onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(c.surfaceContainer)
+            .tvClickable(RoundedCornerShape(6.dp), onClick = onClick).padding(horizontal = 18.dp, vertical = if (sub.isEmpty()) 18.dp else 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(40.dp).clip(CircleShape).background(c.surfaceContainerHigh), contentAlignment = Alignment.Center) {
-            Icon(icon, null, Modifier.size(22.dp))
-        }
-        Column(Modifier.weight(1f).padding(start = 14.dp, end = 8.dp)) {
+        Icon(icon, null, Modifier.size(24.dp), tint = accent)
+        Column(Modifier.weight(1f).padding(start = 18.dp, end = 8.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -1057,4 +1056,23 @@ fun BackHook(app: AppState, enabled: Boolean, onBack: () -> Unit) {
         app.backHooks.add(h)
         onDispose { app.backHooks.remove(h) }
     }
+}
+
+/**
+ * One piece of a segmented group (Flow's lists, Material 3 Expressive): rounded large at the group's
+ * outer corners and small between pieces, 2 dp apart, on the raised surface colour.
+ */
+@Composable
+fun Segment(first: Boolean, last: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val big = 24.dp
+    val small = 6.dp
+    val shape = RoundedCornerShape(if (first) big else small, if (first) big else small, if (last) big else small, if (last) big else small)
+    Box(modifier.fillMaxWidth().padding(top = if (first) 0.dp else 2.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceContainer)) { content() }
+}
+
+/** a section's name over its group: small, bold, in the accent colour (Flow's section headers) */
+@Composable
+fun SectionLabel(t: String, modifier: Modifier = Modifier) {
+    Text(t, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = accent,
+        modifier = modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 8.dp))
 }
