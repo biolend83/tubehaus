@@ -1,0 +1,6 @@
+- Settings, Library and the player menu as grouped lists
+- Player: new controls, swipe sideways to seek, level bars, floating mini player
+- Music: covers swipe as pages; music keeps playing on Home (no black PiP)
+- Kids' and some label videos play again
+- Recommendations learn title words and the time of day
+- Faster: the next video is fetched early; vibration on gestures
