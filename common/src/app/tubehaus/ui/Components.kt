@@ -1,5 +1,10 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.ui.input.pointer.pointerInput
+
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.Role
@@ -332,7 +337,7 @@ fun VideoCard(v: Video, app: AppState, queue: List<Video> = emptyList()) {
     // one video per row), the avatar lined up with its edge, a bold title, the rows well apart
     val phone = LocalCompact.current
     Column(Modifier.fillMaxWidth().padding(horizontal = if (phone) 12.dp else 0.dp)
-        .tvClickable(RoundedCornerShape(18.dp), onLongClick = { menu.value = true }) { app.watch(v, queue) }.padding(bottom = if (phone) 22.dp else 32.dp)) {
+        .warmOnPress(app, v).tvClickable(RoundedCornerShape(18.dp), onLongClick = { menu.value = true }) { app.watch(v, queue) }.padding(bottom = if (phone) 22.dp else 32.dp)) {
         if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.fillMaxWidth(), rounded = 16)
         Row(Modifier.padding(top = if (phone) 10.dp else 12.dp)) {
             if (v.channelId.isNotEmpty()) {
@@ -358,7 +363,7 @@ fun VideoRow(v: Video, app: AppState, queue: List<Video> = emptyList(), extra: L
     val calm = app.store.settings.value.calm
     val menu = remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(16.dp), onLongClick = { menu.value = true }) { if (onClick != null) onClick() else app.watch(v, queue) }.padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().let { if (onClick == null) it.warmOnPress(app, v) else it }.tvClickable(RoundedCornerShape(16.dp), onLongClick = { menu.value = true }) { if (onClick != null) onClick() else app.watch(v, queue) }.padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         // big: YouTube's search results on a computer, a large picture and a larger title beside it
         if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.width(thumbWidth), rounded = if (big) 18 else 12)
@@ -1075,4 +1080,28 @@ fun Segment(first: Boolean, last: Boolean, modifier: Modifier = Modifier, conten
 fun SectionLabel(t: String, modifier: Modifier = Modifier) {
     Text(t, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = accent,
         modifier = modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 8.dp))
+}
+
+/**
+ * Starts fetching a video's streams the moment a finger rests on its card (Flow's tap prefetch),
+ * so the player has them by the time the tap ends. A touch that turns into a scroll asks nothing:
+ * the finger has to stay put for a moment first. Not on a metered connection.
+ */
+@Composable
+fun Modifier.warmOnPress(app: AppState, v: Video): Modifier {
+    if (v.live || v.short || v.id.isEmpty()) return this
+    return pointerInput(v.id) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+            val still = withTimeoutOrNull(90L) {
+                while (true) {
+                    val e = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    val c = e.changes.firstOrNull { it.id == down.id } ?: return@withTimeoutOrNull false
+                    if (!c.pressed || (c.position - down.position).getDistance() > viewConfiguration.touchSlop) return@withTimeoutOrNull false
+                }
+                @Suppress("UNREACHABLE_CODE") false
+            } ?: true
+            if (still && !app.platform.metered()) Streams.prefetch(app.scope, v.id)
+        }
+    }
 }
