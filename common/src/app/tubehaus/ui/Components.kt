@@ -384,11 +384,12 @@ fun ChannelRow(c: Channel, app: AppState) {
         Modifier.fillMaxWidth().tvClickable(RoundedCornerShape(16.dp)) { app.go(Screen.Channel(c.id, c.name)) }.padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.width(168.dp), contentAlignment = Alignment.Center) { Avatar(c.avatar, 88) }
-        Column(Modifier.weight(1f).padding(start = 10.dp)) {
-            Text(c.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(listOf(c.handle, c.subsText).filter { it.isNotEmpty() }.joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // the picture at the start, as in Flow's lists (it sat alone in the middle of a thumbnail's width)
+        Avatar(c.avatar, if (LocalCompact.current) 56 else 88)
+        Column(Modifier.weight(1f).padding(start = 14.dp, end = 8.dp)) {
+            Text(c.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (c.handle.isNotEmpty()) Text(c.handle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (c.subsText.isNotEmpty()) Text(c.subsText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
         SubscribeButton(c.id, c.name, c.avatar, app)
     }
@@ -948,6 +949,8 @@ fun Narrow(content: @Composable () -> Unit) {
 /** Design 2 (glass): a small see-through card, two a row on a phone */
 @Composable
 fun GlassCard(v: Video, app: AppState, queue: List<Video> = emptyList(), solid: Boolean = false) {
+    // the opaque box around every video made the lists heavy: a plain card, as Flow's, on a phone
+    if (solid && LocalCompact.current) { VideoCard(v, app, queue); return }
     if (!app.kidsAllow(v.channelId)) return
     val menu = remember { mutableStateOf(false) }
     // solid: the big cards look, an opaque rounded box with the channel's picture; else see-through glass
