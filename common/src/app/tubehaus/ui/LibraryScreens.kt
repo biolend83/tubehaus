@@ -366,18 +366,29 @@ private fun LibRow(icon: ImageVector, label: String, count: String, onClick: () 
  *  like) have no title or channel to show (#71): look those up once the list is open, a few at a time. */
 @Composable
 private fun FillMissingTitles(app: AppState, list: String, items: List<Meta>) {
-    val current by rememberUpdatedState(items)
-    LaunchedEffect(list) {
-        val missing = current.filter { it.title.isEmpty() }.map { it.id }.distinct().take(200)
+    // again when the list changes (a sync from your server brings items after the list is open)
+    val missing = items.filter { it.title.isEmpty() }.map { it.id }.distinct().take(200)
+    LaunchedEffect(list, missing) {
         for (part in missing.chunked(4)) coroutineScope {
             for (id in part) launch {
-                try {
-                    val d = YouTube.details(id)
-                    app.store.fillMeta(id, d.title, d.author, d.channelId)
-                } catch (_: Exception) {}
+                val d = try { YouTube.details(id) } catch (_: Exception) { null }
+                if (d != null && d.title.isNotEmpty()) app.store.fillMeta(id, d.title, d.author, d.channelId)
+                else oembed(id)?.let { (t, a) -> app.store.fillMeta(id, t, a, d?.channelId.orEmpty()) }
             }
         }
     }
+}
+
+/** title and channel name from YouTube's oEmbed (a small public JSON), when the watch page gives none */
+private suspend fun oembed(id: String): Pair<String, String>? = try {
+    val j = kotlinx.serialization.json.Json.parseToJsonElement(
+        app.tubehaus.engine.Net.get("https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3D$id"),
+    ) as kotlinx.serialization.json.JsonObject
+    val t = (j["title"] as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
+    val a = (j["author_name"] as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
+    if (t.isEmpty()) null else t to a
+} catch (_: Exception) {
+    null
 }
 
 @Composable

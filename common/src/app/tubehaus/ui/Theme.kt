@@ -169,12 +169,14 @@ object Motion {
 }
 
 @Composable
-fun TubeTheme(mode: Int, wallpaper: ((Boolean) -> ColorScheme?)? = null, font: FontFamily? = null, look: Int = 0, content: @Composable () -> Unit) {
+fun TubeTheme(mode: Int, wallpaper: ((Boolean) -> ColorScheme?)? = null, font: FontFamily? = null, look: Int = 0, night: Int = 2, content: @Composable () -> Unit) {
     // 0 follow the system, 1 light, 2 dark, 3 black (pure black for AMOLED screens),
     // 4 the wallpaper's colours (Material You, Android 12+), light or dark with the system
     val darkOn = when (mode) { 1 -> false; 2, 3 -> true; else -> isSystemInDarkTheme() }
     val scheme = when {
         mode == 3 -> black
+        // following the system, its dark side can be the black one (#78)
+        mode == 0 && darkOn && night == 3 -> black
         mode == 4 -> wallpaper?.invoke(darkOn) ?: if (darkOn) dark else light
         look == 1 -> if (darkOn) cardsDark else cardsLight
         look == 2 -> if (darkOn) glassDark else glassLight
