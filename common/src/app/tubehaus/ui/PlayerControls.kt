@@ -190,6 +190,9 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
     var settings by remember { mutableStateOf(false) }
     // a sideways swipe over the picture: where it will land and how far that is from where it started
     var scrub by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+    // a click on the picture (mouse): the new state's icon swells in the middle and fades, as YouTube's
+    var bezelTick by remember { mutableIntStateOf(0) }
+    var bezelPlay by remember { mutableStateOf(false) }
     var gesture by remember { mutableStateOf<Pair<String, Float>?>(null) }   // "brightness"/"volume", level
     // TV: the video itself holds the remote's focus (OK, left/right); up or down moves it onto the buttons
     val tv = app.platform.tv
@@ -372,7 +375,7 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
                 }
                 .pointerInput(touch, st.durationMs, w, dtap) {
                     if (!touch) {
-                        detectTapGestures(onTap = { toggle() }, onDoubleTap = { app.setFull(!fullscreen) })
+                        detectTapGestures(onTap = { bezelPlay = !playingNow; toggle(); bezelTick++ }, onDoubleTap = { app.setFull(!fullscreen) })
                         return@pointerInput
                     }
                     // as YouTube's app: a double tap on a side jumps 10 seconds, and each further tap
@@ -488,6 +491,16 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
         // a double tap's jump, as YouTube's app shows it: a light half-moon on that side, a ripple
         // from the finger, arrows running the way of the jump and the seconds jumped so far
         jump?.let { (side, secs) -> JumpRipple(side, secs, jumpAt, jumpTick, w) }
+        if (bezelTick > 0) {
+            val grow = remember { androidx.compose.animation.core.Animatable(1f) }
+            LaunchedEffect(bezelTick) { grow.snapTo(0f); grow.animateTo(1f, tween(520, easing = androidx.compose.animation.core.LinearOutSlowInEasing)) }
+            if (grow.value < 1f) Box(
+                Modifier.align(Alignment.Center).size(64.dp)
+                    .graphicsLayer { val k = grow.value; alpha = 1f - k; scaleX = 1f + 0.5f * k; scaleY = 1f + 0.5f * k }
+                    .clip(CircleShape).background(Color(0x66000000)),
+                contentAlignment = Alignment.Center,
+            ) { Icon(if (bezelPlay) Sym.PlayArrow.fill else Sym.Pause.fill, null, tint = Color.White, modifier = Modifier.size(40.dp)) }
+        }
         // the seek swipe's read-out in the middle of the picture
         var lastScrub by remember { mutableStateOf(0L to 0L) }
         scrub?.let { lastScrub = it }
@@ -783,9 +796,9 @@ private fun MouseOverlay(
             }
         }
         if (st.ended) {
-            Row(Modifier.align(Alignment.Center), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                CenterButton(Sym.Replay.fill, tr("Replay"), 64) { player.seekTo(0); player.play() }
-                if (app.playback.next != null) CenterButton(Sym.SkipNext.fill, tr("Next"), 64) { app.playback.skipNext() }
+            Row(Modifier.align(Alignment.Center), horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.CenterVertically) {
+                PlayButton(st) { player.seekTo(0); player.play() }
+                if (app.playback.next != null) SkipButton(Sym.SkipNext.fill, tr("Next")) { app.playback.skipNext() }
             }
         }
         // bottom: seek bar, then the buttons
@@ -806,7 +819,8 @@ private fun MouseOverlay(
                 Spacer(Modifier.width(8.dp))
                 TimeText(app, st, dragging)
                 Spacer(Modifier.weight(1f))
-                if (st.speed != 1f) Text("${st.speed}x", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(end = 4.dp))
+                if (st.speed != 1f) Text("${st.speed}x", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = 6.dp).clip(CircleShape).background(PILL).clickable { setSettings(true) }.padding(horizontal = 10.dp, vertical = 3.dp))
                 CastButton(app, iconSize = 26)
                 CaptionsButton(app, st) {}
                 Box {
