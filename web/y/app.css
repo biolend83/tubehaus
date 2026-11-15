@@ -1738,7 +1738,7 @@ html.tv .sx-nav { display: none; }
 /* medium player: a shorter chapter name, so it never runs under the buttons beside it */
 @container (max-width: 820px) { .ytp-chap { max-width: 150px; } }
 
-/* ------------------------------------------------ segmented lists (the apps' 1.6.1, after Flow's)
+/* ------------------------------------------------ segmented lists (as the apps' 1.6.1)
    Each row of a settings card is a rounded piece of its own, 2px from the next: the group's outer
    corners large, the inner ones small, no lines between. The card's title sits above the pieces. */
 html:not(.tv) .sx-card { background: none; padding: 0; border-radius: 0; }
@@ -1752,7 +1752,7 @@ html:not(.tv) .sx-seg, html:not(.tv) .sx-sel select, html:not(.tv) .sx-in { back
 html:not(.tv) .sx-seg { background: color-mix(in srgb, var(--fg) 7%, var(--box)); }
 @media (max-width: 640px) { html:not(.tv) .sx-rows > * { padding-left: 16px; padding-right: 16px; } html:not(.tv) .sx-rows { border-radius: 20px; } }
 
-/* ------------------------------------------------ the player on a touch screen (the apps' 1.6.1, after Flow's)
+/* ------------------------------------------------ the player on a touch screen (as the apps' 1.6.1)
    a light dim with darker edges, previous and next as bare icons, play in a round button that squeezes
    under the finger and pops its icon, the time in a small dark pill, the seek bar easing thicker */
 @media (pointer: coarse) {

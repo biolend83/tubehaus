@@ -2977,7 +2977,7 @@ def eng_tv(vid):
         f.pop("cipher", None)
     if not any(f.get("url") for f in sd.get("adaptiveFormats") or []):
         return None
-    # YouTube holds the links back behind the start ad it placed, about 0.8 of its skip offset (Flow measured it)
+    # YouTube holds the links back behind the start ad it placed, about 0.8 of its skip offset
     wait = 0
     for p in d.get("adPlacements") or []:
         r = (p or {}).get("adPlacementRenderer") or {}
