@@ -1597,12 +1597,30 @@ def _freetube_meta(v, at_ms):
     return m
 
 
+def _takeout_cells(text):
+    """the insides of Takeout's <div class="content-cell ... body-1"> cells, found with str.find: a
+    regular expression here took quadratic time on a file of opening tags that never close"""
+    pos = 0
+    while True:
+        i = text.find('<div class="content-cell', pos)
+        if i < 0:
+            return
+        j = text.find('">', i)
+        k = text.find("</div>", j) if j >= 0 else -1
+        if k < 0:
+            return
+        pos = k + 6
+        head = text[i + 12:j]                  # content-cell mdl-cell ... body-1
+        if head.endswith("body-1") and '"' not in head and k - j < 20000:
+            yield text[j + 2:k]
+
+
 def _takeout_html(text):
     """Takeout's watch-history.html: one cell per video, newest first (its dates are in the
     account's language, so only the order is kept)."""
     import html
     now, out = int(time.time()), []
-    for cell in re.findall(r'<div class="content-cell[^"]*body-1">(.*?)</div>', text, re.S):
+    for cell in _takeout_cells(text):
         v = re.search(r'href="https://(?:www|music)\.youtube\.com/watch\?v=([\w-]{11})[^"]*">(.*?)</a>', cell, re.S)
         if not v:
             continue
@@ -5357,7 +5375,11 @@ def _oidc_return():
 def _safe_back(back):
     """a path on this site to go back to after signing in; anything else goes to the start page"""
     back = str(back or "/")
-    return back if back.startswith("/") and not back.startswith("//") and chr(92) not in back and len(back) < 1000 else "/"
+    if not back.startswith("/") or back.startswith("//") or chr(92) in back or len(back) >= 1000:
+        return "/"
+    # it ends up in a Location header: line breaks and other control or non-ASCII characters are
+    # %-escaped, so nothing can start a header of its own
+    return urllib.parse.quote(back, safe="/?&=%#:@!$'()*+,;~-._")
 
 
 def oidc_start(back):

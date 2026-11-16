@@ -40,8 +40,13 @@
     return v;
   }
   function open(v) {
+    // only a web address: parsed, so a saved or typed "javascript:..." can never run here
+    // (a link element parses it on old TV browsers too, which have no URL())
+    var u = document.createElement("a");
+    u.href = v + "/";
+    if (u.protocol !== "http:" && u.protocol !== "https:") return;
     try { localStorage.setItem(KEY, v); } catch (e) { }
-    location.replace(v + "/");
+    location.replace(u.href);
   }
   function submit() {
     var v = clean(addr.value);
