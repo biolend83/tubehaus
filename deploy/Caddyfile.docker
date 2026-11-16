@@ -11,12 +11,28 @@
 #     (TUBEHAUS_MAX_ACCOUNTS=4 closes sign-ups once the household has its accounts)
 # or put Authelia / Authentik / a passkey gate in front with forward_auth instead.
 
+{
+	# TUBEHAUS_AUTH=basic: the wrong-password limit (forward_auth) is asked before the password (basic_auth)
+	order forward_auth before basic_auth
+}
+
 (auth-none) {
 }
 
 (auth-basic) {
+	# basic_auth has no limit on wrong passwords of its own: the TubeHaus server counts them. A request
+	# that carries a password asks it first (429 after 10 wrong ones from that address in 10 minutes),
+	# and every password basic_auth refuses is reported to it.
+	@tried header Authorization *
+	forward_auth @tried {$TUBEHAUS_SERVER:tubehaus:3010} {
+		uri /api/p/auth/basic-gate
+	}
 	basic_auth {
 		{$TUBEHAUS_USER} {$TUBEHAUS_PASSWORD_HASH}
+	}
+	handle_errors 401 {
+		rewrite * /api/p/auth/basic-fail
+		reverse_proxy {$TUBEHAUS_SERVER:tubehaus:3010}
 	}
 }
 

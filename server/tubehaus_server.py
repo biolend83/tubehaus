@@ -118,9 +118,32 @@ LINKS = _links(env("HT_LINKS", ""))
 
 lock = threading.Lock()
 LIVE_CACHE = {}
+GOOGLE_HOSTS = ("youtube.com", "youtu.be", "googlevideo.com", "ytimg.com", "ggpht.com", "googleusercontent.com",
+                "google.com", "googleapis.com", "gstatic.com", "cloudflare.com")
+
+
+def google_host(url):
+    """True for an https address on YouTube's or Google's servers (or Cloudflare's, for the WARP check)"""
+    u = urllib.parse.urlsplit(url)
+    h = (u.hostname or "").lower().rstrip(".")
+    return u.scheme == "https" and any(h == d or h.endswith("." + d) for d in GOOGLE_HOSTS)
+
+
+class _GoogleOnly(urllib.request.HTTPRedirectHandler):
+    """The addresses fetched for a visitor (streams, pictures, captions) are YouTube's and Google's. A redirect may
+    send one on to another of their servers, never anywhere else: not to this machine, its network or a cloud's
+    metadata address."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not google_host(newurl):
+            raise urllib.error.HTTPError(req.full_url, code, "redirect to another site refused", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 # every request to YouTube itself goes through YT_PROXY when one is set
 YT = urllib.request.build_opener(urllib.request.ProxyHandler(
-    {"http": "http://" + YT_PROXY, "https": "http://" + YT_PROXY} if YT_PROXY else {}))
+    {"http": "http://" + YT_PROXY, "https": "http://" + YT_PROXY} if YT_PROXY else {}), _GoogleOnly())
+# YouTube's pictures, straight (not through YT_PROXY), with the same rule for redirects
+PIC = urllib.request.build_opener(_GoogleOnly())
 LIVE_ORIGIN = PUBLIC
 LIVE_BASE = LIVE_ORIGIN + "/api/p/live/s/"   # + base64url(segment url) + ".ts"; proxies re-decode %-escapes
 
@@ -3879,7 +3902,7 @@ def eng_img(path):
             return 404, "text/plain", b"not found"
         url = "https://%s.ytimg.com/sb/%s" % (m.group(1), path.split("/", 3)[3])
     try:
-        r = urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": BROWSER_UA}), timeout=20)
+        r = PIC.open(urllib.request.Request(url, headers={"User-Agent": BROWSER_UA}), timeout=20)
         return 200, r.headers.get("Content-Type") or "image/jpeg", r.read()
     except urllib.error.HTTPError as e:
         return e.code, "text/plain", b""
@@ -5188,6 +5211,7 @@ SESSION_DAYS = 30
 COOKIE = "th_session"
 auth_lk = threading.Lock()
 auth_tries = {}      # key -> [timestamps] for sign-up / login rate limits
+basic_fails = {}     # address -> times Caddy's basic_auth refused a password from it (TUBEHAUS_AUTH=basic)
 USERNAME = re.compile(r"[a-z0-9_]{3,24}")
 
 
@@ -5718,6 +5742,43 @@ class H(BaseHTTPRequestHandler):
             return h
         return hops[0]                     # all private: someone at home, as the first proxy saw them
 
+    def basic_guard(self, p):
+        """TUBEHAUS_AUTH=basic: Caddy's basic_auth has no limit on wrong passwords, so Caddy asks here first
+        (/api/p/auth/basic-gate, only for requests that carry a password) and tells us each one it refused
+        (/api/p/auth/basic-fail, from its handle_errors). 10 wrong in 10 minutes from one address: "too many"
+        until the oldest of them is 10 minutes old. True when the request was one of these two and has been answered."""
+        if not p.endswith(("/api/p/auth/basic-gate", "/api/p/auth/basic-fail")):
+            return False
+        ip, now = self.client_ip(), time.time()
+        with auth_lk:
+            fails = basic_fails[ip] = [t for t in basic_fails.get(ip, []) if now - t < 900]
+            if p.endswith("/basic-fail") and self.headers.get("Authorization"):
+                fails.append(now)
+                if len(fails) == 10:
+                    log("auth", "10 wrong passwords from one address: held off for 10 minutes", every=0)
+            if not fails:
+                basic_fails.pop(ip, None)
+            if len(basic_fails) > 20000:
+                basic_fails.clear()
+            blocked = len([t for t in fails if now - t < 600]) >= 10
+        if p.endswith("/basic-gate") and not blocked:
+            self.send_response(204)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return True
+        body = (b"Too many wrong passwords from your network. Please try again in 10 minutes.\n" if blocked
+                else b"Please sign in.\n")
+        self.send_response(429 if blocked else 401)
+        if blocked:
+            self.send_header("Retry-After", "600")
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+        return True
+
     def needs_sign_in(self, p):
         """True, with a 401 sent, for a household library call from someone not signed in."""
         if not (ACCOUNTS and not PUBLIC_MODE) or _req.user or not personal(p) or "/api/p/auth/" in p or "/api/p/admin/" in p:
@@ -5778,6 +5839,8 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         _req.user = self.cookie_user() if ACCOUNTS else None
         p = self.path.split("?")[0].rstrip("/")
+        if self.basic_guard(p):
+            return
         if p.endswith("/api/p/auth/check"):         # asked by the reverse proxy for every request
             if not ACCOUNTS or self.cookie_user():
                 stat("visitors", self.client_ip())
@@ -5980,6 +6043,8 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         _req.user = self.cookie_user() if ACCOUNTS else None
         p = self.path.split("?")[0].rstrip("/")
+        if self.basic_guard(p):
+            return
         try:
             n = int(self.headers.get("Content-Length") or 0)
         except ValueError:
@@ -6197,6 +6262,8 @@ class H(BaseHTTPRequestHandler):
     def do_HEAD(self):
         # Shaka guesses the manifest type from a HEAD's Content-Type
         p = self.path.split("?")[0]
+        if self.basic_guard(p.rstrip("/")):
+            return
         self.send_response(200)
         self.send_header("Connection", "close")   # nothing to frame a HEAD reply with
         if "/live/" in p:
