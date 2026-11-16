@@ -94,7 +94,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "1.6.1"
+const val VERSION = "1.6.2"
 
 /** Settings' categories, as cards on its first page: key, icon, title, what is inside */
 private class Cat(val key: String, val icon: Symbol, val title: String, val sub: String)
@@ -387,6 +387,9 @@ private fun SettingsRows(
                 // Android 12+: Material You, the colours of the wallpaper
                 listOfNotNull(("4" to tr("Wallpaper colours")).takeIf { app.platform.wallpaperColors(false) != null })
             r.row("display", tr("Theme") + " dark light black") { Seg(tr("Theme"), "${s.dark}", themes) { c -> set { it.copy(dark = c.toInt()) } } }
+            if (s.dark == 0) r.row("display", tr("When it's dark") + " night dark black amoled") {
+                Seg(tr("When it's dark"), "${s.nightTheme}", listOf("2" to tr("Dark"), "3" to tr("Black (AMOLED)"))) { c -> set { it.copy(nightTheme = c.toInt()) } }
+            }
             if (!app.platform.tv) r.row("display", tr("Design") + " look style layout cards glass") {
                 Seg(tr("Design"), "${s.look}", listOf("3" to tr("TubeHaus 1.5"), "0" to tr("Classic"), "1" to tr("Big cards"), "2" to tr("Glass"))) { c -> set { it.copy(look = c.toInt()) } }
             }
