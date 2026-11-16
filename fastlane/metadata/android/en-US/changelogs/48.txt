@@ -1,0 +1,6 @@
+- iPhone/iPad: Home works again, and typing after a search
+- Picture-in-picture button in the player
+- Theme: pick Dark or Black (AMOLED) when following the system
+- Start in the original audio, not a dub in the device's language
+- Imported playlists fill in missing titles
+- More keyboard shortcuts on desktop
