@@ -22,6 +22,12 @@ services:
       HT_PROXY: ${HT_PROXY:-}
       HT_SUB_LANG: ${TUBEHAUS_SUB_LANG:-en}
       TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-none}
+      HT_PUBLIC_URL: ${TUBEHAUS_URL:-http://localhost:8080}
+      HT_OIDC_ISSUER: ${TUBEHAUS_OIDC_ISSUER:-}
+      HT_OIDC_CLIENT_ID: ${TUBEHAUS_OIDC_CLIENT_ID:-}
+      HT_OIDC_CLIENT_SECRET: ${TUBEHAUS_OIDC_CLIENT_SECRET:-}
+      HT_OIDC_NAME: ${TUBEHAUS_OIDC_NAME:-}
+      HT_OIDC_ONLY: ${TUBEHAUS_OIDC_ONLY:-0}
     volumes:
       - tubehaus-data:/data
 

@@ -35,6 +35,10 @@
   .langsel { margin-top: 16px; text-align: center; }
   .langsel select { height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--fg2); font: inherit; font-size: 13px; }
   .langsel select option { color: initial; }
+  .sso { display: block; height: 44px; line-height: 42px; margin-top: 4px; border: 1px solid var(--line); border-radius: 22px; text-align: center;
+    color: var(--fg); text-decoration: none; font-weight: 600; }
+  .sso:hover, .sso:focus { border-color: var(--blue); outline: 0; }
+  .or { text-align: center; color: var(--fg2); font-size: 13px; margin: 16px 0 -6px; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -128,6 +132,28 @@
       $("go").disabled = false;
     }
   };
+  // single sign-on (HT_OIDC_*): a button to the provider; with passwords off it's the only way in
+  if (new URLSearchParams(location.search).get("sso") === "fail") $("err").textContent = $t("SSO 로그인이 되지 않았어요. 다시 해 보세요");
+  fetch("/api/p/auth/me", { credentials: "same-origin" }).then((r) => r.json()).then((d) => {
+    if (!d.sso) return;
+    const a = document.createElement("a");
+    a.className = "sso";
+    a.href = "/api/p/auth/oidc" + q;
+    a.textContent = $t("{0}(으)로 계속하기", d.sso);
+    if (d.passwords === false) {
+      $("title").textContent = $t("로그인");
+      $("sub").textContent = $t("이 서버를 쓰려면 로그인해야 해요");
+      $("f").hidden = $("switch").hidden = true;
+      $("f").before(a);
+      a.after($("err"));
+      if (!FIRST_VISIT) a.focus();
+    } else {
+      const or = document.createElement("div");
+      or.className = "or";
+      or.textContent = $t("또는");
+      $("f").before(a, or);
+    }
+  }).catch(() => { });
   if (!FIRST_VISIT) $("u").focus();
 </script>
 </body>

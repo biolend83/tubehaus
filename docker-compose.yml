@@ -39,6 +39,12 @@ services:
       HT_PUBLIC_MODE: ${TUBEHAUS_PUBLIC:-0}
       TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-none}           # "accounts": one library per person
       HT_MAX_ACCOUNTS: ${TUBEHAUS_MAX_ACCOUNTS:-1000}
+      # single sign-on with your own identity provider (TUBEHAUS_AUTH=accounts; see .env.example)
+      HT_OIDC_ISSUER: ${TUBEHAUS_OIDC_ISSUER:-}
+      HT_OIDC_CLIENT_ID: ${TUBEHAUS_OIDC_CLIENT_ID:-}
+      HT_OIDC_CLIENT_SECRET: ${TUBEHAUS_OIDC_CLIENT_SECRET:-}
+      HT_OIDC_NAME: ${TUBEHAUS_OIDC_NAME:-}
+      HT_OIDC_ONLY: ${TUBEHAUS_OIDC_ONLY:-0}
       HT_VID_PREFETCH: ${TUBEHAUS_PREFETCH:-4}
       HT_MAX_VIEWERS: ${TUBEHAUS_MAX_VIEWERS:-0}
       HT_MAX_HEIGHT: ${TUBEHAUS_MAX_HEIGHT:-0}

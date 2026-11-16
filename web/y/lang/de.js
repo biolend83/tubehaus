@@ -609,5 +609,10 @@ export default {
  "{0} 남음": "noch {0}",
  "이 영상에 챕터 {0}개를 만들었어요. 재생 막대에 보여요": "{0} Kapitel für dieses Video erstellt: Die Zeitleiste zeigt sie",
  "반응 보내기": "Reaktion senden",
- "{0}명 보는 중": "{0} sehen zu"
+ "{0}명 보는 중": "{0} sehen zu",
+ "{0}(으)로 계속하기": "Weiter mit {0}",
+ "또는": "oder",
+ "SSO 로그인이 되지 않았어요. 다시 해 보세요": "Die Einmalanmeldung hat nicht geklappt. Bitte versuche es erneut",
+ "이 서버를 쓰려면 로그인해야 해요": "Melde dich an, um diesen Server zu nutzen",
+ "비밀번호 로그인은 이 서버에서 꺼져 있어요": "Passwörter sind auf diesem Server deaktiviert"
 };

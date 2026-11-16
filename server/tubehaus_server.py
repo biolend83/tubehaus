@@ -5234,6 +5234,17 @@ def session_user(token):
     return user if u and str(u.get("gen", 0)) == gen else None
 
 
+def _take_shared_library(user):
+    """switching a server that was used without accounts: its library becomes the first account's"""
+    if PUBLIC_MODE:
+        return
+    for src, dst in ((YTLIB, _ytlib_file(user)), (SHORTS, _shorts_file(user))):
+        if os.path.exists(src) and not os.path.exists(dst):
+            with yt_lock:
+                jsave(dst, jload(src, {}))
+    log("auth", "first account: took over the shared library", every=0)
+
+
 def auth_signup(b, ip):
     user = str(b.get("username", "")).strip().lower()
     pw = str(b.get("password", ""))
@@ -5259,13 +5270,8 @@ def auth_signup(b, ip):
         users[user] = {"salt": salt.hex(), "hash": h, "gen": 1, "created": int(time.time())}
         jsave(USERS, users)
         os.chmod(USERS, 0o600)
-    if first and not PUBLIC_MODE:
-        # switching a server that was used without accounts: its library becomes the first account's
-        for src, dst in ((YTLIB, _ytlib_file(user)), (SHORTS, _shorts_file(user))):
-            if os.path.exists(src) and not os.path.exists(dst):
-                with yt_lock:
-                    jsave(dst, jload(src, {}))
-        log("auth", "first account: took over the shared library", every=0)
+    if first:
+        _take_shared_library(user)
     log("auth", "new account", every=0)
     stat("signups")
     return 200, {"ok": True, "user": user, "cookie": session_make(user, 1)}
@@ -5312,6 +5318,134 @@ def auth_login(b, ip):
         return 401, {"error": "Wrong user name or password"}
     stat("logins")
     return 200, {"ok": True, "user": user, "cookie": session_make(user, u.get("gen", 1))}
+
+
+# ---------- single sign-on (OpenID Connect) ----------
+# Signing in through your own identity provider (Authentik, Authelia, Keycloak, Pocket ID, Google, ...)
+# next to, or instead of, passwords. The provider's client gets the redirect URI
+# <HT_PUBLIC_URL>/api/p/auth/oidc/callback. It's the code flow with PKCE, and who signed in is read
+# from the provider's userinfo endpoint over HTTPS, so no token signature needs checking here.
+# A first sign-in makes an account named after the provider's user name, tied to the provider's
+# "sub": never to a password account that happens to have the same name.
+OIDC_ISSUER = env("HT_OIDC_ISSUER", "").strip().rstrip("/")
+OIDC_ID = env("HT_OIDC_CLIENT_ID", "").strip()
+OIDC_SECRET = env("HT_OIDC_CLIENT_SECRET", "").strip()
+OIDC_NAME = env("HT_OIDC_NAME", "").strip()[:40] or "SSO"           # on the button: "Continue with ..."
+OIDC_CLAIM = env("HT_OIDC_USER_CLAIM", "").strip() or "preferred_username"
+OIDC_SCOPES = env("HT_OIDC_SCOPES", "").strip() or "openid profile email"
+OIDC = bool(ACCOUNTS and OIDC_ISSUER and OIDC_ID)
+OIDC_ONLY = OIDC and env("HT_OIDC_ONLY", "0") == "1"     # no passwords at all: only the provider signs people in
+oidc_meta = {}
+oidc_pending = {}          # state -> (PKCE verifier, where to go back to, expiry)
+
+
+def _oidc_conf():
+    if not oidc_meta.get("at") or time.time() - oidc_meta["at"] > 3600:
+        with urllib.request.urlopen(OIDC_ISSUER + "/.well-known/openid-configuration", timeout=10) as r:
+            d = json.loads(r.read())
+        for k in ("authorization_endpoint", "token_endpoint", "userinfo_endpoint"):
+            if not str(d.get(k, "")).startswith(("https://", "http://")):
+                raise ValueError("the provider's configuration has no " + k)
+        oidc_meta.update(d=d, at=time.time())
+    return oidc_meta["d"]
+
+
+def _oidc_return():
+    return PUBLIC + "/api/p/auth/oidc/callback"
+
+
+def _safe_back(back):
+    """a path on this site to go back to after signing in; anything else goes to the start page"""
+    back = str(back or "/")
+    return back if back.startswith("/") and not back.startswith("//") and chr(92) not in back and len(back) < 1000 else "/"
+
+
+def oidc_start(back):
+    """the provider's sign-in address to send the browser to"""
+    conf = _oidc_conf()
+    state, verifier = secrets.token_urlsafe(24), secrets.token_urlsafe(48)
+    now = time.time()
+    with auth_lk:
+        for k in [k for k, v in oidc_pending.items() if v[2] < now]:
+            del oidc_pending[k]
+        if len(oidc_pending) > 5000:
+            oidc_pending.clear()
+        oidc_pending[state] = (verifier, _safe_back(back), now + 600)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    q = urllib.parse.urlencode({"response_type": "code", "client_id": OIDC_ID, "redirect_uri": _oidc_return(),
+                                "scope": OIDC_SCOPES, "state": state, "nonce": secrets.token_urlsafe(16),
+                                "code_challenge": challenge, "code_challenge_method": "S256"})
+    ep = conf["authorization_endpoint"]
+    return ep + ("&" if "?" in ep else "?") + q
+
+
+def _oidc_username(claims, sub, users):
+    raw = claims.get(OIDC_CLAIM) or claims.get("preferred_username") or str(claims.get("email") or "").split("@")[0]
+    base = re.sub(r"_+", "_", re.sub(r"[^a-z0-9_]", "_", str(raw or "").lower())).strip("_")[:20]
+    if len(base) < 3:
+        base = "user_" + hashlib.sha256(sub.encode()).hexdigest()[:6]
+    name, n = base, 2
+    while name in users:
+        name, n = f"{base}_{n}", n + 1
+    return name
+
+
+def oidc_finish(q):
+    """(user, session generation, where to go back to) for the provider's answer; ValueError when it failed"""
+    with auth_lk:
+        pend = oidc_pending.pop((q.get("state") or [""])[0], None)
+    if not pend or pend[2] < time.time():
+        raise ValueError("unknown or expired sign-in")
+    if q.get("error"):
+        raise ValueError("the provider said " + q["error"][0][:80])
+    conf = _oidc_conf()
+    form = {"grant_type": "authorization_code", "code": (q.get("code") or [""])[0], "redirect_uri": _oidc_return(),
+            "client_id": OIDC_ID, "code_verifier": pend[0]}
+    head = {"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}
+    if OIDC_SECRET:
+        # one way of sending the secret, the one the provider takes (client_secret_basic when it doesn't say)
+        if "client_secret_basic" in conf.get("token_endpoint_auth_methods_supported", ["client_secret_basic"]):
+            pair = urllib.parse.quote(OIDC_ID, safe="") + ":" + urllib.parse.quote(OIDC_SECRET, safe="")
+            head["Authorization"] = "Basic " + base64.b64encode(pair.encode()).decode()
+        else:
+            form["client_secret"] = OIDC_SECRET
+    req = urllib.request.Request(conf["token_endpoint"], urllib.parse.urlencode(form).encode(), head)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            tok = json.loads(r.read())
+    except urllib.error.HTTPError as ex:
+        raise ValueError(f"the provider refused the code (HTTP {ex.code})")
+    if not tok.get("access_token"):
+        raise ValueError("no access token from the provider")
+    req = urllib.request.Request(conf["userinfo_endpoint"], headers={"Authorization": "Bearer " + tok["access_token"], "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        claims = json.loads(r.read())
+    sub = str(claims.get("sub") or "")
+    if not sub:
+        raise ValueError("the provider didn't say who signed in")
+    key = OIDC_ISSUER + "|" + sub
+    made = False
+    with auth_lk:
+        users = jload(USERS, {})
+        user = next((u for u, v in users.items() if v.get("oidc") == key), None)
+        first = not users
+        if not user:
+            if len(users) >= MAX_ACCOUNTS:
+                raise ValueError("no new accounts are taken")
+            user = _oidc_username(claims, sub, users)
+            # no password: this account signs in only through the provider
+            users[user] = {"salt": "", "hash": "", "gen": 1, "created": int(time.time()), "oidc": key}
+            jsave(USERS, users)
+            os.chmod(USERS, 0o600)
+            made = True
+        gen = users[user].get("gen", 1)
+    if made:
+        if first:
+            _take_shared_library(user)
+        log("auth", "new account (single sign-on)", every=0)
+        stat("signups")
+    stat("logins")
+    return user, gen, pend[1]
 
 
 # ---------- usage counts (public instances only) ----------
@@ -5630,10 +5764,35 @@ class H(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             return self.send(401, {"error": "Please sign in"})
+        # single sign-on: before the other-site check, since the provider's page sends the browser back here
+        if OIDC and (p.endswith("/api/p/auth/oidc") or p.endswith("/api/p/auth/oidc/callback")):
+            q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            cookie = None
+            try:
+                if p.endswith("/oidc"):
+                    if _too_many("oidc:" + self.client_ip(), 30, 600):
+                        return self.send(429, {"error": "Too many attempts. Please wait a few minutes"})
+                    to = oidc_start((q.get("r") or ["/"])[0])
+                else:
+                    user, gen, to = oidc_finish(q)
+                    cookie = session_make(user, gen)
+            except Exception as ex:
+                log("auth", "single sign-on failed: %s" % str(ex)[:200], every=0)
+                back = (q.get("r") or ["/"])[0] if p.endswith("/oidc") else "/"
+                to = "/login?sso=fail&r=" + urllib.parse.quote(_safe_back(back), safe="")
+            self.send_response(302)
+            self.send_header("Location", to)
+            self.send_header("Cache-Control", "no-store")
+            if cookie:
+                self.send_header("Set-Cookie", f"{COOKIE}={cookie}; Path=/; Max-Age={SESSION_DAYS * 86400}; HttpOnly; Secure; SameSite=Lax")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if self.cross_site(p) or self.needs_sign_in(p):
             return
         if p.endswith("/api/p/auth/me"):
-            return self.send(200, {"accounts": ACCOUNTS, "user": self.cookie_user() if ACCOUNTS else None})
+            return self.send(200, {"accounts": ACCOUNTS, "user": self.cookie_user() if ACCOUNTS else None,
+                                   "sso": OIDC_NAME if OIDC else None, "passwords": not OIDC_ONLY})
         if self.over_limit(p):
             return
         if p.endswith("/api/p/admin/stats"):
@@ -5822,6 +5981,8 @@ class H(BaseHTTPRequestHandler):
             gen = int(jload(USERS, {}).get(_req.user, {}).get("gen", 1))     # the one the change just made
             return self.send_cookie(200, d, session_make(_req.user, gen), SESSION_DAYS * 86400)
         if ACCOUNTS and (p.endswith("/api/p/auth/signup") or p.endswith("/api/p/auth/login")):
+            if OIDC_ONLY:
+                return self.send(403, {"error": "Passwords are turned off on this server"})
             fn = auth_signup if p.endswith("/signup") else auth_login
             code, d = fn(body, self.client_ip())
             if code != 200:

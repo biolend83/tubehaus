@@ -280,6 +280,7 @@ TubeHaus has no accounts by default: without a login, everyone who opens the add
 
 - **Built-in password:** `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER` and `TUBEHAUS_PASSWORD_HASH` in `.env` (hash from `docker compose run --rm caddy caddy hash-password`; every `$` as `$$`)
 - **An account for each person:** `TUBEHAUS_AUTH=accounts` gives a sign-in page and a library per person
+- **Single sign-on:** with accounts on, `TUBEHAUS_OIDC_ISSUER`, `TUBEHAUS_OIDC_CLIENT_ID` and `TUBEHAUS_OIDC_CLIENT_SECRET` add a "Continue with …" button for your OpenID Connect provider (Authentik, Authelia, Keycloak, Pocket ID, …; redirect URI `<TUBEHAUS_URL>/api/p/auth/oidc/callback`). `TUBEHAUS_OIDC_ONLY=1` turns passwords off
 - **Your own gate:** Authelia, Authentik or a passkey gate in front with `forward_auth`
 - **Not exposed at all:** keep it on your home network, or reach it from anywhere over Tailscale or WireGuard
 
@@ -485,6 +486,8 @@ Running one? [Add it here](https://github.com/biolend83/tubehaus/issues/new?temp
 | `HT_MAX_VIEWERS`, `HT_MAX_HEIGHT`, `HT_RATE_PER_MIN`, `HT_MAX_CONNECTIONS` | `0`, `0`, `120` public / `0`, `256` | load limits (see *Handling a crowd*) |
 | `HT_VID_PREFETCH` (`TUBEHAUS_PREFETCH`) | `4` | videos you're likely to click next, looked up ahead so they start at once (0 = only what you ask for) |
 | `TUBEHAUS_AUTH=accounts` | | Docker: a sign-in page and a library for each person (`HT_ACCOUNTS=1` in a manual setup); `TUBEHAUS_MAX_ACCOUNTS` closes sign-ups |
+| `HT_OIDC_ISSUER`, `HT_OIDC_CLIENT_ID`, `HT_OIDC_CLIENT_SECRET` (`TUBEHAUS_OIDC_*`) | empty | with accounts: sign in through your OpenID Connect provider; redirect URI `<HT_PUBLIC_URL>/api/p/auth/oidc/callback`. A first sign-in makes the account, named after the `preferred_username` claim (`HT_OIDC_USER_CLAIM`) |
+| `HT_OIDC_NAME`, `HT_OIDC_ONLY`, `HT_OIDC_SCOPES` | `SSO`, `0`, `openid profile email` | the button's name ("Continue with …"), `1` = no passwords at all, the scopes asked for |
 | `HT_PUBLIC_PROXIES` | `0` | proxies with public addresses in front of your own (they can't be told from visitors); see [SECURITY.md](SECURITY.md) |
 | `HT_MAX_BODY_MB` | `64` | largest request body (YouTube history imports) |
 | `HT_NAME`, `HT_LINKS` (`TUBEHAUS_NAME`, `TUBEHAUS_LINKS`) | empty | your instance's own name, and extra side-menu links as JSON `[{"name": "…", "url": "https://…"}]` (or `/path`; a `.apk` link downloads). Any name can be one per language, `{"ko": "홈튜브", "en": "HomeTube"}`: visitors see theirs, else English |

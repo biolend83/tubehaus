@@ -609,5 +609,10 @@ export default {
  "{0} 남음": "{0} kaldı",
  "이 영상에 챕터 {0}개를 만들었어요. 재생 막대에 보여요": "Bu video için {0} bölüm oluşturuldu: ilerleme çubuğunda görünür",
  "반응 보내기": "Tepki gönder",
- "{0}명 보는 중": "{0} kişi izliyor"
+ "{0}명 보는 중": "{0} kişi izliyor",
+ "{0}(으)로 계속하기": "{0} ile devam et",
+ "또는": "veya",
+ "SSO 로그인이 되지 않았어요. 다시 해 보세요": "Tek oturum açma başarısız oldu. Lütfen tekrar deneyin",
+ "이 서버를 쓰려면 로그인해야 해요": "Bu sunucuyu kullanmak için oturum açın",
+ "비밀번호 로그인은 이 서버에서 꺼져 있어요": "Bu sunucuda parolalar kapalı"
 };
