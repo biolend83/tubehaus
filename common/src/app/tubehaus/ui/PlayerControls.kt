@@ -620,6 +620,8 @@ private fun TouchOverlay(
                     if (!v?.author.isNullOrEmpty()) Text(v!!.author, color = Color(0xCCFFFFFF), style = MaterialTheme.typography.bodySmall, maxLines = 1)
                 }
             }
+            if (app.platform.canPip && app.casting.link == null)
+                IconButton(onClick = { app.platform.startPip() }) { Icon(Sym.Pip.outline, tr("Picture in picture"), tint = Color.White) }
             CastButton(app) { poke() }
             CaptionsButton(app, st) { poke() }
             IconButton(onClick = openSettings) { Icon(Sym.Settings.outline, tr("Settings"), tint = Color.White) }
