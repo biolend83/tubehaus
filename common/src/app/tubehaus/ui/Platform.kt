@@ -27,6 +27,9 @@ interface Platform {
     val nearby: Nearby? get() = null
     /** iPad and iPhone: the AirPlay button in the player's controls; null elsewhere */
     val airplay: (@Composable (Modifier) -> Unit)? get() = null
+    /** the player's button that moves the video into a small window over other apps (Android phones, iPhone and iPad) */
+    val canPip: Boolean get() = false
+    fun startPip() {}
 
     /** a share sheet where there is one; false when the link was copied to the clipboard instead */
     fun share(title: String, url: String): Boolean

@@ -93,6 +93,9 @@ class IosPlayer : VideoPlayer {
     private var opts = PlayOptions()
     /** where to start once the item is ready (AVPlayer ignores a seek before that); -1 = done */
     private var startAt = -1L
+    /** the player's picture-in-picture button (nothing happens while AVPlayer can't yet) */
+    fun startPip() { picture.pip?.startPictureInPicture() }
+
     /** the original audio is chosen once per video, as soon as AVPlayer has read the list */
     private var audioPicked = false
     private var heightsJob: Job? = null
@@ -334,7 +337,7 @@ private class PlayerHost(private val moved: (PlayerHost, Boolean) -> Unit) : UIV
  */
 private class PlayerView(player: AVPlayer) : UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)) {
     private val picture = AVPlayerLayer.playerLayerWithPlayer(player)
-    private val pip: AVPictureInPictureController? =
+    val pip: AVPictureInPictureController? =
         if (AVPictureInPictureController.isPictureInPictureSupported()) AVPictureInPictureController(playerLayer = picture) else null
 
     init {

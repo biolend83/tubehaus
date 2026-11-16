@@ -139,6 +139,11 @@ class AndroidPlatform(private val app: Application) : Platform {
         activity?.setHideBars(on)
     }
 
+    override val canPip: Boolean
+        get() = !tv && android.os.Build.VERSION.SDK_INT >= 26 &&
+            app.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)
+    override fun startPip() { activity?.startPip() }
+
     override fun setFullscreen(on: Boolean) {
         activity?.setFullscreen(on)
         // brightness set by the gesture lasts while in full screen; out of it the system's applies again

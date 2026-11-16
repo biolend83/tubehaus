@@ -50,6 +50,8 @@ class IosPlatform : Platform {
         }.getOrNull()
     }
     override val player = IosPlayer()
+    override val canPip: Boolean get() = platform.AVKit.AVPictureInPictureController.isPictureInPictureSupported()
+    override fun startPip() = player.startPip()
     /** AirPlay instead of Google Cast: the system's list of TVs */
     override val airplay: (@androidx.compose.runtime.Composable (androidx.compose.ui.Modifier) -> Unit)? = { m -> AirPlayButton(m, player) }
 
