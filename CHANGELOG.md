@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.6.2 — 2026-11-16
+
+### Added
+- **Single sign-on with OpenID Connect** (#81): with `TUBEHAUS_AUTH=accounts`, set `TUBEHAUS_OIDC_ISSUER`, `TUBEHAUS_OIDC_CLIENT_ID` and `TUBEHAUS_OIDC_CLIENT_SECRET` and the sign-in page gets a "Continue with …" button for your provider (Authentik, Authelia, Keycloak, Pocket ID, ...). The redirect URI is `<TUBEHAUS_URL>/api/p/auth/oidc/callback`. A first sign-in makes that person's account, tied to the provider's `sub` and never to a password account of the same name. `TUBEHAUS_OIDC_ONLY=1` turns passwords off; `TUBEHAUS_OIDC_NAME` names the button
+- **Light and dark theme when following the system** (#78): Settings → Theme → "When it's light" / "When it's dark" pick the light or light glass theme, and the dark or glass theme
+
+### Security
+- Watch history files from Takeout are read without a regular expression that took quadratic time on a crafted file
+- The TV apps' start page opens only http and https addresses
+
 ## v1.6.1 — 2026-11-15
 
 ### Fixed
