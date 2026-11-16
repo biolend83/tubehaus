@@ -238,6 +238,11 @@ class MainActivity : ComponentActivity() {
         return b.build()
     }
 
+    /** the player's picture-in-picture button */
+    fun startPip() {
+        if (Build.VERSION.SDK_INT >= 26) runCatching { enterPictureInPictureMode(pipParams()) }
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         // going home while a video plays: keep it in a small window
