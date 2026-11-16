@@ -5802,6 +5802,8 @@ class H(BaseHTTPRequestHandler):
                 log("auth", "single sign-on failed: %s" % str(ex)[:200], every=0)
                 back = (q.get("r") or ["/"])[0] if p.endswith("/oidc") else "/"
                 to = "/login?sso=fail&r=" + urllib.parse.quote(_safe_back(back), safe="")
+            # never a line break in a header, whatever the address was made from
+            to = to.replace("\r", "").replace("\n", "")
             self.send_response(302)
             self.send_header("Location", to)
             self.send_header("Cache-Control", "no-store")
