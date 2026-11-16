@@ -8,6 +8,10 @@ on:
     paths: [packaging/flatpak/**, .github/workflows/flatpak.yml]
     tags: ['app-v*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "attach the file to this release (app-v...)"
+        required: false
 
 jobs:
   app:
@@ -44,16 +48,21 @@ jobs:
           name: app
       - name: Put the app next to the manifest
         run: mkdir -p packaging/flatpak/app && tar -C packaging/flatpak/app -xf app.tar && ls packaging/flatpak/app
-      - uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
-        with:
-          bundle: TubeHaus.flatpak
-          manifest-path: packaging/flatpak/io.github.biolend83.TubeHaus.yml
-          cache-key: flatpak-builder-${{ hashFiles('packaging/flatpak/io.github.biolend83.TubeHaus.yml') }}
+      # flatpak-builder run directly, the SDK installed for this user next to the build: the action's
+      # update of the image's own SDK failed with "Invalid cross-device link" (2026-11-15)
+      - name: Build the Flatpak
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak-builder --user --install-deps-from=flathub --disable-rofiles-fuse --force-clean \
+            --repo=repo build packaging/flatpak/io.github.biolend83.TubeHaus.yml
+          flatpak build-bundle repo TubeHaus.flatpak io.github.biolend83.TubeHaus
       - name: Attach to the release
-        if: startsWith(github.ref, 'refs/tags/app-v')
+        if: startsWith(github.ref, 'refs/tags/app-v') || inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
+          GITHUB_REF_NAME=$TAG
           ver=${GITHUB_REF_NAME#app-v}
           cp TubeHaus.flatpak "TubeHaus-$ver-linux-x86_64.flatpak"
           dnf install -y gh >/dev/null 2>&1 || true
