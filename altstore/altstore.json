@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.6.2",
+          "buildVersion": "48",
+          "date": "2026-11-16T11:09:35+00:00",
+          "localizedDescription": "1.6.2: Home works again on iPhone and iPad, typing after a search, a picture-in-picture button, original audio instead of dubs.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.6.2/TubeHaus-1.6.2-ipad.ipa",
+          "size": 21968404,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.6.1",
           "buildVersion": "47",
           "date": "2026-11-15T01:16:26+00:00",
@@ -230,11 +239,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.6.1",
-      "versionDate": "2026-11-15T01:16:26+00:00",
-      "versionDescription": "1.6.1: grouped lists and a new player, swipe to seek, kids' videos play again, music keeps playing on Home.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.6.1/TubeHaus-1.6.1-ipad.ipa",
-      "size": 21956207
+      "version": "1.6.2",
+      "versionDate": "2026-11-16T11:09:35+00:00",
+      "versionDescription": "1.6.2: Home works again on iPhone and iPad, typing after a search, a picture-in-picture button, original audio instead of dubs.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.6.2/TubeHaus-1.6.2-ipad.ipa",
+      "size": 21968404
     }
   ],
   "news": [],
