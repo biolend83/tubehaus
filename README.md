@@ -226,6 +226,9 @@ docker compose up -d
 
 That's it: Caddy, the TubeHaus server with its YouTube engine and Cloudflare WARP, the PO-token provider for live streams and whisper.cpp for live captions come up together. Open your domain. WARP registers itself on first start and keeps its registration in a volume.
 
+> [!NOTE]
+> **On TrueNAS?** TubeHaus is in the TrueNAS app catalog: **Apps → Discover Apps**, search for **TubeHaus** (community train). Nothing to clone.
+
 > [!IMPORTANT]
 > **Going on a public domain? Set a login in `.env` first:** `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER` and `TUBEHAUS_PASSWORD_HASH` (the hash comes from `docker compose run --rm caddy caddy hash-password`; write every `$` as `$$`). Without it, everyone who opens the address shares the same library. More ways: [Add a login before you expose it](#add-a-login-before-you-expose-it).
 
