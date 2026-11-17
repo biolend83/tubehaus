@@ -1,6 +1,6 @@
 // Watch page, Shorts, mini player
 import { $, $$, el, esc, icon, api, lib, settings, toast, fmtTime, fmtViews, fmtCount, ago, epoch, exactTime, thumb, normVideo, metaOf, pickThumb, fmtSubs, safeHtml, linkify, parseT, copy, PUBLIC, siteName } from "./util.js";
-import { videoInfo, prefetch, player, state, card, norm, remember, known, fillProgress, avatar, subBtn, navigate, videoMenu, shareDialog, saveDialog, downloadDialog, keysDialog, setList, inList, queue, setPosCache, getPos, pageCleanup, popup, mi } from "./core.js";
+import { videoInfo, videoInfoFast, prefetch, player, state, card, norm, remember, known, fillProgress, avatar, subBtn, navigate, videoMenu, shareDialog, saveDialog, downloadDialog, keysDialog, setList, inList, queue, setPosCache, getPos, pageCleanup, popup, mi } from "./core.js";
 import { loadPlaylist } from "./pages.js";
 import { capText } from "./player.js";
 import { $t, LANG, LOCALE, REGION } from "./i18n.js";
@@ -194,13 +194,19 @@ export async function watch(page, m, alive) {
 
   // the same video is already playing (back from the mini player): do not reload it
   const same = W.id === id && player.info?.videoId === id;
-  let info;
+  let info, full = null;
   if (same) info = W.info;
   else {
     saveProgress(true);
     W.id = id; W.v = null; W.info = null; W.sentMeta = false; W.lastSave = 0;
     player.next = null; player.hasPrev = false;
-    try { info = await videoInfo(id); }
+    try {
+      // the full answer when it is here already (prefetched); else the quick one, so the video starts about half
+      // a second sooner, and the related videos and subscriber count are filled in when the full one arrives
+      // both asked for at once: when the full one is kept (here or on the server) it is the one that wins
+      full = videoInfo(id);
+      info = await Promise.race([full, videoInfoFast(id).then((f) => (f && !f.error ? f : full), () => full)]);
+    }
     catch (e) {
       if (!alive()) return;
       W.id = null;
@@ -255,6 +261,20 @@ export async function watch(page, m, alive) {
   }
   player.setIcons();
 
+  // started on the quick answer: the rest when the full one comes
+  if (info.partial && full) full.then((f) => {
+    if (!alive() || W.id !== id || !f || f.error) return;
+    W.info = f;
+    W.related = norm(f.recommendedVideos || []);
+    if (!W.v.authorThumb) W.v.authorThumb = pickThumb(f.authorThumbnails, 88);
+    player.next = nextItem()?.v || null;
+    player.setIcons();
+    if (document.documentElement.classList.contains("tv")) return;
+    renderInfo(page, f);
+    renderRelated(page);
+    const nx = nextItem();
+    if (nx) setTimeout(() => prefetch(nx.v.id), 5000);
+  }).catch(() => { });
   // TVs show only the full-page player, so skip description, related videos and comments (less work for a weak TV)
   if (document.documentElement.classList.contains("tv")) {
     const nx = nextItem();

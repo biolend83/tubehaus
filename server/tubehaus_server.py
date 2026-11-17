@@ -3128,13 +3128,29 @@ eng_caps = {}            # video -> (time, [caption tracks with YouTube's addres
 eng_caps_lk = threading.Lock()
 
 
-def eng_video(vid, hl="", gl=""):
-    """/api/v1/videos/<id>: the streams (a player client), the details (WEB's player) and the watch page (next), at once"""
+eng_futs = {}             # (video, hl, gl) -> (streams, details, watch page futures, when): shared by ?fast=1 and the full answer
+eng_futs_lk = threading.Lock()
+
+
+def eng_video(vid, hl="", gl="", fast=False):
+    """/api/v1/videos/<id>: the streams (a player client), the details (WEB's player) and the watch page (next), at once.
+    fast: without waiting for the watch page (YouTube takes about half a second more for it): no related videos and
+    subscriber count yet. The web player starts on that and asks for the full answer next, which then only waits
+    for what is still on its way: the three requests to YouTube are made once for both."""
     hl, gl = hl or ENG_HL or "en", gl or ENG_REGION
     t0 = time.time()
-    fp = ENG_POOL.submit(eng_player, vid)
-    fm = ENG_POOL.submit(it_call, "player", {"videoId": vid, "contentCheckOk": True, "racyCheckOk": True}, None, 1, BROWSER_UA, hl, gl)
-    fn = ENG_POOL.submit(it_call, "next", {"videoId": vid}, None, 1, BROWSER_UA, hl, gl)
+    with eng_futs_lk:
+        now = time.time()
+        for k in [k for k, f in eng_futs.items() if now - f[3] > 30]:
+            del eng_futs[k]
+        f = eng_futs.get((vid, hl, gl))
+        if f:
+            fp, fm, fn = f[:3]
+        else:
+            fp = ENG_POOL.submit(eng_player, vid)
+            fm = ENG_POOL.submit(it_call, "player", {"videoId": vid, "contentCheckOk": True, "racyCheckOk": True}, None, 1, BROWSER_UA, hl, gl)
+            fn = ENG_POOL.submit(it_call, "next", {"videoId": vid}, None, 1, BROWSER_UA, hl, gl)
+            eng_futs[(vid, hl, gl)] = (fp, fm, fn, now)
     d, client = fp.result()
     try:
         web = fm.result()
@@ -3155,7 +3171,7 @@ def eng_video(vid, hl="", gl=""):
             if not d.get("videoDetails") and web.get("videoDetails"):
                 d["videoDetails"] = web["videoDetails"]
     try:
-        nx = fn.result()
+        nx = {} if fast and not fn.done() else fn.result()
     except Exception:
         nx = {}
     ps = d.get("playabilityStatus") or {}
@@ -3892,7 +3908,10 @@ def eng_api_now(path, qs, hl="", gl=""):
     try:
         m = re.fullmatch(r"/api/v1/videos/([\w-]{11})", p)
         if m:
-            v = eng_video(m.group(1), hl, gl)
+            fast = (qs.get("fast") or "") == "1"
+            v = eng_video(m.group(1), hl, gl, fast)
+            if fast:
+                v = dict(v, partial=True)
             if (qs.get("local") or "").lower() in ("true", "1"):
                 # as Invidious' ?local=true: the streams through this server (other Invidious clients ask for it)
                 v = dict(v, **{k: [dict(x, url=_companion_url(x["url"])) if str(x.get("url", "")).startswith("http") else x
@@ -6330,6 +6349,11 @@ class H(BaseHTTPRequestHandler):
         # from the cache above when we can, because otherwise every click waits on YouTube.
         t0 = time.time()
         key = self.path
+        if key.endswith("?fast=1"):
+            # the quick answer is asked for when the full one isn't at hand: if it is (prefetched), that one
+            with vid_lk:
+                if key[:-7] in vid_cache:
+                    key = key[:-7]
         with vid_lk:
             hit = vid_cache.get(key)
         if hit and time.time() - hit[0] < VID_STALE:

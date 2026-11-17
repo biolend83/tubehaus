@@ -514,6 +514,9 @@ export const markRestore = () => (_restore = true);
 // When a finger touches a card or the mouse rests on it, fetch the video info early -> it opens instantly.
 // Hovering flips through storyboard frames (like YouTube's moving previews).
 export const videoInfo = (id) => api(`/api/v1/videos/${id}`, { ttl: 300000 });
+// the streams and the title without the related videos (the server doesn't wait for YouTube's watch page):
+// the player starts on this while the full answer is still coming
+export const videoInfoFast = (id) => api(`/api/v1/videos/${id}?fast=1`, { ttl: 60000 });
 const prefetched = new Set();
 export function prefetch(id) {
   if (!id || prefetched.has(id)) return;
