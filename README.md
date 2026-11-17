@@ -14,7 +14,7 @@ On the TV, the phone, the PC and the iPad. Run it on your own server, or just in
 ![Docker: amd64 | arm64](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white)
 [![Featured in selfh.st Weekly](https://img.shields.io/badge/featured%20in-selfh.st%20weekly-2ea44f)](https://selfh.st/weekly/2026-10-23/)
 
-**[⬇ Get the app](#get-the-app)** &nbsp;·&nbsp; **[🖥️ Run the server](#quick-start-docker)** &nbsp;·&nbsp; **[✨ What's new in 1.6](#new-in-16-its-own-youtube-engine)** &nbsp;·&nbsp; **English** · [한국어](README.ko.md)
+**[⬇ Get the app](#get-the-app)** &nbsp;·&nbsp; **[🖥️ Run the server](#quick-start-docker)** &nbsp;·&nbsp; **[✨ What's new in 1.6](#new-in-16-its-own-youtube-engine-and-fast)** &nbsp;·&nbsp; **English** · [한국어](README.ko.md)
 
 <img src="docs/devices.jpg" alt="TubeHaus on Android TV, iPad and an Android phone" width="860">
 
@@ -78,19 +78,19 @@ There are two ways to run it. Same name, same look; they differ in *where* the w
 
 All files, Windows portable and ARM builds: **[latest release](https://github.com/biolend83/tubehaus/releases/latest)**. Install notes and source per platform: [`android-app`](https://github.com/biolend83/tubehaus/tree/android-app) · [`windows-app`](https://github.com/biolend83/tubehaus/tree/windows-app) · [`mac-app`](https://github.com/biolend83/tubehaus/tree/mac-app) · [`linux-app`](https://github.com/biolend83/tubehaus/tree/linux-app) · [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). The rest of this README is about the server.
 
-## New in 1.6: its own YouTube engine
+## New in 1.6: its own YouTube engine, and fast
 
-The server no longer sits on Invidious. It talks to YouTube itself, so the stack is **three containers lighter** (no Invidious, no companion, no PostgreSQL) and it is quicker where it counts. Measured side by side on one server, through the same WARP address, first visits:
+The server no longer sits on Invidious. It talks to YouTube itself, so the stack is **three containers lighter** (no Invidious, no companion, no PostgreSQL). 1.6.3 then made it quick: a video starts on the streams alone and the title, description and related videos fill in a moment later, answers are kept and refreshed in the background, and the stream connections to YouTube stay open.
 
-| Opening… | TubeHaus 1.6 | Invidious |
-|---|---|---|
-| a video | **0.60 s** `▇▇▇▇▇▇` | 1.29 s `▇▇▇▇▇▇▇▇▇▇▇▇▇` |
-| a channel | **0.27 s** `▇▇▇` | 0.66 s `▇▇▇▇▇▇▇` |
-| a channel's videos | **0.21 s** `▇▇` | 0.61 s `▇▇▇▇▇▇` |
-| comments | 0.19 s `▇▇` | 0.16 s `▇▇` |
-| a search | 0.63 s `▇▇▇▇▇▇` | 0.56 s `▇▇▇▇▇▇` |
+Measured on one server through the same WARP address, first visits (median):
 
-Streams came through about 10% faster too (85 vs 75 Mbit/s). It still answers in [Invidious](https://invidious.io)' API format, so the web app, the apps' server mode and other tools that speak that API keep working. Up to 1.5 TubeHaus was built on Invidious and [invidious-companion](https://github.com/iv-org/invidious-companion), and much of what it knows about YouTube was learned from them: thank you, Invidious team. Updating from 1.5? See [below](#quick-start-docker).
+| | TubeHaus 1.6.3 | TubeHaus 1.6.0 | Invidious |
+|---|---|---|---|
+| **Video starts playing** | **0.16 s** `▇▇` | 0.60 s `▇▇▇▇▇▇` | 1.29 s `▇▇▇▇▇▇▇▇▇▇▇▇▇` |
+| **Each piece of the stream** | **0.04–0.07 s** `▇` | 0.15 s `▇▇` | – |
+| **Opening it again** (search, channel, video) | **under 0.03 s** `▏` | the full wait again | the full wait again |
+
+Hovering a video or showing search results already fetches the first few, so a click usually lands on a page that is ready. It still answers in [Invidious](https://invidious.io)' API format, so the web app, the apps' server mode and other tools that speak that API keep working. Up to 1.5 TubeHaus was built on Invidious and [invidious-companion](https://github.com/iv-org/invidious-companion), and much of what it knows about YouTube was learned from them: thank you, Invidious team. Updating from 1.5? See [below](#quick-start-docker).
 
 <div align="center">
 <img src="docs/tour.gif" alt="TubeHaus: Home, a search, a video and its &quot;at a glance&quot; panel" width="860">
@@ -103,7 +103,7 @@ Streams came through about 10% faster too (85 vs 75 Mbit/s). It still answers in
 <td width="50%" valign="top">
 
 **⚡ Instant, and always the best picture**<br>
-Video pages come from a cache that refreshes in the background, and the videos you're likely to open next are looked up before you click. Quality never drops on its own: 60 fps first, the codec your device decodes in hardware, a buffer sized for 8K.
+A video starts in about a sixth of a second, pages you've seen open from a cache that refreshes in the background, and the videos you're likely to open next are looked up before you click. Quality never drops on its own: 60 fps first, the codec your device decodes in hardware, a buffer sized for 8K.
 
 </td>
 <td width="50%" valign="top">

@@ -14,7 +14,7 @@ TV, 폰, PC, 아이패드에서. 내 서버에 돌리거나, 그냥 앱을 깔�
 ![Docker: amd64 | arm64](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white)
 [![Featured in selfh.st Weekly](https://img.shields.io/badge/featured%20in-selfh.st%20weekly-2ea44f)](https://selfh.st/weekly/2026-10-23/)
 
-**[⬇ 앱 받기](#앱-받기)** &nbsp;·&nbsp; **[🖥️ 서버 설치](#빠른-설치-docker)** &nbsp;·&nbsp; **[✨ 1.6 새 기능](#16-새-기능-자체-유튜브-엔진)** &nbsp;·&nbsp; [English](README.md) · **한국어**
+**[⬇ 앱 받기](#앱-받기)** &nbsp;·&nbsp; **[🖥️ 서버 설치](#빠른-설치-docker)** &nbsp;·&nbsp; **[✨ 1.6 새 기능](#16-새-기능-자체-유튜브-엔진-그리고-빠름)** &nbsp;·&nbsp; [English](README.md) · **한국어**
 
 <img src="docs/devices.jpg" alt="Android TV, iPad, Android 폰에서 돌아가는 TubeHaus" width="860">
 
@@ -78,19 +78,19 @@ TV에서 멈추고 폰에서 이어 봐요. 집의 모든 기기와 브라우저
 
 전체 파일, Windows portable, ARM 빌드: **[최신 릴리스](https://github.com/biolend83/tubehaus/releases/latest)**. 플랫폼별 설치 안내와 소스: [`android-app`](https://github.com/biolend83/tubehaus/tree/android-app) · [`windows-app`](https://github.com/biolend83/tubehaus/tree/windows-app) · [`mac-app`](https://github.com/biolend83/tubehaus/tree/mac-app) · [`linux-app`](https://github.com/biolend83/tubehaus/tree/linux-app) · [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). 이 README의 나머지는 서버판 이야기예요.
 
-## 1.6 새 기능: 자체 유튜브 엔진
+## 1.6 새 기능: 자체 유튜브 엔진, 그리고 빠름
 
-서버판이 이제 Invidious 위에서 돌지 않아요. 유튜브에 직접 물어봐서, **컨테이너가 세 개 줄었고**(Invidious, companion, PostgreSQL 없음) 중요한 곳에서 더 빨라요. 같은 서버, 같은 WARP 주소에서 나란히 잰 결과예요(처음 여는 경우):
+서버판이 이제 Invidious 위에서 돌지 않아요. 유튜브에 직접 물어봐서 **컨테이너가 세 개 줄었어요**(Invidious, companion, PostgreSQL 없음). 1.6.3에서는 속도를 올렸어요. 영상은 스트림만 받으면 바로 재생되고 제목·설명·관련 영상은 잠깐 뒤에 채워져요. 받은 답은 보관해 두고 뒤에서 새로 고치고, 유튜브 영상 서버와의 연결은 열어 둔 채 다시 써요.
 
-| 여는 것 | TubeHaus 1.6 | Invidious |
-|---|---|---|
-| 영상 | **0.60초** `▇▇▇▇▇▇` | 1.29초 `▇▇▇▇▇▇▇▇▇▇▇▇▇` |
-| 채널 | **0.27초** `▇▇▇` | 0.66초 `▇▇▇▇▇▇▇` |
-| 채널의 동영상 탭 | **0.21초** `▇▇` | 0.61초 `▇▇▇▇▇▇` |
-| 댓글 | 0.19초 `▇▇` | 0.16초 `▇▇` |
-| 검색 | 0.63초 `▇▇▇▇▇▇` | 0.56초 `▇▇▇▇▇▇` |
+같은 서버, 같은 WARP 주소에서 잰 결과예요(처음 여는 경우, 중앙값):
 
-영상 스트림도 10%쯤 빨랐어요(85 대 75 Mbit/s). 답은 여전히 [Invidious](https://invidious.io) API 모양이라 웹 화면, 앱의 서버 모드, 그 API를 쓰는 다른 도구가 그대로 돌아가요. 1.5까지는 Invidious와 [invidious-companion](https://github.com/iv-org/invidious-companion) 위에서 동작했고, 유튜브에 대해 아는 많은 것을 두 프로젝트에서 배웠어요. Invidious 팀에 감사드려요. 1.5에서 업데이트한다면 [아래](#빠른-설치-docker)를 보세요.
+| | TubeHaus 1.6.3 | TubeHaus 1.6.0 | Invidious |
+|---|---|---|---|
+| **영상 재생 시작** | **0.16초** `▇▇` | 0.60초 `▇▇▇▇▇▇` | 1.29초 `▇▇▇▇▇▇▇▇▇▇▇▇▇` |
+| **스트림 조각 하나** | **0.04~0.07초** `▇` | 0.15초 `▇▇` | – |
+| **다시 열 때** (검색, 채널, 영상) | **0.03초 이하** `▏` | 다시 처음만큼 | 다시 처음만큼 |
+
+영상에 마우스를 올리거나 검색 결과가 뜨면 앞의 몇 개를 미리 받아 둬서, 누르면 대개 이미 준비된 화면이 열려요. 답은 여전히 [Invidious](https://invidious.io) API 모양이라 웹 화면, 앱의 서버 모드, 그 API를 쓰는 다른 도구가 그대로 돌아가요. 1.5까지는 Invidious와 [invidious-companion](https://github.com/iv-org/invidious-companion) 위에서 동작했고, 유튜브에 대해 아는 많은 것을 두 프로젝트에서 배웠어요. Invidious 팀에 감사드려요. 1.5에서 업데이트한다면 [아래](#빠른-설치-docker)를 보세요.
 
 <div align="center">
 <img src="docs/tour.gif" alt="TubeHaus: 첫 화면, 검색, 영상과 &quot;이 영상 한눈에&quot;" width="860">
