@@ -3816,7 +3816,72 @@ def _fields(obj, fields):
     return [pick(o) for o in obj] if isinstance(obj, list) else pick(obj)
 
 
+# Answers kept for a while, so a page seen again (Back, another tab, the next person at home) is there at
+# once instead of after YouTube's half a second. Past its time an answer is still sent straight away and
+# fetched again behind it; past STALE it is fetched first. Videos have their own cache (vid_cache).
+API_TTL = (("/api/v1/search/suggestions", 3600), ("/api/v1/search", 900), ("/api/v1/comments/", 600),
+           ("/api/v1/channels/", 600), ("/api/v1/playlists/", 900), ("/api/v1/mixes/", 1800),
+           ("/api/v1/trending", 1800), ("/api/v1/popular", 1800), ("/api/v1/resolveurl", 86400))
+API_STALE = 6 * 3600
+api_cache = {}            # (path, query, hl, gl) -> (time, status, answer)
+api_busy = {}             # the same key being fetched now -> threading.Event (one request to YouTube, not several)
+api_lk = threading.Lock()
+
+
 def eng_api(path, qs, hl="", gl=""):
+    """eng_api_now, with answers kept for API_TTL (see above)"""
+    p = path.split("?")[0].rstrip("/")
+    ttl = next((t for pre, t in API_TTL if p == pre or p.startswith(pre) and pre.endswith("/")), 0)
+    if not ttl:
+        return eng_api_now(path, qs, hl, gl)
+    key = (p, tuple(sorted((k, str(v)) for k, v in qs.items())), hl, gl)
+    now = time.time()
+    with api_lk:
+        hit = api_cache.get(key)
+        if hit and now - hit[0] < ttl:
+            return hit[1], hit[2]
+        if hit and now - hit[0] < API_STALE:
+            if key not in api_busy:              # sent as it is, fetched again behind it
+                api_busy[key] = threading.Event()
+                threading.Thread(target=_api_refresh, args=(key, path, qs, hl, gl), name="api-refresh", daemon=True).start()
+            return hit[1], hit[2]
+        wait = api_busy.get(key)
+        if not wait:
+            api_busy[key] = threading.Event()
+    if wait:                                     # someone else is asking YouTube for this very thing
+        wait.wait(20)
+        with api_lk:
+            hit = api_cache.get(key)
+        if hit:
+            return hit[1], hit[2]
+        return eng_api_now(path, qs, hl, gl)
+    return _api_refresh(key, path, qs, hl, gl)
+
+
+def _api_refresh(key, path, qs, hl, gl):
+    try:
+        code, obj = eng_api_now(path, qs, hl, gl)
+        if code == 200:
+            with api_lk:
+                api_cache[key] = (time.time(), code, obj)
+                if len(api_cache) > 3000:
+                    for k in sorted(api_cache, key=lambda k: api_cache[k][0])[:600]:
+                        api_cache.pop(k, None)
+            if key[0] == "/api/v1/search" and isinstance(obj, list):
+                # the first results are the likely clicks: their videos are fetched now, as related videos already are
+                ids = [x.get("videoId") for x in obj if isinstance(x, dict) and x.get("type") == "video"][:VID_PREFETCH]
+                if ids:
+                    threading.Thread(target=vid_bg, args=(None, {"recommendedVideos": [{"videoId": v} for v in ids]}),
+                                     name="vid-warm", daemon=True).start()
+        return code, obj
+    finally:
+        with api_lk:
+            ev = api_busy.pop(key, None)
+        if ev:
+            ev.set()
+
+
+def eng_api_now(path, qs, hl="", gl=""):
     """an Invidious API path (/api/v1/...) answered by the engine: (HTTP status, JSON object).
     YouTube's language is ?hl=, else HT_HL, else English (as Invidious: the numbers in its texts read surely)"""
     hl = hl or qs.get("hl") or ENG_HL or "en"

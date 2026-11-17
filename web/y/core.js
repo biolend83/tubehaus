@@ -567,4 +567,19 @@ export function initCardHover() {
     const c = e.target.closest("[data-vid]");
     if (c) prefetch(c.dataset.vid);
   }, { passive: true });
+  // the video is asked for when the mouse rests on its card a moment (anywhere on it, not only the picture),
+  // and at the latest when the button goes down: a click comes about 100 ms after that
+  let restT = 0, restOn = null;
+  document.addEventListener("pointerover", (e) => {
+    if (e.pointerType !== "mouse") return;
+    const c = e.target.closest("[data-vid]");
+    if (!c || c === restOn) return;
+    restOn = c;
+    clearTimeout(restT);
+    restT = setTimeout(() => prefetch(c.dataset.vid), 120);
+  });
+  document.addEventListener("pointerdown", (e) => {
+    const c = e.target.closest("[data-vid]");
+    if (c) prefetch(c.dataset.vid);
+  }, { capture: true, passive: true });
 }
