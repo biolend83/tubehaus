@@ -670,7 +670,7 @@ class Engine(unittest.TestCase):
         fake = {"videoId": "dQw4w9WgXcQ", "formatStreams": [], "adaptiveFormats": [
             {"itag": "140", "url": "https://rr1---sn-x.googlevideo.com/videoplayback?expire=1&itag=140"}]}
         old = ts.eng_video
-        ts.eng_video = lambda vid, hl="", gl="": fake
+        ts.eng_video = lambda vid, hl="", gl="", fast=False: fake
         try:
             code, d = ts.eng_api("/api/v1/videos/dQw4w9WgXcQ", {"local": "true"})
             self.assertEqual(code, 200)
