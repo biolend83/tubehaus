@@ -213,8 +213,27 @@ class MpvPlayer : VideoPlayer {
 
     /** Settings → Read further ahead: 20 minutes and up to 2 GB instead of 5 minutes and 150 MB */
     override fun setReadAhead(long: Boolean) {
+        longAhead = long
         set("cache-secs", if (long) "1200" else "300"); set("demuxer-readahead-secs", if (long) "1200" else "300")
-        set("demuxer-max-bytes", if (long) "2GiB" else "150MiB")
+        memory()
+    }
+
+    @Volatile private var longAhead = false
+    @Volatile private var bufferMb = 0
+    override val memoryLimit get() = true
+
+    /** Settings → Memory for the video (#87): an exact number of MB, three quarters ahead and a quarter behind */
+    override fun setBufferMb(mb: Int) {
+        bufferMb = mb
+        memory()
+    }
+
+    private fun memory() {
+        if (bufferMb > 0) {
+            set("demuxer-max-bytes", "${bufferMb * 3 / 4}MiB"); set("demuxer-max-back-bytes", "${maxOf(bufferMb / 4, 1)}MiB")
+        } else {
+            set("demuxer-max-bytes", if (longAhead) "2GiB" else "150MiB"); set("demuxer-max-back-bytes", "50MiB")
+        }
     }
 
     /** Settings → Sound output (#46): for example ALSA when PipeWire's default doesn't play */
