@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.6.3",
+          "buildVersion": "49",
+          "date": "2026-11-17T07:15:35+00:00",
+          "localizedDescription": "1.6.3: faster video pages, reorder the queue by dragging, the player no longer sits under the status bar.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.6.3/TubeHaus-1.6.3-ipad.ipa",
+          "size": 22002470,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.6.2",
           "buildVersion": "48",
           "date": "2026-11-16T11:09:35+00:00",
@@ -239,11 +248,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.6.2",
-      "versionDate": "2026-11-16T11:09:35+00:00",
-      "versionDescription": "1.6.2: Home works again on iPhone and iPad, typing after a search, a picture-in-picture button, original audio instead of dubs.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.6.2/TubeHaus-1.6.2-ipad.ipa",
-      "size": 21968404
+      "version": "1.6.3",
+      "versionDate": "2026-11-17T07:15:35+00:00",
+      "versionDescription": "1.6.3: faster video pages, reorder the queue by dragging, the player no longer sits under the status bar.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.6.3/TubeHaus-1.6.3-ipad.ipa",
+      "size": 22002470
     }
   ],
   "news": [],
