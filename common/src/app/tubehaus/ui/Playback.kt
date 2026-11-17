@@ -249,7 +249,7 @@ class Playback(private val app: AppState) {
             }
             launch {
                 try {
-                    val d = YouTube.details(v.id)
+                    val d = Infos.get(app.scope, v.id)
                     if (video?.id == v.id) {
                         details = d
                         // a video opened from a link or a notification knows only its id; if it then won't play,
