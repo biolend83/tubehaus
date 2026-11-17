@@ -64,8 +64,8 @@ data class ArtistPage(
  * YouTube Music, without an account and without Premium. Where YouTube keeps Music's songs and
  * charts for Premium (Korea among other countries, November 2026), its albums and artists still
  * answer, and so do YouTube's own radio mixes of a song ("RDAMVM" + id), which are mostly the
- * songs' audio tracks. So: albums and artists from music.youtube.com, songs from YouTube's
- * search, and the radio from YouTube's watch page.
+ * songs' audio tracks. So: albums and artists from music.youtube.com, songs from the matching
+ * albums and YouTube's search, and the radio from YouTube's watch page.
  */
 object Music {
     private const val ARTISTS = "EgWKAQIgAWoQEBAQBRAJEAoQBBAVEA4QEQ%3D%3D"
@@ -76,7 +76,89 @@ object Music {
         val artists = async { runCatching { cards(InnerTube.call("search", mapOf("query" to q, "params" to urlDecode(ARTISTS)), Clients.MUSIC)) }.getOrDefault(emptyList()) }
         val albums = async { runCatching { cards(InnerTube.call("search", mapOf("query" to q, "params" to urlDecode(ALBUMS)), Clients.MUSIC)) }.getOrDefault(emptyList()) }
         val songs = async { songsFor(q) }
-        MusicResults(artists.await().filter { it.kind == "artist" }.take(6), albums.await().filter { it.kind == "album" }.take(12), songs.await())
+        val ar = artists.await().filter { it.kind == "artist" }.take(6)
+        val al = albums.await().filter { it.kind == "album" }.take(12)
+        val vs = songs.await()
+        MusicResults(ar, al, runCatching { albumSongsFirst(q, ar, al, vs) }.getOrDefault(vs))
+    }
+
+    private val KEEP = Regex("""(?i)live|cover|remix|acoustic|\bver\b|ver\.|version|perform|stage|practice|dance|sped|slowed|\binst|karaoke|""" +
+        "piano|concert|fancam|teaser|relay|mashup|nightcore|medley|full album|playlist|커버|라이브|무대|직캠|교차|리믹스|연습")
+    private val BRACKETS = Regex("""\(.*?\)|\[.*?]|（.*?）|【.*?】""")
+    private val WORDS = Regex("(?i)official|music video|m/?v|lyrics?( video)?|audio|visualizer|performance video|live clip")
+    private val IN_PARENS = Regex("[(（]([^()（）]+)[)）]")
+
+    /** letters and digits only, lower case, without what's in brackets: "Blueming (Official MV)" -> "blueming" */
+    private fun norm(s: String, keepBrackets: Boolean = false): String =
+        (if (keepBrackets) s else s.replace(BRACKETS, " ")).lowercase().filter { it.isLetterOrDigit() }
+
+    /** ([titles], [artists]) a video's title stands for: "[MV] IU(아이유) _ Blueming(블루밍)" */
+    private fun parts(title: String, channel: String): Pair<List<String>, List<String>> {
+        var t = title.replace(Regex("""\[.*?]|【.*?】"""), " ").trim()
+        val arts = mutableListOf(channel.removeSuffix(" - Topic").removeSuffix("VEVO").removeSuffix(" Official"))
+        val q = Regex("['‘\"“](.+?)['’\"”]").find(t)
+        if (q != null) {
+            t.substring(0, q.range.first).trim().takeIf { it.isNotEmpty() }?.let { arts += it }
+            t = q.groupValues[1]
+        } else Regex("""^(.+?)\s+[-_–]\s+(.+)$""").find(t)?.let { arts += it.groupValues[1]; t = it.groupValues[2] }
+        t = t.replace(WORDS, " ")
+        val titles = listOf(t.replace(BRACKETS, " ")) + IN_PARENS.findAll(t).map { it.groupValues[1] }
+        return titles to arts
+    }
+
+    /**
+     * Songs as they are on their albums (the plain recording; YouTube Music's own Songs shelf is Premium-only
+     * in some countries), then the videos that aren't just another upload of one of them (music video, lyrics,
+     * TV stage), other versions (live, covers) last. YouTube's video search alone is mostly music videos.
+     */
+    private suspend fun albumSongsFirst(q: String, artists: List<MusicCard>, albums: List<MusicCard>, videos: List<Song>): List<Song> = coroutineScope {
+        val nq = norm(q)
+        val want = mutableSetOf(nq)
+        val by = mutableSetOf<String>()
+        val tops = videos.take(6).filter { !KEEP.containsMatchIn(it.title) }
+        for (v in tops) {
+            val (ts, ars) = parts(v.title, v.artist)
+            ts.forEach { want += norm(it) }
+            (ars + IN_PARENS.findAll(v.title + " " + v.artist).map { it.groupValues[1] }).forEach { by += norm(it) }
+        }
+        want.removeAll { it.length < 2 }
+        by.removeAll { it.length < 2 }
+        // the album is by the artist searched for, not a karaoke or tribute single named after the song ("EP • IU • 2019")
+        fun ours(a: MusicCard): Boolean {
+            val ps = a.subtitle.split("•").map { it.trim() }
+            return (if (ps.size > 2) ps.subList(1, ps.size - 1) else ps).any { p ->
+                val x = norm(p)
+                x.isNotEmpty() && (x in nq || by.any { y -> x == y || (minOf(x.length, y.length) >= 4 && (x in y || y in x)) })
+            }
+        }
+        val opened = albums.filter(::ours).take(3).map { a -> async { runCatching { album(a.id).songs }.getOrDefault(emptyList()) } }.map { it.await() }
+        val found = mutableListOf<Song>()
+        val seen = mutableSetOf<String>()
+        // a song's names: "Good day (좋은 날)" is "goodday" and "좋은날" (YouTube Music shows either, by language)
+        fun names(t: String) = (listOf(norm(t)) + IN_PARENS.findAll(t).map { norm(it.groupValues[1]) }).filter { it.length >= 2 }
+        val versionWanted = KEEP.containsMatchIn(q)
+        fun take(s: Song) {
+            val ns = names(s.title)
+            // not a remix or live take unless asked for, not the song named like the artist ("New Jeans" for "뉴진스 hype boy")
+            if (ns.isEmpty() || ns.any { it in seen } || (!versionWanted && KEEP.containsMatchIn(s.title)) || (nq !in ns && norm(s.artist) in ns)) return
+            seen += ns; found += s
+        }
+        opened.forEach { l -> l.forEach { if (names(it.title).any { n -> n in want }) take(it) } }
+        opened.forEach { l -> l.forEach { if (names(it.title).any { n -> n.length >= 3 && n in nq }) take(it) } }   // "아이유 좋은날" -> "좋은 날"
+        // not on those albums (a single the search didn't list): the albums of "<song> <artist>", as the top video names them
+        if (found.isEmpty()) for (v in tops.take(2)) {
+            val (ts, ars) = parts(v.title, v.artist)
+            val more = runCatching { cards(InnerTube.call("search", mapOf("query" to "${ts.first().trim()} ${ars.last().trim()}", "params" to urlDecode(ALBUMS)), Clients.MUSIC)) }
+                .getOrDefault(emptyList()).filter { it.kind == "album" && ours(it) }.take(3)
+            more.map { a -> async { runCatching { album(a.id).songs }.getOrDefault(emptyList()) } }.forEach { d ->
+                d.await().forEach { if (names(it.title).any { n -> n in want }) take(it) }
+            }
+            if (found.isNotEmpty()) break
+        }
+        if (found.isEmpty() && artists.any { norm(it.title) == nq }) opened.forEach { l -> l.take(4).forEach(::take) }  // just a name
+        if (found.isEmpty()) return@coroutineScope videos
+        val same = { v: Song -> val f = norm(v.title, keepBrackets = true); seen.any { it.length >= 3 && it in f } }
+        found + videos.filter { !same(it) && !KEEP.containsMatchIn(it.title) } + videos.filter { KEEP.containsMatchIn(it.title) }
     }
 
     /** YouTube's videos for [q] that look like songs: not live, not Shorts, a song's length */
