@@ -1104,7 +1104,7 @@ fun Modifier.warmOnPress(app: AppState, v: Video): Modifier {
                 }
                 @Suppress("UNREACHABLE_CODE") false
             } ?: true
-            if (still && !app.platform.metered()) Streams.prefetch(app.scope, v.id)
+            if (still && !app.platform.metered()) { Streams.prefetch(app.scope, v.id); Infos.prefetch(app.scope, v.id) }
         }
     }
 }
