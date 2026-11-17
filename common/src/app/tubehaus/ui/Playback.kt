@@ -249,7 +249,7 @@ class Playback(private val app: AppState) {
             }
             launch {
                 try {
-                    val d = YouTube.details(v.id)
+                    val d = Infos.get(app.scope, v.id)
                     if (video?.id == v.id) {
                         details = d
                         // a video opened from a link or a notification knows only its id; if it then won't play,
@@ -517,6 +517,14 @@ class Playback(private val app: AppState) {
         if (video == null || music) { app.watch(v); return }
         val mine = if (ownQueue) queue else emptyList()
         queue = if (mine.any { it.id == v.id }) mine else mine + v
+        ownQueue = true
+    }
+
+    /** the queue reordered by hand (#85): dragged by its handle, or Move up / Move down */
+    fun moveInQueue(v: Video, to: Int) {
+        val rest = queue.filter { it.id != v.id }
+        if (rest.size == queue.size) return
+        queue = rest.take(to.coerceIn(0, rest.size)) + v + rest.drop(to.coerceIn(0, rest.size))
         ownQueue = true
     }
 

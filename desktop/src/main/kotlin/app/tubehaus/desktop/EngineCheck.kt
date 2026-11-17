@@ -16,6 +16,7 @@ import okhttp3.Request
 
 /** `./gradlew :desktop:engineCheck` - runs every engine call against YouTube and prints what came back. */
 fun main() = runBlocking {
+    app.tubehaus.engine.Remote.githubToken = System.getenv("TH_GITHUB_TOKEN")?.takeIf { it.isNotBlank() }
     // TH_SOCKS=127.0.0.1:40000: every request through that SOCKS proxy (the daily CI check goes out through WARP)
     System.getenv("TH_SOCKS")?.split(':')?.let { (h, p) -> System.setProperty("socksProxyHost", h); System.setProperty("socksProxyPort", p) }
     val failed = ArrayList<String>()
