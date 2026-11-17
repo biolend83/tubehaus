@@ -29,6 +29,9 @@ interface Platform {
     val airplay: (@Composable (Modifier) -> Unit)? get() = null
     /** the player's button that moves the video into a small window over other apps (Android phones, iPhone and iPad) */
     val canPip: Boolean get() = false
+    /** Android 12+: the system page where YouTube's addresses are switched on for this app ("Open by default") */
+    val linkSettings: Boolean get() = false
+    fun openLinkSettings() {}
     fun startPip() {}
 
     /** a share sheet where there is one; false when the link was copied to the clipboard instead */

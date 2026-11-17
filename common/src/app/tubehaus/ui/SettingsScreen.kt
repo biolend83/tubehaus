@@ -547,6 +547,9 @@ private fun SettingsRows(
         }
         // ------------------------------------------------------------------ integrations
         r.group("integrations", "SponsorBlock")
+        if (app.platform.linkSettings) r.row("integrations", tr("Open YouTube links in TubeHaus") + " links youtube open") {
+            SItem(tr("Open YouTube links in TubeHaus"), tr("Android asks for this once: under \"Open by default\", turn on the YouTube addresses")) { app.platform.openLinkSettings() }
+        }
         r.row("integrations", "SponsorBlock sponsor skip") {
             Column {
                 Toggle("SponsorBlock", tr("Skips sponsors and other parts people marked inside videos (sponsor.ajay.app). Only 4 characters of a hash are sent, not the video"), s.sponsor) { b -> set { it.copy(sponsor = b) } }

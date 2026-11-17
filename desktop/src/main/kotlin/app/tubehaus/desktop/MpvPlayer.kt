@@ -131,9 +131,10 @@ class MpvPlayer : VideoPlayer {
             if (o("hwdec", "auto-copy-safe") < 0) o("hwdec", "auto-copy")   // GPU decoding, frames copied back for us
             o("idle", "yes"); o("keep-open", "no"); o("ytdl", "no")
             o("input-default-bindings", "no"); o("input-vo-keyboard", "no"); o("osc", "no")
-            // read far ahead (5 minutes, up to 500 MB) and keep the last part for seeking back
+            // read ahead (5 minutes, up to 150 MB, mpv's own limit) and keep the last 50 MB for seeking back.
+            // It was 500 + 100 MB: all of it sits in memory, and the app took 1.5 GB on a long video (#87)
             o("cache", "yes"); o("cache-secs", "300"); o("demuxer-readahead-secs", "300")
-            o("demuxer-max-bytes", "500MiB"); o("demuxer-max-back-bytes", "100MiB")
+            o("demuxer-max-bytes", "150MiB"); o("demuxer-max-back-bytes", "50MiB")
             o("sub-auto", "no"); o("sub-font-size", "42"); o("sub-margin-y", "40")
             // captions as on YouTube: white on a see-through black box behind each line (mpv 0.38+; before that, an outline)
             if (o("sub-border-style", "opaque-box") >= 0) { o("sub-border-color", "#BF080808"); o("sub-border-size", "6"); o("sub-shadow-offset", "0") }
@@ -210,10 +211,10 @@ class MpvPlayer : VideoPlayer {
         lib!!.mpv_command(p, arrayOf(*a, null))
     }
 
-    /** Settings → Read further ahead: 20 minutes and up to 2 GB instead of 5 minutes and 500 MB */
+    /** Settings → Read further ahead: 20 minutes and up to 2 GB instead of 5 minutes and 150 MB */
     override fun setReadAhead(long: Boolean) {
         set("cache-secs", if (long) "1200" else "300"); set("demuxer-readahead-secs", if (long) "1200" else "300")
-        set("demuxer-max-bytes", if (long) "2GiB" else "500MiB")
+        set("demuxer-max-bytes", if (long) "2GiB" else "150MiB")
     }
 
     /** Settings → Sound output (#46): for example ALSA when PipeWire's default doesn't play */

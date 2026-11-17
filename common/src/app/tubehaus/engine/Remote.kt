@@ -15,6 +15,11 @@ import kotlin.concurrent.Volatile
 object Remote {
     private const val CLIENTS_URL = "https://raw.githubusercontent.com/biolend83/tubehaus/android-app/clients.json"
     private const val RELEASES_URL = "https://api.github.com/repos/biolend83/tubehaus/releases?per_page=30"
+    /** the daily engine check sends its CI token: without one GitHub allows 60 requests an hour per address,
+     *  and WARP's shared addresses run out of them */
+    var githubToken: String? = null
+    private fun ghHeaders() = mapOf("Accept" to "application/vnd.github+json") +
+        (githubToken?.let { mapOf("Authorization" to "Bearer $it") } ?: emptyMap())
     const val DAY = 86_400_000L
 
     /** where the last good client list is kept; set by the app */
@@ -61,7 +66,7 @@ object Remote {
 
     /** the releases of [tag]'s line on GitHub, newest first, with what each one changed; null when GitHub can't be reached */
     suspend fun releaseNotes(tag: String = "app-v"): List<Notes>? {
-        val text = runCatching { Net.get(RELEASES_URL, mapOf("Accept" to "application/vnd.github+json")) }.getOrNull() ?: return null
+        val text = runCatching { Net.get(RELEASES_URL, ghHeaders()) }.getOrNull() ?: return null
         val list = runCatching { parse(text).arr }.getOrNull() ?: return null
         return list.filter { it.at("draft").bool.not() && it.at("tag_name").str?.startsWith(tag) == true }
             .map { Notes(it.at("tag_name").str!!.removePrefix(tag), whatsNew(it.at("body").str ?: "")) }
@@ -117,7 +122,7 @@ object Remote {
 
     /** the same, with [pick] choosing the file by its name */
     suspend fun newerReleaseWhere(tag: String, current: String, pick: ((String) -> Boolean)?): Release? {
-        val text = runCatching { Net.get(RELEASES_URL, mapOf("Accept" to "application/vnd.github+json")) }.getOrNull() ?: return null
+        val text = runCatching { Net.get(RELEASES_URL, ghHeaders()) }.getOrNull() ?: return null
         val best = runCatching { parse(text).arr }.getOrNull().orEmpty()
             .filter { it.at("draft").bool.not() && it.at("tag_name").str?.startsWith(tag) == true }
             .maxByOrNull { version(it.at("tag_name").str!!.removePrefix(tag)) }
