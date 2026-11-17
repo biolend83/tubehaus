@@ -3978,7 +3978,108 @@ def gv_open(url, rng=None, timeout=60):
     h = {"User-Agent": VIS_UA, "Origin": "https://www.youtube.com", "Referer": "https://www.youtube.com/"}
     if rng:
         h["Range"] = rng
-    return YT.open(urllib.request.Request(url, headers=h), timeout=timeout)
+    return gv_fetch(url, h, timeout)
+
+
+_gv_idle = {}                 # host -> [(when, connection)]: kept-open tunnels to googlevideo.com servers
+_gv_lk = threading.Lock()
+GV_KEEP, GV_IDLE_S = 6, 50    # per host; YouTube drops an idle connection after about a minute
+
+
+def _gv_conn(host, timeout):
+    now = time.time()
+    with _gv_lk:
+        kept = _gv_idle.get(host) or []
+        while kept:
+            at, c = kept.pop()
+            if now - at < GV_IDLE_S and c.sock:
+                c.timeout = timeout
+                c.sock.settimeout(timeout)
+                return c, True
+            c.close()
+    if YT_PROXY:
+        ph, _, pp = YT_PROXY.rpartition(":")
+        c = http.client.HTTPSConnection(ph, int(pp), timeout=timeout)
+        c.set_tunnel(host, 443)
+    else:
+        c = http.client.HTTPSConnection(host, 443, timeout=timeout)
+    return c, False
+
+
+def _gv_keep(host, c):
+    with _gv_lk:
+        kept = _gv_idle.setdefault(host, [])
+        if len(kept) < GV_KEEP:
+            kept.append((time.time(), c))
+            return
+    c.close()
+
+
+class _GvResp:
+    """an answer on a kept-open connection; the connection goes back to the pool once the body is read to its end,
+    and is closed if the reader stops early"""
+    def __init__(self, url, host, c, r):
+        self.url, self.host, self.c, self.r = url, host, c, r
+        self.status = self.code = r.status
+        self.headers = r.headers
+        self.done = False
+
+    def read(self, n=-1):
+        try:
+            data = self.r.read() if n is None or n < 0 else self.r.read(n)
+        except Exception:
+            self.close()
+            raise
+        if self.r.isclosed() and not self.done:
+            self.done = True
+            if self.r.will_close:
+                self.c.close()
+            else:
+                _gv_keep(self.host, self.c)
+        return data
+
+    def geturl(self):
+        return self.url
+
+    def close(self):
+        if not self.done:
+            self.done = True
+            self.c.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        self.close()
+
+
+def gv_fetch(url, headers, timeout=60):
+    """GET a googlevideo.com stream on a kept-open tunnel (a new one costs ~150 ms of CONNECT + TLS through WARP,
+    a kept one ~35 ms); redirects and anything odd go the old way. HTTPError like urllib for 4xx/5xx."""
+    u = urllib.parse.urlsplit(url)
+    host = u.hostname or ""
+    if u.scheme != "https" or not host.endswith(".googlevideo.com"):
+        return YT.open(urllib.request.Request(url, headers=headers), timeout=timeout)
+    path = u.path + ("?" + u.query if u.query else "")
+    for attempt in range(2):
+        c, reused = _gv_conn(host, timeout)
+        try:
+            c.request("GET", path, headers=headers)
+            r = c.getresponse()
+        except (http.client.HTTPException, OSError):
+            c.close()
+            if reused and attempt == 0:
+                continue
+            raise
+        if 300 <= r.status < 400:
+            c.close()
+            return YT.open(urllib.request.Request(url, headers=headers), timeout=timeout)
+        resp = _GvResp(url, host, c, r)
+        if r.status >= 400:
+            body = resp.read()
+            raise urllib.error.HTTPError(url, r.status, r.reason, r.headers, __import__("io").BytesIO(body))
+        return resp
+    raise OSError("no connection")
 
 
 def eng_format_url(vid, itag):
@@ -6269,6 +6370,7 @@ class H(BaseHTTPRequestHandler):
                 try:
                     self.wfile.write(chunk)
                 except Exception:
+                    getattr(resp, "close", lambda: None)()
                     return          # client went away mid-download
                 sent += len(chunk)
                 continue
@@ -6281,7 +6383,7 @@ class H(BaseHTTPRequestHandler):
                     r2.add_header(k, v)
             r2.add_header("Range", "bytes=%d-" % sent)
             try:
-                resp = YT.open(r2, timeout=120)
+                resp = gv_fetch(r2.full_url, dict(r2.header_items()), 120)
             except Exception as ex:
                 log("stream", "resume FAIL %dB %s" % (sent, repr(ex)[:60]), t0)
                 break
@@ -6325,7 +6427,7 @@ class H(BaseHTTPRequestHandler):
         req = urllib.request.Request(url, headers=h)
         t0 = time.time()
         try:
-            r = YT.open(req, timeout=60)
+            r = gv_fetch(url, h, 60)
         except urllib.error.HTTPError as e:
             log("stream", "%d %s" % (e.code, url.split("?")[0][:60]), t0)
             return self.send(e.code, {"error": "YouTube answered %d for the stream" % e.code})
