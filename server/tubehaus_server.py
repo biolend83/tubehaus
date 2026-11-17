@@ -6479,6 +6479,11 @@ class H(BaseHTTPRequestHandler):
                 log("videos", "parse FAIL %d %s" % (code, repr(ex)[:100]), t0)
             if VID_PREFETCH and isinstance(d, dict) and d.get("recommendedVideos"):
                 threading.Thread(target=vid_bg, args=(None, d), name="vid-warm", daemon=True).start()
+            m = re.match(r"/api/v1/videos/([\w-]{11})", key)
+            if m and code == 200:
+                # the comments are YouTube's slowest answer (~0.8 s): asked for now, they're ready when the page scrolls there
+                threading.Thread(target=eng_api, args=("/api/v1/comments/" + m.group(1), {"sort_by": "top"}),
+                                 name="comments-warm", daemon=True).start()
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", "*")
