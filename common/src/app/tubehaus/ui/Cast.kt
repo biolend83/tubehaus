@@ -92,6 +92,8 @@ class SwitchPlayer(val local: VideoPlayer, scope: CoroutineScope) : VideoPlayer 
     override fun setAudioTrack(lang: String) = p.setAudioTrack(lang)
     override fun setLoop(on: Boolean) = p.setLoop(on)
     override fun setReadAhead(long: Boolean) = local.setReadAhead(long)
+    override val memoryLimit get() = local.memoryLimit
+    override fun setBufferMb(mb: Int) = local.setBufferMb(mb)
     override fun setCaptionStyle(size: Int, bg: Int, pos: Int) = local.setCaptionStyle(size, bg, pos)
     override fun audioDevices() = local.audioDevices()
     override fun setAudioDevice(name: String) = local.setAudioDevice(name)

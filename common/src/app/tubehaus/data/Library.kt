@@ -141,6 +141,8 @@ data class Settings(
     val tapToPause: Boolean = false,
     /** read about 20 minutes ahead instead of 5 (more memory) */
     val longBuffer: Boolean = false,
+    /** the desktop player's memory for the video in MB, ahead and behind together; 0 = automatic */
+    val bufferMb: Int = 0,
     /** what the panel beside the video shows first on wide screens: "next" or "comments" */
     val sideTab: String = "next",
     /** phones: the search box at the bottom, within reach of a thumb */

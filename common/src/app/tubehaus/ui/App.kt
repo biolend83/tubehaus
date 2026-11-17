@@ -200,7 +200,7 @@ fun App(app: AppState) {
                         while (true) { app.checkForUpdates(); kotlinx.coroutines.delay(3_600_000) }
                     }
                     LaunchedEffect(settings.hideBars) { app.platform.setImmersive(settings.hideBars) }
-                    LaunchedEffect(settings.longBuffer) { app.player.setReadAhead(settings.longBuffer) }
+                    LaunchedEffect(settings.longBuffer, settings.bufferMb) { app.player.setReadAhead(settings.longBuffer); app.player.setBufferMb(settings.bufferMb) }
                     LaunchedEffect(settings.captionSize, settings.captionBg, settings.captionPos) {
                         app.player.setCaptionStyle(settings.captionSize, settings.captionBg, settings.captionPos)
                     }
