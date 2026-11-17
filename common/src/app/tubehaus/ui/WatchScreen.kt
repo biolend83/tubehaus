@@ -63,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
@@ -687,7 +688,30 @@ private fun LazyListScope.related(app: AppState, big: Boolean, thumb: Dp = 200.d
     if (queue.isNotEmpty()) {
         item { SectionTitle(tr("Up next")) }
         items(queue, key = { "q" + it.id }) { v ->
-            VideoRow(v, app, extra = listOf(tr("Remove from queue") to { pb.unqueue(v) }), thumbWidth = minOf(thumb, 168.dp)) { pb.open(v, queue.dropWhile { it.id != v.id }.drop(1)); app.stack[app.stack.size - 1] = Screen.Watch(v.id) }
+            // the handle at the end drags a video to another place in the queue (#85); the menu moves it one step
+            val at = queue.indexOfFirst { it.id == v.id }
+            var dy by remember(v.id) { mutableStateOf(0f) }
+            var rowH by remember { mutableStateOf(1) }
+            Row(
+                Modifier.fillMaxWidth().onSizeChanged { rowH = it.height.coerceAtLeast(1) }
+                    .zIndex(if (dy != 0f) 1f else 0f).graphicsLayer { translationY = dy },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.weight(1f)) {
+                    VideoRow(v, app, extra = listOfNotNull(
+                        (tr("Move up") to { pb.moveInQueue(v, at - 1) }).takeIf { at > 0 },
+                        (tr("Move down") to { pb.moveInQueue(v, at + 1) }).takeIf { at < queue.lastIndex },
+                        tr("Remove from queue") to { pb.unqueue(v) },
+                    ), thumbWidth = minOf(thumb, 168.dp)) { pb.open(v, queue.dropWhile { it.id != v.id }.drop(1)); app.stack[app.stack.size - 1] = Screen.Watch(v.id) }
+                }
+                if (queue.size > 1) Icon(Sym.DragHandle.outline, tr("Move up") + " / " + tr("Move down"), tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(44.dp).padding(10.dp).pointerInput(v.id, at, queue.size) {
+                        detectVerticalDragGestures(
+                            onDragEnd = { val to = at + kotlin.math.round(dy / rowH).toInt(); dy = 0f; if (to != at) pb.moveInQueue(v, to) },
+                            onDragCancel = { dy = 0f },
+                        ) { ch, d -> ch.consume(); dy += d }
+                    })
+            }
         }
     }
     if (app.store.settings.value.hideRelated) return
