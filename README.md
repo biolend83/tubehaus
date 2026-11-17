@@ -541,11 +541,15 @@ People who made TubeHaus better, with code, translations, testing or ideas:
 - <img src="https://github.com/karimabousleiman.png?size=48" width="24" height="24" alt=""> [@karimabousleiman](https://github.com/karimabousleiman): ended live stream recordings failing in the web player (#86)
 - <img src="https://github.com/arcastro.png?size=48" width="24" height="24" alt=""> [@arcastro](https://github.com/arcastro): opening YouTube links in TubeHaus (#88)
 
-**Testing the apps** (on [r/DigitalEscapeTools](https://www.reddit.com/r/DigitalEscapeTools/))
+**Testing and feedback on Reddit** (mostly [r/DigitalEscapeTools](https://www.reddit.com/r/DigitalEscapeTools/))
 - [u/Proper_Witness9173](https://www.reddit.com/user/Proper_Witness9173/): brightness and volume swipes, the tablet layout, comments beside the video, picture-in-picture and most of 0.3.8
 - [u/DryYam2258](https://www.reddit.com/user/DryYam2258/): the first Mac tester; asked for text size, removing subscriptions and channel pictures, and suggested subscription groups
 - [u/Gloomy_Acadia_445](https://www.reddit.com/user/Gloomy_Acadia_445/): asked for Linux, which led to the .deb, .rpm and tar.gz builds
 - [u/Victor_Orbis35](https://www.reddit.com/user/Victor_Orbis35/): reported "mpv is missing" on Windows, which turned out to be a missing Vulkan runtime (fixed in 0.3.5)
+- [u/ValerieAnne84](https://www.reddit.com/user/ValerieAnne84/): crashes and D-pad trouble on Android TV (onn 4K Pro)
+- [u/Low-Term5893](https://www.reddit.com/user/Low-Term5893/): testing on an Android smart TV
+- [u/Training_Constant_84](https://www.reddit.com/user/Training_Constant_84/): ran the Docker server and on Kubernetes behind Authentik, and reported downloads in the wrong audio language
+- [u/human-rights-4-all](https://www.reddit.com/user/human-rights-4-all/): asked for Invidious to be credited up front, which it now is
 
 Opened a useful issue, sent a pull request or tested an app? You belong here too.
 

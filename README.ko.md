@@ -411,11 +411,15 @@ WARP, 유튜브 연결, 검색, 실제 영상 조회(스트림 몇 바이트까�
 - <img src="https://github.com/karimabousleiman.png?size=48" width="24" height="24" alt=""> [@karimabousleiman](https://github.com/karimabousleiman): 끝난 라이브 다시보기가 웹 플레이어에서 안 나오는 문제 (#86)
 - <img src="https://github.com/arcastro.png?size=48" width="24" height="24" alt=""> [@arcastro](https://github.com/arcastro): 유튜브 링크를 TubeHaus로 열기 (#88)
 
-**앱 테스트** ([r/DigitalEscapeTools](https://www.reddit.com/r/DigitalEscapeTools/))
+**Reddit에서 테스트와 의견** (주로 [r/DigitalEscapeTools](https://www.reddit.com/r/DigitalEscapeTools/))
 - [u/Proper_Witness9173](https://www.reddit.com/user/Proper_Witness9173/): 밝기·볼륨 제스처, 태블릿 화면, 영상 옆 댓글, PiP 등 0.3.8의 대부분
 - [u/DryYam2258](https://www.reddit.com/user/DryYam2258/): 첫 Mac 테스터. 글자 크기, 구독 지우기, 채널 사진 요청과 구독 그룹 제안
 - [u/Gloomy_Acadia_445](https://www.reddit.com/user/Gloomy_Acadia_445/): 리눅스 요청으로 .deb, .rpm, tar.gz가 생겼어요
 - [u/Victor_Orbis35](https://www.reddit.com/user/Victor_Orbis35/): Windows "mpv is missing" 제보. 원인은 빠진 Vulkan 런타임이었어요 (0.3.5에서 수정)
+- [u/ValerieAnne84](https://www.reddit.com/user/ValerieAnne84/): 안드로이드 TV(onn 4K Pro)에서 충돌과 리모컨 방향키 문제 제보
+- [u/Low-Term5893](https://www.reddit.com/user/Low-Term5893/): 안드로이드 스마트 TV에서 테스트
+- [u/Training_Constant_84](https://www.reddit.com/user/Training_Constant_84/): Docker 서버와 Authentik 뒤 쿠버네티스에서 실행해 보고, 내려받은 영상의 음성 언어가 다른 문제 제보
+- [u/human-rights-4-all](https://www.reddit.com/user/human-rights-4-all/): Invidious 출처를 앞에 밝히자고 제안 (지금은 그렇게 돼 있어요)
 
 유용한 이슈를 열었거나, PR을 보냈거나, 앱을 테스트해 주셨나요? 여기에 함께 올려 드릴게요.
 
