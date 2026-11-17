@@ -540,6 +540,14 @@ class Playback(private val app: AppState) {
         ownQueue = true
     }
 
+    /** the queue reordered by hand (#85): dragged by its handle, or Move up / Move down */
+    fun moveInQueue(v: Video, to: Int) {
+        val rest = queue.filter { it.id != v.id }
+        if (rest.size == queue.size) return
+        queue = rest.take(to.coerceIn(0, rest.size)) + v + rest.drop(to.coerceIn(0, rest.size))
+        ownQueue = true
+    }
+
     fun unqueue(v: Video) {
         queue = queue.filter { it.id != v.id }
         if (queue.isEmpty()) ownQueue = false
