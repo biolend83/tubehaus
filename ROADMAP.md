@@ -5,7 +5,6 @@ What's planned and where help is welcome. Plans, not promises: priorities change
 
 ## Next
 
-- **A TubeHaus icon of its own.** The current one is a red play button that looks too much like YouTube's
 - **Better search**
 - **Translation review by native speakers** for the machine-assisted languages ([#5](https://github.com/biolend83/tubehaus/issues/5))
 - **Smoother public instances**: lighter on the server under a crowd, clearer messages when it's full
