@@ -1199,5 +1199,42 @@ class TitleTranslation(unittest.TestCase):
         self.assertTrue(ts.personal("/api/p/yt/tr"))            # other web sites can't use it as a translator
 
 
+class MusicSongsFromAlbums(unittest.TestCase):
+    """Music search: a song's album recording first, the music videos and lyric uploads of it left out."""
+
+    def setUp(self):
+        self.albums = {
+            "MPREb_lovepoem": {"songs": [ts._m_song("aaaaaaaaaaa", "Blueming", "IU", album="Love poem", album_id="MPREb_lovepoem"),
+                                         ts._m_song("bbbbbbbbbbb", "Love poem", "IU", album="Love poem", album_id="MPREb_lovepoem")]},
+            "MPREb_karaoke": {"songs": [ts._m_song("ccccccccccc", "Blueming", "Karaoke Kings", album="Hits", album_id="MPREb_karaoke")]},
+        }
+        self._album, self._song_of = ts._album_cached, ts.music_song_of
+        ts._album_cached = lambda bid, hl, region: self.albums[bid]
+        ts.music_song_of = lambda *a: {}
+
+    def tearDown(self):
+        ts._album_cached, ts.music_song_of = self._album, self._song_of
+
+    def test_album_track_first_and_its_videos_dropped(self):
+        videos = [ts._m_song("v0000000001", "[MV] IU(아이유) _ Blueming(블루밍)", "1theK (원더케이)"),
+                  ts._m_song("v0000000002", "IU Blueming Lyrics (아이유 블루밍 가사)", "Lemoring"),
+                  ts._m_song("v0000000003", "[IU] Blueming Live Clip (2019 IU Tour Concert)", "이지금 [IU Official]"),
+                  ts._m_song("v0000000004", "Through the Night(밤편지)", "이지금 [IU Official]")]
+        albums = [{"id": "MPREb_karaoke", "sub": "Single • Karaoke Kings • 2020", "kind": "album"},
+                  {"id": "MPREb_lovepoem", "sub": "EP • IU • 2019", "kind": "album"}]
+        out = ts.music_songs_first_from_albums("아이유 블루밍", [], albums, videos, "ko", "KR")
+        self.assertEqual(out[0]["id"], "aaaaaaaaaaa")                  # IU's own recording, not the karaoke album
+        ids = [s["id"] for s in out]
+        self.assertNotIn("ccccccccccc", ids)
+        self.assertNotIn("v0000000001", ids)                          # the music video of the same song
+        self.assertNotIn("v0000000002", ids)                          # a lyric upload of it
+        self.assertEqual(ids[-1], "v0000000003")                      # a live version: kept, last
+        self.assertIn("v0000000004", ids)                             # another song stays
+
+    def test_nothing_found_keeps_the_videos(self):
+        videos = [ts._m_song("v0000000009", "Some vlog", "Someone")]
+        self.assertEqual(ts.music_songs_first_from_albums("abc xyz", [], [], videos, "en", "US"), videos)
+
+
 if __name__ == "__main__":
     unittest.main()

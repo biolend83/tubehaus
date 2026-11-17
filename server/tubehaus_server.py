@@ -4236,8 +4236,86 @@ def music_search(q, hl, region):
         b = ex.submit(safe, lambda: _m_cards(yt_call("search", {"query": q, "params": M_ALBUMS}, music=True, hl=hl, region=region)))
         s = ex.submit(safe, lambda: music_songs_for(q, hl, region))
         artists, albums, songs = a.result(), b.result(), s.result()
-    return {"artists": [x for x in artists if x["kind"] == "artist"][:6], "albums": [x for x in albums if x["kind"] == "album"][:12],
-            "songs": songs}
+    artists = [x for x in artists if x["kind"] == "artist"][:6]
+    albums = [x for x in albums if x["kind"] == "album"][:12]
+    try:
+        songs = music_songs_first_from_albums(q, artists, albums, songs, hl, region)
+    except Exception as ex:
+        log("music", f"album songs FAIL {repr(ex)[:100]}")
+    return {"artists": artists, "albums": albums, "songs": songs}
+
+
+def music_songs_first_from_albums(q, artists, albums, videos, hl, region):
+    """Songs as they are on their albums (the plain recording, like YouTube Music's Songs, which is a Premium
+    shelf in some countries), then the videos that are not just another upload of one of those songs.
+    YouTube's video search alone is mostly music videos, lyric uploads, TV stages and live clips."""
+    from concurrent.futures import ThreadPoolExecutor
+    nq = _norm_t(q)
+    # what the search means: its own words, and the songs and artists of the top videos ("[MV] IU(아이유) _ Blueming")
+    want, by = {nq}, set()
+    tops = [v for v in videos[:6] if not SONG_KEEP.search(v["title"])]
+    for v in tops:
+        titles, arts = _song_parts(v["title"], v["artist"])
+        want.update(_norm_t(t) for t in titles)
+        by.update(_norm_t(x) for x in arts + re.findall(r"[(（]([^()（）]+)[)）]", v["title"] + " " + v["artist"]))
+    want = {w for w in want if len(w) >= 2}
+    by = {x for x in by if len(x) >= 2}
+
+    def ours(a):
+        """the album is by the artist searched for, not a cover, karaoke or tribute single named after the song"""
+        parts = [p.strip() for p in (a.get("sub") or "").split("•")]
+        for p in parts[1:-1] or parts:
+            x = _norm_t(p)
+            if x and (x in nq or any(x == y or (min(len(x), len(y)) >= 4 and (x in y or y in x)) for y in by)):
+                return True
+        return False
+
+    def album(a):
+        try:
+            return _album_cached(a["id"], hl, region)
+        except Exception:
+            return {}
+    mine = [a for a in albums if ours(a)][:3]
+    with ThreadPoolExecutor(3) as ex:
+        opened = list(ex.map(album, mine))
+    found, seen = [], set()
+
+    def take(s):
+        n = _norm_t(s.get("title"))
+        if len(n) >= 2 and n not in seen:
+            found.append(s)
+            seen.add(n)
+    for al in opened:
+        for s in al.get("songs") or []:
+            if _norm_t(s["title"]) in want:
+                take(s)
+    for al in opened:
+        for s in al.get("songs") or []:
+            n = _norm_t(s["title"])
+            if len(n) >= 3 and n in nq:          # "아이유 좋은날" -> "좋은 날"
+                take(s)
+    # nothing on those albums: the recording the top videos are of, looked up the way the player does
+    if not found:
+        for v in tops[:2]:
+            try:
+                r = music_song_of(v["title"], v["artist"], v.get("len") or 0, hl, region).get("song")
+            except Exception:
+                r = None
+            if r:
+                take(r)
+    # just an artist's name: the first songs of their albums
+    if not found and any(_norm_t(a["title"]) == nq for a in artists):
+        for al in opened:
+            for s in (al.get("songs") or [])[:4]:
+                take(s)
+    if not found:
+        return videos
+    # the same song again (music video, lyric upload, TV stage): left out; other versions (live, covers) last
+    flat = lambda t: re.sub(r"\W", "", (t or "").lower())     # brackets kept: "Through the Night(밤편지)"
+    same = lambda v: any(len(n) >= 3 and n in flat(v["title"]) for n in seen)
+    rest = [v for v in videos if not same(v) and not SONG_KEEP.search(v["title"])]
+    versions = [v for v in videos if SONG_KEEP.search(v["title"])]
+    return found + rest + versions
 
 
 def music_album(bid, hl, region):
