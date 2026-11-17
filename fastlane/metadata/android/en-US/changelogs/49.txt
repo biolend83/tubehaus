@@ -1,0 +1,6 @@
+- Faster: video details are fetched while you press a card
+- Reorder the queue by dragging, or Move up / Move down
+- Desktop: set the player's memory for the video exactly (MB)
+- Android: no black band above the player; open links by default setting
+- iPhone: the player no longer sits under the status bar
+- Update checks no longer hit GitHub's limit

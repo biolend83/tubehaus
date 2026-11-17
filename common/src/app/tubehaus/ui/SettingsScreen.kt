@@ -94,7 +94,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "1.6.2"
+const val VERSION = "1.6.3"
 
 /** Settings' categories, as cards on its first page: key, icon, title, what is inside */
 private class Cat(val key: String, val icon: Symbol, val title: String, val sub: String)
@@ -490,6 +490,19 @@ private fun SettingsRows(
             Toggle(tr("Read further ahead"), tr("About 20 minutes of the video instead of 5, for fewer stops on a fast connection. Uses more memory") +
                 if (android) " " + tr("(from the next start)") else "", s.longBuffer) { b -> set { it.copy(longBuffer = b) } }
         }
+        if (app.platform.player.memoryLimit) r.row("player", tr("Memory for the video (MB)") + " memory buffer ram") {
+            // an exact number of MB (#87); 0 = automatic
+            var text by remember { mutableStateOf(if (s.bufferMb > 0) s.bufferMb.toString() else "0") }
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Text(tr("Memory for the video (MB)"), style = MaterialTheme.typography.bodyLarge)
+                Text(tr("How much of the video the player keeps in memory, ahead and behind. 0 = automatic: 150 MB, or 2 GB with Read further ahead"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(text, { t ->
+                    text = t.filter(Char::isDigit).take(5)
+                    val mb = (text.toIntOrNull() ?: 0).let { if (it == 0) 0 else it.coerceIn(16, 16384) }
+                    set { it.copy(bufferMb = mb) }
+                }, Modifier.width(140.dp).padding(top = 8.dp), singleLine = true, suffix = { Text("MB") })
+            }
+        }
         if (devices.isNotEmpty()) r.row("player", tr("Sound output") + " audio speaker headphones") {
             // the desktop: which speaker or headphones (#46)
             val opts = listOf("" to tr("System default")) + devices.filter { it.first != "auto" }.map { (n, d) -> n to d.ifEmpty { n } }
@@ -547,6 +560,9 @@ private fun SettingsRows(
         }
         // ------------------------------------------------------------------ integrations
         r.group("integrations", "SponsorBlock")
+        if (app.platform.linkSettings) r.row("integrations", tr("Open YouTube links in TubeHaus") + " links youtube open") {
+            SItem(tr("Open YouTube links in TubeHaus"), tr("Android asks for this once: under \"Open by default\", turn on the YouTube addresses")) { app.platform.openLinkSettings() }
+        }
         r.row("integrations", "SponsorBlock sponsor skip") {
             Column {
                 Toggle("SponsorBlock", tr("Skips sponsors and other parts people marked inside videos (sponsor.ajay.app). Only 4 characters of a hash are sent, not the video"), s.sponsor) { b -> set { it.copy(sponsor = b) } }
