@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.6.3 — 2026-11-17
+
+### Faster
+- A video starts on a quick answer (the streams) and fills in the title, description and related videos when they come: playback starts in about a seventh of the time
+- Search, comments, channels, playlists and trending are kept for a while and refreshed in the background; the first search results and the video under the pointer are fetched early
+- Streams reuse kept-open connections to YouTube's video servers instead of a new tunnel and TLS handshake for every range
+
+### Fixed
+- Ended live recordings play on the web (#86)
+- The engine check uses the workflow's token, so it no longer runs into GitHub's limit (#89)
+
+### Security
+- The shared password login (`TUBEHAUS_AUTH=basic` behind Caddy) allows 10 wrong passwords in 10 minutes, then answers 429
+- Redirects from YouTube are followed only to Google's own servers
+
 ## v1.6.2 — 2026-11-16
 
 ### Added
