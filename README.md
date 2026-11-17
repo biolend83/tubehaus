@@ -80,15 +80,20 @@ All files, Windows portable and ARM builds: **[latest release](https://github.co
 
 ## New in 1.6: its own YouTube engine, and fast
 
-The server no longer sits on Invidious. It talks to YouTube itself, so the stack is **three containers lighter** (no Invidious, no companion, no PostgreSQL). 1.6.3 then made it quick: a video starts on the streams alone and the title, description and related videos fill in a moment later, answers are kept and refreshed in the background, and the stream connections to YouTube stay open.
+The server no longer sits on Invidious. It talks to YouTube itself, so the stack is **three containers lighter** (no Invidious, no companion, no PostgreSQL). 1.6.3 then made it quick: a video starts on the streams alone and the title, description and related videos fill in a moment later, answers are kept and refreshed in the background, the stream connections to YouTube stay open, and a video's comments are fetched as it opens.
 
-Measured on one server through the same WARP address, first visits (median):
+| | TubeHaus 1.6.3 | Invidious |
+|---|---|---|
+| **A video starts playing** | **0.16 s** `▇▇` | 1.29 s `▇▇▇▇▇▇▇▇▇▇▇▇▇` |
+| The whole video page (title, description, related) | **0.59 s** `▇▇▇▇▇▇` | 1.29 s `▇▇▇▇▇▇▇▇▇▇▇▇▇` |
+| A channel | **0.38 s** `▇▇▇▇` | 0.66 s `▇▇▇▇▇▇▇` |
+| A channel's videos | **0.28 s** `▇▇▇` | 0.61 s `▇▇▇▇▇▇` |
+| A search | **0.56 s** `▇▇▇▇▇▇` | 0.56 s `▇▇▇▇▇▇` |
+| Comments, once the video is open | **0.002 s** `▏` | 0.16 s `▇▇` |
+| **Anything opened again** | **0.002 s** `▏` | – |
+| Each piece of the stream | **0.07 s** `▇` | – |
 
-| | TubeHaus 1.6.3 | TubeHaus 1.6.0 | Invidious |
-|---|---|---|---|
-| **Video starts playing** | **0.16 s** `▇▇` | 0.60 s `▇▇▇▇▇▇` | 1.29 s `▇▇▇▇▇▇▇▇▇▇▇▇▇` |
-| **Each piece of the stream** | **0.04–0.07 s** `▇` | 0.15 s `▇▇` | – |
-| **Opening it again** (search, channel, video) | **under 0.03 s** `▏` | the full wait again | the full wait again |
+Medians of 10–12 first visits each, on one server through the same WARP address (TubeHaus measured 2026-11-17; Invidious in the 1.6.0 comparison, before it left the server). A search or channel is mostly YouTube's own time, so it can't go much lower; what TubeHaus adds is that the video plays before the page is complete, the next clicks are fetched while you look, and nothing is fetched twice. Stream pieces reuse open connections (a new one takes 0.17 s).
 
 Hovering a video or showing search results already fetches the first few, so a click usually lands on a page that is ready. It still answers in [Invidious](https://invidious.io)' API format, so the web app, the apps' server mode and other tools that speak that API keep working. Up to 1.5 TubeHaus was built on Invidious and [invidious-companion](https://github.com/iv-org/invidious-companion), and much of what it knows about YouTube was learned from them: thank you, Invidious team. Updating from 1.5? See [below](#quick-start-docker).
 
