@@ -819,7 +819,10 @@ fun WatchSheet(app: AppState, expanded: Boolean, barPx: Int) {
     val list = remember(v.id) { androidx.compose.foundation.lazy.LazyListState() }
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val d = androidx.compose.ui.platform.LocalDensity.current
-    val top = androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(d)
+    // the app's root already keeps clear of the status bar (safe drawing padding) except in full screen:
+    // counting it again here left a band as tall as the status bar above the video (#84)
+    val statusTop = androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(d)
+    val top = if (app.fullscreen) statusTop else 0
     val nav = androidx.compose.foundation.layout.WindowInsets.navigationBars.getBottom(d)
     val full by remember { androidx.compose.runtime.derivedStateOf { f.value < 0.02f } }
     val mini by remember { androidx.compose.runtime.derivedStateOf { f.value > 0.98f } }

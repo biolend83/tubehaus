@@ -151,6 +151,13 @@ class AndroidPlatform(private val app: Application) : Platform {
         get() = !tv && android.os.Build.VERSION.SDK_INT >= 26 &&
             app.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)
     override fun startPip() { activity?.startPip() }
+    override val linkSettings: Boolean get() = !tv && android.os.Build.VERSION.SDK_INT >= 31
+    override fun openLinkSettings() {
+        runCatching {
+            app.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS,
+                android.net.Uri.parse("package:" + app.packageName)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
 
     override fun setFullscreen(on: Boolean) {
         activity?.setFullscreen(on)
