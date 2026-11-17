@@ -29,6 +29,9 @@ interface Platform {
     val airplay: (@Composable (Modifier) -> Unit)? get() = null
     /** the player's button that moves the video into a small window over other apps (Android phones, iPhone and iPad) */
     val canPip: Boolean get() = false
+    /** Android 12+: the system page where YouTube's addresses are switched on for this app ("Open by default") */
+    val linkSettings: Boolean get() = false
+    fun openLinkSettings() {}
     fun startPip() {}
 
     /** a share sheet where there is one; false when the link was copied to the clipboard instead */
@@ -176,6 +179,10 @@ interface VideoPlayer {
     fun setZoom(on: Boolean) {}
     /** read about 20 minutes ahead instead of 5 */
     fun setReadAhead(long: Boolean) {}
+    /** players whose memory for the video can be set exactly (the desktop's mpv) */
+    val memoryLimit: Boolean get() = false
+    /** that memory in MB; 0 = automatic */
+    fun setBufferMb(mb: Int) {}
     /** Settings → captions: text size in %, the box behind them in % opacity (0 = an outline instead), 0 bottom / 1 higher / 2 top */
     fun setCaptionStyle(size: Int, bg: Int, pos: Int) {}
     /** the desktop: the sound outputs to choose from, as (name, description); empty where the system picks */
