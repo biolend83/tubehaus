@@ -513,9 +513,13 @@ Running one? [Add it here](https://github.com/biolend83/tubehaus/issues/new?temp
 People who made TubeHaus better, with code, translations, testing or ideas:
 
 **Code and design**
-- <img src="https://github.com/onedge.png?size=48" width="24" height="24" alt=""> [@onedge](https://github.com/onedge): "Back to music" in the music player (#68, #69)
+- <img src="https://github.com/onedge.png?size=48" width="24" height="24" alt=""> [@onedge](https://github.com/onedge): a Translate link on comments, translated on the device itself (iPhone, iPad, Mac); what plays in Control Center and on the lock screen with the media keys (iPad, macOS); "Back to music" in the music player (#49 to #52, #68, #69, #73 to #75)
 - <img src="https://github.com/Aaqibhafeezkhan.png?size=48" width="24" height="24" alt=""> [@Aaqibhafeezkhan](https://github.com/Aaqibhafeezkhan): the house-and-play icon, remembering the playback speed, an nginx example, Spanish polish (#28, #29, #30, #31)
 - <img src="https://github.com/bh-official.png?size=48" width="24" height="24" alt=""> [@bh-official](https://github.com/bh-official): the exact upload date on hover, and tests for exact upload times (#26, #27)
+- <img src="https://github.com/eran3d.png?size=48" width="24" height="24" alt=""> [@eran3d](https://github.com/eran3d): iPhone and iPad start in the original audio track instead of a dub (#80)
+- <img src="https://github.com/Neatly9509.png?size=48" width="24" height="24" alt=""> [@Neatly9509](https://github.com/Neatly9509): iPhone playback with Safari's own player and the top safe area, server captions with no lost lines after a pause, and caption settings (#41, #53, #54)
+- <img src="https://github.com/odykyi.png?size=48" width="24" height="24" alt=""> [@odykyi](https://github.com/odykyi): running the whole stack with Flisk (#40, #42), and recommending TubeHaus in a YouTube Community thread (#43)
+- <img src="https://github.com/adebayomoses.png?size=48" width="24" height="24" alt=""> [@adebayomoses](https://github.com/adebayomoses): unit tests for the sidx parser (#48)
 - <img src="https://github.com/onyks-os.png?size=48" width="24" height="24" alt=""> [@onyks-os](https://github.com/onyks-os): the first contribution, fixing the install instructions (#1)
 
 **Translations**
@@ -523,7 +527,19 @@ People who made TubeHaus better, with code, translations, testing or ideas:
 - <img src="https://github.com/rahul05ranjan.png?size=48" width="24" height="24" alt=""> [@rahul05ranjan](https://github.com/rahul05ranjan): Bengali, and a Hindi review by a native speaker (#16, #17)
 
 **Ideas and bug reports**
-- <img src="https://github.com/JamesMowery.png?size=48" width="24" height="24" alt=""> [@JamesMowery](https://github.com/JamesMowery): import from file and data export (which became v0.4.0), and the wrong posted time on new videos (#14, #15, #20)
+- <img src="https://github.com/JamesMowery.png?size=48" width="24" height="24" alt=""> [@JamesMowery](https://github.com/JamesMowery): import from file and data export (which became v0.4.0), the wrong posted time on new videos, and a bigger volume slider (#14, #15, #20, #32)
+- <img src="https://github.com/DEDSECex0dus.png?size=48" width="24" height="24" alt=""> [@DEDSECex0dus](https://github.com/DEDSECex0dus): fifteen reports and ideas from daily use, from Linux resets, crashes and RAM use to picture-in-picture, a drag-and-drop queue and custom themes (#63 to #67, #70 to #72, #77 to #79, #82, #84, #85, #87)
+- <img src="https://github.com/DarekRobert.png?size=48" width="24" height="24" alt=""> [@DarekRobert](https://github.com/DarekRobert): old videos showing as "just now" with 0 views in the subscription feed (#33)
+- <img src="https://github.com/attiamohammed.png?size=48" width="24" height="24" alt=""> [@attiamohammed](https://github.com/attiamohammed): the APK for self-hosted servers (#34)
+- <img src="https://github.com/JonnyWalker115.png?size=48" width="24" height="24" alt=""> [@JonnyWalker115](https://github.com/JonnyWalker115): search history (#35)
+- <img src="https://github.com/krrishroy.png?size=48" width="24" height="24" alt=""> [@krrishroy](https://github.com/krrishroy): an app crash and freeze (#44)
+- <img src="https://github.com/dachronos.png?size=48" width="24" height="24" alt=""> [@dachronos](https://github.com/dachronos): mpv not being recognized, and choosing the audio device (#45, #46)
+- <img src="https://github.com/iamprabhuantony.png?size=48" width="24" height="24" alt=""> [@iamprabhuantony](https://github.com/iamprabhuantony): "mpv is missing" (#61)
+- <img src="https://github.com/teruis.png?size=48" width="24" height="24" alt=""> [@teruis](https://github.com/teruis): an AppImage package and translated subtitles (#62)
+- <img src="https://github.com/MrCableYolo.png?size=48" width="24" height="24" alt=""> [@MrCableYolo](https://github.com/MrCableYolo): "This video is not available" (#76)
+- <img src="https://github.com/hilloIsTheBest.png?size=48" width="24" height="24" alt=""> [@hilloIsTheBest](https://github.com/hilloIsTheBest): OIDC sign-in (#81)
+- <img src="https://github.com/karimabousleiman.png?size=48" width="24" height="24" alt=""> [@karimabousleiman](https://github.com/karimabousleiman): ended live stream recordings failing in the web player (#86)
+- <img src="https://github.com/arcastro.png?size=48" width="24" height="24" alt=""> [@arcastro](https://github.com/arcastro): opening YouTube links in TubeHaus (#88)
 
 **Testing the apps** (on [r/DigitalEscapeTools](https://www.reddit.com/r/DigitalEscapeTools/))
 - [u/Proper_Witness9173](https://www.reddit.com/user/Proper_Witness9173/): brightness and volume swipes, the tablet layout, comments beside the video, picture-in-picture and most of 0.3.8

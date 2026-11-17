@@ -383,9 +383,13 @@ WARP, 유튜브 연결, 검색, 실제 영상 조회(스트림 몇 바이트까�
 코드, 번역, 테스트, 아이디어로 TubeHaus를 더 좋게 만들어 준 분들이에요.
 
 **코드와 디자인**
-- <img src="https://github.com/onedge.png?size=48" width="24" height="24" alt=""> [@onedge](https://github.com/onedge): 음악 플레이어의 "음악으로 돌아가기" (#68, #69)
+- <img src="https://github.com/onedge.png?size=48" width="24" height="24" alt=""> [@onedge](https://github.com/onedge): 댓글 번역 링크(아이폰·아이패드·Mac 기기 안에서 번역), 제어 센터·잠금 화면과 미디어 키에 지금 재생 표시(아이패드, macOS), 음악 플레이어의 "음악으로 돌아가기" (#49~#52, #68, #69, #73~#75)
 - <img src="https://github.com/Aaqibhafeezkhan.png?size=48" width="24" height="24" alt=""> [@Aaqibhafeezkhan](https://github.com/Aaqibhafeezkhan): 집과 재생 버튼 아이콘, 재생 속도 기억, nginx 예시, 스페인어 다듬기 (#28, #29, #30, #31)
 - <img src="https://github.com/bh-official.png?size=48" width="24" height="24" alt=""> [@bh-official](https://github.com/bh-official): 마우스를 올리면 정확한 업로드 날짜, 업로드 시각 테스트 (#26, #27)
+- <img src="https://github.com/eran3d.png?size=48" width="24" height="24" alt=""> [@eran3d](https://github.com/eran3d): 아이폰·아이패드에서 더빙이 아니라 원래 음성으로 시작 (#80)
+- <img src="https://github.com/Neatly9509.png?size=48" width="24" height="24" alt=""> [@Neatly9509](https://github.com/Neatly9509): 아이폰에서 Safari 자체 플레이어로 재생과 위쪽 안전 영역, 멈췄다 다시 나와도 줄이 빠지지 않는 서버 자막, 자막 설정 (#41, #53, #54)
+- <img src="https://github.com/odykyi.png?size=48" width="24" height="24" alt=""> [@odykyi](https://github.com/odykyi): Flisk로 전체 스택 실행 (#40, #42), 유튜브 커뮤니티 글에서 TubeHaus 추천 (#43)
+- <img src="https://github.com/adebayomoses.png?size=48" width="24" height="24" alt=""> [@adebayomoses](https://github.com/adebayomoses): sidx 파서 단위 테스트 (#48)
 - <img src="https://github.com/onyks-os.png?size=48" width="24" height="24" alt=""> [@onyks-os](https://github.com/onyks-os): 첫 기여, 설치 안내 수정 (#1)
 
 **번역**
@@ -393,7 +397,19 @@ WARP, 유튜브 연결, 검색, 실제 영상 조회(스트림 몇 바이트까�
 - <img src="https://github.com/rahul05ranjan.png?size=48" width="24" height="24" alt=""> [@rahul05ranjan](https://github.com/rahul05ranjan): 벵골어, 원어민의 힌디어 다듬기 (#16, #17)
 
 **아이디어와 버그 제보**
-- <img src="https://github.com/JamesMowery.png?size=48" width="24" height="24" alt=""> [@JamesMowery](https://github.com/JamesMowery): 파일 가져오기와 데이터 내보내기 제안(v0.4.0), 새 영상의 업로드 시각 오류 제보 (#14, #15, #20)
+- <img src="https://github.com/JamesMowery.png?size=48" width="24" height="24" alt=""> [@JamesMowery](https://github.com/JamesMowery): 파일 가져오기와 데이터 내보내기 제안(v0.4.0), 새 영상의 업로드 시각 오류 제보, 볼륨 슬라이더를 더 크게 (#14, #15, #20, #32)
+- <img src="https://github.com/DEDSECex0dus.png?size=48" width="24" height="24" alt=""> [@DEDSECex0dus](https://github.com/DEDSECex0dus): 매일 쓰면서 보낸 제보와 아이디어 15개. 리눅스 초기화·충돌·메모리 사용부터 PiP, 끌어서 옮기는 재생 대기열, 직접 고르는 테마까지 (#63~#67, #70~#72, #77~#79, #82, #84, #85, #87)
+- <img src="https://github.com/DarekRobert.png?size=48" width="24" height="24" alt=""> [@DarekRobert](https://github.com/DarekRobert): 구독 피드에서 오래된 영상이 "방금 전", 조회수 0으로 보이는 문제 (#33)
+- <img src="https://github.com/attiamohammed.png?size=48" width="24" height="24" alt=""> [@attiamohammed](https://github.com/attiamohammed): 자체 서버용 APK (#34)
+- <img src="https://github.com/JonnyWalker115.png?size=48" width="24" height="24" alt=""> [@JonnyWalker115](https://github.com/JonnyWalker115): 검색 기록 (#35)
+- <img src="https://github.com/krrishroy.png?size=48" width="24" height="24" alt=""> [@krrishroy](https://github.com/krrishroy): 앱 충돌과 멈춤 (#44)
+- <img src="https://github.com/dachronos.png?size=48" width="24" height="24" alt=""> [@dachronos](https://github.com/dachronos): mpv를 못 찾는 문제, 오디오 장치 선택 (#45, #46)
+- <img src="https://github.com/iamprabhuantony.png?size=48" width="24" height="24" alt=""> [@iamprabhuantony](https://github.com/iamprabhuantony): "mpv is missing" (#61)
+- <img src="https://github.com/teruis.png?size=48" width="24" height="24" alt=""> [@teruis](https://github.com/teruis): AppImage 패키지와 자막 번역 (#62)
+- <img src="https://github.com/MrCableYolo.png?size=48" width="24" height="24" alt=""> [@MrCableYolo](https://github.com/MrCableYolo): "This video is not available" (#76)
+- <img src="https://github.com/hilloIsTheBest.png?size=48" width="24" height="24" alt=""> [@hilloIsTheBest](https://github.com/hilloIsTheBest): OIDC 로그인 (#81)
+- <img src="https://github.com/karimabousleiman.png?size=48" width="24" height="24" alt=""> [@karimabousleiman](https://github.com/karimabousleiman): 끝난 라이브 다시보기가 웹 플레이어에서 안 나오는 문제 (#86)
+- <img src="https://github.com/arcastro.png?size=48" width="24" height="24" alt=""> [@arcastro](https://github.com/arcastro): 유튜브 링크를 TubeHaus로 열기 (#88)
 
 **앱 테스트** ([r/DigitalEscapeTools](https://www.reddit.com/r/DigitalEscapeTools/))
 - [u/Proper_Witness9173](https://www.reddit.com/user/Proper_Witness9173/): 밝기·볼륨 제스처, 태블릿 화면, 영상 옆 댓글, PiP 등 0.3.8의 대부분
