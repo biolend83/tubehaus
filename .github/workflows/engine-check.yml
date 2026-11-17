@@ -62,6 +62,9 @@ jobs:
         id: run
         env:
           TH_REPORT: ${{ runner.temp }}/failed.txt
+          # the update check asks GitHub's API; through WARP's shared address it runs out of the
+          # 60 requests an hour that GitHub allows without a token
+          TH_GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
           # "Sign in to confirm you're not a bot" is about the address this run got from WARP, not about
@@ -94,6 +97,7 @@ jobs:
           TH_REPAIR_STATUS: ${{ runner.temp }}/repair.txt
           TH_REPORT: ${{ runner.temp }}/failed-after.txt
           GH_TOKEN: ${{ github.token }}
+          TH_GITHUB_TOKEN: ${{ github.token }}
         run: |
           ./gradlew --no-daemon -q :desktop:engineRepair || true
           status=$(cat "$TH_REPAIR_STATUS" 2>/dev/null || echo none)

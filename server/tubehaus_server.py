@@ -350,8 +350,48 @@ def _atrack(f):
             "name": t.get("displayName") or ""}
 
 
+def _mp4_ranges(head):
+    """(init, index) byte ranges ("0-740", "741-56188") from the first bytes of an MP4 stream: everything up to
+    the end of its moov box, then its sidx box; None when they aren't both there"""
+    p, init, index = 0, None, None
+    while p + 8 <= len(head):
+        size, kind = int.from_bytes(head[p:p + 4], "big"), head[p + 4:p + 8]
+        if size == 1 and p + 16 <= len(head):
+            size = int.from_bytes(head[p + 8:p + 16], "big")
+        if size < 8:
+            return None
+        if kind == b"moov":
+            init = "0-%d" % (p + size - 1)
+        elif kind == b"sidx":
+            index = "%d-%d" % (p, p + size - 1)
+            break
+        p += size
+    return (init, index) if init and index else None
+
+
+def _fill_ranges(d):
+    """Recordings of a stream that has just ended come without YouTube's initRange/indexRange for their
+    formats (#86), and the HLS and DASH lists need both: read them from each MP4 stream's first bytes."""
+    todo = [f for f in d.get("adaptiveFormats") or [] if f.get("url") and not (f.get("init") and f.get("index"))
+            and (f.get("type") or "").split(";")[0] in ("video/mp4", "audio/mp4")]
+    if not todo:
+        return
+
+    def one(f):
+        try:
+            got = _mp4_ranges(gv_open(f["url"], "bytes=0-262143", 20).read())
+            if got:
+                f["init"], f["index"] = got
+        except Exception as ex:
+            log("ranges", "itag %s: %s" % (f.get("itag"), repr(ex)[:80]), every=60)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(6) as ex:
+        list(ex.map(one, todo[:24]))
+
+
 def _hls_formats(d):
     """(video formats, [the best AAC audio per language, the original first]) Apple's player can take: H.264 and AAC in MP4"""
+    _fill_ranges(d)
     fs = [f for f in d.get("adaptiveFormats") or [] if f.get("url") and f.get("init") and f.get("index")]
     video = [f for f in fs if (f.get("type") or "").startswith("video/mp4") and 'codecs="avc1' in f["type"]]
     best = {}
@@ -444,6 +484,7 @@ def dash_mpd(vid):
     and VP9 (WebM). (The companion's list, used before the built-in engine, had only the MP4 ones.) HDR (VP9.2, BT.2020) is left out where the same size exists
     in SDR (HDR looks washed out on SDR screens); where it is the only one, as 8K often is, it stays."""
     d = _video_json(vid)
+    _fill_ranges(d)
     fs = [f for f in d.get("adaptiveFormats") or [] if f.get("url") and f.get("init") and f.get("index")]
     if not fs:
         raise ValueError("no streams")
