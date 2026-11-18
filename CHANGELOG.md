@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.6.4 — 2026-11-18
 
 ### Fixed
 - The Android, Windows and iPad apps can sign in to a server with accounts (`TUBEHAUS_AUTH=accounts`, the app stores' default): the server now takes the account's name and password from the app, with the same wrong-password limit as the sign-in page ([#92](https://github.com/biolend83/tubehaus/issues/92))
