@@ -5666,6 +5666,35 @@ def auth_login(b, ip):
     return 200, {"ok": True, "user": user, "cookie": session_make(user, u.get("gen", 1))}
 
 
+basic_ok = {}      # sha256(user:password:gen) -> until when: the hash is slow, the apps send it with every request
+
+
+def basic_account(user, pw, ip):
+    """the account a name and password from an app belong to, or None (same limits as the sign-in page)"""
+    user = user.strip().lower()
+    u = jload(USERS, {}).get(user) if USERNAME.fullmatch(user) else None
+    key = hashlib.sha256(f"{user}:{pw}:{u.get('gen', 1) if u else ''}".encode()).hexdigest()
+    now = time.time()
+    with auth_lk:
+        if u and basic_ok.get(key, 0) > now:
+            return user
+    if _too_many("login:" + ip, 10, 600) or _too_many("user:" + user, 10, 600):
+        return None
+    salt = bytes.fromhex(u["salt"]) if u else b"\0" * 16
+    ok = hmac.compare_digest(_pw_hash(pw, salt), u["hash"]) if u else (_pw_hash(pw, salt) and False)
+    if not ok:
+        return None
+    with auth_lk:
+        if len(basic_ok) > 1000:
+            basic_ok.clear()
+        basic_ok[key] = now + 600
+        # a right password isn't a try against the limit
+        for k in ("login:" + ip, "user:" + user):
+            if auth_tries.get(k):
+                auth_tries[k].pop()
+    return user
+
+
 # ---------- single sign-on (OpenID Connect) ----------
 # Signing in through your own identity provider (Authentik, Authelia, Keycloak, Pocket ID, Google, ...)
 # next to, or instead of, passwords. The provider's client gets the redirect URI
@@ -6126,7 +6155,20 @@ class H(BaseHTTPRequestHandler):
             k, _, v = part.strip().partition("=")
             if k == COOKIE:
                 return session_user(v)
-        return None
+        return self.basic_user()
+
+    def basic_user(self):
+        """The apps sign in with the account's name and password on every request (Authorization: Basic)"""
+        a = self.headers.get("Authorization") or ""
+        if not (ACCOUNTS and not OIDC_ONLY and a[:6].lower() == "basic "):
+            return None
+        try:
+            user, _, pw = base64.b64decode(a[6:].strip()).decode().partition(":")
+        except Exception:
+            return None
+        if not hasattr(self, "_basic"):           # asked several times a request: one try against the limit
+            self._basic = basic_account(user, pw, self.client_ip())
+        return self._basic
 
     def send_cookie(self, code, obj, value, max_age):
         # session tokens are user.expiry.generation.hex-signature; anything else is never sent
@@ -6141,6 +6183,7 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(b)
 
     def do_GET(self):
+        self.__dict__.pop("_basic", None)
         _req.user = self.cookie_user() if ACCOUNTS else None
         p = self.path.split("?")[0].rstrip("/")
         if self.basic_guard(p):
@@ -6345,6 +6388,7 @@ class H(BaseHTTPRequestHandler):
         self.send(404, {"error": "not found"})
 
     def do_POST(self):
+        self.__dict__.pop("_basic", None)
         _req.user = self.cookie_user() if ACCOUNTS else None
         p = self.path.split("?")[0].rstrip("/")
         if self.basic_guard(p):
