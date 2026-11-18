@@ -185,6 +185,8 @@ data class Settings(
     val codec: String = "",
     /** music: only the sound is downloaded (less data), the picture comes back with "Watch video" */
     val musicAudioOnly: Boolean = true,
+    /** where the sung line sits, percent from the top of the lyrics */
+    val lyricsAt: Int = 45,
     /** wellbeing: a reminder after this many minutes of watching in a row; 0 off */
     val breakMinutes: Int = 0,
     /** wellbeing: a reminder once a day past this many minutes; 0 off */

@@ -692,6 +692,8 @@ private val KO by lazy { mapOf(
     "{n} channels have a speed of their own" to "채널 {n}개에 따로 정한 속도가 있어요",
     "Automatic picks what this device decodes best. H.264 is the most compatible, VP9 and AV1 look better for the same data but need a newer device. A video without the codec plays in another." to "자동은 이 기기가 가장 잘 푸는 코덱을 골라요. H.264는 호환성이 가장 좋고, VP9와 AV1은 같은 데이터로 더 선명하지만 최신 기기가 필요해요. 그 코덱이 없는 동영상은 다른 코덱으로 재생돼요.",
     "Sound only for music" to "음악은 소리만",
+    "Lyrics position" to "가사 위치",
+    "Default" to "기본",
     "Songs from the Music tab load only their sound, which saves data. \"Watch video\" brings the picture back." to "음악 탭의 노래는 소리만 불러와 데이터를 아껴요. '동영상 보기'를 누르면 화면이 다시 나와요.",
     "Lyrics come from LRCLIB (lrclib.net), a free database of lyrics. The song's title and artist are sent to it when you open the lyrics." to "가사는 무료 가사 데이터베이스인 LRCLIB(lrclib.net)에서 가져와요. 가사를 열 때 노래 제목과 아티스트가 그쪽으로 보내져요.",
     "Clear music history" to "음악 기록 지우기",
