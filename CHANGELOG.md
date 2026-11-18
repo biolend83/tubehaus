@@ -4,6 +4,7 @@
 
 ### Fixed
 - The Android, Windows and iPad apps can sign in to a server with accounts (`TUBEHAUS_AUTH=accounts`, the app stores' default): the server now takes the account's name and password from the app, with the same wrong-password limit as the sign-in page ([#92](https://github.com/biolend83/tubehaus/issues/92))
+- Signing in on a server opened over plain http (`http://<server>:8080`, as the app stores set it up) no longer just reloads the page: the sign-in cookie is marked Secure only over https
 
 ### Added
 - **Vietnamese interface** (Tiếng Việt): every string translated (`web/y/lang/vi.js`), and trending and search default to Vietnam

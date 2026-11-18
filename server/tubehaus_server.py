@@ -6150,6 +6150,12 @@ class H(BaseHTTPRequestHandler):
             return True
         return False
 
+    def secure(self):
+        """ " Secure" unless the page was opened over plain http (http://<server>:8080 at home, as the app
+        stores set it up): browsers throw a Secure cookie from an http page away, and signing in just reloads"""
+        proto = (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
+        return "" if proto == "http" or (not proto and PUBLIC.startswith("http://")) else " Secure;"
+
     def cookie_user(self):
         for part in (self.headers.get("Cookie") or "").split(";"):
             k, _, v = part.strip().partition("=")
@@ -6177,7 +6183,7 @@ class H(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
-        self.send_header("Set-Cookie", f"{COOKIE}={value}; Path=/; Max-Age={max_age}; HttpOnly; Secure; SameSite=Lax")
+        self.send_header("Set-Cookie", f"{COOKIE}={value}; Path=/; Max-Age={max_age}; HttpOnly;{self.secure()} SameSite=Lax")
         self.send_header("Content-Length", str(len(b)))
         self.end_headers()
         self.wfile.write(b)
@@ -6218,7 +6224,7 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Location", to)
             self.send_header("Cache-Control", "no-store")
             if cookie:
-                self.send_header("Set-Cookie", f"{COOKIE}={cookie}; Path=/; Max-Age={SESSION_DAYS * 86400}; HttpOnly; Secure; SameSite=Lax")
+                self.send_header("Set-Cookie", f"{COOKIE}={cookie}; Path=/; Max-Age={SESSION_DAYS * 86400}; HttpOnly;{self.secure()} SameSite=Lax")
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
