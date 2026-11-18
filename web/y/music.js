@@ -831,12 +831,12 @@ export async function musicSearch(page, m, alive) {
     topHtml = `<a class="m-top ${top.kind}" href="${esc(hrefOf(top))}" data-nav data-mc="${top.kind}:${esc(top.id)}">
       <span class="m-tcv">${top.art ? `<img alt="" src="${esc(img(top.art))}">` : icon("person")}</span>
       <span class="m-ttx"><b>${esc(top.title)}</b><span>${esc(top.sub || "")}</span></span>
-      <span class="m-tbtn"><button class="pill white" data-mcplay>${icon(top.kind === "artist" ? "shuffle" : "play")}${top.kind === "artist" ? $t("셔플") : $t("재생")}</button></span></a>`;
+      </a>`;
   } else if (d.songs[0]) {
     const s = d.songs[0];
     topHtml = `<div class="m-top song" data-ml="${reg([s], "radio")}"><div class="m-row" data-k="0" data-id="${esc(s.id)}">
       <span class="m-tcv sq">${imgTag(s, true)}</span><span class="m-ttx"><b>${esc(s.title)}</b><span>${esc(s.artist)}</span></span>
-      <span class="m-tbtn"><span class="pill white">${icon("play")}${$t("재생")}</span></span></div></div>`;
+</div></div>`;
   }
   $(".m-res", page).innerHTML = `
     <div class="m-topgrid">
