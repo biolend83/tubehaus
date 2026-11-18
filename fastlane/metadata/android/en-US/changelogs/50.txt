@@ -1,0 +1,6 @@
+- Several people on one device, each with their own library and an optional PIN
+- TV: "Who's watching?" when the app opens; Settings no longer falls off small screens
+- Repeat a playlist
+- Music search shows the album recordings first, not music videos
+- Windows: updates install from inside the app
+- Signing in to servers with accounts works; server playback retries a dropped connection

@@ -186,6 +186,8 @@ fun App(app: AppState) {
                                 }
                                 // a TV: its own big-screen layout and player
                                 tv -> TvApp(app)
+                                // a phone or computer the household shares: "Who's watching?" when it opens
+                                !app.whoAsked && app.store.people.value.askOnOpen && app.store.people.value.names.size > 1 -> WhoIsWatching(app, app.store.people.value)
                                 app.fullscreen && app.current is Screen.Watch -> FullscreenWatch(app)
                                 else -> Shell(app)
                             }
@@ -631,7 +633,7 @@ private fun UpdateDialog(app: AppState, r: app.tubehaus.engine.Remote.Release) {
                     if (ok) app.update = null else { failed = true; app.platform.openExternal(r.page); app.update = null }
                 }
                 if (inApp) got = 0f else { app.platform.openExternal(url ?: r.page); app.update = null }
-            }) { Text(tr(if (app.platform.name == "android" && r.download != null) "Update now" else "Download")) }
+            }) { Text(tr(if (r.download != null && (app.platform.name == "android" || r.download.endsWith(".msi"))) "Update now" else "Download")) }
         },
         dismissButton = {
             Row {
