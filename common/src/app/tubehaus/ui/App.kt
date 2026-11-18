@@ -186,6 +186,8 @@ fun App(app: AppState) {
                                 }
                                 // a TV: its own big-screen layout and player
                                 tv -> TvApp(app)
+                                // a phone or computer the household shares: "Who's watching?" when it opens
+                                !app.whoAsked && app.store.people.value.askOnOpen && app.store.people.value.names.size > 1 -> WhoIsWatching(app, app.store.people.value)
                                 app.fullscreen && app.current is Screen.Watch -> FullscreenWatch(app)
                                 else -> Shell(app)
                             }

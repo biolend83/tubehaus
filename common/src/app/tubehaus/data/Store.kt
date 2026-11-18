@@ -108,6 +108,8 @@ data class People(
     val firstName: String = "",
     /** person id -> their PIN, hashed (Store.pinHash); someone without one is picked with no question */
     val pins: Map<String, String> = emptyMap(),
+    /** phones and computers: ask who is watching when the app opens (a TV always asks) */
+    val askOnOpen: Boolean = false,
 )
 
 private fun now() = Sys.nowMs() / 1000
