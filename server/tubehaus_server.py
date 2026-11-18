@@ -6230,7 +6230,8 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Location", to)
             self.send_header("Cache-Control", "no-store")
             if cookie:
-                self.send_header("Set-Cookie", f"{COOKIE}={cookie}; Path=/; Max-Age={SESSION_DAYS * 86400}; {"HttpOnly; Secure; SameSite=Lax" if self.secure() else "HttpOnly; SameSite=Lax"}")
+                flags = "HttpOnly; Secure; SameSite=Lax" if self.secure() else "HttpOnly; SameSite=Lax"
+                self.send_header("Set-Cookie", f"{COOKIE}={cookie}; Path=/; Max-Age={SESSION_DAYS * 86400}; {flags}")
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
