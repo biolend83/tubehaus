@@ -76,7 +76,7 @@ class MainActivity : ComponentActivity() {
             kotlinx.coroutines.flow.combine(
                 state.player.state.map { it.playing }.distinctUntilChanged(),
                 androidx.compose.runtime.snapshotFlow { listOf(state.playback.video?.id, state.playback.music, state.playback.withVideo, state.casting.link != null) },
-            ) { _, _ -> }.collect { runCatching { setPictureInPictureParams(pipParams()) } }
+            ) { _, _ -> }.collect { if (Build.VERSION.SDK_INT >= 26) runCatching { setPictureInPictureParams(pipParams()) } }
         }
         setContent {
             Box(Modifier.fillMaxSize().let { if (state.fullscreen || state.pip) it else it.safeDrawingPadding() }) { App(state) }
@@ -232,6 +232,7 @@ class MainActivity : ComponentActivity() {
     private fun watchingVideo() = state.playback.video != null && state.casting.link == null && state.player.state.value.playing &&
         (!state.playback.music || state.playback.withVideo)
 
+    @androidx.annotation.RequiresApi(26)
     private fun pipParams(): PictureInPictureParams {
         val b = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9))
         if (Build.VERSION.SDK_INT >= 31) b.setAutoEnterEnabled(watchingVideo()).setSeamlessResizeEnabled(true)

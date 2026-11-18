@@ -14,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "io.github.biolend83.tubehaus"
-        minSdk = 26
+        minSdk = 25
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersion
@@ -55,6 +55,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
     buildFeatures {
@@ -75,6 +76,7 @@ kotlin {
 }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     val composeBom = platform("androidx.compose:compose-bom:2025.06.01")
     implementation(composeBom)
     implementation(platform("org.jetbrains.kotlin:kotlin-bom:2.2.0"))
