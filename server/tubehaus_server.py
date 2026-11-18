@@ -4257,7 +4257,8 @@ def music_songs_first_from_albums(q, artists, albums, videos, hl, region):
     for v in tops:
         titles, arts = _song_parts(v["title"], v["artist"])
         want.update(_norm_t(t) for t in titles)
-        by.update(_norm_t(x) for x in arts + re.findall(r"[(（]([^()（）]+)[)）]", v["title"] + " " + v["artist"]))
+        names = arts + re.findall(r"[(（]([^()（）]+)[)）]", v["title"] + " " + v["artist"])
+        by.update(_norm_t(x) for x in names + [w for x in names for w in x.split()])
     want = {w for w in want if len(w) >= 2}
     by = {x for x in by if len(x) >= 2}
 
@@ -4529,7 +4530,9 @@ def music_song_of(title, channel, length, hl, region):
     want = {_norm_t(t) for t in titles} - {""}
     # the names in brackets too: "IU(아이유)", "RESCENE (리센느)" (YouTube Music shows either, by language)
     extra = re.findall(r"[(（]([^()（）]+)[)）]", title + " " + channel)
-    arts = [a for a in dict.fromkeys(_norm_t(x) for x in artists + extra) if a and not re.match(r"(?i)^(feat|ft|prod|official|mv|part)", a)]
+    # and each word of a name: "IVE 아이브" is the album's "IVE (아이브)"
+    words = [w for x in artists + extra for w in x.split() if len(_norm_t(w)) >= 2]
+    arts = [a for a in dict.fromkeys(_norm_t(x) for x in artists + extra + words) if a and not re.match(r"(?i)^(feat|ft|prod|official|mv|part)", a)]
     if not want or not arts:
         return {}
 
