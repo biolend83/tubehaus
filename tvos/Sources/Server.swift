@@ -96,7 +96,7 @@ final class Server {
         var errorDescription: String? { Server.say(code) }
     }
 
-    static func say(_ code: String) -> String {
+    nonisolated static func say(_ code: String) -> String {
         switch code {
         case "address": return "That doesn't look like a web address"
         case "login": return "The user name or password is wrong"
@@ -178,7 +178,12 @@ final class Server {
     }
 
     /// one change for the server (the endpoints the web version uses); a newer one with the same key replaces it
-    func send(_ path: String, key: String = "", _ body: [String: Any]) {
+    nonisolated func send(_ path: String, key: String = "", _ body: [String: Any]) {
+        let b = body as NSDictionary
+        Task { @MainActor in self.sendNow(path, key: key, b as? [String: Any] ?? [:]) }
+    }
+
+    private func sendNow(_ path: String, key: String, _ body: [String: Any]) {
         guard connected else { return }
         var q = queue
         if !key.isEmpty { q.removeAll { $0["key"] as? String == key } }
@@ -220,7 +225,7 @@ final class Server {
     /// the server's HLS of a video (all qualities, the original audio first), and what it knows of it
     func stream(_ id: String) async throws -> StreamInfo {
         let o = try await json("/api/v1/videos/\(id)")
-        if let e = o["error"] as? String { throw EngineError(e) }
+        if let e = o["error"] as? String { throw EngineError(kind: "OTHER", message: e) }
         let live = o["liveNow"] as? Bool ?? false
         let hls: URL?
         if live, let h = o["hlsUrl"] as? String { hls = URL(string: h.hasPrefix("/") ? base + h : h) }
