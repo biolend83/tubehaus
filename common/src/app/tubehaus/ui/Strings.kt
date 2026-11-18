@@ -44,6 +44,7 @@ fun tr(s: String): String {
 fun textOverride(key: String, lang: String): String = ""
 
 private val KO by lazy { mapOf(
+    "Ask who's watching when the app opens" to "앱을 열 때 누가 볼지 묻기",
     "PIN for {n}" to "{n}의 PIN",
     "Asked before switching to you, so others can't open your library" to "나로 바꿀 때 물어봐요. 다른 사람이 내 서재를 열 수 없어요",
     "PIN set" to "PIN을 설정했어요",
@@ -759,6 +760,7 @@ private val KO by lazy { mapOf(
 
 // Español. Machine-made, not yet read by a native speaker: corrections welcome
 private val ES by lazy { mapOf(
+    "Ask who's watching when the app opens" to "Preguntar quién está viendo al abrir la app",
     "PIN for {n}" to "PIN de {n}",
     "Asked before switching to you, so others can't open your library" to "Se pide antes de cambiar a ti, para que nadie más abra tu biblioteca",
     "PIN set" to "PIN establecido",
@@ -1428,6 +1430,7 @@ private val ES by lazy { mapOf(
 
 // 日本語. Machine-made, not yet read by a native speaker: corrections welcome
 private val JA by lazy { mapOf(
+    "Ask who's watching when the app opens" to "アプリを開くときに誰が見るか聞く",
     "PIN for {n}" to "{n} の PIN",
     "Asked before switching to you, so others can't open your library" to "あなたに切り替えるときに確認します。他の人はあなたのライブラリを開けません",
     "PIN set" to "PIN を設定しました",
@@ -2097,6 +2100,7 @@ private val JA by lazy { mapOf(
 
 // Deutsch. Machine-made, not yet read by a native speaker: corrections welcome
 private val DE by lazy { mapOf(
+    "Ask who's watching when the app opens" to "Beim Öffnen fragen, wer schaut",
     "PIN for {n}" to "PIN für {n}",
     "Asked before switching to you, so others can't open your library" to "Wird vor dem Wechsel zu dir abgefragt, damit andere deine Mediathek nicht öffnen",
     "PIN set" to "PIN festgelegt",
@@ -2766,6 +2770,7 @@ private val DE by lazy { mapOf(
 
 // 简体中文 (Simplified Chinese). Machine-made, not yet read by a native speaker: corrections welcome
 private val ZH by lazy { mapOf(
+    "Ask who's watching when the app opens" to "打开应用时询问谁在观看",
     "PIN for {n}" to "{n} 的 PIN",
     "Asked before switching to you, so others can't open your library" to "切换到你时需要输入，其他人无法打开你的媒体库",
     "PIN set" to "已设置 PIN",
@@ -3435,6 +3440,7 @@ private val ZH by lazy { mapOf(
 
 // Português (Portuguese). Machine-made, not yet read by a native speaker: corrections welcome
 private val PT by lazy { mapOf(
+    "Ask who's watching when the app opens" to "Perguntar quem está assistindo ao abrir o app",
     "PIN for {n}" to "PIN de {n}",
     "Asked before switching to you, so others can't open your library" to "Pedido antes de mudar para você, para ninguém abrir sua biblioteca",
     "PIN set" to "PIN definido",
@@ -4104,6 +4110,7 @@ private val PT by lazy { mapOf(
 
 // Français (French). Machine-made, not yet read by a native speaker: corrections welcome
 private val FR by lazy { mapOf(
+    "Ask who's watching when the app opens" to "Demander qui regarde à l'ouverture",
     "PIN for {n}" to "PIN de {n}",
     "Asked before switching to you, so others can't open your library" to "Demandé avant de passer à vous, pour que personne d'autre n'ouvre votre bibliothèque",
     "PIN set" to "PIN défini",
@@ -4773,6 +4780,7 @@ private val FR by lazy { mapOf(
 
 // Русский (Russian). Machine-made, not yet read by a native speaker: corrections welcome
 private val RU by lazy { mapOf(
+    "Ask who's watching when the app opens" to "Спрашивать, кто смотрит, при открытии",
     "PIN for {n}" to "PIN для {n}",
     "Asked before switching to you, so others can't open your library" to "Запрашивается при переключении на вас, чтобы другие не открыли вашу библиотеку",
     "PIN set" to "PIN установлен",
@@ -5442,6 +5450,7 @@ private val RU by lazy { mapOf(
 
 // हिन्दी (Hindi). Machine-made, not yet read by a native speaker: corrections welcome
 private val HI by lazy { mapOf(
+    "Ask who's watching when the app opens" to "ऐप खोलते समय पूछें कि कौन देख रहा है",
     "PIN for {n}" to "{n} का PIN",
     "Asked before switching to you, so others can't open your library" to "आप पर जाने से पहले पूछा जाता है, ताकि कोई और आपकी लाइब्रेरी न खोले",
     "PIN set" to "PIN सेट हो गया",
@@ -6111,6 +6120,7 @@ private val HI by lazy { mapOf(
 
 // Bahasa Indonesia (Indonesian). Machine-made, not yet read by a native speaker: corrections welcome
 private val ID by lazy { mapOf(
+    "Ask who's watching when the app opens" to "Tanyakan siapa yang menonton saat aplikasi dibuka",
     "PIN for {n}" to "PIN untuk {n}",
     "Asked before switching to you, so others can't open your library" to "Ditanyakan sebelum beralih ke Anda, agar orang lain tak bisa membuka pustaka Anda",
     "PIN set" to "PIN disetel",
@@ -6780,6 +6790,7 @@ private val ID by lazy { mapOf(
 
 // Türkçe (Turkish). Machine-made, not yet read by a native speaker: corrections welcome
 private val TR by lazy { mapOf(
+    "Ask who's watching when the app opens" to "Uygulama açılınca kimin izlediğini sor",
     "PIN for {n}" to "{n} için PIN",
     "Asked before switching to you, so others can't open your library" to "Sana geçmeden önce sorulur, böylece başkaları kitaplığını açamaz",
     "PIN set" to "PIN ayarlandı",
@@ -7449,6 +7460,7 @@ private val TR by lazy { mapOf(
 
 // বাংলা (Bengali). Machine-made, not yet read by a native speaker: corrections welcome
 private val BN by lazy { mapOf(
+    "Ask who's watching when the app opens" to "অ্যাপ খুললে কে দেখছেন জিজ্ঞেস করুন",
     "PIN for {n}" to "{n}-এর PIN",
     "Asked before switching to you, so others can't open your library" to "আপনাতে বদলানোর আগে জিজ্ঞেস করা হয়, যাতে অন্যরা আপনার লাইব্রেরি খুলতে না পারে",
     "PIN set" to "PIN সেট হয়েছে",

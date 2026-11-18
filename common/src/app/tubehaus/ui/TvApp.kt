@@ -311,7 +311,7 @@ private fun RailItem(icon: Symbol, label: String, selected: Boolean, open: Boole
 /** "Who's watching?": everyone on this TV as a big round letter, and "Add a person"; OK picks (their PIN first,
  *  if they set one); the one who used it last has the focus */
 @Composable
-private fun WhoIsWatching(app: AppState, people: People) {
+internal fun WhoIsWatching(app: AppState, people: People) {
     val first = remember { FocusRequester() }
     var adding by remember { mutableStateOf(false) }
     var picking by remember { mutableStateOf<String?>(null) }

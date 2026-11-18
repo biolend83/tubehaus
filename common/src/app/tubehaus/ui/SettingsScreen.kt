@@ -748,6 +748,9 @@ private fun PeopleItems(app: AppState) {
             }
         }
         SItem(tr("Add a person"), tr("Starts with an empty library; switch any time here")) { adding = true }
+        if (p.names.size > 1 && !app.platform.tv) Toggle(tr("Ask who's watching when the app opens"), "", p.askOnOpen) { b ->
+            app.store.people.update { it.copy(askOnOpen = b) }; app.store.people.flushNow()
+        }
         if (p.names.isNotEmpty()) SItem(tr("PIN for {n}").replace("{n}", personLabel(app, p.names.firstOrNull { Store.personId(it) == p.current } ?: "")),
             if (p.pins[p.current] != null) tr("On: asked before switching to you") else tr("Off: anyone here can switch to you")) { pinFor = true }
     }
