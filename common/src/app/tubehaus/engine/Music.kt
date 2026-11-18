@@ -119,7 +119,9 @@ object Music {
         for (v in tops) {
             val (ts, ars) = parts(v.title, v.artist)
             ts.forEach { want += norm(it) }
-            (ars + IN_PARENS.findAll(v.title + " " + v.artist).map { it.groupValues[1] }).forEach { by += norm(it) }
+            // and each word of a name: "IVE 아이브" is the album's "IVE (아이브)"
+            val names = ars + IN_PARENS.findAll(v.title + " " + v.artist).map { it.groupValues[1] }
+            (names + names.flatMap { it.split(' ') }).forEach { by += norm(it) }
         }
         want.removeAll { it.length < 2 }
         by.removeAll { it.length < 2 }
