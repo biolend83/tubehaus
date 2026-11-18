@@ -92,7 +92,7 @@ private fun rowsOf(lines: List<Lyrics.Line>): List<Row> {
  * derived state, so the frames don't recompose the page)
  */
 @Composable
-fun SyncedLyrics(lines: List<Lyrics.Line>, now: () -> Long, seek: (Long) -> Unit, footer: String, modifier: Modifier = Modifier) {
+fun SyncedLyrics(lines: List<Lyrics.Line>, now: () -> Long, seek: (Long) -> Unit, footer: String, modifier: Modifier = Modifier, at: Int = 45) {
     val rows = remember(lines) { rowsOf(lines) }
     val active by remember(rows) { derivedStateOf { rows.indexOfLast { it.ms <= now() + LEAD_MS }.coerceAtLeast(0) } }
     // each row's own view of where the list is: they all head for the same place, at different moments
@@ -169,7 +169,7 @@ fun SyncedLyrics(lines: List<Lyrics.Line>, now: () -> Long, seek: (Long) -> Unit
         var y = 0f
         ps.forEachIndexed { i, p -> tops[i] = y; y += p.height + if (i < rows.size && rows[i].gap) gapPx * 0.4f else gapPx }
         val h = if (cs.hasBoundedHeight) cs.maxHeight else 1200
-        val anchor = h * 0.45f
+        val anchor = h * at.coerceIn(10, 80) / 100f
         layout(cs.maxWidth, h) {
             ps.forEachIndexed { i, p ->
                 val top = anchor + tops[i] - scroll[i].value + user.value

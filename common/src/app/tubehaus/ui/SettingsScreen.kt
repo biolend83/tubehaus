@@ -525,6 +525,10 @@ private fun SettingsRows(
         r.row("music", tr("Sound only for music") + " audio data") {
             Toggle(tr("Sound only for music"), tr("Songs from the Music tab load only their sound, which saves data. \"Watch video\" brings the picture back."), s.musicAudioOnly) { b -> set { it.copy(musicAudioOnly = b) } }
         }
+        r.row("music", tr("Lyrics position") + " lyrics position") {
+            val opts = listOf(25, 35, 45, 55, 65).map { "$it" to (if (it == 45) "$it% (" + tr("Default") + ")" else "$it%") }
+            Choice(tr("Lyrics position"), opts.firstOrNull { it.first == "${s.lyricsAt}" }?.second ?: "${s.lyricsAt}%", opts) { c -> set { it.copy(lyricsAt = c.toInt()) } }
+        }
         r.row("music", tr("Lyrics") + " lyrics lrclib") {
             Note(tr("Lyrics are looked for first on YouTube Music (only the song's video id is sent), then on LRCLIB (lrclib.net), a free database of lyrics (the song's title and artist are sent). Only when you open the lyrics."))
         }
