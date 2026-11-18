@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -255,12 +257,14 @@ private fun TvRail(app: AppState, root: Screen?, req: FocusRequester, open: Bool
                 if (open) Text("TubeHaus", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 12.dp))
             }
             Spacer(Modifier.height(16.dp))
-            tabs.forEachIndexed { i, t ->
-                RailItem(t.icon, t.label, i == selected, open, Modifier.focusRequester(pick[i]).let { if (i == 0) it.focusRequester(first) else it }) {
-                    app.goRoot(t.screen); toContent()
+            // the tabs scroll on a short screen (a 720p TV), so Settings under them always stays on it
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                tabs.forEachIndexed { i, t ->
+                    RailItem(t.icon, t.label, i == selected, open, Modifier.focusRequester(pick[i]).let { if (i == 0) it.focusRequester(first) else it }) {
+                        app.goRoot(t.screen); toContent()
+                    }
                 }
             }
-            Spacer(Modifier.weight(1f))
             RailItem(Sym.Settings, tr("Settings"), selected == -2, open, Modifier.focusRequester(settingsReq)) {
                 app.goRoot(Screen.Settings); toContent()
             }
