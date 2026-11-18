@@ -19,6 +19,13 @@ struct TubeHausTV: App {
                     }
                     await ImportServer.fillIn()
                 }
+                .task {
+                    // a connected TubeHaus server: its library now and every five minutes, changes sent as they happen
+                    while !Task.isCancelled {
+                        await Server.shared.sync()
+                        try? await Task.sleep(nanoseconds: 300_000_000_000)
+                    }
+                }
         }
     }
 }
@@ -36,13 +43,16 @@ enum Route: Hashable {
     case liked
     case learned
     case manageSubs
+    case musicAlbum(String)
+    case musicArtist(String)
+    case nowPlaying
 
     var isVideo: Bool { if case .video = self { return true } else { return false } }
     var isSearch: Bool { if case .search = self { return true } else { return false } }
 }
 
 enum Tab: String, Hashable {
-    case home, shorts, subscriptions, library, settings
+    case home, shorts, subscriptions, music, library, settings
 }
 
 /// Where the app is: the tab picked in the side menu and the pages opened on top of it. Opening
@@ -100,8 +110,24 @@ struct RootView: View {
     @State private var nav = Nav.shared
     @State private var player = PlayerModel.shared
     @State private var folded = Settings.railFolded
+    /// "Who's watching?" is asked once each time the app opens (not when a launch argument opens a page: the CI check)
+    @State private var asked = Self.skipWho
+
+    private static var skipWho: Bool {
+        let d = UserDefaults.standard
+        if d.bool(forKey: "who") { return false }
+        return ["tab", "open", "channel"].contains { d.string(forKey: $0) != nil } || d.bool(forKey: "import")
+    }
 
     var body: some View {
+        if !asked {
+            WhoIsWatching { asked = true }
+        } else {
+            main
+        }
+    }
+
+    private var main: some View {
         VStack(spacing: 0) {
             if nav.showsTopBar {
                 TopBar(folded: folded) { setFolded(false) }
@@ -137,6 +163,7 @@ struct RootView: View {
         case .home: HomeView()
         case .shorts: ShortsView()
         case .subscriptions: SubscriptionsView()
+        case .music: MusicView()
         case .library: LibraryView()
         case .settings: SettingsView()
         }
@@ -156,6 +183,9 @@ struct RootView: View {
             case .liked: LocalList(kind: .liked)
             case .learned: LearnedView()
             case .manageSubs: ManageSubsView()
+            case .musicAlbum(let id): MusicPageView(id: id, artist: false)
+            case .musicArtist(let id): MusicPageView(id: id, artist: true)
+            case .nowPlaying: NowPlaying()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -210,6 +240,7 @@ struct Rail: View {
                 RailItem(icon: "bolt.fill", label: "Shorts", selected: nav.tab == .shorts && nav.path.isEmpty) { nav.go(.shorts) }
             }
             RailItem(icon: "play.square.stack", label: "Subscriptions", selected: nav.tab == .subscriptions && nav.path.isEmpty) { nav.go(.subscriptions) }
+            RailItem(icon: "music.note", label: "Music", selected: nav.tab == .music && nav.path.isEmpty) { nav.go(.music) }
             RailItem(icon: "play.rectangle.on.rectangle", label: "Library", selected: nav.tab == .library && nav.path.isEmpty) { nav.go(.library) }
             Rectangle().fill(Theme.outline).frame(width: 80, height: 2).padding(.vertical, 12)
             if let last = library.continueWatching.first?.video, !nav.watching {

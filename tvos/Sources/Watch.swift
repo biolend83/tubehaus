@@ -23,6 +23,18 @@ final class PlayerModel {
     var fullscreen = false
     /// what plays after this video, before Up next ("Play all")
     var queue: [Video] = []
+    /// the whole list "Play all" started, for "Repeat playlist": after the last one it starts again
+    private(set) var round: [Video] = []
+    var loopList = false
+
+    /// [list] from its first video, in order
+    func playAll(_ list: [Video]) {
+        guard let first = list.first else { return }
+        MusicPlayer.shared.stop()
+        queue = Array(list.dropFirst())
+        round = list
+        Nav.shared.open(first)
+    }
 
     private(set) var choices: [Subtitles.Choice] = []
     private(set) var choice: Subtitles.Choice?
@@ -112,6 +124,8 @@ final class PlayerModel {
         error = nil
         fullscreen = false
         queue = []
+        round = []
+        loopList = false
     }
 
     /// back from full screen: the page goes on playing
@@ -123,7 +137,8 @@ final class PlayerModel {
         let id = v.id
         async let d = try? YT.details(id)
         do {
-            let s = try await YT.stream(id)
+            // through the TubeHaus server when one is connected: its own HLS, no bot check for this TV
+            let s = Server.shared.connected ? try await Server.shared.stream(id) : try await YT.stream(id)
             guard video?.id == id else { return }
             stream = s
             // a video opened by id alone (or from an old list) gets its name and length from the streams
@@ -152,7 +167,8 @@ final class PlayerModel {
 
     private func start(_ url: URL, _ s: StreamInfo) {
         guard let v = video else { return }
-        let item = AVPlayerItem(url: url)
+        MusicPlayer.shared.stop()
+        let item = AVPlayerItem(asset: Server.shared.asset(url))
         item.externalMetadata = [meta(.commonIdentifierTitle, v.title), meta(.iTunesMetadataTrackSubTitle, v.author)]
         player.replaceCurrentItem(with: item)
         let at = Library.shared.resumeAt(v.id, length: v.lengthSec)
@@ -212,6 +228,7 @@ final class PlayerModel {
         Library.shared.watched(v, at: last)
         if let n = next() {
             if queue.first?.id == n.id { queue.removeFirst() }
+            else if queue.isEmpty && loopList && round.first?.id == n.id { queue = Array(round.dropFirst()) }
             Nav.shared.replace(with: n)     // its page opens it (WatchView)
         } else {
             ended = true
@@ -222,6 +239,7 @@ final class PlayerModel {
     /// what plays when this one ends: the queue, then (with Autoplay) the first of Up next not seen yet
     func next() -> Video? {
         if let q = queue.first { return q }
+        if loopList, round.count > 1, let first = round.first { return first }
         guard Settings.autoplayNext else { return nil }
         return related.items.compactMap(\.video).first { !$0.live && !Library.shared.finished($0.id) }
     }
@@ -526,6 +544,10 @@ struct WatchView: View {
                     likePill
                     ActionChip(library.isLater(current.id) ? "Saved" : "Watch later",
                                icon: library.isLater(current.id) ? "checkmark" : "clock") { library.toggleLater(current) }
+                    if mine && model.round.count > 1 {
+                        ActionChip(model.loopList ? "Repeating playlist" : "Repeat playlist",
+                                   icon: model.loopList ? "repeat.circle.fill" : "repeat") { model.loopList.toggle() }
+                    }
                     if mine, let n = model.next() {
                         ActionChip("Next", icon: "forward.end.fill") {
                             if model.queue.first?.id == n.id { model.queue.removeFirst() }
@@ -886,8 +908,8 @@ struct PlaylistView: View {
                     let list = videos.items.compactMap(\.video)
                     if let first = list.first {
                         FilledButton("Play all", icon: "play.fill") {
-                            PlayerModel.shared.queue = Array(list.dropFirst())
-                            Nav.shared.open(first)
+                            _ = first
+                            PlayerModel.shared.playAll(list)
                         }
                     }
                 }

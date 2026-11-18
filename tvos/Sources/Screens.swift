@@ -574,8 +574,8 @@ struct LocalList: View {
                     Spacer()
                     if let first = list.first {
                         FilledButton("Play all", icon: "play.fill") {
-                            PlayerModel.shared.queue = Array(list.dropFirst())
-                            Nav.shared.open(first)
+                            _ = first
+                            PlayerModel.shared.playAll(list)
                         }
                     }
                 }
@@ -664,9 +664,16 @@ struct SettingsView: View {
     @State private var region = UserDefaults.standard.string(forKey: "gl") ?? ""
     @State private var engine = ""
     @State private var dialog: Dialog?
+    @State private var server = Server.shared
+    @State private var sheet: Sheet?
+
+    enum Sheet: String, Identifiable {
+        case server, addPerson, pin
+        var id: String { rawValue }
+    }
 
     enum Dialog: String, Identifiable {
-        case language, region, captions, captionSize, clear
+        case language, region, captions, captionSize, clear, people, disconnect
         var id: String { rawValue }
     }
 
@@ -693,6 +700,23 @@ struct SettingsView: View {
                 toggle("Video at a glance", "Key words and moments under a video, made on this TV from its captions", $glance) { Settings.glance = $0 }
                 item("Captions", captions.isEmpty ? "Off" : name(language: captions)) { dialog = .captions }
                 item("Caption size", ["Small", "Medium", "Large"][max(0, min(2, captionSize))]) { dialog = .captionSize }
+
+                group("People on this TV")
+                item("Using TubeHaus now: \(People.name(People.everyone.first { People.id($0) == People.current } ?? ""))",
+                     People.everyone.count > 1 ? "Switch to someone else, or remove someone" : "Everyone can have their own subscriptions, history and recommendations") { dialog = .people }
+                item("Add a person", "They start with an empty library and their own TubeHaus server login") { sheet = .addPerson }
+                item(People.hasPin(People.current) ? "PIN: on" : "PIN: off", "Asked before switching to you, so others can't open your library") { sheet = .pin }
+
+                group("TubeHaus server")
+                if server.connected {
+                    item("Connected to \(server.base.replacingOccurrences(of: "https://", with: ""))",
+                         server.problem.map(Server.say) ?? (server.syncedAt.map { "Synced at \($0.formatted(date: .omitted, time: .shortened))" } ?? "Syncing…")) {
+                        Task { await server.sync() }
+                    }
+                    item("Disconnect", "This TV keeps its copy of the library") { dialog = .disconnect }
+                } else {
+                    item("Connect to a TubeHaus server", "Your library shared with your server and your other devices, videos played through the server, and the Music tab") { sheet = .server }
+                }
 
                 group("Your data")
                 item("What TubeHaus learned about you", "See and change what your recommendations are based on") { Nav.shared.push(.learned) }
@@ -734,12 +758,51 @@ struct SettingsView: View {
                 }
             case .clear:
                 Button("Clear", role: .destructive) { library.clearHistory() }
+            case .people:
+                ForEach(People.everyone, id: \.self) { e in
+                    let id = People.id(e)
+                    if id != People.current {
+                        Button("Switch to \(People.name(e))") { switchPerson(id) }
+                    }
+                }
+                ForEach(People.everyone, id: \.self) { e in
+                    let id = People.id(e)
+                    if id != People.current && !People.hasPin(id) {
+                        Button("Remove \(People.name(e))", role: .destructive) { People.remove(id) }
+                    }
+                }
+            case .disconnect:
+                Button("Disconnect", role: .destructive) { server.disconnect() }
+            }
+        }
+        .sheet(item: $sheet) { s in
+            switch s {
+            case .server: ConnectServer()
+            case .addPerson: AddPerson {}
+            case .pin: SetPin()
+            }
+        }
+        .sheet(item: Binding(get: { pinFor.map(PinFor.init) }, set: { pinFor = $0?.id })) { p in
+            PinEntry(title: "PIN for \(People.name(People.everyone.first { People.id($0) == p.id } ?? ""))") { pin in
+                guard People.pinOK(p.id, pin) else { return false }
+                pinFor = nil
+                People.switchTo(p.id)
+                return true
             }
         }
     }
 
+    @State private var pinFor: String?
+    private struct PinFor: Identifiable { let id: String }
+
+    private func switchPerson(_ id: String) {
+        if People.hasPin(id) { pinFor = id } else { People.switchTo(id) }
+    }
+
     private func title(_ d: Dialog?) -> String {
         switch d {
+        case .people: return "People on this TV"
+        case .disconnect: return "Disconnect from the server?"
         case .language: return "Language"
         case .region: return "Region"
         case .captions: return "Captions"

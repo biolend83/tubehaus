@@ -2,7 +2,8 @@ import Foundation
 import Observation
 
 /// Everything the TV keeps: subscriptions, what was watched and where it stopped, Watch later,
-/// likes, and what Home learned. All on the Apple TV itself (UserDefaults); no account, no server.
+/// likes, and what Home learned. All on the Apple TV itself (UserDefaults), each person's in their
+/// own (People.swift); with a TubeHaus server connected, every change goes to it too (Server.swift).
 @Observable
 final class Library {
     static let shared = Library()
@@ -23,9 +24,19 @@ final class Library {
     /// channel names, for the list of what was learned (the scores are kept by channel id)
     private(set) var names: [String: String] = [:]
 
-    private let store = UserDefaults.standard
+    /// the person using the TV: the first one keeps the TV's own UserDefaults, the others a suite each
+    private(set) var defaults = People.defaults(for: People.current)
+    private var store: UserDefaults { defaults }
 
-    private init() {
+    private init() { load() }
+
+    /// someone else uses the TV now: their things
+    func switchTo(_ person: String) {
+        defaults = People.defaults(for: person)
+        load()
+    }
+
+    private func load() {
         subscriptions = read("subscriptions") ?? []
         history = read("history") ?? []
         later = read("later") ?? []
@@ -53,9 +64,11 @@ final class Library {
     }
 
     func toggleSubscription(_ c: Channel) {
-        if isSubscribed(c.id) { subscriptions.removeAll { $0.id == c.id } }
+        let on = !isSubscribed(c.id)
+        if !on { subscriptions.removeAll { $0.id == c.id } }
         else { subscriptions.append(c); sortSubs() }
         write("subscriptions", subscriptions)
+        Server.shared.send("/yt/sub", key: "sub:\(c.id)", ["id": c.id, "on": on, "name": c.name, "thumb": c.avatar])
     }
 
     /// adds the channels not there yet; returns how many were new
@@ -68,6 +81,7 @@ final class Library {
         subscriptions += new
         sortSubs()
         write("subscriptions", subscriptions)
+        for c in new { Server.shared.send("/yt/sub", key: "sub:\(c.id)", ["id": c.id, "on": true, "name": c.name, "thumb": c.avatar]) }
         return new.count
     }
 
@@ -107,16 +121,19 @@ final class Library {
         history.insert(Watched(video: v, position: position, at: Date().timeIntervalSince1970), at: 0)
         if history.count > 500 { history.removeLast(history.count - 500) }
         write("history", history)
+        Server.shared.send("/yt/pos", key: "pos:\(v.id)", ["id": v.id, "t": Int(position), "len": v.lengthSec, "meta": Self.meta(v)])
     }
 
     func forget(_ id: String) {
         history.removeAll { $0.video.id == id }
         write("history", history)
+        Server.shared.send("/yt/hist/del", ["id": id])
     }
 
     func clearHistory() {
         history = []
         write("history", history)
+        Server.shared.send("/yt/hist/del", ["all": true])
     }
 
     /// started but not finished, newest first
@@ -137,37 +154,47 @@ final class Library {
     func isLater(_ id: String) -> Bool { later.contains { $0.id == id } }
 
     func toggleLater(_ v: Video) {
-        if isLater(v.id) { later.removeAll { $0.id == v.id } } else { later.insert(v, at: 0) }
+        let on = !isLater(v.id)
+        if !on { later.removeAll { $0.id == v.id } } else { later.insert(v, at: 0) }
         write("later", later)
+        list("wl", v, on)
+    }
+
+    private func list(_ name: String, _ v: Video, _ on: Bool) {
+        Server.shared.send("/yt/list", key: "list:\(name):\(v.id)", ["list": name, "on": on, "video": Self.meta(v)])
     }
 
     func isLiked(_ id: String) -> Bool { liked.contains { $0.id == id } }
 
     /// a like stays on the TV; it tells Home what to show more of
     func toggleLike(_ v: Video, keywords: [String]) {
-        if isLiked(v.id) {
+        let on = !isLiked(v.id)
+        if !on {
             liked.removeAll { $0.id == v.id }
         } else {
             liked.insert(v, at: 0)
             learn(v, keywords: keywords, watched: 0, length: 0, liked: true)
         }
         write("liked", liked)
-        if disliked.contains(v.id) { disliked.removeAll { $0 == v.id }; write("disliked", disliked) }
+        list("likes", v, on)
+        if disliked.contains(v.id) { disliked.removeAll { $0 == v.id }; write("disliked", disliked); list("dislikes", v, false) }
     }
 
     func isDisliked(_ id: String) -> Bool { disliked.contains(id) }
 
     /// a dislike: less from this channel
     func toggleDislike(_ v: Video) {
-        if isDisliked(v.id) {
+        let on = !isDisliked(v.id)
+        if !on {
             disliked.removeAll { $0 == v.id }
         } else {
             disliked.append(v.id)
             if disliked.count > 2000 { disliked.removeFirst(disliked.count - 2000) }
-            if isLiked(v.id) { liked.removeAll { $0.id == v.id }; write("liked", liked) }
+            if isLiked(v.id) { liked.removeAll { $0.id == v.id }; write("liked", liked); list("likes", v, false) }
             nudge(v, -1.5)
         }
         write("disliked", disliked)
+        list("dislikes", v, on)
     }
 
     // MARK: what Home learned (see Recommend.swift)
@@ -230,6 +257,65 @@ final class Library {
     func resetTaste() {
         taste = Taste()
         write("taste", taste)
+    }
+
+    // MARK: a TubeHaus server's library (its export, "tubehaus" format: the apps' Library)
+
+    /// what a server keeps of a video
+    static func meta(_ v: Video) -> [String: Any] {
+        ["id": v.id, "title": v.title, "author": v.author, "authorId": v.channelId, "len": v.lengthSec,
+         "published": v.publishedAt, "views": v.views, "live": v.live]
+    }
+
+    private static func video(_ m: [String: Any]) -> Video? {
+        guard let id = m["id"] as? String, !id.isEmpty else { return nil }
+        var v = Video(id: id, title: m["title"] as? String ?? "", author: m["author"] as? String ?? "",
+                      channelId: m["authorId"] as? String ?? "", lengthSec: (m["len"] as? NSNumber)?.intValue ?? 0)
+        v.views = (m["views"] as? NSNumber)?.intValue ?? 0
+        v.publishedAt = (m["published"] as? NSNumber)?.intValue ?? 0
+        v.live = m["live"] as? Bool ?? false
+        return v
+    }
+
+    /// the server's library in place of this TV's lists (what Home learned stays the TV's own)
+    func take(server o: [String: Any]) {
+        let subs = (o["subs"] as? [String: [String: Any]] ?? [:]).map { id, s in
+            Channel(id: id, name: s["name"] as? String ?? "", avatar: s["thumb"] as? String ?? "")
+        }
+        subscriptions = subs.map { c in
+            var c = c
+            if c.avatar.isEmpty, let mine = subscriptions.first(where: { $0.id == c.id }) { c.avatar = mine.avatar }
+            if c.name.isEmpty, let mine = subscriptions.first(where: { $0.id == c.id }) { c.name = mine.name }
+            return c
+        }
+        sortSubs()
+        let pos = o["pos"] as? [String: [NSNumber]] ?? [:]
+        history = (o["hist"] as? [[String: Any]] ?? []).prefix(500).compactMap { m in
+            guard let v = Self.video(m) else { return nil }
+            let p = pos[v.id]
+            return Watched(video: v, position: p?.first?.doubleValue ?? 0,
+                           at: (m["at"] as? NSNumber)?.doubleValue ?? p.flatMap { $0.count > 2 ? $0[2].doubleValue : nil } ?? 0)
+        }
+        later = (o["wl"] as? [[String: Any]] ?? []).compactMap(Self.video)
+        liked = (o["likes"] as? [[String: Any]] ?? []).compactMap(Self.video)
+        disliked = o["dislikes"] as? [String] ?? []
+        write("subscriptions", subscriptions); write("history", history); write("later", later)
+        write("liked", liked); write("disliked", disliked)
+    }
+
+    /// this TV's library as a TubeHaus export, for the server to merge in when it is connected
+    func exportJSON() -> String {
+        var subs: [String: Any] = [:]
+        for c in subscriptions { subs[c.id] = ["name": c.name, "thumb": c.avatar] }
+        var pos: [String: Any] = [:]
+        for w in history { pos[w.video.id] = [Int(w.position), w.video.lengthSec, Int(w.at)] }
+        let o: [String: Any] = [
+            "subs": subs, "pos": pos,
+            "hist": history.map { var m = Self.meta($0.video); m["at"] = Int($0.at); return m },
+            "wl": later.map(Self.meta), "likes": liked.map(Self.meta), "dislikes": disliked,
+        ]
+        let d = (try? JSONSerialization.data(withJSONObject: o)) ?? Data("{}".utf8)
+        return String(data: d, encoding: .utf8) ?? "{}"
     }
 
     /// nothing to go on yet: Home first asks for a few topics
