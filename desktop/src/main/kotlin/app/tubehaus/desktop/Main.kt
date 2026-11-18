@@ -78,6 +78,8 @@ class DesktopPlatform : Platform {
         return false
     }
 
+    override fun installUpdate(url: String, progress: (Float) -> Unit, done: (Boolean) -> Unit) = WinUpdate.install(url, progress, done)
+
     override fun openExternal(url: String) {
         runCatching { Desktop.getDesktop().browse(URI(url)) }
     }
