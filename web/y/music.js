@@ -545,13 +545,7 @@ async function loadLyrics() {
       box.innerHTML = `<div class="ly-none">${icon("lyrics")}<p>${$t("이 곡의 가사를 찾지 못했어요")}</p></div>`;
       return;
     }
-    // a music video longer than the song the times were made for: they may run early or late
-    const vlen = s.len || Math.round(audio.duration) || 0;
-    const off = d.synced && d.len && vlen && Math.abs(vlen - d.len) > 2;
-    box.innerHTML = `${d.synced ? `<div class="ly-sync${off ? " warn" : ""}">
-        <span class="ly-sync-t">${off ? $t("영상이 노래보다 {0}초 길어서 가사가 어긋날 수 있어요", Math.abs(vlen - d.len)) : $t("가사 타이밍")}</span>
-        <div class="ly-sync-b"><button data-lyoff="-500" aria-label="${$t("가사 빨리")}">−0.5${$t("초")}</button><output></output><button data-lyoff="500" aria-label="${$t("가사 늦게")}">+0.5${$t("초")}</button>
-        <button class="ly-sync-tap" data-lyoff="sync">${$t("지금 부르는 줄 누르기")}</button></div></div>` : ""}<div class="ly ${d.synced ? "synced" : ""}">${d.synced ? '<div class="ly-pad"></div>' : ""}${d.lines.map(([ms, w]) =>
+    box.innerHTML = `<div class="ly ${d.synced ? "synced" : ""}">${d.synced ? '<div class="ly-pad"></div>' : ""}${d.lines.map(([ms, w]) =>
       w ? `<p class="ly-line"${d.synced ? ` data-ms="${ms}"` : ""}>${esc(w)}</p>` : `<p class="ly-gap">${d.synced ? "♪" : ""}</p>`).join("")}${d.synced ? '<div class="ly-pad"></div>' : ""}
       <div class="ly-src">${$t("가사 제공: {0}", "LRCLIB")}</div></div>`;
     MP.lyLine = -1;
@@ -603,7 +597,9 @@ function followLyrics(t, jump = false) {
   ps.forEach((p, j) => { p.classList.toggle("on", j === k); p.classList.toggle("past", j < k); });
   const p = ps[k];
   if (p && Date.now() - (MP.handScroll || 0) > 3500) {
-    box.scrollTo({ top: p.offsetTop - box.clientHeight * 0.38, behavior: jump ? "auto" : "smooth" });
+    // the line being sung in the middle of the box
+    const at = box.scrollTop + p.getBoundingClientRect().top - box.getBoundingClientRect().top;
+    box.scrollTo({ top: at - (box.clientHeight - p.offsetHeight) / 2, behavior: jump ? "auto" : "smooth" });
   }
 }
 
