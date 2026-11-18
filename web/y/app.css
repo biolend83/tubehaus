@@ -1338,6 +1338,9 @@ html.mfull-open, html.mfull-open body { overflow: hidden; }
 .ly.synced p { color: color-mix(in srgb, var(--fg) 30%, transparent); transition: color .35s, transform .35s; transform-origin: left center; cursor: pointer; }
 .ly.synced p.past { color: color-mix(in srgb, var(--fg) 52%, transparent); }
 .ly.synced p.on { color: var(--fg); transform: scale(1.025); }
+/* the sung part of the line: filled left to right (an inline span, so a wrapped line fills row by row) */
+.ly.synced p.on span { color: transparent; -webkit-background-clip: text; background-clip: text;
+  background-image: linear-gradient(90deg, var(--fg) calc(var(--p, 0) * 100%), color-mix(in srgb, var(--fg) 38%, transparent) calc(var(--p, 0) * 100%)); }
 .ly.synced p:hover { color: var(--fg); }
 .ly:not(.synced) p { font-size: 18px; font-weight: 600; padding: 3px 4px; }
 .ly .ly-gap { min-height: 18px; }

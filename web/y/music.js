@@ -546,7 +546,7 @@ async function loadLyrics() {
       return;
     }
     box.innerHTML = `<div class="ly ${d.synced ? "synced" : ""}">${d.synced ? '<div class="ly-pad"></div>' : ""}${d.lines.map(([ms, w]) =>
-      w ? `<p class="ly-line"${d.synced ? ` data-ms="${ms}"` : ""}>${esc(w)}</p>` : `<p class="ly-gap">${d.synced ? "♪" : ""}</p>`).join("")}${d.synced ? '<div class="ly-pad"></div>' : ""}
+      w ? `<p class="ly-line"${d.synced ? ` data-ms="${ms}"` : ""}><span>${esc(w)}</span></p>` : `<p class="ly-gap">${d.synced ? "♪" : ""}</p>`).join("")}${d.synced ? '<div class="ly-pad"></div>' : ""}
       <div class="ly-src">${$t("가사 제공: {0}", "LRCLIB")}</div></div>`;
     MP.lyLine = -1;
     paintLySync();
@@ -584,18 +584,39 @@ function paintLySync() {
   $(".mf-lyrics", $("#mfull"))?.classList.toggle("ly-tapping", !!MP.lySync);
   $(".ly-sync-tap", bar).textContent = MP.lySync ? $t("지금 부르는 줄을 눌러 주세요") : $t("지금 부르는 줄 누르기");
 }
+// the line being sung fills from left to right (a wrapped line row after row), as far as the song is
+// between its start and the next line's; one animation frame at a time while it plays
+let lyRaf = 0;
+function lyFill() {
+  if (lyRaf) return;
+  const step = () => {
+    lyRaf = 0;
+    const d = MP.lyrics, k = MP.lyLine;
+    const box = $("#mfull .mf-lyrics");
+    if (!d?.synced || !box || !MP.open || MP.tab !== "lyrics" || k < 0) return;
+    const p = $$(".ly > p", box)[k];
+    if (!p) return;
+    const ms = audio.currentTime * 1000 + 100 - lyOff();
+    const from = d.lines[k][0];
+    const to = Math.min(d.lines[k + 1]?.[0] ?? from + 5000, from + 12000);
+    p.style.setProperty("--p", Math.max(0, Math.min(1, (ms - from) / Math.max(1, to - from))).toFixed(4));
+    if (!audio.paused) lyRaf = requestAnimationFrame(step);
+  };
+  lyRaf = requestAnimationFrame(step);
+}
 function followLyrics(t, jump = false) {
   const d = MP.lyrics;
   if (!d?.synced) return;
   const ms = t * 1000 + 100 - lyOff();
   let k = -1;
   for (let j = 0; j < d.lines.length; j++) { if (d.lines[j][0] <= ms) k = j; else break; }
-  if (k === MP.lyLine && !jump) return;
+  if (k === MP.lyLine && !jump) { lyFill(); return; }
   MP.lyLine = k;
   const box = $("#mfull .mf-lyrics");
   const ps = $$(".ly > p", box);
   ps.forEach((p, j) => { p.classList.toggle("on", j === k); p.classList.toggle("past", j < k); });
   const p = ps[k];
+  lyFill();
   if (p && Date.now() - (MP.handScroll || 0) > 3500) {
     // the line being sung in the middle of the box
     const at = box.scrollTop + p.getBoundingClientRect().top - box.getBoundingClientRect().top;
