@@ -42,10 +42,31 @@ object ServerVideo {
         auth?.let { put("Authorization", it) }
     }
 
+    /** a phone between Wi-Fi and mobile data, or the server getting a fresh WARP address, can drop one
+     *  request: a failed connection is tried twice more before "The server didn't answer" (#94) */
+    private suspend fun fetchVideo(url: String): String {
+        var last: Exception? = null
+        for (wait in listOf(0L, 1500L, 3000L)) {
+            if (wait > 0) kotlinx.coroutines.delay(wait)
+            try {
+                return Net.get(url, headers())
+            } catch (e: HttpError) {
+                // the server answered: 502/503/504 are its way to YouTube, worth another go; the rest aren't
+                if (e.code !in 502..504) throw e
+                last = e
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                last = e
+            }
+        }
+        throw last ?: Exception("no answer")
+    }
+
     suspend fun stream(id: String): Stream {
         val b = base.ifEmpty { throw YtError("No server") }
         val text = try {
-            Net.get("$b/api/v1/videos/$id", headers())
+            fetchVideo("$b/api/v1/videos/$id")
         } catch (e: HttpError) {
             throw YtError(serverError(e.code), if (e.code == 404) YtError.Kind.UNAVAILABLE else YtError.Kind.NETWORK)
         } catch (e: kotlinx.coroutines.CancellationException) {

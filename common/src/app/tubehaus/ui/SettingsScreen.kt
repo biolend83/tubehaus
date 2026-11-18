@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.data.Store
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import app.tubehaus.engine.SponsorBlock
@@ -94,7 +95,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "1.6.3"
+const val VERSION = "1.6.4"
 
 /** Settings' categories, as cards on its first page: key, icon, title, what is inside */
 private class Cat(val key: String, val icon: Symbol, val title: String, val sub: String)
@@ -618,6 +619,8 @@ private fun SettingsRows(
         r.row("data", tr("Manage subscriptions")) { SItem(tr("Manage subscriptions"), tr("Remove channels, or all of them")) { app.go(Screen.ManageSubs) } }
         r.row("data", tr("Export") + " backup") { SItem(tr("Export"), tr("A backup you can import here, into TubeHaus on a server, or into other apps")) { dialog = "export" } }
         r.row("data", tr("Clear watch history") + " history") { SItem(tr("Clear watch history"), "") { dialog = "clear" } }
+        r.group("data", tr("People on this device"))
+        r.row("data", tr("People on this device") + " family household profile account switch user") { PeopleItems(app) }
         r.group("data", tr("TubeHaus server"))
         r.row("data", tr("TubeHaus server") + " sync server") { ServerItems(app) { dialog = "server" } }
         // ------------------------------------------------------------------ about
@@ -721,6 +724,54 @@ private fun Note(text: String) {
             .background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 14.dp, vertical = 12.dp))
 }
 
+/**
+ * Everyone who uses the app on this device, each with their own library, recommendations, settings
+ * and TubeHaus server login. A tap switches; "Add a person" starts someone with an empty library.
+ */
+@Composable
+private fun PeopleItems(app: AppState) {
+    val p by app.store.people.state.collectAsState()
+    var adding by remember { mutableStateOf(false) }
+    var pinFor by remember { mutableStateOf(false) }
+    var switching by remember { mutableStateOf<String?>(null) }
+    var removing by remember { mutableStateOf<String?>(null) }
+    Column {
+        if (p.names.isEmpty()) Note(tr("Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login."))
+        for (e in p.names) {
+            val id = Store.personId(e)
+            val me = id == p.current
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) {
+                    SItem(personLabel(app, e), if (me) tr("Using the app now") else tr("Switch to this person")) { if (!me) switching = id }
+                }
+                if (!me) IconButton(onClick = { removing = id }) { Icon(Sym.Close.outline, tr("Remove"), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        }
+        SItem(tr("Add a person"), tr("Starts with an empty library; switch any time here")) { adding = true }
+        if (p.names.size > 1 && !app.platform.tv) Toggle(tr("Ask who's watching when the app opens"), "", p.askOnOpen) { b ->
+            app.store.people.update { it.copy(askOnOpen = b) }; app.store.people.flushNow()
+        }
+        if (p.names.isNotEmpty()) SItem(tr("PIN for {n}").replace("{n}", personLabel(app, p.names.firstOrNull { Store.personId(it) == p.current } ?: "")),
+            if (p.pins[p.current] != null) tr("On: asked before switching to you") else tr("Off: anyone here can switch to you")) { pinFor = true }
+    }
+    if (adding) AddPersonDialog(app) { adding = false }
+    if (pinFor) SetPinDialog(app) { pinFor = false }
+    PersonSwitch(app, switching, cancel = { switching = null }) { switching = null }
+    removing?.let { id ->
+        val who = p.names.firstOrNull { Store.personId(it) == id }?.let { personLabel(app, it) } ?: ""
+        val locked = p.pins[id] != null
+        if (locked) PinDialog(app, tr("Remove {n}?").replace("{n}", who), { removing = null }) { pin ->
+            app.store.pinOk(id, pin).also { if (it) { app.store.removePerson(id); removing = null } }
+        } else AlertDialog(
+            onDismissRequest = { removing = null },
+            title = { Text(tr("Remove {n}?").replace("{n}", who)) },
+            text = { Text(tr("Their library, history and settings on this device are deleted. What's on a TubeHaus server stays there.")) },
+            confirmButton = { TextButton(onClick = { app.store.removePerson(id); removing = null }) { Text(tr("Remove")) } },
+            dismissButton = { TextButton(onClick = { removing = null }) { Text(tr("Cancel")) } },
+        )
+    }
+}
+
 /** Not connected: one line that opens [ServerDialog]. Connected: where, how the last sync went, sync now, disconnect. */
 @Composable
 private fun ServerItems(app: AppState, open: () -> Unit) {
@@ -750,7 +801,7 @@ private fun serverProblem(code: String) = when (code) {
     "address" -> tr("That doesn't look like a web address")
     "login" -> tr("The user name or password is wrong")
     "public" -> tr("This is a public instance: it keeps libraries in each browser, so there is nothing to sync")
-    "notTubeHaus" -> tr("No TubeHaus server answered there (or its login is a web page the app can't fill in: use TUBEHAUS_AUTH=basic)")
+    "notTubeHaus" -> tr("No TubeHaus server answered there")
     else -> tr("Couldn't reach the server")
 }
 

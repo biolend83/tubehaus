@@ -251,6 +251,19 @@ class AppState(val platform: Platform, val store: Store) {
         platform.setFullscreen(on)
     }
 
+    /** the TV has asked "Who's watching?" since it opened (or there is only one person) */
+    var whoAsked by mutableStateOf(false)
+
+    /** someone else uses the app now: their library, recommendations, settings and server login */
+    fun switchPerson(id: String) {
+        if (id == store.people.value.current) return
+        playback.close()
+        store.switchPerson(id)
+        sync.personChanged()
+        stack.clear(); stack.add(Screen.Home)
+        sync.refreshSoon()
+    }
+
     fun watch(v: Video, queue: List<Video> = emptyList()) {
         playback.open(v, queue)
         go(Screen.Watch(v.id))
