@@ -702,7 +702,16 @@ private fun LazyListScope.related(app: AppState, big: Boolean, thumb: Dp = 200.d
     val pb = app.playback
     val queue = pb.queue
     if (queue.isNotEmpty()) {
-        item { SectionTitle(tr("Up next")) }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SectionTitle(tr("Up next"), Modifier.weight(1f))
+                // "Repeat playlist" (#91): after the last video the list starts again
+                IconButton(onClick = { pb.loopList = !pb.loopList }, modifier = Modifier.padding(end = 8.dp)) {
+                    Icon(if (pb.loopList) Sym.Repeat.fill else Sym.Repeat.outline, tr("Repeat playlist"),
+                        tint = if (pb.loopList) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
         items(queue, key = { "q" + it.id }) { v ->
             // the handle at the end drags a video to another place in the queue (#85); the menu moves it one step
             val at = queue.indexOfFirst { it.id == v.id }

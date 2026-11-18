@@ -54,12 +54,21 @@ class Playback(private val app: AppState) {
     /** "Play now" */
     fun playUpNext() { val n = upNext ?: return; cancelUpNext(); goNext(n) }
     private fun goNext(n: Video) {
-        open(n, queue.drop(if (queue.firstOrNull()?.id == n.id) 1 else 0))
+        open(n, rest(n))
         if (app.current is Screen.Watch) app.stack[app.stack.size - 1] = Screen.Watch(n.id)
     }
     /** "Up next" when there is no queue */
     val next: Video?
-        get() = if (music) (songs.getOrNull(songAt + 1) ?: songs.firstOrNull()?.takeIf { repeat == 1 })?.video() else queue.firstOrNull() ?: details?.related?.filterIsInstance<Video>()?.firstOrNull { !it.live && !it.short }
+        get() = if (music) (songs.getOrNull(songAt + 1) ?: songs.firstOrNull()?.takeIf { repeat == 1 })?.video()
+        else queue.firstOrNull() ?: round.firstOrNull()?.takeIf { loopList && round.size > 1 } ?: details?.related?.filterIsInstance<Video>()?.firstOrNull { !it.live && !it.short }
+
+    /** the playlist or queue that was started, all of it: "Repeat playlist" (#91) starts it again after the last one */
+    private var round: List<Video> = emptyList()
+    var loopList by mutableStateOf(false)
+    /** the videos after [n]: the queue, or the whole list again when it starts over */
+    private fun rest(n: Video): List<Video> =
+        if (queue.isEmpty() && loopList && round.firstOrNull()?.id == n.id) round.drop(1)
+        else queue.drop(if (queue.firstOrNull()?.id == n.id) 1 else 0)
 
     // ------------------------------------------------------------------ music
     /** what plays came from the music tab: the cover instead of the picture, songs one after another */
@@ -233,6 +242,13 @@ class Playback(private val app: AppState) {
         val mine = ownQueue && !asSong && newQueue.all { n -> queue.any { it.id == n.id } }
         queue = (if (mine && newQueue.isEmpty()) queue else newQueue).filter { it.id != v.id }
         ownQueue = mine && queue.isNotEmpty()
+        when {
+            asSong -> { round = emptyList(); loopList = false }
+            // going on through the same list keeps all of it; another list replaces it
+            !mine && newQueue.isNotEmpty() -> if (!(round.any { it.id == v.id } && queue.all { q -> round.any { it.id == q.id } })) round = listOf(v) + queue
+            mine -> if (round.none { it.id == v.id }) round = listOf(v) + queue else round = round + queue.filter { q -> round.none { it.id == q.id } }
+            round.none { it.id == v.id } -> { round = emptyList(); loopList = false }
+        }
         stream = null
         details = null
         error = null; errorAge = false
@@ -385,7 +401,7 @@ class Playback(private val app: AppState) {
             return
         }
         if (app.store.settings.value.calm) return       // calm mode: nothing starts by itself
-        if (!app.store.settings.value.autoplay && queue.isEmpty()) return
+        if (!app.store.settings.value.autoplay && queue.isEmpty() && !(loopList && round.size > 1)) return
         val n = next ?: return
         // a playlist goes straight on; a suggestion is counted down first, so it can be stopped
         val wait = if (queue.isNotEmpty() || app.platform.tv) 800L else UP_NEXT_MS
@@ -424,6 +440,7 @@ class Playback(private val app: AppState) {
         job?.cancel()
         player.stop()
         video = null; stream = null; details = null; error = null; errorAge = false; queue = emptyList(); ownQueue = false
+        round = emptyList(); loopList = false
         segments = emptyList(); skippable = null; justSkipped = null
         music = false; songs = emptyList(); songAt = 0; radio = false; abA = -1L; abB = -1L
     }
@@ -431,7 +448,7 @@ class Playback(private val app: AppState) {
     fun skipNext() {
         if (music) { if (songAt + 1 < songs.size) playSongAt(songAt + 1) else if (repeat == 1 && songs.isNotEmpty()) playSongAt(0); return }
         val n = next ?: return
-        open(n, queue.drop(if (queue.firstOrNull()?.id == n.id) 1 else 0))
+        open(n, rest(n))
         if (app.current is Screen.Watch) app.stack[app.stack.size - 1] = Screen.Watch(n.id)
     }
 
