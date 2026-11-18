@@ -44,6 +44,14 @@ fun tr(s: String): String {
 fun textOverride(key: String, lang: String): String = ""
 
 private val KO by lazy { mapOf(
+    "PIN for {n}" to "{n}의 PIN",
+    "Asked before switching to you, so others can't open your library" to "나로 바꿀 때 물어봐요. 다른 사람이 내 서재를 열 수 없어요",
+    "PIN set" to "PIN을 설정했어요",
+    "PIN removed" to "PIN을 지웠어요",
+    "Remove PIN" to "PIN 지우기",
+    "On: asked before switching to you" to "켜짐: 나로 바꿀 때 물어봐요",
+    "Off: anyone here can switch to you" to "꺼짐: 누구나 나로 바꿀 수 있어요",
+    "Who's watching?" to "누가 볼까요?",
     "People on this device" to "이 기기를 쓰는 사람",
     "First person" to "첫 번째 사람",
     "Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login." to "집에 있는 사람마다 구독, 시청 기록, 추천, TubeHaus 서버 로그인을 따로 가질 수 있어요.",
@@ -751,6 +759,14 @@ private val KO by lazy { mapOf(
 
 // Español. Machine-made, not yet read by a native speaker: corrections welcome
 private val ES by lazy { mapOf(
+    "PIN for {n}" to "PIN de {n}",
+    "Asked before switching to you, so others can't open your library" to "Se pide antes de cambiar a ti, para que nadie más abra tu biblioteca",
+    "PIN set" to "PIN establecido",
+    "PIN removed" to "PIN quitado",
+    "Remove PIN" to "Quitar PIN",
+    "On: asked before switching to you" to "Activado: se pide antes de cambiar a ti",
+    "Off: anyone here can switch to you" to "Desactivado: cualquiera puede cambiar a ti",
+    "Who's watching?" to "¿Quién está viendo?",
     "People on this device" to "Personas en este dispositivo",
     "First person" to "Primera persona",
     "Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login." to "Cada persona de la casa puede tener aquí sus propias suscripciones, historial y recomendaciones, y su propio inicio de sesión en el servidor TubeHaus.",
@@ -1412,6 +1428,14 @@ private val ES by lazy { mapOf(
 
 // 日本語. Machine-made, not yet read by a native speaker: corrections welcome
 private val JA by lazy { mapOf(
+    "PIN for {n}" to "{n} の PIN",
+    "Asked before switching to you, so others can't open your library" to "あなたに切り替えるときに確認します。他の人はあなたのライブラリを開けません",
+    "PIN set" to "PIN を設定しました",
+    "PIN removed" to "PIN を削除しました",
+    "Remove PIN" to "PIN を削除",
+    "On: asked before switching to you" to "オン: 切り替え時に確認",
+    "Off: anyone here can switch to you" to "オフ: 誰でも切り替え可能",
+    "Who's watching?" to "誰が見ますか？",
     "People on this device" to "このデバイスを使う人",
     "First person" to "最初の人",
     "Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login." to "家族それぞれが、登録チャンネル・履歴・おすすめ、TubeHaus サーバーのログインを別々に持てます。",
@@ -2073,6 +2097,14 @@ private val JA by lazy { mapOf(
 
 // Deutsch. Machine-made, not yet read by a native speaker: corrections welcome
 private val DE by lazy { mapOf(
+    "PIN for {n}" to "PIN für {n}",
+    "Asked before switching to you, so others can't open your library" to "Wird vor dem Wechsel zu dir abgefragt, damit andere deine Mediathek nicht öffnen",
+    "PIN set" to "PIN festgelegt",
+    "PIN removed" to "PIN entfernt",
+    "Remove PIN" to "PIN entfernen",
+    "On: asked before switching to you" to "An: wird vor dem Wechsel zu dir abgefragt",
+    "Off: anyone here can switch to you" to "Aus: jeder hier kann zu dir wechseln",
+    "Who's watching?" to "Wer schaut gerade?",
     "People on this device" to "Personen auf diesem Gerät",
     "First person" to "Erste Person",
     "Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login." to "Jede Person im Haushalt kann hier eigene Abos, einen eigenen Verlauf, eigene Empfehlungen und eine eigene Anmeldung am TubeHaus-Server haben.",
@@ -2734,6 +2766,14 @@ private val DE by lazy { mapOf(
 
 // 简体中文 (Simplified Chinese). Machine-made, not yet read by a native speaker: corrections welcome
 private val ZH by lazy { mapOf(
+    "PIN for {n}" to "{n} 的 PIN",
+    "Asked before switching to you, so others can't open your library" to "切换到你时需要输入，其他人无法打开你的媒体库",
+    "PIN set" to "已设置 PIN",
+    "PIN removed" to "已移除 PIN",
+    "Remove PIN" to "移除 PIN",
+    "On: asked before switching to you" to "开：切换到你时需要输入",
+    "Off: anyone here can switch to you" to "关：任何人都能切换到你",
+    "Who's watching?" to "谁在观看？",
     "People on this device" to "此设备上的用户",
     "First person" to "第一位用户",
     "Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login." to "家里每个人都可以在这里拥有自己的订阅、观看记录和推荐，以及自己的 TubeHaus 服务器登录。",
@@ -3395,6 +3435,14 @@ private val ZH by lazy { mapOf(
 
 // Português (Portuguese). Machine-made, not yet read by a native speaker: corrections welcome
 private val PT by lazy { mapOf(
+    "PIN for {n}" to "PIN de {n}",
+    "Asked before switching to you, so others can't open your library" to "Pedido antes de mudar para você, para ninguém abrir sua biblioteca",
+    "PIN set" to "PIN definido",
+    "PIN removed" to "PIN removido",
+    "Remove PIN" to "Remover PIN",
+    "On: asked before switching to you" to "Ligado: pedido antes de mudar para você",
+    "Off: anyone here can switch to you" to "Desligado: qualquer um pode mudar para você",
+    "Who's watching?" to "Quem está assistindo?",
     "People on this device" to "Pessoas neste dispositivo",
     "First person" to "Primeira pessoa",
     "Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login." to "Cada pessoa da casa pode ter aqui suas próprias inscrições, histórico e recomendações, e seu próprio login no servidor TubeHaus.",
@@ -4056,6 +4104,14 @@ private val PT by lazy { mapOf(
 
 // Français (French). Machine-made, not yet read by a native speaker: corrections welcome
 private val FR by lazy { mapOf(
+    "PIN for {n}" to "PIN de {n}",
+    "Asked before switching to you, so others can't open your library" to "Demandé avant de passer à vous, pour que personne d'autre n'ouvre votre bibliothèque",
+    "PIN set" to "PIN défini",
+    "PIN removed" to "PIN supprimé",
+    "Remove PIN" to "Supprimer le PIN",
+    "On: asked before switching to you" to "Activé : demandé avant de passer à vous",
+    "Off: anyone here can switch to you" to "Désactivé : n'importe qui peut passer à vous",
+    "Who's watching?" to "Qui regarde ?",
     "People on this device" to "Personnes sur cet appareil",
     "First person" to "Première personne",
     "Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login." to "Chaque personne du foyer peut avoir ici ses propres abonnements, historique et recommandations, et sa propre connexion au serveur TubeHaus.",
@@ -4717,6 +4773,14 @@ private val FR by lazy { mapOf(
 
 // Русский (Russian). Machine-made, not yet read by a native speaker: corrections welcome
 private val RU by lazy { mapOf(
+    "PIN for {n}" to "PIN для {n}",
+    "Asked before switching to you, so others can't open your library" to "Запрашивается при переключении на вас, чтобы другие не открыли вашу библиотеку",
+    "PIN set" to "PIN установлен",
+    "PIN removed" to "PIN удалён",
+    "Remove PIN" to "Удалить PIN",
+    "On: asked before switching to you" to "Вкл.: запрашивается при переключении на вас",
+    "Off: anyone here can switch to you" to "Выкл.: любой может переключиться на вас",
+    "Who's watching?" to "Кто смотрит?",
     "People on this device" to "Люди на этом устройстве",
     "First person" to "Первый человек",
     "Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login." to "У каждого в доме могут быть свои подписки, история и рекомендации, а также свой вход на сервер TubeHaus.",
@@ -5378,6 +5442,14 @@ private val RU by lazy { mapOf(
 
 // हिन्दी (Hindi). Machine-made, not yet read by a native speaker: corrections welcome
 private val HI by lazy { mapOf(
+    "PIN for {n}" to "{n} का PIN",
+    "Asked before switching to you, so others can't open your library" to "आप पर जाने से पहले पूछा जाता है, ताकि कोई और आपकी लाइब्रेरी न खोले",
+    "PIN set" to "PIN सेट हो गया",
+    "PIN removed" to "PIN हटा दिया",
+    "Remove PIN" to "PIN हटाएँ",
+    "On: asked before switching to you" to "चालू: आप पर जाने से पहले पूछा जाता है",
+    "Off: anyone here can switch to you" to "बंद: कोई भी आप पर जा सकता है",
+    "Who's watching?" to "कौन देख रहा है?",
     "People on this device" to "इस डिवाइस के लोग",
     "First person" to "पहला व्यक्ति",
     "Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login." to "घर में हर किसी की यहाँ अपनी सदस्यताएँ, इतिहास, सुझाव और TubeHaus सर्वर लॉगिन हो सकते हैं।",
@@ -6039,6 +6111,14 @@ private val HI by lazy { mapOf(
 
 // Bahasa Indonesia (Indonesian). Machine-made, not yet read by a native speaker: corrections welcome
 private val ID by lazy { mapOf(
+    "PIN for {n}" to "PIN untuk {n}",
+    "Asked before switching to you, so others can't open your library" to "Ditanyakan sebelum beralih ke Anda, agar orang lain tak bisa membuka pustaka Anda",
+    "PIN set" to "PIN disetel",
+    "PIN removed" to "PIN dihapus",
+    "Remove PIN" to "Hapus PIN",
+    "On: asked before switching to you" to "Aktif: ditanyakan sebelum beralih ke Anda",
+    "Off: anyone here can switch to you" to "Mati: siapa pun bisa beralih ke Anda",
+    "Who's watching?" to "Siapa yang menonton?",
     "People on this device" to "Orang di perangkat ini",
     "First person" to "Orang pertama",
     "Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login." to "Setiap orang di rumah bisa punya langganan, riwayat, rekomendasi, dan login server TubeHaus sendiri di sini.",
@@ -6700,6 +6780,14 @@ private val ID by lazy { mapOf(
 
 // Türkçe (Turkish). Machine-made, not yet read by a native speaker: corrections welcome
 private val TR by lazy { mapOf(
+    "PIN for {n}" to "{n} için PIN",
+    "Asked before switching to you, so others can't open your library" to "Sana geçmeden önce sorulur, böylece başkaları kitaplığını açamaz",
+    "PIN set" to "PIN ayarlandı",
+    "PIN removed" to "PIN kaldırıldı",
+    "Remove PIN" to "PIN'i kaldır",
+    "On: asked before switching to you" to "Açık: sana geçmeden önce sorulur",
+    "Off: anyone here can switch to you" to "Kapalı: herkes sana geçebilir",
+    "Who's watching?" to "Kim izliyor?",
     "People on this device" to "Bu cihazdaki kişiler",
     "First person" to "İlk kişi",
     "Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login." to "Evdeki herkes burada kendi aboneliklerine, geçmişine, önerilerine ve kendi TubeHaus sunucu girişine sahip olabilir.",
@@ -7361,6 +7449,14 @@ private val TR by lazy { mapOf(
 
 // বাংলা (Bengali). Machine-made, not yet read by a native speaker: corrections welcome
 private val BN by lazy { mapOf(
+    "PIN for {n}" to "{n}-এর PIN",
+    "Asked before switching to you, so others can't open your library" to "আপনাতে বদলানোর আগে জিজ্ঞেস করা হয়, যাতে অন্যরা আপনার লাইব্রেরি খুলতে না পারে",
+    "PIN set" to "PIN সেট হয়েছে",
+    "PIN removed" to "PIN সরানো হয়েছে",
+    "Remove PIN" to "PIN সরান",
+    "On: asked before switching to you" to "চালু: আপনাতে বদলানোর আগে জিজ্ঞেস করা হয়",
+    "Off: anyone here can switch to you" to "বন্ধ: যে কেউ আপনাতে বদলাতে পারে",
+    "Who's watching?" to "কে দেখছেন?",
     "People on this device" to "এই ডিভাইসের মানুষ",
     "First person" to "প্রথম জন",
     "Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login." to "বাড়ির প্রত্যেকে এখানে নিজের সাবস্ক্রিপশন, ইতিহাস, সুপারিশ আর TubeHaus সার্ভার লগইন রাখতে পারেন।",

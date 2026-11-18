@@ -106,6 +106,8 @@ data class People(
     /** everyone, the first person included (as [firstName]) */
     val names: List<String> = emptyList(),
     val firstName: String = "",
+    /** person id -> their PIN, hashed (Store.pinHash); someone without one is picked with no question */
+    val pins: Map<String, String> = emptyMap(),
 )
 
 private fun now() = Sys.nowMs() / 1000
@@ -164,11 +166,20 @@ class Store(dir: Path) {
         return id
     }
 
+    fun hasPin(id: String) = people.value.pins[id] != null
+    fun pinOk(id: String, pin: String) = people.value.pins[id].let { it == null || it == pinHash(id, pin) }
+    /** a PIN for [id], or none ([pin] null) */
+    fun setPin(id: String, pin: String?) {
+        people.update { p -> p.copy(pins = if (pin == null) p.pins - id else p.pins + (id to pinHash(id, pin))) }
+        people.flushNow()
+    }
+    private fun pinHash(id: String, pin: String) = app.tubehaus.engine.sha256("tubehaus-person:$id:$pin".encodeToByteArray()).hex()
+
     /** someone else on this device leaves: their folder is deleted (never the one using it now) */
     fun removePerson(id: String) {
         if (id == people.value.current) return
         runCatching { FileSystem.SYSTEM.deleteRecursively(folder(id.ifEmpty { "_first" })) }
-        people.update { p -> p.copy(names = p.names.filter { personId(it) != id }) }
+        people.update { p -> p.copy(names = p.names.filter { personId(it) != id }, pins = p.pins - id) }
         people.flushNow()
     }
 
