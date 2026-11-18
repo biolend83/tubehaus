@@ -6157,7 +6157,7 @@ class H(BaseHTTPRequestHandler):
         """ " Secure" unless the page was opened over plain http (http://<server>:8080 at home, as the app
         stores set it up): browsers throw a Secure cookie from an http page away, and signing in just reloads"""
         proto = (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
-        return "" if proto == "http" or (not proto and PUBLIC.startswith("http://")) else " Secure;"
+        return not (proto == "http" or (not proto and PUBLIC.startswith("http://")))
 
     def cookie_user(self):
         for part in (self.headers.get("Cookie") or "").split(";"):
@@ -6181,12 +6181,15 @@ class H(BaseHTTPRequestHandler):
 
     def send_cookie(self, code, obj, value, max_age):
         # session tokens are user.expiry.generation.hex-signature; anything else is never sent
-        value = value if re.fullmatch(r"[a-z0-9_]{3,24}\.\d+\.\d+\.[0-9a-f]{64}", value or "") else ""
+        if not (isinstance(value, str) and re.fullmatch(r"[a-z0-9_]{3,24}\.\d+\.\d+\.[0-9a-f]{64}", value)):
+            value = ""
+        value = "".join(c for c in value if c in "abcdefghijklmnopqrstuvwxyz0123456789_.")
+        flags = "HttpOnly; Secure; SameSite=Lax" if self.secure() else "HttpOnly; SameSite=Lax"
         b = json.dumps(obj, ensure_ascii=False).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
-        self.send_header("Set-Cookie", f"{COOKIE}={value}; Path=/; Max-Age={max_age}; HttpOnly;{self.secure()} SameSite=Lax")
+        self.send_header("Set-Cookie", f"{COOKIE}={value}; Path=/; Max-Age={int(max_age)}; {flags}")
         self.send_header("Content-Length", str(len(b)))
         self.end_headers()
         self.wfile.write(b)
@@ -6227,7 +6230,7 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Location", to)
             self.send_header("Cache-Control", "no-store")
             if cookie:
-                self.send_header("Set-Cookie", f"{COOKIE}={cookie}; Path=/; Max-Age={SESSION_DAYS * 86400}; HttpOnly;{self.secure()} SameSite=Lax")
+                self.send_header("Set-Cookie", f"{COOKIE}={cookie}; Path=/; Max-Age={SESSION_DAYS * 86400}; {"HttpOnly; Secure; SameSite=Lax" if self.secure() else "HttpOnly; SameSite=Lax"}")
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
