@@ -819,28 +819,8 @@ export async function musicSearch(page, m, alive) {
     $(".m-res", page).innerHTML = `<div class="empty">${icon("search")}<p>${$t("검색 결과가 없어요")}</p></div>`;
     return;
   }
-  // the best match: the first artist when the name fits the search, else the first album, else the first song
-  const norm = (x) => String(x || "").toLowerCase().replace(/[\s()（）\[\]·.,'"!?-]/g, "");
-  const nq = norm(q);
-  const art = d.artists.find((a) => norm(a.title) && (nq.includes(norm(a.title)) || norm(a.title).includes(nq)));
-  const alb = !art && d.albums.find((a) => norm(a.title) && nq.includes(norm(a.title)));
-  const top = art || alb;
-  let topHtml = "";
-  if (top) {
-    CARDS.set(top.kind + ":" + top.id, top);
-    topHtml = `<a class="m-top ${top.kind}" href="${esc(hrefOf(top))}" data-nav data-mc="${top.kind}:${esc(top.id)}">
-      <span class="m-tcv">${top.art ? `<img alt="" src="${esc(img(top.art))}">` : icon("person")}</span>
-      <span class="m-ttx"><b>${esc(top.title)}</b><span>${esc(top.sub || "")}</span></span>
-      </a>`;
-  } else if (d.songs[0]) {
-    const s = d.songs[0];
-    topHtml = `<div class="m-top song" data-ml="${reg([s], "radio")}"><div class="m-row" data-k="0" data-id="${esc(s.id)}">
-      <span class="m-tcv sq">${imgTag(s, true)}</span><span class="m-ttx"><b>${esc(s.title)}</b><span>${esc(s.artist)}</span></span>
-</div></div>`;
-  }
   $(".m-res", page).innerHTML = `
     <div class="m-topgrid">
-      ${topHtml ? `<section class="m-sec"><div class="m-h"><h2>${$t("최상위 결과")}</h2></div>${topHtml}</section>` : ""}
       ${d.songs.length ? sec($t("노래"), songList(d.songs, { mode: "radio", limit: 5 }), playAll("songs")) : ""}
     </div>
     ${d.albums.length ? sec($t("앨범"), cardRow(d.albums)) : ""}
