@@ -4,11 +4,11 @@
 
 export const LANGS = [
   ["ko", "한국어"], ["en", "English"], ["ja", "日本語"], ["zh", "简体中文"], ["es", "Español"],
-  ["pt", "Português"], ["fr", "Français"], ["de", "Deutsch"], ["ru", "Русский"], ["hi", "हिन्दी"], ["id", "Bahasa Indonesia"], ["tr", "Türkçe"], ["bn", "বাংলা"],
+  ["pt", "Português"], ["fr", "Français"], ["de", "Deutsch"], ["ru", "Русский"], ["hi", "हिन्दी"], ["id", "Bahasa Indonesia"], ["tr", "Türkçe"], ["bn", "বাংলা"], ["vi", "Tiếng Việt"],
 ];
 const CODES = LANGS.map(([c]) => c);
 // country used for trending / search results, when the browser does not say
-const REGIONS = { ko: "KR", en: "US", ja: "JP", zh: "TW", es: "ES", pt: "BR", fr: "FR", de: "DE", ru: "RU", hi: "IN", id: "ID", tr: "TR", bn: "BD" };
+const REGIONS = { ko: "KR", en: "US", ja: "JP", zh: "TW", es: "ES", pt: "BR", fr: "FR", de: "DE", ru: "RU", hi: "IN", id: "ID", tr: "TR", bn: "BD", vi: "VN" };
 
 let saved;
 try { saved = JSON.parse(localStorage.getItem("yt.settings") || "{}").lang; } catch { }

@@ -78,8 +78,8 @@ far; another language is a new map next to `KO` and an entry in `LANGS`. The web
 
 ## Translations
 
-Interface text lives in `web/y/lang/<code>.js`, keyed by the original Korean text. TubeHaus has 13 languages and
-isn't taking new ones for now, so every language can be kept complete with each release. Fixes to the existing
+Interface text lives in `web/y/lang/<code>.js`, keyed by the original Korean text. TubeHaus has 14 languages, so
+every language can be kept complete with each release. Fixes to the existing
 translations are very welcome; several were machine-assisted. Edit the values only and keep the keys and the
 `{0}` placeholders as they are.
 

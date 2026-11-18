@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- **Vietnamese interface** (Tiếng Việt): every string translated (`web/y/lang/vi.js`), and trending and search default to Vietnam
+
 ### Changed
 - Music search puts the songs as they are on their albums first (the plain recording, not the music video) and leaves out music videos and lyric uploads of those songs; live versions and covers come last. YouTube Music's own Songs search needs Premium in some countries, so the songs come from the matching albums by the searched artist
 
