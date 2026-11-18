@@ -36,7 +36,7 @@ val storeJson = Json { ignoreUnknownKeys = true; encodeDefaults = false; explici
 
 /** One JSON file kept in memory as a StateFlow and written back (atomically) shortly after each change. */
 @OptIn(FlowPreview::class)
-class JsonFile<T>(private val file: Path, private val ser: KSerializer<T>, empty: T, scope: CoroutineScope) {
+class JsonFile<T>(private val file: Path, private val ser: KSerializer<T>, private val empty: T, scope: CoroutineScope) {
     // a getter, not a field: load() runs in the first initializer below, before fields after it are set
     private val fs: FileSystem get() = FileSystem.SYSTEM
     // the debounced save (a background thread) and flushNow (the main one) may meet
@@ -81,7 +81,36 @@ class JsonFile<T>(private val file: Path, private val ser: KSerializer<T>, empty
     fun update(f: (T) -> T) = flow.update(f)
 
     fun flushNow() { trySave(flow.value) }
+
+    /** a copy of what's in it, written to [to] (another person's folder, see Store.switchPerson) */
+    fun copyTo(to: Path) {
+        val text = storeJson.encodeToString(ser, flow.value)
+        to.parent?.let { fs.createDirectories(it) }
+        fs.write(to) { writeUtf8(text) }
+    }
+
+    /** what [from] holds (nothing there: empty) in place of what it held; saved to its own file shortly */
+    fun takeFrom(from: Path) {
+        flow.value = try {
+            if (fs.exists(from)) storeJson.decodeFromString(ser, fs.read(from) { readUtf8() }) else empty
+        } catch (e: Exception) { empty }
+        trySave(flow.value)
+    }
 }
+
+/** The people who use the app on this device, each with a library, taste and settings of their own (a household on one TV) */
+@Serializable
+data class People(
+    /** who is using it now; "" is the first person, whose files have always been in the data folder itself */
+    val current: String = "",
+    /** everyone, the first person included (as [firstName]) */
+    val names: List<String> = emptyList(),
+    val firstName: String = "",
+    /** person id -> their PIN, hashed (Store.pinHash); someone without one is picked with no question */
+    val pins: Map<String, String> = emptyMap(),
+    /** phones and computers: ask who is watching when the app opens (a TV always asks) */
+    val askOnOpen: Boolean = false,
+)
 
 private fun now() = Sys.nowMs() / 1000
 
@@ -105,12 +134,69 @@ class Store(dir: Path) {
     val stats = JsonFile(dir / "stats.json", WatchStats.serializer(), WatchStats(), scope)
     /** the music tab's recent songs, searches and pages */
     val music = JsonFile(dir / "music.json", MusicData.serializer(), MusicData(), scope)
+    val people = JsonFile(dir / "people.json", People.serializer(), People(), scope)
+    private val base = dir
+    /** what each person has of their own; the channel pictures stay shared */
+    private val own get() = listOf(lib to "library.json", taste to "taste.json", settings to "settings.json", profiles to "profiles.json",
+        queue to "sync-queue.json", stats to "stats.json", music to "music.json")
+    private fun folder(id: String) = base / "people" / id
+
+    /**
+     * Another person's things in place of this one's: whoever uses the app now is put away in
+     * people/<id>/, and [id]'s come out (nothing yet: an empty library and the usual settings).
+     * The files in the data folder are always the person using it, so nothing else needs to know.
+     */
+    fun switchPerson(id: String) {
+        val cur = people.value.current
+        if (id == cur) return
+        val shared = settings.value.let { Triple(it.lang, it.region, it.dark) }
+        val fresh = !FileSystem.SYSTEM.exists(folder(id.ifEmpty { "_first" }) / "settings.json")
+        flush()
+        for ((f, name) in own) f.copyTo(folder(cur.ifEmpty { "_first" }) / name)
+        for ((f, name) in own) f.takeFrom(folder(id.ifEmpty { "_first" }) / name)
+        // a new person starts in the device's language and look, not the defaults
+        if (fresh) settings.update { it.copy(lang = shared.first, region = shared.second, dark = shared.third) }
+        people.update { it.copy(current = id) }
+        flush(); people.flushNow()
+    }
+
+    /** a new person (their library starts empty); returns their id */
+    fun addPerson(name: String): String {
+        val id = "p" + Sys.nowMs().toString(36)
+        people.update { it.copy(names = (if (it.names.isEmpty()) listOf("") else it.names) + "$id:$name") }
+        people.flushNow()
+        return id
+    }
+
+    fun hasPin(id: String) = people.value.pins[id] != null
+    fun pinOk(id: String, pin: String) = people.value.pins[id].let { it == null || it == pinHash(id, pin) }
+    /** a PIN for [id], or none ([pin] null) */
+    fun setPin(id: String, pin: String?) {
+        people.update { p -> p.copy(pins = if (pin == null) p.pins - id else p.pins + (id to pinHash(id, pin))) }
+        people.flushNow()
+    }
+    private fun pinHash(id: String, pin: String) = app.tubehaus.engine.sha256("tubehaus-person:$id:$pin".encodeToByteArray()).hex()
+
+    /** someone else on this device leaves: their folder is deleted (never the one using it now) */
+    fun removePerson(id: String) {
+        if (id == people.value.current) return
+        runCatching { FileSystem.SYSTEM.deleteRecursively(folder(id.ifEmpty { "_first" })) }
+        people.update { p -> p.copy(names = p.names.filter { personId(it) != id }, pins = p.pins - id) }
+        people.flushNow()
+    }
+
     /** set by ServerSync: something was queued */
     var onQueued: (() -> Unit)? = null
 
     fun flush() {
         lib.flushNow(); taste.flushNow(); settings.flushNow(); profiles.flushNow(); queue.flushNow(); avatars.flushNow()
         stats.flushNow(); music.flushNow()
+    }
+
+    companion object {
+        /** names are kept as "id:name" ("" for the first person) */
+        fun personId(entry: String) = if (entry.isEmpty()) "" else entry.substringBefore(":")
+        fun personName(entry: String) = entry.substringAfter(":", "")
     }
 
     /** with a server connected: the same change for it (the endpoints the web version uses) */

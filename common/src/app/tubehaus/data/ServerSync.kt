@@ -171,6 +171,12 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
         }
     }
 
+    /** another person on this device: their server (or none), nothing of the last one's sync state */
+    fun personChanged() {
+        problem.value = if (store.settings.value.server.isEmpty()) null else ""
+        syncedAt.value = 0
+    }
+
     /** this device keeps its copy of the library and goes back to being on its own */
     fun disconnect() {
         store.settings.update { it.copy(server = "", serverUser = "", serverPass = "") }
