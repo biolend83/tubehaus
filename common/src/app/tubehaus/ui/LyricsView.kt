@@ -169,7 +169,7 @@ fun SyncedLyrics(lines: List<Lyrics.Line>, now: () -> Long, seek: (Long) -> Unit
         var y = 0f
         ps.forEachIndexed { i, p -> tops[i] = y; y += p.height + if (i < rows.size && rows[i].gap) gapPx * 0.4f else gapPx }
         val h = if (cs.hasBoundedHeight) cs.maxHeight else 1200
-        val anchor = h * 0.3f
+        val anchor = h * 0.45f
         layout(cs.maxWidth, h) {
             ps.forEachIndexed { i, p ->
                 val top = anchor + tops[i] - scroll[i].value + user.value
