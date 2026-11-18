@@ -1,5 +1,8 @@
 package app.tubehaus.ui
 
+import app.tubehaus.data.People
+import app.tubehaus.data.Store
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.AnimatedVisibility
@@ -110,6 +113,9 @@ private fun tvTabs(app: AppState): List<TvTab> {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TvApp(app: AppState) {
+    // a TV is shared: who is watching is asked first, each time the app opens
+    val people by app.store.people.state.collectAsState()
+    if (!app.whoAsked) { WhoIsWatching(app, people); return }
     val cur = app.current
     val root = app.stack.firstOrNull()
     val rail = remember { FocusRequester() }
@@ -300,3 +306,51 @@ private fun RailItem(icon: Symbol, label: String, selected: Boolean, open: Boole
     }
 }
 
+
+
+/** "Who's watching?": everyone on this TV as a big round letter, and "Add a person"; OK picks (their PIN first,
+ *  if they set one); the one who used it last has the focus */
+@Composable
+private fun WhoIsWatching(app: AppState, people: People) {
+    val first = remember { FocusRequester() }
+    var adding by remember { mutableStateOf(false) }
+    var picking by remember { mutableStateOf<String?>(null) }
+    val names = people.names.ifEmpty { listOf("") }
+    Column(
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+    ) {
+        Text(tr("Who's watching?"), fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(40.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+            for (e in names) {
+                val id = Store.personId(e)
+                WhoTile(personLabel(app, e).take(1).uppercase(), personLabel(app, e), people.pins[id] != null,
+                    if (id == people.current) Modifier.focusRequester(first) else Modifier) { picking = id }
+            }
+            WhoTile("+", tr("Add a person"), false, Modifier) { adding = true }
+        }
+    }
+    LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+    if (adding) AddPersonDialog(app) { adding = false; if (app.store.people.value.names.isNotEmpty()) app.whoAsked = true }
+    PersonSwitch(app, picking, cancel = { picking = null }) { picking = null; app.whoAsked = true }
+}
+
+@Composable
+private fun WhoTile(letter: String, name: String, locked: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val src = remember { MutableInteractionSource() }
+    val focused by src.collectIsFocusedAsState()
+    Column(
+        modifier.width(150.dp).clip(RoundedCornerShape(20.dp)).clickable(src, indication = null, onClick = onClick).padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier.size(110.dp).clip(CircleShape).background(if (focused) Color.White else MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(letter, fontSize = 44.sp, fontWeight = FontWeight.Bold, color = if (focused) Color.Black else Teal)
+        }
+        Text(if (locked) "$name 🔒" else name, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 12.dp), fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal)
+    }
+}

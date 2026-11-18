@@ -732,8 +732,9 @@ private fun Note(text: String) {
 private fun PeopleItems(app: AppState) {
     val p by app.store.people.state.collectAsState()
     var adding by remember { mutableStateOf(false) }
+    var pinFor by remember { mutableStateOf(false) }
+    var switching by remember { mutableStateOf<String?>(null) }
     var removing by remember { mutableStateOf<String?>(null) }
-    val label = { e: String -> if (e.isEmpty()) p.firstName.ifEmpty { tr("First person") } else Store.personName(e) }
     Column {
         if (p.names.isEmpty()) Note(tr("Everyone in the house can have their own subscriptions, history and recommendations here, and their own TubeHaus server login."))
         for (e in p.names) {
@@ -741,46 +742,24 @@ private fun PeopleItems(app: AppState) {
             val me = id == p.current
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) {
-                    SItem(label(e), if (me) tr("Using the app now") else tr("Switch to this person")) { if (!me) app.switchPerson(id) }
+                    SItem(personLabel(app, e), if (me) tr("Using the app now") else tr("Switch to this person")) { if (!me) switching = id }
                 }
                 if (!me) IconButton(onClick = { removing = id }) { Icon(Sym.Close.outline, tr("Remove"), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
         SItem(tr("Add a person"), tr("Starts with an empty library; switch any time here")) { adding = true }
+        if (p.names.isNotEmpty()) SItem(tr("PIN for {n}").replace("{n}", personLabel(app, p.names.firstOrNull { Store.personId(it) == p.current } ?: "")),
+            if (p.pins[p.current] != null) tr("On: asked before switching to you") else tr("Off: anyone here can switch to you")) { pinFor = true }
     }
-    if (adding) {
-        var name by remember { mutableStateOf("") }
-        // the first person gets a name too the first time someone is added
-        var first by remember { mutableStateOf(p.firstName) }
-        AlertDialog(
-            onDismissRequest = { adding = false },
-            title = { Text(tr("Add a person")) },
-            text = {
-                Column {
-                    if (p.names.isEmpty()) {
-                        Text(tr("Your name (the library on this device now)"), style = MaterialTheme.typography.bodySmall)
-                        OutlinedTextField(first, { first = it.take(30) }, Modifier.fillMaxWidth(), singleLine = true)
-                        Spacer(Modifier.height(12.dp))
-                    }
-                    Text(tr("Their name"), style = MaterialTheme.typography.bodySmall)
-                    OutlinedTextField(name, { name = it.take(30).replace(":", "") }, Modifier.fillMaxWidth(), singleLine = true)
-                }
-            },
-            confirmButton = {
-                TextButton(enabled = name.isNotBlank(), onClick = {
-                    if (p.names.isEmpty()) app.store.people.update { it.copy(firstName = first.trim()) }
-                    val id = app.store.addPerson(name.trim())
-                    adding = false
-                    app.switchPerson(id)
-                    app.toast(tr("Now using the app: {n}").replace("{n}", name.trim()))
-                }) { Text(tr("Add")) }
-            },
-            dismissButton = { TextButton(onClick = { adding = false }) { Text(tr("Cancel")) } },
-        )
-    }
+    if (adding) AddPersonDialog(app) { adding = false }
+    if (pinFor) SetPinDialog(app) { pinFor = false }
+    PersonSwitch(app, switching, cancel = { switching = null }) { switching = null }
     removing?.let { id ->
-        val who = p.names.firstOrNull { Store.personId(it) == id }?.let(label) ?: ""
-        AlertDialog(
+        val who = p.names.firstOrNull { Store.personId(it) == id }?.let { personLabel(app, it) } ?: ""
+        val locked = p.pins[id] != null
+        if (locked) PinDialog(app, tr("Remove {n}?").replace("{n}", who), { removing = null }) { pin ->
+            app.store.pinOk(id, pin).also { if (it) { app.store.removePerson(id); removing = null } }
+        } else AlertDialog(
             onDismissRequest = { removing = null },
             title = { Text(tr("Remove {n}?").replace("{n}", who)) },
             text = { Text(tr("Their library, history and settings on this device are deleted. What's on a TubeHaus server stays there.")) },
