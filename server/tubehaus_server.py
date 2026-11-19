@@ -4796,19 +4796,33 @@ def _feed_lengths(cid, out):
     Videos tab (one request, only when the channel has a video not seen before)"""
     old = {e["id"]: e for e in yt_feed["items"].get(cid) or []}
     for e in out:
-        if "len" in old.get(e["id"], {}):
-            e["len"] = old[e["id"]]["len"]
+        o = old.get(e["id"], {})
+        for k in ("len", "lenAsked"):
+            if k in o:
+                e[k] = o[k]
     need = [e for e in out if "len" not in e and not e["short"]]
-    if not need:
-        return
-    try:
-        d = json.loads(_inv(f"/api/v1/channels/{cid}/videos", 20))
-        got = {v.get("videoId"): int(v.get("lengthSeconds") or 0) for v in d.get("videos") or []}
-    except Exception as ex:
-        log("ytfeed", f"{cid} lengths FAIL {repr(ex)[:100]}")
-        return
-    for e in need:
-        e["len"] = got.get(e["id"], 0)       # 0: not on the tab (a live, a premiere); not asked again
+    if need:
+        try:
+            d = json.loads(_inv(f"/api/v1/channels/{cid}/videos", 20))
+            got = {v.get("videoId"): int(v.get("lengthSeconds") or 0) for v in d.get("videos") or []}
+        except Exception as ex:
+            log("ytfeed", f"{cid} lengths FAIL {repr(ex)[:100]}")
+            return
+        for e in need:
+            e["len"] = got.get(e["id"], 0)
+    # not on the first page of the tab: the video itself, once (a live stays 0), a few per refresh
+    for e in [e for e in out if not e.get("len") and not e["short"] and not e.get("lenAsked")]:
+        if _FEED_ASK["left"] <= 0:
+            break
+        _FEED_ASK["left"] -= 1
+        e["lenAsked"] = True
+        try:
+            e["len"] = int(json.loads(_inv(f"/api/v1/videos/{e['id']}", 20)).get("lengthSeconds") or 0)
+        except Exception:
+            pass
+
+
+_FEED_ASK = {"left": 0}       # videos asked one by one for their length, per refresh
 
 
 def yt_fill_thumbs():
@@ -4852,6 +4866,7 @@ def yt_feed_refresh():
         with yt_lock:            # everyone's channels: one fetch each, however many people follow it
             subs = list(dict.fromkeys(c for u in _lib_owners() for c in _yt_load(u)["subs"]))
         from concurrent.futures import ThreadPoolExecutor
+        _FEED_ASK["left"] = 60
         with ThreadPoolExecutor(6) as ex:
             list(ex.map(yt_feed_one, subs))
         yt_feed["updated"] = time.time()
