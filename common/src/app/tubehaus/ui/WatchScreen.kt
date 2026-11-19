@@ -123,7 +123,7 @@ fun WatchScreen(app: AppState) {
         LaunchedEffect(pb.transcriptAsked) {
             if (!pb.transcriptAsked) return@LaunchedEffect
             pb.transcriptAsked = false
-            if (wide) side = "transcript" else { commentsOpen = false; transcriptOpen = true }
+            if (wide) { side = "transcript"; transcriptOpen = true } else { commentsOpen = false; transcriptOpen = true }
         }
         if (wide) {
             // tablets and the desktop: the video and its details on the left; up next or the comments on the right
@@ -155,7 +155,9 @@ fun WatchScreen(app: AppState) {
                     if (hasRelated) add("next" to tr("Up next"))
                     if (token != null && !pc) add("comments" to tr("Comments"))
                     if (tablet && !pc && set.underVideo != 2) add("details" to tr("Details"))
-                    if (hasCaptions) add("transcript" to tr("Transcript"))
+                    // the transcript as a tab next to the others; alone (up next and comments hidden) only
+                    // when asked for, or it would fill the side of every video with no way to close it
+                    if (hasCaptions && (isNotEmpty() || transcriptOpen)) add("transcript" to tr("Transcript"))
                 }
                 if (tabs.isNotEmpty()) {
                     val shown = side.takeIf { s -> tabs.any { it.first == s } } ?: tabs.first().first
@@ -168,7 +170,7 @@ fun WatchScreen(app: AppState) {
                         when {
                             shown == "comments" && token != null -> Comments(app, token)
                             shown == "details" -> LazyColumn(Modifier.fillMaxSize()) { item { Info(app, v) } }
-                            shown == "transcript" -> TranscriptPanel(app, null)
+                            shown == "transcript" -> TranscriptPanel(app, if (tabs.size == 1) ({ transcriptOpen = false }) else null)
                             else -> LazyColumn(Modifier.fillMaxSize()) { related(app, big = false, thumb = if (sideWidth < 340.dp) 128.dp else 200.dp) }
                         }
                     }
