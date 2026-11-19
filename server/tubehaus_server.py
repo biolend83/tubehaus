@@ -4868,7 +4868,7 @@ def yt_feed_refresh():
         with yt_lock:            # everyone's channels: one fetch each, however many people follow it
             subs = list(dict.fromkeys(c for u in _lib_owners() for c in _yt_load(u)["subs"]))
         from concurrent.futures import ThreadPoolExecutor
-        _FEED_ASK["left"] = 60
+        _FEED_ASK["left"] = 300
         with ThreadPoolExecutor(6) as ex:
             list(ex.map(yt_feed_one, subs))
         yt_feed["updated"] = time.time()
