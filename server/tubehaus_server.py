@@ -4770,6 +4770,7 @@ def yt_feed_one(cid):
     if root is None:
         got = yt_feed_channel_page(cid)
         if got is not None:
+            _feed_lengths(cid, got)
             yt_feed["items"][cid] = got
         return
     out = []
