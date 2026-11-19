@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.6.5 — 2026-11-19
+
+### Added
+- **Apps sign in through the browser** (single sign-on with Authentik and others, or just to type no password on a TV): the app shows a code and opens `/api/p/auth/app`; whoever is signed in there presses Allow and the app gets a session of its own (sent as `Authorization: Bearer`), which "Sign out everywhere" ends like any other. Needs `TUBEHAUS_AUTH=accounts`; the health answer says `app_sign_in` ([#95](https://github.com/biolend83/tubehaus/discussions/95))
+- Video lengths on the subscription feed's thumbnails, also for channels whose RSS feed is down ([#95](https://github.com/biolend83/tubehaus/discussions/95))
+
+### Fixed
+- Calm mode leaves no empty column next to a video that has no playlist or related videos ([#95](https://github.com/biolend83/tubehaus/discussions/95))
+
+### Security
+- The sign-in cookie header is built from fixed parts only (code scanning)
+
 ## v1.6.4 — 2026-11-18
 
 ### Fixed
