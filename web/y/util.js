@@ -145,7 +145,17 @@ export async function api(path, { method = "GET", body, ttl = 0, signal, quiet =
     let d = null;
     try { d = await r.json(); } catch { }
     if (!r.ok) throw new HttpError(r.status, d && d.error ? $tMsg(d.error) : $t("서버 오류 ") + r.status);
-    if (method === "GET" && ttl) cache.set(key, { t: Date.now(), v: d });
+    if (method === "GET" && ttl) {
+      // kept answers expire, and at most 200 stay: every video the mouse rests on is fetched early
+      // (a full video answer is large), so an open tab used to grow until the computer ran out of memory
+      const now = Date.now();
+      cache.delete(key);
+      cache.set(key, { t: now, ttl, v: d });
+      if (cache.size > 200) {
+        for (const [k, c] of cache) { if (now - c.t >= c.ttl) cache.delete(k); }
+        while (cache.size > 200) cache.delete(cache.keys().next().value);
+      }
+    }
     return d;
   })();
   if (method === "GET" && ttl) {

@@ -520,6 +520,7 @@ export const videoInfoFast = (id) => api(`/api/v1/videos/${id}?fast=1`, { ttl: 6
 const prefetched = new Set();
 export function prefetch(id) {
   if (!id || prefetched.has(id)) return;
+  if (prefetched.size > 500) prefetched.clear();
   prefetched.add(id);
   videoInfo(id).catch(() => prefetched.delete(id));
 }
@@ -534,6 +535,7 @@ async function hoverPreview(th, id) {
   if (!th.dataset.hov || info.liveNow) return;
   const sb = sbOf(info);
   if (!sb || !sb.count) return;
+  if (th._sbT) return;          // already showing (two hovers in quick succession both got here)
   const box = el(`<div class="sbprev"></div>`);
   th.append(box);
   const per = sb.storyboardWidth * sb.storyboardHeight, W = th.clientWidth, H = (W * sb.height) / sb.width;
@@ -564,7 +566,8 @@ export function initCardHover() {
     delete th.dataset.hov;
     clearTimeout(hovT);
     clearInterval(th._sbT);
-    th.querySelector(".sbprev")?.remove();
+    th._sbT = 0;
+    th.querySelectorAll(".sbprev").forEach((b) => b.remove());
   });
   document.addEventListener("touchstart", (e) => {
     const c = e.target.closest("[data-vid]");
