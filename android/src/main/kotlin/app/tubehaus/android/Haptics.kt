@@ -39,6 +39,7 @@ class Haptics(private val context: Context) {
     /** true when it played; false leaves it to the system's own path */
     fun play(t: HapticFeedbackType): Boolean {
         val v = vibrator ?: return false
+        if (Build.VERSION.SDK_INT < 26) return false
         val k = kind(t) ?: return false
         return runCatching {
             val effect = if (Build.VERSION.SDK_INT >= 29) {

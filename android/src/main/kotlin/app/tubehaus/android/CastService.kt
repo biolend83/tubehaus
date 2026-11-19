@@ -50,7 +50,7 @@ class CastService : Service() {
         }
         val name = intent?.getStringExtra("name") ?: ""
         val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CHANNEL, tr("Cast"), NotificationManager.IMPORTANCE_LOW))
+        if (android.os.Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel(CHANNEL, tr("Cast"), NotificationManager.IMPORTANCE_LOW))
         val open = PendingIntent.getActivity(
             this, 1, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
