@@ -806,6 +806,8 @@ private fun serverProblem(code: String) = when (code) {
     "login" -> tr("The user name or password is wrong")
     "public" -> tr("This is a public instance: it keeps libraries in each browser, so there is nothing to sync")
     "notTubeHaus" -> tr("No TubeHaus server answered there")
+    "noBrowserSignIn" -> tr("This server has no accounts, or is older than 1.6.5: use the user name and password")
+    "expired" -> tr("Nobody pressed Allow in time. Try again")
     else -> tr("Couldn't reach the server")
 }
 
@@ -817,6 +819,8 @@ private fun ServerDialog(app: AppState, close: () -> Unit) {
     var pass by remember { mutableStateOf(s.serverPass) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var browser by remember { mutableStateOf<Pair<String, String>?>(null) }      // the page and its code, while waiting
+    var job by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     AlertDialog(
         onDismissRequest = { if (!busy) close() },
         title = { Text(tr("TubeHaus server")) },
@@ -829,6 +833,27 @@ private fun ServerDialog(app: AppState, close: () -> Unit) {
                 Text(tr("If the server asks for a login:"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
                 OutlinedTextField(user, { user = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(tr("User name")) })
                 PasswordField(app, pass, { pass = it }, Modifier.fillMaxWidth().padding(top = 4.dp))
+                Text(tr("Or, for single sign-on (Authentik, ...) or to type nothing here:"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
+                val b = browser
+                if (b == null) {
+                    TextButton(enabled = !busy && address.isNotBlank(), onClick = {
+                        busy = true; error = null
+                        job = app.scope.launch {
+                            val e = app.sync.connectInBrowser(address, "TubeHaus " + tr("app")) { url, code ->
+                                browser = url to code
+                                app.platform.openExternal(url)
+                            }
+                            busy = false; browser = null
+                            if (e == null) { app.toast(tr("Connected: the library is shared with the server")); close() } else error = e
+                        }
+                    }) { Text(tr("Sign in with the browser")) }
+                } else {
+                    Text(tr("Sign in on the page that opened and press Allow. On a TV, open this on your phone:"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(b.first, style = MaterialTheme.typography.bodySmall, color = Blue, modifier = Modifier.padding(top = 4.dp))
+                    }
+                    Text(tr("Code") + ": " + b.second, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp))
+                }
                 error?.let { Text(serverProblem(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)) }
             }
         },
@@ -842,7 +867,7 @@ private fun ServerDialog(app: AppState, close: () -> Unit) {
                 }
             }) { Text(if (busy) tr("Connecting…") else tr("Connect")) }
         },
-        dismissButton = { TextButton(enabled = !busy, onClick = close) { Text(tr("Cancel")) } },
+        dismissButton = { TextButton(enabled = !busy || browser != null, onClick = { job?.cancel(); close() }) { Text(tr("Cancel")) } },
     )
 }
 
