@@ -25,9 +25,10 @@ object ServerVideo {
 
     /** from Settings: the server's address and its login (empty when it has none) */
     @OptIn(ExperimentalEncodingApi::class)
-    fun set(server: String, user: String, pass: String) {
+    fun set(server: String, user: String, pass: String, token: String = "") {
         base = server.trim().trimEnd('/')
-        auth = if (user.isNotEmpty()) "Basic " + Base64.encode("$user:$pass".encodeToByteArray()) else null
+        auth = if (token.isNotEmpty()) "Bearer $token"
+            else if (user.isNotEmpty()) "Basic " + Base64.encode("$user:$pass".encodeToByteArray()) else null
     }
 
     /** the Authorization header for [url] when it is on the server, else null */

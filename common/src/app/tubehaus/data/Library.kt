@@ -127,6 +127,8 @@ data class Settings(
     val server: String = "",
     val serverUser: String = "",
     val serverPass: String = "",
+    /** a sign-in from the server's page in the browser (single sign-on), used instead of a password */
+    val serverToken: String = "",
     /** once a day: a newer app version, and the stream client list (engine/Remote.kt) */
     val checkUpdates: Boolean = true,
     /** text size: 1 normal, up to 1.5 */
@@ -185,6 +187,8 @@ data class Settings(
     val codec: String = "",
     /** music: only the sound is downloaded (less data), the picture comes back with "Watch video" */
     val musicAudioOnly: Boolean = true,
+    /** where the sung line sits, percent from the top of the lyrics */
+    val lyricsAt: Int = 45,
     /** wellbeing: a reminder after this many minutes of watching in a row; 0 off */
     val breakMinutes: Int = 0,
     /** wellbeing: a reminder once a day past this many minutes; 0 off */

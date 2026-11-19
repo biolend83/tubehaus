@@ -1,0 +1,3 @@
+- Sign in to your server through the browser, for single sign-on (Authentik and others)
+- Lyrics: the sung line sits in the middle; its height can be changed in Settings
+- Android 7.1 is supported (no picture-in-picture or vibration there)

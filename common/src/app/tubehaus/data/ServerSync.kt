@@ -45,8 +45,8 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
     init {
         store.onQueued = { kick.trySend(Unit) }
         // with a server connected, videos play through it (ServerVideo)
-        store.settings.value.let { ServerVideo.set(it.server, it.serverUser, it.serverPass) }
-        scope.launch { store.settings.state.collect { ServerVideo.set(it.server, it.serverUser, it.serverPass) } }
+        store.settings.value.let { ServerVideo.set(it.server, it.serverUser, it.serverPass, it.serverToken) }
+        scope.launch { store.settings.state.collect { ServerVideo.set(it.server, it.serverUser, it.serverPass, it.serverToken) } }
         scope.launch {
             while (true) {
                 // a change: send it a little later, so a burst (a playing video saves its position
@@ -67,7 +67,9 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
 
     private fun headers(s: Settings = store.settings.value): Map<String, String> = buildMap {
         put("Accept", "application/json")
-        if (s.serverUser.isNotEmpty()) {
+        if (s.serverToken.isNotEmpty()) {
+            put("Authorization", "Bearer ${s.serverToken}")
+        } else if (s.serverUser.isNotEmpty()) {
             put("Authorization", "Basic " + basic("${s.serverUser}:${s.serverPass}"))
         }
     }
@@ -145,7 +147,50 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
      */
     suspend fun connect(address: String, user: String, pass: String): String? {
         val base = normalize(address) ?: return "address"
-        val s = store.settings.value.copy(server = base, serverUser = user.trim(), serverPass = pass)
+        return connectAs(base, store.settings.value.copy(server = base, serverUser = user.trim(), serverPass = pass, serverToken = ""))
+    }
+
+    /**
+     * Signing in on the server's own page in the browser, for single sign-on (Authentik, ...): the
+     * server gives a code, [show] opens its page (and shows the code to check), someone signed in
+     * there presses Allow, and this device gets a sign-in of its own. Ten minutes at most.
+     */
+    suspend fun connectInBrowser(address: String, name: String, show: (url: String, code: String) -> Unit): String? {
+        val base = normalize(address) ?: return "address"
+        val h = try {
+            storeJson.parseToJsonElement(Net.get("$base/api/p/health", mapOf("Accept" to "application/json"))) as JsonObject
+        } catch (e: Exception) {
+            return reason(e)
+        }
+        if (h["ok"] != JsonPrimitive(true)) return "notTubeHaus"
+        if (!h.at("app_sign_in").bool) return "noBrowserSignIn"
+        val start = try {
+            storeJson.parseToJsonElement(Net.post("$base/api/p/auth/app/start", buildJsonObject { put("name", name) }.toString(),
+                mapOf("Accept" to "application/json", "Content-Type" to "application/json"))) as JsonObject
+        } catch (e: Exception) {
+            return if (e is HttpError && e.code == 404) "noBrowserSignIn" else reason(e)
+        }
+        val code = start.at("code").str.orEmpty()
+        show(base + start.at("path").str.orEmpty(), code.take(4) + "-" + code.drop(4))
+        val token = withTimeoutOrNull(600_000) {
+            var t = ""
+            while (t.isEmpty()) {
+                delay(2500)
+                val r = try {
+                    storeJson.parseToJsonElement(Net.get("$base/api/p/auth/app/poll?c=$code", mapOf("Accept" to "application/json"))) as JsonObject
+                } catch (e: Exception) {
+                    if (e is HttpError && e.code == 404) return@withTimeoutOrNull ""
+                    continue
+                }
+                t = r.at("token").str.orEmpty()
+            }
+            t
+        }
+        if (token.isNullOrEmpty()) return "expired"
+        return connectAs(base, store.settings.value.copy(server = base, serverUser = "", serverPass = "", serverToken = token))
+    }
+
+    private suspend fun connectAs(base: String, s: Settings): String? {
         val health = try {
             Net.get("$base/api/p/health", headers(s))
         } catch (e: Exception) {
@@ -179,7 +224,7 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
 
     /** this device keeps its copy of the library and goes back to being on its own */
     fun disconnect() {
-        store.settings.update { it.copy(server = "", serverUser = "", serverPass = "") }
+        store.settings.update { it.copy(server = "", serverUser = "", serverPass = "", serverToken = "") }
         store.queue.update { emptyList() }
         problem.value = null
         syncedAt.value = 0
