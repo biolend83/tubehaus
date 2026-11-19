@@ -127,6 +127,8 @@ data class Settings(
     val server: String = "",
     val serverUser: String = "",
     val serverPass: String = "",
+    /** a sign-in from the server's page in the browser (single sign-on), used instead of a password */
+    val serverToken: String = "",
     /** once a day: a newer app version, and the stream client list (engine/Remote.kt) */
     val checkUpdates: Boolean = true,
     /** text size: 1 normal, up to 1.5 */
