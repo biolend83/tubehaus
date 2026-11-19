@@ -4812,7 +4812,8 @@ def _feed_lengths(cid, out):
         for e in need:
             e["len"] = got.get(e["id"], 0)
     # not on the first page of the tab: the video itself, once (a live stays 0), a few per refresh
-    for e in [e for e in out if not e.get("len") and not e["short"] and not e.get("lenAsked")]:
+    recent = time.time() - 14 * 86400
+    for e in [e for e in out if not e.get("len") and not e["short"] and not e.get("lenAsked") and e["published"] > recent]:
         if _FEED_ASK["left"] <= 0:
             break
         _FEED_ASK["left"] -= 1
