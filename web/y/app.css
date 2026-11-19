@@ -424,6 +424,9 @@ label.tr-lang { display: flex; align-items: center; gap: 8px; }
 /* calm mode: no Shorts, trending or recommendations anywhere */
 html.calm .gi[data-r="shorts"], html.calm #mguide a[data-r="shorts"], html.calm .g-explore,
 html.calm .shorts-shelf, html.calm .chips:not(.small), html.calm .w-related { display: none !important; }
+/* no right column left over: the video in the middle, a little wider (a playlist or panel keeps the column) */
+html.calm .w-secondary:not(:has(.w-panel > *, .w-plpanel > *)) { display: none; }
+html.calm .w-cols:not(:has(.w-panel > *, .w-plpanel > *)) { max-width: 1280px; }
 .cm-open { margin: 16px 0; }
 /* public instance: nothing that would be shared between strangers */
 html.public .w-actions .cast { display: none !important; }

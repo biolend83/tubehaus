@@ -4745,7 +4745,7 @@ def yt_feed_channel_page(cid):
             o = old.get(v["videoId"])
             pub, views = (o["published"], o.get("views")) if o else (int(now) if old else 0, None)
         out.append({"id": v["videoId"], "title": v.get("title") or "", "author": v.get("author") or "", "authorId": cid,
-                    "published": pub, "views": views, "short": False})
+                    "published": pub, "views": views, "short": False, "len": int(v.get("lengthSeconds") or 0)})
     return out
 
 
@@ -4787,7 +4787,28 @@ def yt_feed_one(cid):
         out.append({"id": vid, "title": e.findtext("a:title", "", ns), "author": e.findtext("a:author/a:name", "", ns),
                     "authorId": cid, "published": pub, "views": int(st.get("views", 0)) if st is not None else None,
                     "short": "/shorts/" in href})
+    _feed_lengths(cid, out)
     yt_feed["items"][cid] = out
+
+
+def _feed_lengths(cid, out):
+    """RSS has no length: keep the ones known, and for new videos read them from the channel's
+    Videos tab (one request, only when the channel has a video not seen before)"""
+    old = {e["id"]: e for e in yt_feed["items"].get(cid) or []}
+    for e in out:
+        if "len" in old.get(e["id"], {}):
+            e["len"] = old[e["id"]]["len"]
+    need = [e for e in out if "len" not in e and not e["short"]]
+    if not need:
+        return
+    try:
+        d = json.loads(_inv(f"/api/v1/channels/{cid}/videos", 20))
+        got = {v.get("videoId"): int(v.get("lengthSeconds") or 0) for v in d.get("videos") or []}
+    except Exception as ex:
+        log("ytfeed", f"{cid} lengths FAIL {repr(ex)[:100]}")
+        return
+    for e in need:
+        e["len"] = got.get(e["id"], 0)       # 0: not on the tab (a live, a premiere); not asked again
 
 
 def yt_fill_thumbs():
