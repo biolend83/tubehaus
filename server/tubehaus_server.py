@@ -5621,6 +5621,77 @@ def session_user(token):
     return user if u and str(u.get("gen", 0)) == gen else None
 
 
+# Signing an app in through the browser, for single sign-on (Authentik, ...) or when typing a
+# password on a TV is a pain: the app asks for a code and opens this server's page with it; who is
+# signed in there (or signs in) presses Allow; the app, asking every few seconds, then gets a session
+# token of its own (Authorization: Bearer), which "Sign out everywhere" ends like any other.
+app_pairs = {}
+app_lock = threading.Lock()
+APP_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def app_pair_start(name):
+    code = "".join(secrets.choice(APP_CODE_CHARS) for _ in range(8))
+    now = time.time()
+    with app_lock:
+        for k in [k for k, v in app_pairs.items() if v["exp"] < now]:
+            del app_pairs[k]
+        if len(app_pairs) > 2000:
+            app_pairs.clear()
+        app_pairs[code] = {"exp": now + 600, "user": None, "gen": None,
+                           "name": re.sub(r"[^\w .()'-]", "", str(name or ""))[:40] or "an app"}
+    return code
+
+
+def _app_code(c):
+    c = re.sub(r"[^A-Z0-9]", "", str(c or "").upper())[:8]
+    with app_lock:
+        v = app_pairs.get(c)
+        return (c, v) if v and v["exp"] >= time.time() else (c, None)
+
+
+def app_pair_poll(c):
+    c, v = _app_code(c)
+    if not v:
+        return 404, {"error": "expired"}
+    if not v["user"]:
+        return 200, {"waiting": True}
+    with app_lock:
+        app_pairs.pop(c, None)
+    log("auth", "app signed in through the browser", every=0)
+    return 200, {"token": session_make(v["user"], v["gen"]), "user": v["user"]}
+
+
+def app_pair_page(c, user, done=False):
+    """the page the app opens: who, which app, Allow"""
+    import html as _h
+    c, v = _app_code(c)
+    if not v:
+        msg, form = "This code has expired. Start again in the app.", ""
+    elif done:
+        msg, form = "Done: the app is signed in. You can close this page.", ""
+    else:
+        msg = f"Sign in TubeHaus on <b>{_h.escape(v['name'])}</b> as <b>{_h.escape(user)}</b>?"
+        form = (f'<form method="post" action="/api/p/auth/app/allow"><input type="hidden" name="c" value="{c}">'
+                f'<p>Code <b>{c[:4]}-{c[4:]}</b>: check that the app shows the same.</p>'
+                '<button>Allow</button></form>')
+    return ('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<title>TubeHaus</title><style>body{font:16px system-ui,sans-serif;max-width:420px;margin:15vh auto;padding:0 16px;'
+            'color:#111;background:#fff}@media(prefers-color-scheme:dark){body{color:#eee;background:#111}}'
+            'button{font:inherit;padding:10px 28px;border:0;border-radius:20px;background:#3ea6ff;color:#000;cursor:pointer}</style>'
+            f'<h2>TubeHaus</h2><p>{msg}</p>{form}')
+
+
+def app_pair_allow(c, user):
+    c, v = _app_code(c)
+    if not v:
+        return False
+    gen = int(jload(USERS, {}).get(user, {}).get("gen", 1))
+    with app_lock:
+        v.update(user=user, gen=gen)
+    return True
+
+
 def _take_shared_library(user):
     """switching a server that was used without accounts: its library becomes the first account's"""
     if PUBLIC_MODE:
@@ -5945,7 +6016,8 @@ def health():
             "warp_rotations_30min": len([t for t in rot_hist if now - t < 1800]),
             "live_captions": bool(LIVECC_ENGINES), "live_caption_engines": list(LIVECC_ENGINES), "public": PUBLIC_MODE,
             "max_height": MAX_HEIGHT or None, "viewers": len([1 for t in list(viewers.values()) if now - t < 180]),
-            "max_viewers": MAX_VIEWERS or None, "accounts": ACCOUNTS, "name": NAME or None, "links": LINKS}
+            "max_viewers": MAX_VIEWERS or None, "accounts": ACCOUNTS, "name": NAME or None, "links": LINKS,
+            "sso": OIDC_NAME if OIDC else None, "app_sign_in": ACCOUNTS}
 
 
 viewers, rate, load_lk = {}, {}, threading.Lock()   # ip -> last seen / (tokens, time)
@@ -6070,6 +6142,17 @@ class H(BaseHTTPRequestHandler):
             self.close_connection = True
             log("http", "%s %s unhandled %s: %s" % (getattr(self, "command", "?"),
                 str(getattr(self, "path", "?"))[:60], type(ex).__name__, str(ex)[:120]), t0, every=0)
+
+    def send_page(self, page):
+        b = page.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Content-Length", str(len(b)))
+        self.end_headers()
+        self.wfile.write(b)
 
     def send(self, code, obj):
         b = json.dumps(obj, ensure_ascii=False).encode()
@@ -6202,6 +6285,9 @@ class H(BaseHTTPRequestHandler):
             k, _, v = part.strip().partition("=")
             if k == COOKIE:
                 return session_user(v)
+        a = self.headers.get("Authorization") or ""
+        if a[:7].lower() == "bearer ":          # an app signed in through the browser (app_pair_*)
+            return session_user(a[7:].strip())
         return self.basic_user()
 
     def basic_user(self):
@@ -6275,6 +6361,19 @@ class H(BaseHTTPRequestHandler):
             return
         if self.cross_site(p) or self.needs_sign_in(p):
             return
+        if ACCOUNTS and p.endswith("/api/p/auth/app/poll"):
+            return self.send(*app_pair_poll(self.qs().get("c", "")))
+        if ACCOUNTS and p.endswith("/api/p/auth/app"):
+            c = self.qs().get("c", "")
+            user = self.cookie_user()
+            if not user:      # sign in first (single sign-on or password), then back here
+                c = re.sub(r"[^A-Za-z0-9]", "", c)[:8]
+                self.send_response(302)
+                self.send_header("Location", "/login?r=" + urllib.parse.quote("/api/p/auth/app?c=" + c, safe=""))
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            return self.send_page(app_pair_page(c, user))
         if p.endswith("/api/p/auth/me"):
             return self.send(200, {"accounts": ACCOUNTS, "user": self.cookie_user() if ACCOUNTS else None,
                                    "sso": OIDC_NAME if OIDC else None, "passwords": not OIDC_ONLY})
@@ -6460,6 +6559,17 @@ class H(BaseHTTPRequestHandler):
         except Exception:
             body = {}
         body = body if isinstance(body, dict) else {}
+        if ACCOUNTS and p.endswith("/api/p/auth/app/start"):
+            if _too_many("app:" + self.client_ip(), 20, 600):
+                return self.send(429, {"error": "Too many attempts. Please wait a few minutes"})
+            c = app_pair_start(body.get("name"))
+            return self.send(200, {"code": c, "path": "/api/p/auth/app?c=" + c})
+        if ACCOUNTS and p.endswith("/api/p/auth/app/allow"):
+            c = (urllib.parse.parse_qs(body_bytes.decode("utf-8", "replace")).get("c") or [""])[0]
+            if not _req.user:
+                return self.send(401, {"error": "Please sign in"})
+            ok = app_pair_allow(c, _req.user)
+            return self.send_page(app_pair_page(c, _req.user, done=ok))
         if ACCOUNTS and p.endswith("/api/p/auth/logout"):
             return self.send_cookie(200, {"ok": True}, "", 0)
         if ACCOUNTS and p.endswith("/api/p/auth/password"):
