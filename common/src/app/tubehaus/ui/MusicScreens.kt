@@ -893,7 +893,7 @@ private fun LyricsPanel(app: AppState, s: Song) {
             val st by app.player.state.collectAsState()
             if (f.synced) {
                 val clock = rememberSongClock(st.positionMs, st.playing, st.speed)
-                SyncedLyrics(f.lines, clock, { app.player.seekTo(it) }, tr(if (f.youTube) "Lyrics from YouTube Music" else "Lyrics come from LRCLIB"), Modifier.fillMaxSize())
+                SyncedLyrics(f.lines, clock, { app.player.seekTo(it) }, tr(if (f.youTube) "Lyrics from YouTube Music" else "Lyrics come from LRCLIB"), Modifier.fillMaxSize(), app.store.settings.value.lyricsAt)
                 return
             }
             val list = rememberLazyListState()
