@@ -110,6 +110,12 @@ class MpvPlayer : VideoPlayer {
      * memory the garbage collector barely sees, and after a few minutes the app ran out of it.)
      */
     @Volatile private var front: Image? = null
+    /**
+     * Frames replaced but not freed yet (they are freed on the UI thread). When the app is in the
+     * background, macOS slows that thread down (App Nap) while mpv goes on at 30-60 frames a second,
+     * each a few MB: they piled up until the computer ran out of memory. Past a few, frames are dropped.
+     */
+    private val unfreed = java.util.concurrent.atomic.AtomicInteger(0)
     private val sampling = FilterMipmap(FilterMode.LINEAR, MipmapMode.NONE)
     /** bumped for every new frame: the Canvas reads it, so Compose repaints (only repaints) */
     private val frames = mutableIntStateOf(0)
@@ -164,11 +170,11 @@ class MpvPlayer : VideoPlayer {
                 val ctx = render ?: return
                 val fresh = l.mpv_render_context_update(ctx) and LibMpv.RENDER_UPDATE_FRAME != 0L
                 if (!fresh && !redraw) return@synchronized
-                // nothing on screen (another page is open): mpv drops the frame and plays on
-                if (views == 0) return@synchronized
+                // nothing on screen (another page is open), or the old frames not freed yet: mpv drops the frame and plays on
+                if (views == 0 || unfreed.get() > 2) return@synchronized
                 val (w, h) = target() ?: return@synchronized
                 redraw = false
-                val t = target?.takeIf { it.w == w && it.h == h } ?: Target(w, h).also { target = it }
+                val t = target?.takeIf { it.w == w && it.h == h } ?: Target(w, h).also { target?.bitmap?.close(); target = it }
                 swSize.setInt(0, w); swSize.setInt(4, h)
                 stride.setLong(0, t.bitmap.rowBytes.toLong())
                 val p = LibMpv.params(
@@ -201,7 +207,10 @@ class MpvPlayer : VideoPlayer {
         val old = front
         front = img
         frames.intValue++
-        if (old != null) SwingUtilities.invokeLater { old.close() }
+        if (old != null) {
+            unfreed.incrementAndGet()
+            SwingUtilities.invokeLater { old.close(); unfreed.decrementAndGet() }
+        }
     }
 
     private fun clearPicture() = show(null)
