@@ -55,6 +55,8 @@ object YouTube {
      * (see [ServerVideo]), and from this device when there isn't or the server can't.
      */
     suspend fun stream(id: String): Stream {
+        // a test build that plays everything the SABR way (TUBEHAUS_SABR_ONLY / -PsabrOnly): no other client, no server
+        if (Sabr.only && Sabr.available) return sabr(id)
         if (!ServerVideo.on) return device(id)
         return try {
             ServerVideo.stream(id)
@@ -87,6 +89,10 @@ object YouTube {
             if (attempt == 0 && first?.kind != YtError.Kind.AGE && Cipher.available) {
                 try { return tv(id) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
             }
+            // nothing with links plays it: YouTube's web player way (SABR, with its own web token)
+            if (attempt == 0 && first?.kind != YtError.Kind.AGE && Sabr.available) {
+                try { return sabr(id) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
+            }
             // every client asked to sign in: the wall is on this visitor identity, so try a new one
             if (!walled || attempt == 1 || !InnerTube.reroll()) break
             first = null
@@ -110,6 +116,14 @@ object YouTube {
         val wait = Cipher.prerollMs(d) - (Sys.nowMs() - answeredAt)
         if (wait > 0) kotlinx.coroutines.delay(wait)
         return s
+    }
+
+    /** the web player's answer, its formats served by [Sabr] on this device */
+    internal suspend fun sabr(id: String): Stream {
+        val d = Sabr.prepare(id) ?: throw YtError("No SABR", YtError.Kind.UNAVAILABLE)
+        val s = parse(id, d, Clients.WEB_SABR) { i -> Sabr.url(id, i) }
+        if (s.video.isEmpty() || s.audio.isEmpty()) throw YtError("No playable streams", YtError.Kind.UNAVAILABLE)
+        return s.copy(captions = s.captions.map { it.copy(url = Sabr.captionUrl(id, it.url)) })
     }
 
     /** one client's answer for a video, as it is: for the engine check and repair tools (the app goes through [stream]) */

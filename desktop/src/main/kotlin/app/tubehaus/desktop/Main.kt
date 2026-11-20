@@ -201,6 +201,12 @@ private fun startApp() {
     val bundled = System.getProperty("compose.application.resources.dir") ?: File("resources/windows").absolutePath
     System.setProperty("jna.library.path", if (isMac) "$bundled:/opt/homebrew/lib:/usr/local/lib:/opt/local/lib" else bundled)
     val platform = DesktopPlatform()
+    // what nothing else plays: SABR from a hidden Edge or Chrome page, its formats kept in the cache while they play
+    if (BrowserSabr.browser() != null) {
+        app.tubehaus.engine.Sabr.dir = File(platform.cacheDir.toString(), "sabr").apply { deleteRecursively() }
+        app.tubehaus.engine.Sabr.host = BrowserSabr(File(platform.cacheDir.toString(), "sabr-browser"))
+        app.tubehaus.engine.Sabr.only = System.getenv("TUBEHAUS_SABR_ONLY") != null
+    }
     val state = AppState(platform, Store(platform.dataDir))
     // macOS Control Center and the media keys: what plays and its buttons
     MacMediaControls(state, File(platform.cacheDir.toString(), "nowplaying")).start()

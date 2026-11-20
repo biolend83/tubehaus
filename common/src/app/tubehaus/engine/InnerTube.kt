@@ -86,6 +86,8 @@ object Clients {
         "com.google.android.apps.youtube.kids/7.36.1 (Linux; U; Android 11) gzip",
         mapOf("androidSdkVersion" to 30, "osName" to "Android", "osVersion" to "11"),
     )
+    /** YouTube's web player through [Sabr]: never called on InnerTube from here, the name marks streams it played */
+    val WEB_SABR = Client("WEB_SABR", "2.20261119.01.00", 1, "")
     /** in the order the player tries them; replaced by the list on GitHub when there is a newer one (Remote) */
     @Volatile var PLAYERS = listOf(VISIONOS, ANDROID_VR)
 }

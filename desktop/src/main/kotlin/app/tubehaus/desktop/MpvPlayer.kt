@@ -403,7 +403,7 @@ class MpvPlayer : VideoPlayer {
         return main.filter { it.codecFamily == "opus" }.maxByOrNull { it.bitrate } ?: main.maxByOrNull { it.bitrate }
     }
 
-    private fun source(u: String) = if (u.startsWith("file:")) java.io.File(java.net.URI(u)).absolutePath else LocalProxy.wrap(u)
+    private fun source(u: String) = if (u.startsWith("file:")) java.io.File(java.net.URI(u)).absolutePath else if (u.startsWith("http://127.0.0.1:")) u else LocalProxy.wrap(u)
 
     private fun open(startMs: Long) {
         val s = stream ?: return
