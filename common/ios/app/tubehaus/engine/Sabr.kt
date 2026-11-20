@@ -24,7 +24,7 @@ import platform.Foundation.NSDate
 import platform.Foundation.NSLock
 import platform.Foundation.dateWithTimeIntervalSinceNow
 import platform.posix.AF_INET
-import platform.posix.IntVar
+import kotlinx.cinterop.IntVar
 import platform.posix.O_CREAT
 import platform.posix.O_RDWR
 import platform.posix.SOCK_STREAM
