@@ -483,6 +483,7 @@ Running one? [Add it here](https://github.com/biolend83/tubehaus/issues/new?temp
 | `HT_PUBLIC_URL` | `http://localhost:8080` | the address browsers use |
 | `HT_YT_PROXY` | `127.0.0.1:40000` | WARP proxy (empty = direct) |
 | `HT_WARP_ROTATE` | `1` | reconnect WARP when YouTube blocks |
+| `HT_SABR` | `1` | SABR (what YouTube's own web player gets) when no other way plays a video; `first` to use it before them, `0` off. Needs deno |
 | `HT_REGION` | `US` | default region of searches and trending |
 | `HT_HL` | (the viewer's language) | YouTube's language for its texts |
 | `HT_YTDLP` | `yt-dlp` | for live streams |

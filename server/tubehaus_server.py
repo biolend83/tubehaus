@@ -33,6 +33,8 @@ PUBLIC = env("HT_PUBLIC_URL", "http://localhost:8080").rstrip("/")   # where bro
 # which listens on 127.0.0.1:40000 and speaks HTTP CONNECT) is what makes this work.
 YT_PROXY = env("HT_YT_PROXY", "127.0.0.1:40000")        # "" = connect to YouTube directly
 WARP_ROTATE = env("HT_WARP_ROTATE", "1") == "1"         # get a new WARP address when YouTube blocks us
+SABR = env("HT_SABR", "1")                               # "1": SABR when no other client plays a video, "first": before them, "0": never
+SABR_PORT = int(env("HT_SABR_PORT", "3033"))             # the SABR helper (server/sabr/sabr.mjs, run by deno), on 127.0.0.1
 YTDLP = env("HT_YTDLP", "yt-dlp")
 LT = env("HT_LIBRETRANSLATE", "")                        # optional LibreTranslate URL (translation fallback)
 SUB_LANG = env("HT_SUB_LANG", "en")                      # default target of translated subtitles (the app asks for its own language)
@@ -333,6 +335,8 @@ def _video_json(vid):
 def _companion_url(url):
     """a googlevideo.com stream address as this server's proxy path for it (/companion/videoplayback, the path
     Invidious' companion used, so the apps' server mode finds it where it always did)"""
+    if url.startswith("/"):
+        return url        # already on this server (/companion/sabr)
     u = urllib.parse.urlsplit(url)
     return "/companion/videoplayback?%s&host=%s" % (u.query, u.netloc)
 
@@ -2940,6 +2944,77 @@ def eng_player(vid):
     return first or {}, None
 
 
+# ---- SABR: what YouTube's own web player gets ----
+# When no client above gives plain stream addresses (or with HT_SABR=first), the helper server/sabr/sabr.mjs
+# reads the watch page, makes a web proof-of-origin token (BotGuard in JSDOM, no account) and speaks SABR;
+# each format is then a file on this server, /companion/sabr?v=&itag=, with byte ranges like any other.
+SABR_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sabr")
+_sabr = {"proc": None, "ok": False, "fails": 0}
+
+
+def _deno():
+    import shutil
+    for c in (env("HT_DENO", ""), "deno", "/usr/local/bin/deno", "/root/.deno/bin/deno", os.path.expanduser("~/.deno/bin/deno")):
+        if c and shutil.which(c):
+            return shutil.which(c)
+    return None
+
+
+def sabr_loop():
+    """keeps the SABR helper running (deno with the npm packages it names, cached under STATE/deno)"""
+    import subprocess
+    rt = _deno()
+    if SABR == "0" or not rt:
+        log("sabr", "off" if SABR == "0" else "no deno: SABR off", every=0)
+        return
+    e = dict(os.environ, HT_SABR_PORT=str(SABR_PORT), HT_SABR_DIR=os.path.join(STATE, "sabr"),
+             DENO_DIR=env("DENO_DIR", os.path.join(STATE, "deno")), DENO_NO_UPDATE_CHECK="1", NO_COLOR="1")
+    if YT_PROXY:
+        px = YT_PROXY if "://" in YT_PROXY else "http://" + YT_PROXY
+        e.update(HTTPS_PROXY=px, HTTP_PROXY=px, NO_PROXY="127.0.0.1,localhost")
+    while True:
+        t0 = time.time()
+        try:
+            proc = subprocess.Popen([rt, "run", "--allow-all", "--quiet", "--no-lock", os.path.join(SABR_DIR, "sabr.mjs")], env=e,
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace")
+            _sabr["proc"] = proc
+            for line in proc.stdout:
+                line = line.rstrip()
+                if line.startswith("[sabr]"):
+                    _sabr["ok"] = True
+                    log("sabr", line[7:][:200], every=0)
+                elif line and "libEGL" not in line and "TU:" not in line:
+                    log("sabr", "| " + line[:200], every=60)
+            proc.wait()
+        except Exception as ex:
+            log("sabr", "start FAIL " + repr(ex)[:120], every=0)
+        _sabr["ok"] = False
+        # a helper that keeps dying: wait longer before the next start (up to 10 minutes)
+        _sabr["fails"] = 0 if time.time() - t0 > 600 else _sabr["fails"] + 1
+        time.sleep(min(600, 5 * 2 ** min(_sabr["fails"], 7)))
+
+
+def sabr_get(path, rng=None, timeout=60):
+    h = {"Range": rng} if rng else {}
+    return urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:%d%s" % (SABR_PORT, path), headers=h), timeout=timeout)
+
+
+def eng_sabr(vid, hl="", gl=""):
+    """the watch page's player answer with its formats at /companion/sabr, or None"""
+    if SABR == "0" or not _sabr["ok"]:
+        return None
+    t0 = time.time()
+    try:
+        with sabr_get("/prepare?" + urllib.parse.urlencode({"v": vid, "hl": hl or "en", "gl": gl or "US"}), timeout=40) as r:
+            d = json.loads(r.read())
+    except Exception as ex:
+        log("engine", "video %s SABR FAIL %s" % (vid, repr(ex)[:120]), t0, every=0)
+        return None
+    if (d.get("playabilityStatus") or {}).get("status") != "OK" or not (d.get("streamingData") or {}).get("adaptiveFormats"):
+        return None
+    return d
+
+
 # ---- the TV client: what the others call "not available" (made for kids, some labels' music videos) ----
 # A Samsung TV's YouTube still serves those, but its links come locked: each one's signature and its
 # "n" parameter are challenges set by YouTube's player script. yt-dlp's EJS solver (server/ejs, run by
@@ -3196,6 +3271,11 @@ def eng_video(vid, hl="", gl="", fast=False):
             d, client = tv, "TVHTML5"
             if not d.get("videoDetails") and web.get("videoDetails"):
                 d["videoDetails"] = web["videoDetails"]
+    # nothing gave plain addresses (or SABR is asked for first): what YouTube's own web player gets
+    if (not client and "age" not in reason.lower()) or (SABR == "first" and client):
+        sb = eng_sabr(vid, hl, gl)
+        if sb:
+            d, client = sb, "WEB_SABR"
     try:
         nx = {} if fast and not fn.done() else fn.result()
     except Exception:
@@ -3997,6 +4077,11 @@ def gv_url(path):
 
 def gv_open(url, rng=None, timeout=60):
     """one stream (a googlevideo.com address or our /companion/ path for it) through YT_PROXY, the address it was given to"""
+    if url.startswith("/companion/sabr?"):
+        m = re.search(r"&range=(\d+-\d*)$", url)
+        if m:
+            url, rng = url[:m.start()], "bytes=" + m.group(1)
+        return sabr_get("/track?" + url.split("?", 1)[1], rng, timeout)
     if url.startswith("/"):
         url = gv_url(url) or ""
     if not url.startswith("https://"):
@@ -6553,6 +6638,8 @@ class H(BaseHTTPRequestHandler):
             return self.captions_clean()
         if p in ("/companion/videoplayback", "/videoplayback"):
             return self.stream()
+        if p == "/companion/sabr":
+            return self.sabr_stream()
         if "/api/v1/videos/" in p:
             return self.videos_api()
         if p.endswith("/latest_version"):
@@ -6744,6 +6831,34 @@ class H(BaseHTTPRequestHandler):
             log("stream", "FAIL %s" % repr(ex)[:80], t0)
             return self.send(502, {"error": "No connection to YouTube"})
         return self._pipe_resume(req, r, r.status, r.headers, t0)
+
+    def sabr_stream(self):
+        # /companion/sabr?v=<id>&itag=<n>[&xtags=]: a format YouTube gives only over SABR, from the helper (ranges pass through)
+        t0 = time.time()
+        try:
+            r = sabr_get("/track?" + self.path.split("?", 1)[-1], self.headers.get("Range"), 90)
+        except urllib.error.HTTPError as e:
+            log("stream", "SABR %d" % e.code, t0, every=0)
+            return self.send(e.code if e.code in (400, 404, 416) else 502, {"error": "No SABR stream"})
+        except Exception as ex:
+            log("stream", "SABR FAIL %s" % repr(ex)[:80], t0, every=0)
+            return self.send(502, {"error": "No SABR stream"})
+        self.send_response(r.status)
+        for h in ("Content-Type", "Content-Range", "Accept-Ranges", "Content-Length"):
+            if r.headers.get(h):
+                self.send_header(h, r.headers[h])
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        try:
+            while True:
+                b = r.read(256 * 1024)
+                if not b:
+                    break
+                self.wfile.write(b)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        finally:
+            r.close()
 
     def image(self):
         # /vi/<id>/<name>.jpg, /ggpht/..., /sb/i/...: pictures from YouTube's servers, so the viewer's browser talks only to this one
@@ -7067,6 +7182,7 @@ if __name__ == "__main__":
         sys.exit(1 if doctor() else 0)
     os.makedirs(STATE, exist_ok=True)
     threading.Thread(target=yt_feed_loop, daemon=True).start()
+    threading.Thread(target=sabr_loop, name="sabr", daemon=True).start()
     threading.Thread(target=ytdl_gc_loop, daemon=True).start()
     threading.Thread(target=stats_loop, daemon=True).start()
     log("start", "TubeHaus server on %s:%d, built-in YouTube engine%s" % (BIND[0], BIND[1], ", through " + YT_PROXY if YT_PROXY else ""), every=0)
