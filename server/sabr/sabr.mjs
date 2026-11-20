@@ -345,6 +345,25 @@ async function sweep() {
 }
 setInterval(() => sweep().catch(() => {}), 60e3);
 
+// a caption file whose address wants a token (exp=xpe): with one bound to the video, as the web player sends it.
+// An empty answer means YouTube turned the token down: again with a new minter.
+async function caption(u, vid) {
+  const url = new URL(u);
+  if (url.hostname !== "www.youtube.com" || url.pathname !== "/api/timedtext" || !/^[\w-]{11}$/.test(vid)) return new Response("bad address", { status: 400 });
+  const ver = sessions.get(vid)?.ver || "2.20261119.01.00";
+  for (let i = 0; i < 4; i++) {
+    const m = await getMinter();
+    const pot = await m.m.mintAsWebsafeString(vid);
+    const r = await fetch(u + "&potc=1&pot=" + encodeURIComponent(pot) + "&c=WEB&cver=" + encodeURIComponent(ver),
+      { headers: { "User-Agent": UA, Origin: "https://www.youtube.com", Referer: "https://www.youtube.com/watch?v=" + vid } });
+    const body = await r.arrayBuffer();
+    if (r.ok && body.byteLength > 60) { m.good = true; return new Response(body, { headers: { "Content-Type": r.headers.get("content-type") || "text/plain" } }); }
+    if (!r.ok) return new Response("YouTube answered " + r.status, { status: 502 });
+    turnedDown(m);
+  }
+  return new Response("captions turned down", { status: 502 });
+}
+
 // a range of a format, fetched where it is missing
 async function serveTrack(req, url) {
   const vid = url.searchParams.get("v") || "", itag = url.searchParams.get("itag") || "", xtags = url.searchParams.get("xtags") || "";
@@ -402,6 +421,7 @@ Deno.serve({ hostname: "127.0.0.1", port: PORT, onListen: () => log("listening o
       return Response.json(await answer(vid, s));
     }
     if (url.pathname === "/track") return await serveTrack(req, url);
+    if (url.pathname === "/caption") return await caption(url.searchParams.get("u") || "", url.searchParams.get("v") || "");
     return new Response("not found", { status: 404 });
   } catch (e) {
     log("error", url.pathname, String(e?.message || e).slice(0, 200));

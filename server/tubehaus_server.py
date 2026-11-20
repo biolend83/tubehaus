@@ -3370,6 +3370,13 @@ def eng_caption(vid, label="", lang="", tlang=""):
     if not t:
         raise EngError("No such caption track", 404)
     u = t["baseUrl"] + "&fmt=vtt" + ("&tlang=" + urllib.parse.quote(tlang) if tlang else "")
+    if re.search(r"[?&]exp=[^&]*xpe", u) and _sabr["ok"]:
+        # a web caption address that wants a token (a video only SABR plays): the SABR helper fetches it with one
+        try:
+            with sabr_get("/caption?" + urllib.parse.urlencode({"u": u, "v": vid}), timeout=40) as r:
+                return r.read()
+        except Exception as ex:
+            raise EngError("No captions (%s)" % repr(ex)[:80], 502)
     req = urllib.request.Request(u, headers={"User-Agent": BROWSER_UA})
     try:
         return YT.open(req, timeout=30).read()
