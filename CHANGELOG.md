@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.0 — 2026-11-20
+
+### Added
+- **SABR**: videos YouTube now plays only in its own web player (no stream address for any other client) play again. The server speaks SABR itself with its own proof-of-origin token (no account, no cookies) and serves each format as an ordinary file with byte ranges, so the web player, the apps and TVs need nothing new; seeking far ahead starts there instead of waiting for everything before it. Captions of those videos come through it too
+
+### Fixed
+- Videos made for kids: YouTube Kids' client is asked first, so they play the first time
+- Web: kept answers expire and stay under 200, and a thumbnail's hover preview starts once, so a long session no longer grows the page's memory
+
 ## v1.6.5 — 2026-11-19
 
 ### Added
