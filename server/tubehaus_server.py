@@ -3261,6 +3261,12 @@ def eng_video(vid, hl="", gl="", fast=False):
             log("engine", "video %s KIDS FAIL %s" % (vid, repr(ex)[:120]), t0, every=0)
         if kids:
             d, client = kids, "ANDROID_KIDS"
+    # nothing gave plain addresses (or SABR is asked for first): what YouTube's own web player gets
+    if (not client and "age" not in reason.lower()) or (SABR == "first" and client):
+        sb = eng_sabr(vid, hl, gl)
+        if sb:
+            d, client = sb, "WEB_SABR"
+    # the TV client last: its links wait behind the start ad it places (up to 8 s), SABR opens in 2 or 3
     if not client and (ps.get("status") == "UNPLAYABLE" or ps.get("status") == "LOGIN_REQUIRED" and "age" not in reason.lower()):
         try:
             tv = eng_tv(vid)
@@ -3271,11 +3277,6 @@ def eng_video(vid, hl="", gl="", fast=False):
             d, client = tv, "TVHTML5"
             if not d.get("videoDetails") and web.get("videoDetails"):
                 d["videoDetails"] = web["videoDetails"]
-    # nothing gave plain addresses (or SABR is asked for first): what YouTube's own web player gets
-    if (not client and "age" not in reason.lower()) or (SABR == "first" and client):
-        sb = eng_sabr(vid, hl, gl)
-        if sb:
-            d, client = sb, "WEB_SABR"
     try:
         nx = {} if fast and not fn.done() else fn.result()
     except Exception:
