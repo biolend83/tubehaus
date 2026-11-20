@@ -18,12 +18,18 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersion
+        // -PsabrOnly=true: a test build that plays every video the SABR way
+        val sabrOnly = (findProperty("sabrOnly") ?: "false").toString()
+        manifestPlaceholders["sabrOnly"] = sabrOnly
+        // the test build installs beside the real app: its own id and name
+        manifestPlaceholders["appLabel"] = if (sabrOnly == "true") "TubeHaus-test" else "TubeHaus"
+        if (sabrOnly == "true") applicationIdSuffix = ".test"
     }
 
     // The shared code (engine, library, screens) is compiled into this module as plain sources.
     sourceSets["main"].java.srcDirs("src/main/kotlin", "../common/src", "../common/jvm")
     // Pretendard, the type face of the web app 1.0 (one copy for every platform: common/fonts)
-    sourceSets["main"].assets.srcDirs("../common/fonts", "../common/ejs")
+    sourceSets["main"].assets.srcDirs("../common/fonts", "../common/ejs", "../common/sabr")
 
     signingConfigs {
         // the release key lives outside the repository; without it the APK is signed with the debug key

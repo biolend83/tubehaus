@@ -99,6 +99,17 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
 
     private val dataSource = DefaultDataSource.Factory(ctx, OkHttpDataSource.Factory(Net.client))
 
+    /**
+     * The memory this app may use. The read-ahead lives there: ExoPlayer's usual ~130 MB of video is more than a
+     * small TV (Chromecast with Google TV HD, Fire TV sticks: a 192-256 MB limit) has room for next to the app, and
+     * it crashed after a few minutes of video (#99). So at most a third of it, and such a device counts as [weak].
+     */
+    private val heap = Runtime.getRuntime().maxMemory()
+    private val weak: Boolean by lazy {
+        heap <= 300L * 1024 * 1024 ||
+            (ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice
+    }
+
     val exo: ExoPlayer = ExoPlayer.Builder(ctx)
         .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
         .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
@@ -110,8 +121,12 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         .setLoadControl(
             DefaultLoadControl.Builder()
                 .setBufferDurationsMs(60_000, if (longBuffer) 1_200_000 else 300_000, 1_500, 3_000)
-                .setBackBuffer(30_000, true)
-                .apply { if (longBuffer) setTargetBufferBytes((if (tv) 150 else 400) * 1024 * 1024).setPrioritizeTimeOverSizeThresholds(true) }
+                .setBackBuffer(if (weak) 5_000 else 30_000, true)
+                .apply {
+                    val third = (heap / 3).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                    if (longBuffer) setTargetBufferBytes(minOf((if (tv) 150 else 400) * 1024 * 1024, third)).setPrioritizeTimeOverSizeThresholds(true)
+                    else if (weak) setTargetBufferBytes(third)
+                }
                 .build(),
         )
         .build()
@@ -141,6 +156,8 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             .filter { !it.isEncoder && isHardware(it) }
             .flatMap { it.supportedTypes.toList() }.map { it.lowercase() }.toSet()
         buildList {
+            // a weak device decodes AV1 and VP9 in hardware on paper, yet stutters on them (#99): H.264 first there
+            if (weak) add("h264")
             if ("video/av01" in hw) add("av1")
             if ("video/x-vnd.on2.vp9" in hw) add("vp9")
             add("h264")

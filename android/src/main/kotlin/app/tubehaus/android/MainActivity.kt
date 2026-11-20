@@ -100,6 +100,12 @@ class MainActivity : ComponentActivity() {
 
     /** a shared or opened YouTube link */
     private fun handle(i: Intent?) {
+        // developer builds: adb shell am start -n <app>/.MainActivity --es th_sabrcheck <video id> (results in logcat, tag THSABR)
+        val check = i?.getStringExtra("th_sabrcheck")
+        if (check != null && (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+            state.scope.launch(kotlinx.coroutines.Dispatchers.IO) { app.tubehaus.engine.sabrCheck(check) { android.util.Log.i("THSABR", it) } }
+            return
+        }
         val text = when (i?.action) {
             Intent.ACTION_VIEW -> i.dataString
             Intent.ACTION_SEND -> i.getStringExtra(Intent.EXTRA_TEXT)

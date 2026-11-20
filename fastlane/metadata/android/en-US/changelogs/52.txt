@@ -1,0 +1,4 @@
+- Videos YouTube now plays only in its web player work again (SABR)
+- Videos made for kids play first time
+- Qualities another codec reaches are listed, marked with the codec (e.g. 2160p VP9)
+- Small TVs read ahead within the app's memory; the desktop app can't fill memory in the background

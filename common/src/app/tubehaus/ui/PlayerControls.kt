@@ -1242,8 +1242,16 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
             }
         }
         "q" -> {
+            // higher qualities only another codec reaches (the one playing stops at 1080p, say): marked with that
+            // codec, and picking one plays this video with it. Not on the iPad, whose player has H.264 only.
+            val pb = app.playback
+            val top = st.heights.maxOrNull() ?: 0
+            val more = if (app.platform.name == "ios") emptyMap() else pb.stream?.video.orEmpty()
+                .filter { it.height > top && it.indexRange != null }.groupBy { it.height }
+                .mapValues { (_, l) -> listOf("vp9", "av1", "h264").firstOrNull { c -> l.any { it.codecFamily == c } } ?: l.first().codecFamily }
             Pick(tr("Auto"), st.height == 0) { player.setHeight(0); dismiss() }
-            for (h in st.heights.sortedDescending()) Pick("${h}p", st.height == h) { player.setHeight(h); dismiss() }
+            for ((h, c) in more.entries.sortedByDescending { it.key }) Pick("${h}p", false, codecName(c)) { pb.playWithCodec(c, h); dismiss() }
+            for (h in st.heights.sortedDescending()) Pick("${h}p", st.height == h, if (h > 1080) pb.stream?.video?.filter { it.height == h }?.map { it.codecFamily }?.distinct()?.singleOrNull()?.let(::codecName) ?: codecName(pb.codecNow()) else "") { player.setHeight(h); dismiss() }
         }
         "a" -> for ((lang, name) in st.audioTracks) {
             Pick(name, st.audioTrack == lang) { player.setAudioTrack(lang); dismiss() }
@@ -1297,6 +1305,7 @@ private fun codecName(c: String) = when (c) { "h264" -> "H.264"; "vp9" -> "VP9";
 private fun setCodec(app: AppState, c: String) {
     if (app.store.settings.value.codec == c) return
     app.store.settings.update { it.copy(codec = c) }
+    app.playback.codecFor = null
     app.playback.replay(app.player.state.value.positionMs)
 }
 
@@ -1348,10 +1357,12 @@ private fun SheetRow(icon: ImageVector, label: String, value: String, onClick: (
 }
 
 @Composable
-private fun Pick(label: String, on: Boolean, onClick: () -> Unit) {
+private fun Pick(label: String, on: Boolean, note: String = "", onClick: () -> Unit) {
     SheetLine(onClick) {
         Box(Modifier.width(40.dp)) { if (on) Icon(Sym.Check.fill, null) }
         Text(label, style = MaterialTheme.typography.bodyLarge)
+        // what sets it apart, to its right (the codec of a quality only it reaches)
+        if (note.isNotEmpty()) Text(note, Modifier.padding(start = 10.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
