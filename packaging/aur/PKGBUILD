@@ -1,6 +1,6 @@
 # Maintainer: biolend83 <258010694+biolend83@users.noreply.github.com>
 pkgname=tubehaus-bin
-pkgver=1.6.5
+pkgver=1.7.0
 pkgrel=1
 pkgdesc="Private YouTube client with no Google account, no ads and no tracking"
 arch=('x86_64' 'aarch64')
@@ -12,8 +12,8 @@ conflicts=('tubehaus')
 options=('!strip')
 source_x86_64=("TubeHaus-${pkgver}-linux-amd64.deb::https://github.com/biolend83/tubehaus/releases/download/app-v${pkgver}/TubeHaus-${pkgver}-linux-amd64.deb")
 source_aarch64=("TubeHaus-${pkgver}-linux-arm64.deb::https://github.com/biolend83/tubehaus/releases/download/app-v${pkgver}/TubeHaus-${pkgver}-linux-arm64.deb")
-sha256sums_x86_64=('d125298ef90336b04599d5b105aca96f6590e025c22cd8add68c72cef49bd4ba')
-sha256sums_aarch64=('a8cdd07f66288c62188e9d23ca5ebc9fe3da46e5b4fdb0769eb6935af53e5820')
+sha256sums_x86_64=('fc2f6af9ed521063a4cb3aaa31a4538af9141ff28baf29a2f02d51c0e7d2ba20')
+sha256sums_aarch64=('e687da1e8f0749ddf8768acbf8c6644e6a4512636abffac8ac40d2349be7ac18')
 noextract=("TubeHaus-${pkgver}-linux-amd64.deb" "TubeHaus-${pkgver}-linux-arm64.deb")
 
 package() {
