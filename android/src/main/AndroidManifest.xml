@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Google Cast: finding TVs on the Wi-Fi (multicast DNS) and keeping the Wi-Fi awake while one plays from the phone -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -26,13 +27,15 @@
 
     <application
         android:name=".TubeApp"
+        android:networkSecurityConfig="@xml/network_security"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
-        android:label="TubeHaus"
+        android:label="${appLabel}"
         android:banner="@drawable/tv_banner"
         android:supportsRtl="true"
         android:theme="@style/Theme.TubeHaus">
+        <meta-data android:name="tubehaus.sabrOnly" android:value="${sabrOnly}" />
 
         <activity
             android:name=".MainActivity"

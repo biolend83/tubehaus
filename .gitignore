@@ -18,3 +18,8 @@ desktop/icon.icns
 
 # made by XcodeGen in CI (ios/app/project.yml)
 ios/app/TubeHaus.xcodeproj/
+
+# the app CI puts next to the Flatpak manifest
+packaging/flatpak/app/
+packaging/snap/app/
+desktop/resources/macos/

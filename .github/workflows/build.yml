@@ -136,6 +136,24 @@ jobs:
           app=$(find $out/app -mindepth 1 -maxdepth 1 -type d | head -1)
           tar -C "$(dirname "$app")" -czf "TubeHaus-$ver-linux-${{ matrix.tar }}.tar.gz" "$(basename "$app")"
           ls -la TubeHaus-*
+      - name: Build .AppImage
+        # one file to download, make executable and run; like the tar.gz it uses the system's libmpv
+        continue-on-error: true
+        run: |
+          ver=$(sed -n 's/^app.version=//p' gradle.properties)
+          arch=$(uname -m)
+          app=$(find desktop/build/compose/binaries/main-release/app -mindepth 1 -maxdepth 1 -type d | head -1)
+          mkdir -p AppDir
+          cp -a "$app" AppDir/TubeHaus
+          cp packaging/flatpak/icon.png AppDir/io.github.biolend83.TubeHaus.png
+          cp packaging/flatpak/icon.png AppDir/.DirIcon
+          sed 's/^Exec=.*/Exec=TubeHaus/' packaging/flatpak/io.github.biolend83.TubeHaus.desktop > AppDir/io.github.biolend83.TubeHaus.desktop
+          printf '%s\n' '#!/bin/sh' 'here="$(dirname "$(readlink -f "$0")")"' 'exec "$here/TubeHaus/bin/TubeHaus" "$@"' > AppDir/AppRun
+          chmod +x AppDir/AppRun
+          curl -fsSL -o appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$arch.AppImage"
+          chmod +x appimagetool
+          ARCH=$arch APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool --no-appstream AppDir "TubeHaus-$ver-linux-$arch.AppImage"
+          ls -la TubeHaus-*.AppImage
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.tar }}
@@ -143,9 +161,11 @@ jobs:
             TubeHaus-*.deb
             TubeHaus-*.rpm
             TubeHaus-*.tar.gz
+            TubeHaus-*.AppImage
 
   mac:
-    # mpv comes from Homebrew on the user's Mac (brew install mpv), nothing is bundled
+    # libmpv and the libraries it needs are copied into the app from Homebrew, rewired to load from there,
+    # so the Mac needs no mpv of its own. If that step fails the app still looks for Homebrew's or MacPorts' mpv.
     strategy:
       fail-fast: false
       matrix:
@@ -160,6 +180,52 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - name: Put libmpv inside the app
+        id: mpv
+        continue-on-error: true
+        run: |
+          brew install mpv dylibbundler
+          d=desktop/resources/macos
+          rm -rf $d && mkdir -p $d
+          cp "$(brew --prefix)/lib/libmpv.2.dylib" $d/ && chmod u+w $d/libmpv.2.dylib
+          # every library libmpv needs, copied next to it and pointed at @loader_path
+          dylibbundler -of -b -x $d/libmpv.2.dylib -d $d/ -p @loader_path/
+          install_name_tool -id @loader_path/libmpv.2.dylib $d/libmpv.2.dylib
+          chmod u+w $d/*.dylib
+          # one search path each: macOS refuses a library that lists the same one twice
+          rpaths() { otool -l "$1" | awk '/cmd LC_RPATH/ { getline; getline; print $2 }'; }
+          for f in $d/*.dylib; do
+            for p in $(rpaths "$f" | sort -u); do
+              while rpaths "$f" | grep -qxF "$p"; do install_name_tool -delete_rpath "$p" "$f" || break; done
+            done
+            if otool -L "$f" | grep -q "@rpath/"; then install_name_tool -add_rpath @loader_path/ "$f"; fi
+          done
+          # changed files lose their signature, and Apple Silicon refuses unsigned code: sign them again (ad hoc)
+          for f in $d/*.dylib; do codesign --force --sign - "$f"; done
+          # nothing may still point at Homebrew
+          bad=0
+          for f in $d/*.dylib; do
+            if otool -L "$f" | tail -n +2 | awk '{print $1}' | grep -vE '^(@loader_path|@rpath|/usr/lib|/System)' ; then echo "still outside: $f"; bad=1; fi
+          done
+          test $bad = 0
+          # and it loads, every library from inside the app and none from Homebrew (Apple's Python, not Homebrew's)
+          /usr/bin/python3 - $d/libmpv.2.dylib <<'PY'
+          import ctypes, sys
+          m = ctypes.CDLL(sys.argv[1]); m.mpv_client_api_version.restype = ctypes.c_ulong
+          print("libmpv api", hex(m.mpv_client_api_version()))
+          dyld = ctypes.CDLL("/usr/lib/libSystem.B.dylib"); dyld._dyld_get_image_name.restype = ctypes.c_char_p
+          names = [dyld._dyld_get_image_name(i).decode() for i in range(dyld._dyld_image_count())]
+          brew = [n for n in names if n.startswith(("/opt/homebrew", "/usr/local"))]
+          print(len(names), "libraries loaded,", sum("resources/macos" in n for n in names), "from the app")
+          for n in brew: print("from Homebrew:", n)
+          sys.exit(1 if brew else 0)
+          PY
+          ls $d | wc -l; du -sh $d
+      - name: Without libmpv inside
+        if: steps.mpv.outcome != 'success'
+        run: |
+          rm -rf desktop/resources/macos
+          echo "::warning::libmpv could not be put inside the mac-${{ matrix.arch }} app; it will need Homebrew's or MacPorts' mpv"
       - name: Build .dmg and .zip
         run: |
           # the app icon as .icns, made from the PNG
@@ -198,7 +264,7 @@ jobs:
         # not update the ones already installed, so the APK is always uploaded by hand
         run: |
           # whatever was built (a best-effort build that failed is simply missing), plus their checksums
-          files=$(find windows-* mac-* linux-* -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.zip' -o -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' \) 2>/dev/null | sort)
+          files=$(find windows-* mac-* linux-* -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.zip' -o -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' -o -name '*.AppImage' \) 2>/dev/null | sort)
           # the x64 Windows build is not optional: older apps update from its .msi
           echo "$files" | grep -q '\.msi$' || { echo 'no .msi was built'; exit 1; }
           for f in $files; do (cd "$(dirname "$f")" && sha256sum "$(basename "$f")"); done > SHA256SUMS-desktop.txt

@@ -2,6 +2,14 @@ package app.tubehaus.desktop
 
 import app.tubehaus.ui.tr
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -34,12 +42,26 @@ import java.net.URI
 private val home = System.getProperty("user.home")
 val isMac = System.getProperty("os.name").startsWith("Mac")
 
+/** Linux: $XDG_CONFIG_HOME or ~/.config (in the Flatpak, ~/.var/app/<id>/config: the sandbox can't write to ~/.config) */
+private val linuxConfig = System.getenv("XDG_CONFIG_HOME")?.takeIf { it.startsWith("/") } ?: "$home/.config"
+private val linuxCache = System.getenv("XDG_CACHE_HOME")?.takeIf { it.startsWith("/") } ?: "$home/.cache"
+
 class DesktopPlatform : Platform {
     override val name = "desktop"
-    // Windows: %APPDATA%; macOS: ~/Library/Application Support (and Caches); Linux: ~/.config, ~/.cache
-    override val dataDir: Path = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else "$home/.config", "TubeHaus").toOkioPath()
-    override val cacheDir: Path = File(System.getenv("LOCALAPPDATA") ?: if (isMac) "$home/Library/Caches" else "$home/.cache", "TubeHaus").toOkioPath()
+    // Windows: %APPDATA%; macOS: ~/Library/Application Support (and Caches); Linux: XDG config and cache folders
+    override val dataDir: Path = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else linuxConfig, "TubeHaus").toOkioPath()
+    override val cacheDir: Path = File(System.getenv("LOCALAPPDATA") ?: if (isMac) "$home/Library/Caches" else linuxCache, "TubeHaus").toOkioPath()
     override val touch = false
+    /** Pretendard, one variable font file for every weight (resources: common/fonts) */
+    override val font: androidx.compose.ui.text.font.FontFamily? by lazy {
+        val data = DesktopPlatform::class.java.getResourceAsStream("/PretendardVariable.ttf")?.use { it.readBytes() } ?: return@lazy null
+        runCatching {
+            androidx.compose.ui.text.font.FontFamily(listOf(400, 500, 600, 700, 800).map { w ->
+                androidx.compose.ui.text.platform.Font("Pretendard-$w", data, androidx.compose.ui.text.font.FontWeight(w),
+                    variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(w)))
+            })
+        }.getOrNull()
+    }
     // TUBEHAUS_TV=1: the TV layout on a computer, driven with the arrow keys, Enter and Escape (to try it without a TV)
     override val tv = System.getenv("TUBEHAUS_TV") == "1"
     val mpv = MpvPlayer()
@@ -88,6 +110,11 @@ class DesktopPlatform : Platform {
         done(runCatching { File(d.directory, f).readText() }.getOrNull())
     }
 
+    override fun openTextFiles(done: (List<Pair<String, String>>) -> Unit) {
+        val d = FileDialog(frame, "Open", FileDialog.LOAD).apply { isMultipleMode = true; isVisible = true }
+        done(d.files.mapNotNull { f -> runCatching { f.name to f.readText() }.getOrNull() })
+    }
+
     override fun setFullscreen(on: Boolean) {
         // the title bar and borders come off and the window covers the monitor; Java's own full screen keeps the title bar
         val f = frame
@@ -112,6 +139,10 @@ class DesktopPlatform : Platform {
         }
     }
 
+    private val translator = Translator(File(cacheDir.toString(), "translate"))
+    override val canTranslate get() = translator.available
+    override suspend fun translate(text: String, target: String) = translator.translate(text, target)
+
     // an invisible pointer while the video plays with its controls hidden
     override val blankPointer = PointerIcon(
         Toolkit.getDefaultToolkit().createCustomCursor(BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB), Point(0, 0), "none"),
@@ -123,7 +154,7 @@ class DesktopPlatform : Platform {
 private var shown = false
 
 fun crashed(where: String, e: Throwable) {
-    val dir = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else "$home/.config", "TubeHaus")
+    val dir = File(System.getenv("APPDATA") ?: if (isMac) "$home/Library/Application Support" else linuxConfig, "TubeHaus")
     val log = File(dir, "crash.log")
     val text = buildString {
         append("TubeHaus ").append(System.getProperty("jpackage.app-version") ?: "dev").append(" — ").append(java.time.LocalDateTime.now()).append('\n')
@@ -165,11 +196,20 @@ private fun startApp() {
         System.setProperty("apple.awt.application.appearance", when (theme) { "2", "3" -> "NSAppearanceNameDarkAqua"; "1" -> "NSAppearanceNameAqua"; else -> "system" })
     }
     // libmpv-2.dll: next to the installed app, or in desktop/resources/windows when run from Gradle;
-    // on macOS Homebrew's mpv (Apple Silicon /opt/homebrew, Intel /usr/local), which isn't on the default search path
+    // on macOS the libmpv inside the app first, else Homebrew's mpv (Apple Silicon /opt/homebrew, Intel /usr/local)
+    // or MacPorts' (/opt/local), which aren't on the default search path
     val bundled = System.getProperty("compose.application.resources.dir") ?: File("resources/windows").absolutePath
-    System.setProperty("jna.library.path", if (isMac) "$bundled:/opt/homebrew/lib:/usr/local/lib" else bundled)
+    System.setProperty("jna.library.path", if (isMac) "$bundled:/opt/homebrew/lib:/usr/local/lib:/opt/local/lib" else bundled)
     val platform = DesktopPlatform()
+    // what nothing else plays: SABR from a hidden Edge or Chrome page, its formats kept in the cache while they play
+    if (BrowserSabr.browser() != null) {
+        app.tubehaus.engine.Sabr.dir = File(platform.cacheDir.toString(), "sabr").apply { deleteRecursively() }
+        app.tubehaus.engine.Sabr.host = BrowserSabr(File(platform.cacheDir.toString(), "sabr-browser"))
+        app.tubehaus.engine.Sabr.only = System.getenv("TUBEHAUS_SABR_ONLY") != null
+    }
     val state = AppState(platform, Store(platform.dataDir))
+    // macOS Control Center and the media keys: what plays and its buttons
+    MacMediaControls(state, File(platform.cacheDir.toString(), "nowplaying")).start()
     application {
         val ws = rememberWindowState(size = DpSize(1280.dp, 820.dp))
         platform.window = ws
@@ -192,11 +232,24 @@ private fun startApp() {
                         ws.placement = WindowPlacement.Floating; true
                     } else state.back()
                     Key.F11 -> { state.setFull(!state.fullscreen); true }
+                    // back and forward as in a browser: Alt+Left/Right, on a Mac also Cmd+[ and Cmd+]
+                    Key.DirectionLeft, Key.DirectionRight, Key.LeftBracket, Key.RightBracket -> {
+                        val arrow = e.key == Key.DirectionLeft || e.key == Key.DirectionRight
+                        val back = e.key == Key.DirectionLeft || e.key == Key.LeftBracket
+                        when {
+                            !platform.tv && (if (arrow) e.isAltPressed else e.isMetaPressed) -> { if (back) state.back() else state.forward(); true }
+                            platform.tv -> false
+                            state.current is Screen.Shorts -> state.shortsKeys?.invoke(e.key) ?: false
+                            state.fullscreen || state.current is Screen.Watch -> playerKey(state, e.key)
+                            else -> false
+                        }
+                    }
                     // the player's keys (space, arrows, J/K/L, F, M) where a video is on screen
                     else -> when {
                         platform.tv -> false
                         state.current is Screen.Shorts -> state.shortsKeys?.invoke(e.key) ?: false
-                        state.fullscreen || state.current is Screen.Watch -> playerKey(state, e.key)
+                        state.fullscreen || state.current is Screen.Watch ->
+                            !e.isCtrlPressed && !e.isMetaPressed && !e.isAltPressed && playerKey(state, e.key, e.isShiftPressed)
                         else -> false
                     }
                 }
@@ -206,7 +259,17 @@ private fun startApp() {
                 platform.frame = window
                 WinFrame.darkTitleBar(window)
             }
-            App(state)
+            // the mouse's side buttons go back and forward
+            @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+            androidx.compose.foundation.layout.Box(
+                androidx.compose.ui.Modifier.onPointerEvent(PointerEventType.Press, PointerEventPass.Initial) { ev ->
+                    when (ev.button) {
+                        PointerButton.Back -> { state.back(); ev.changes.forEach { it.consume() } }
+                        PointerButton.Forward -> { state.forward(); ev.changes.forEach { it.consume() } }
+                        else -> {}
+                    }
+                },
+            ) { App(state) }
         }
     }
 }

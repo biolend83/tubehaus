@@ -141,10 +141,11 @@ class MpvPlayer : VideoPlayer {
             // It was 500 + 100 MB: all of it sits in memory, and the app took 1.5 GB on a long video (#87)
             o("cache", "yes"); o("cache-secs", "300"); o("demuxer-readahead-secs", "300")
             o("demuxer-max-bytes", "150MiB"); o("demuxer-max-back-bytes", "50MiB")
-            o("sub-auto", "no"); o("sub-font-size", "42"); o("sub-margin-y", "40")
+            o("sub-auto", "no"); o("sub-font-size", "42")
             // captions as on YouTube: white on a see-through black box behind each line (mpv 0.38+; before that, an outline)
-            if (o("sub-border-style", "opaque-box") >= 0) { o("sub-border-color", "#BF080808"); o("sub-border-size", "6"); o("sub-shadow-offset", "0") }
-            else o("sub-border-size", "2.5")
+            box = o("sub-border-style", "opaque-box") >= 0
+            if (box) o("sub-shadow-offset", "0") else o("sub-border-size", "2.5")
+            capOpts { k, v -> o(k, v) }
             o("audio-display", "no"); o("audio-client-name", "TubeHaus")
             o("audio-device", audioDevice.ifEmpty { "auto" })
             o("terminal", "no"); o("msg-level", "all=warn")
@@ -218,6 +219,27 @@ class MpvPlayer : VideoPlayer {
     private fun cmd(vararg a: String) {
         val p = mpv() ?: return
         lib!!.mpv_command(p, arrayOf(*a, null))
+    }
+
+    /** Settings → caption size, background and position (#54): (size %, box opacity %, 0 bottom / 1 higher / 2 top) */
+    @Volatile private var capStyle = Triple(100, 75, 0)
+    /** this mpv draws a box behind captions (0.38+) */
+    @Volatile private var box = true
+
+    private fun capOpts(o: (String, String) -> Unit) {
+        val (size, bg, pos) = capStyle
+        o("sub-scale", (size / 100.0).toString())
+        if (box) {
+            if (bg > 0) { o("sub-border-style", "opaque-box"); o("sub-border-color", "#%02X080808".format(bg * 255 / 100)); o("sub-border-size", "6") }
+            else { o("sub-border-style", "outline-and-shadow"); o("sub-border-color", "#FF000000"); o("sub-border-size", "2.5") }
+        }
+        o("sub-align-y", if (pos == 2) "top" else "bottom")
+        o("sub-margin-y", if (pos == 1) "160" else "40")
+    }
+
+    override fun setCaptionStyle(size: Int, bg: Int, pos: Int) {
+        capStyle = Triple(size, bg, pos)
+        if (h != null) capOpts { k, v -> set(k, v) }
     }
 
     /** Settings → Read further ahead: 20 minutes and up to 2 GB instead of 5 minutes and 150 MB */
@@ -369,6 +391,8 @@ class MpvPlayer : VideoPlayer {
         val ok = s.video.filter { it.height <= cap }.ifEmpty { s.video.sortedBy { it.height }.take(1) }
         val best = ok.maxOfOrNull { it.height } ?: return null
         val at = ok.filter { it.height == best }
+        // the codec chosen in Settings, where this height has it
+        opts.codec.takeIf { it.isNotEmpty() }?.let { c -> at.firstOrNull { it.codecFamily == c }?.let { return it } }
         return at.firstOrNull { it.codecFamily == "vp9" } ?: at.firstOrNull { it.codecFamily == "h264" } ?: at.first()
     }
 
@@ -379,7 +403,7 @@ class MpvPlayer : VideoPlayer {
         return main.filter { it.codecFamily == "opus" }.maxByOrNull { it.bitrate } ?: main.maxByOrNull { it.bitrate }
     }
 
-    private fun source(u: String) = if (u.startsWith("file:")) java.io.File(java.net.URI(u)).absolutePath else LocalProxy.wrap(u)
+    private fun source(u: String) = if (u.startsWith("file:")) java.io.File(java.net.URI(u)).absolutePath else if (u.startsWith("http://127.0.0.1:")) u else LocalProxy.wrap(u)
 
     private fun open(startMs: Long) {
         val s = stream ?: return
@@ -398,6 +422,9 @@ class MpvPlayer : VideoPlayer {
         soundBad = 0
         if (s.live || s.video.isEmpty()) {
             url = s.hls ?: return
+        } else if (opts.audioOnly && s.audio.isNotEmpty()) {
+            // music: the sound alone (the app shows the cover)
+            url = source((pickAudio(s) ?: return).url)
         } else {
             val cap = if (pinned > 0) pinned else opts.maxHeight
             val v = pickVideo(s, cap) ?: return

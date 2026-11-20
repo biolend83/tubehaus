@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
 
     private var pendingSave: Pair<ByteArray, (Boolean) -> Unit>? = null
     private var pendingOpen: ((String?) -> Unit)? = null
+    private var pendingOpenMany: ((List<Pair<String, String>>) -> Unit)? = null
 
     private val saver = registerForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
         val (bytes, done) = pendingSave ?: return@registerForActivityResult
@@ -53,6 +54,17 @@ class MainActivity : ComponentActivity() {
         if (uri == null) return@registerForActivityResult done(null)
         done(runCatching { contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) } }.getOrNull())
     }
+    private val openerMany = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        val done = pendingOpenMany ?: return@registerForActivityResult
+        pendingOpenMany = null
+        done(uris.mapNotNull { uri ->
+            runCatching {
+                val name = contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: ""
+                name to contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+            }.getOrNull()
+        })
+    }
     private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,7 +72,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         tube.platform.activity = this
         if (Build.VERSION.SDK_INT >= 31) lifecycleScope.launch {
-            state.player.state.map { it.playing }.distinctUntilChanged().collect { runCatching { setPictureInPictureParams(pipParams()) } }
+            // the window's "go small on Home" follows what plays: a video yes, music (only sound) no
+            kotlinx.coroutines.flow.combine(
+                state.player.state.map { it.playing }.distinctUntilChanged(),
+                androidx.compose.runtime.snapshotFlow { listOf(state.playback.video?.id, state.playback.music, state.playback.withVideo, state.casting.link != null) },
+            ) { _, _ -> }.collect { if (Build.VERSION.SDK_INT >= 26) runCatching { setPictureInPictureParams(pipParams()) } }
         }
         setContent {
             Box(Modifier.fillMaxSize().let { if (state.fullscreen || state.pip) it else it.safeDrawingPadding() }) { App(state) }
@@ -84,6 +100,12 @@ class MainActivity : ComponentActivity() {
 
     /** a shared or opened YouTube link */
     private fun handle(i: Intent?) {
+        // developer builds: adb shell am start -n <app>/.MainActivity --es th_sabrcheck <video id> (results in logcat, tag THSABR)
+        val check = i?.getStringExtra("th_sabrcheck")
+        if (check != null && (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+            state.scope.launch(kotlinx.coroutines.Dispatchers.IO) { app.tubehaus.engine.sabrCheck(check) { android.util.Log.i("THSABR", it) } }
+            return
+        }
         val text = when (i?.action) {
             Intent.ACTION_VIEW -> i.dataString
             Intent.ACTION_SEND -> i.getStringExtra(Intent.EXTRA_TEXT)
@@ -108,6 +130,11 @@ class MainActivity : ComponentActivity() {
     fun openTextFile(done: (String?) -> Unit) {
         pendingOpen = done
         opener.launch(arrayOf("*/*"))
+    }
+
+    fun openTextFiles(done: (List<Pair<String, String>>) -> Unit) {
+        pendingOpenMany = done
+        openerMany.launch(arrayOf("*/*"))
     }
 
     // Full screen the YouTube way: the button turns the screen and holds it there until the phone
@@ -188,7 +215,8 @@ class MainActivity : ComponentActivity() {
         if (state.pip || state.platform.tv) return
         val landscape = newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
         if (newConfig.smallestScreenWidthDp >= 600) return
-        if (landscape && !state.fullscreen && state.current is Screen.Watch && state.playback.video != null) {
+        // Settings → Full screen when turned sideways (#58)
+        if (landscape && state.store.settings.value.rotateFull && !state.fullscreen && state.current is Screen.Watch && state.playback.video != null) {
             state.fullscreen = true; bars(false)
         } else if (!landscape && state.fullscreen) {
             state.fullscreen = false; bars(true)
@@ -205,8 +233,12 @@ class MainActivity : ComponentActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    private fun watchingVideo() = state.playback.video != null && state.casting.link == null && state.player.state.value.playing
+    /** a video on screen and playing; a song from the Music tab is only sound and keeps playing behind
+     *  other apps (a black picture-in-picture window for it was no use), unless its video is shown */
+    private fun watchingVideo() = state.playback.video != null && state.casting.link == null && state.player.state.value.playing &&
+        (!state.playback.music || state.playback.withVideo)
 
+    @androidx.annotation.RequiresApi(26)
     private fun pipParams(): PictureInPictureParams {
         val b = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9))
         if (Build.VERSION.SDK_INT >= 31) b.setAutoEnterEnabled(watchingVideo()).setSeamlessResizeEnabled(true)
@@ -235,7 +267,8 @@ class MainActivity : ComponentActivity() {
         super.onStop()
         state.store.flush()
         // background play is off: pause when the app goes away (but not into picture-in-picture)
-        if (!state.store.settings.value.backgroundPlay && !state.pip) state.platform.player.pause()
+        // (music always keeps playing, as a music app does)
+        if (!state.store.settings.value.backgroundPlay && !state.pip && !state.playback.music) state.platform.player.pause()
     }
 
     override fun onDestroy() {

@@ -99,6 +99,17 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
 
     private val dataSource = DefaultDataSource.Factory(ctx, OkHttpDataSource.Factory(Net.client))
 
+    /**
+     * The memory this app may use. The read-ahead lives there: ExoPlayer's usual ~130 MB of video is more than a
+     * small TV (Chromecast with Google TV HD, Fire TV sticks: a 192-256 MB limit) has room for next to the app, and
+     * it crashed after a few minutes of video (#99). So at most a third of it, and such a device counts as [weak].
+     */
+    private val heap = Runtime.getRuntime().maxMemory()
+    private val weak: Boolean by lazy {
+        heap <= 300L * 1024 * 1024 ||
+            (ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice
+    }
+
     val exo: ExoPlayer = ExoPlayer.Builder(ctx)
         .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
         .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
@@ -110,8 +121,12 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         .setLoadControl(
             DefaultLoadControl.Builder()
                 .setBufferDurationsMs(60_000, if (longBuffer) 1_200_000 else 300_000, 1_500, 3_000)
-                .setBackBuffer(30_000, true)
-                .apply { if (longBuffer) setTargetBufferBytes((if (tv) 150 else 400) * 1024 * 1024).setPrioritizeTimeOverSizeThresholds(true) }
+                .setBackBuffer(if (weak) 5_000 else 30_000, true)
+                .apply {
+                    val third = (heap / 3).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                    if (longBuffer) setTargetBufferBytes(minOf((if (tv) 150 else 400) * 1024 * 1024, third)).setPrioritizeTimeOverSizeThresholds(true)
+                    else if (weak) setTargetBufferBytes(third)
+                }
                 .build(),
         )
         .build()
@@ -123,8 +138,15 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
     /** the subtitle track inside the media item (shown or not): toggling it never reloads the video */
     private var loadedCaption: Caption? = null
     private var loadedTranslate: String? = null
+    /** a car is connected (Android Auto): no picture is loaded */
+    private var car = false
     /** the view on screen, for [frame] */
     private var view: PlayerView? = null
+    private var zoomed = false
+    override fun setZoom(on: Boolean) {
+        zoomed = on
+        view?.resizeMode = if (on) AspectRatioFrameLayout.RESIZE_MODE_ZOOM else AspectRatioFrameLayout.RESIZE_MODE_FIT
+    }
     /** the captions, drawn by a view of ours over the video in place of the PlayerView's own (see [youTubeLook]) */
     private var captions: SubtitleView? = null
 
@@ -134,6 +156,8 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             .filter { !it.isEncoder && isHardware(it) }
             .flatMap { it.supportedTypes.toList() }.map { it.lowercase() }.toSet()
         buildList {
+            // a weak device decodes AV1 and VP9 in hardware on paper, yet stutters on them (#99): H.264 first there
+            if (weak) add("h264")
             if ("video/av01" in hw) add("av1")
             if ("video/x-vnd.on2.vp9" in hw) add("vp9")
             add("h264")
@@ -172,7 +196,7 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
     init {
         exo.addListener(object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) = sync()
-            override fun onCues(cueGroup: CueGroup) { captions?.setCues(cueGroup.cues.map(::centred)) }
+            override fun onCues(cueGroup: CueGroup) { captions?.setCues(placed(cueGroup.cues)) }
             override fun onPlayerError(error: PlaybackException) {
                 st.update { it.copy(error = error.message ?: error.errorCodeName) }
                 // stream URLs expire after a few hours: fetch fresh ones and carry on
@@ -249,6 +273,7 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             .setPreferredAudioLanguage(audioLang)      // null: the original track (the manifest's "main" one)
             .setPreferredTextLanguage(caption?.lang)
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, caption == null)
+            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, car || o.audioOnly)
             .build()
         exo.setMediaItem(item(s), o.startMs)
         exo.repeatMode = if (o.loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
@@ -266,9 +291,11 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         if (s.live || s.video.isEmpty()) {
             b.setUri(s.hls).setMimeType(MimeTypes.APPLICATION_M3U8)
         } else {
-            val mpd = if (!tv) Dash.manifest(s, codecs) else {
+            // the codec chosen in Settings first, then the best this phone decodes
+            val order = if (opts.codec.isNotEmpty()) listOf(opts.codec) + codecs else codecs
+            val mpd = if (!tv) Dash.manifest(s, order) else {
                 // on a TV the codec that reaches the highest quality there first (say VP9 at 4K over AV1 that stops at 1080p)
-                val best = codecs.sortedByDescending { c -> s.video.filter { it.codecFamily == c && it.indexRange != null && decodes(it) }.maxOfOrNull { it.height } ?: 0 }
+                val best = if (opts.codec.isNotEmpty()) order else codecs.sortedByDescending { c -> s.video.filter { it.codecFamily == c && it.indexRange != null && decodes(it) }.maxOfOrNull { it.height } ?: 0 }
                 Dash.manifest(s, best, plays = ::decodes)
             }
             b.setUri("data:application/dash+xml;base64," + Base64.encodeToString(mpd.toByteArray(), Base64.NO_WRAP))
@@ -323,7 +350,8 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
 
     /** Android Auto: only the sound is loaded while a car is connected, as nothing shows the picture there */
     fun audioOnly(on: Boolean) {
-        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, on).build()
+        car = on
+        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, on || opts.audioOnly).build()
     }
 
     override fun setAudioTrack(lang: String) {
@@ -374,10 +402,32 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
      * larger than the phone's own caption style, and the video's colours and fonts left out.
      */
     private fun SubtitleView.youTubeLook() {
-        setStyle(CaptionStyleCompat(android.graphics.Color.WHITE, 0xBF080808.toInt(), android.graphics.Color.TRANSPARENT,
-            CaptionStyleCompat.EDGE_TYPE_NONE, android.graphics.Color.BLACK, null))
-        setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * 1.1f)
+        // Settings → caption size, background (no box: an outline keeps them readable) and position (#54)
+        val a = (capBg * 255 / 100).coerceIn(0, 255)
+        setStyle(CaptionStyleCompat(android.graphics.Color.WHITE, (a shl 24) or 0x080808, android.graphics.Color.TRANSPARENT,
+            if (a == 0) CaptionStyleCompat.EDGE_TYPE_OUTLINE else CaptionStyleCompat.EDGE_TYPE_NONE, android.graphics.Color.BLACK, null))
+        setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * 1.1f * capSize / 100f)
+        setBottomPaddingFraction(if (capPos == 1) 0.2f else SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION)
         setApplyEmbeddedStyles(false)
+    }
+
+    @Volatile private var capSize = 100
+    @Volatile private var capBg = 75
+    @Volatile private var capPos = 0
+
+    override fun setCaptionStyle(size: Int, bg: Int, pos: Int) {
+        capSize = size; capBg = bg; capPos = pos
+        captions?.let { v -> v.post { v.youTubeLook(); v.setCues(placed(exo.currentCues.cues)) } }
+    }
+
+    /** the cues to show: centred, and with captions at the top stacked down from the top edge, one under the other */
+    private fun placed(cues: List<Cue>): List<Cue> {
+        if (capPos != 2) return cues.map(::centred)
+        var line = 1
+        return cues.map { c ->
+            val n = c.text?.lines()?.size ?: 1
+            centred(c).buildUpon().setLine(line.toFloat(), Cue.LINE_TYPE_NUMBER).setLineAnchor(Cue.ANCHOR_TYPE_START).build().also { line += n }
+        }
     }
 
     /**
@@ -409,19 +459,24 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         val s by state.collectAsState()
         AndroidView(
             factory = { c ->
-                PlayerView(c).apply {
+                // Android 14+: a SurfaceView, which follows the page's moves and scale there (and is
+                // the lighter one); older: a TextureView, as a SurfaceView would stay put while the
+                // player folds into the mini player
+                val made = if (android.os.Build.VERSION.SDK_INT >= 34) PlayerView(c)
+                    else android.view.LayoutInflater.from(c).inflate(R.layout.player_texture, null) as PlayerView
+                made.apply {
                     layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                     setShowNextButton(false)
                     setShowPreviousButton(false)
                     setShowSubtitleButton(true)
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)   // the thumbnail shows until the first frame
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    resizeMode = if (zoomed) AspectRatioFrameLayout.RESIZE_MODE_ZOOM else AspectRatioFrameLayout.RESIZE_MODE_FIT
                     player = exo
                     subtitleView?.visibility = View.GONE
                     val subs = SubtitleView(c).apply {
                         layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                         youTubeLook()
-                        setCues(exo.currentCues.cues.map(::centred))
+                        setCues(placed(exo.currentCues.cues))
                     }
                     overlayFrameLayout?.addView(subs)
                     captions = subs

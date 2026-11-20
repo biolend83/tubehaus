@@ -13,6 +13,8 @@ import android.os.Looper
 import androidx.core.content.FileProvider
 import okhttp3.Request
 import app.tubehaus.engine.Net
+import app.tubehaus.engine.Cipher
+import app.tubehaus.engine.Sabr
 import android.app.Application
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -54,6 +56,17 @@ private const val RELEASE_KEY_SHA256 = "2d827d6ab148e56e3b45d6b84ec6e7cf8e36a4c6
 
 class AndroidPlatform(private val app: Application) : Platform {
     override val name = "android"
+
+    // the TV client's locked links (videos made for kids...): opened by yt-dlp's solver in a hidden WebView
+    init {
+        Cipher.solver = WebSolver(app)
+        // what nothing else plays: SABR from a hidden page on www.youtube.com, its formats kept in the cache while they play
+        Sabr.dir = java.io.File(app.cacheDir, "sabr").apply { deleteRecursively() }
+        Sabr.host = WebSabr(app)
+        Sabr.only = runCatching {
+            app.packageManager.getApplicationInfo(app.packageName, PackageManager.GET_META_DATA).metaData?.get("tubehaus.sabrOnly")?.toString() == "true"
+        }.getOrDefault(false)
+    }
 
     /** the certificate this copy is signed with is the release key's (its SHA-256, as apksigner prints it) */
     override val releaseKey: Boolean by lazy {
@@ -135,6 +148,10 @@ class AndroidPlatform(private val app: Application) : Platform {
         activity?.openTextFile(done) ?: done(null)
     }
 
+    override fun openTextFiles(done: (List<Pair<String, String>>) -> Unit) {
+        activity?.openTextFiles(done) ?: done(emptyList())
+    }
+
     override fun setImmersive(on: Boolean) {
         activity?.setHideBars(on)
     }
@@ -160,6 +177,9 @@ class AndroidPlatform(private val app: Application) : Platform {
     private val audio by lazy { app.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
     /** this window's brightness; until the gesture sets one it follows the system setting */
+    private val haptics by lazy { Haptics(app) }
+    override fun vibrate(type: androidx.compose.ui.hapticfeedback.HapticFeedbackType) = haptics.play(type)
+
     override fun brightness(): Float? {
         val w = activity?.window ?: return null
         val own = w.attributes.screenBrightness
@@ -216,6 +236,16 @@ class AndroidPlatform(private val app: Application) : Platform {
             main.post { done(ok) }
         }.start()
         return true
+    }
+
+    /** Pretendard, one variable font file for every weight (assets: common/fonts) */
+    override val font: androidx.compose.ui.text.font.FontFamily? by lazy {
+        runCatching {
+            androidx.compose.ui.text.font.FontFamily(listOf(400, 500, 600, 700, 800).map { w ->
+                androidx.compose.ui.text.font.Font("PretendardVariable.ttf", app.assets, androidx.compose.ui.text.font.FontWeight(w),
+                    variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(w)))
+            })
+        }.getOrNull()
     }
 
     override fun wallpaperColors(dark: Boolean): ColorScheme? =
