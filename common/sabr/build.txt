@@ -1,0 +1,7 @@
+sabr-page.js is page-src.mjs bundled with googlevideo 5.0.1 and bgutils-js 4.0.3 (both MIT, by LuanRT):
+
+  npm install googlevideo@5.0.1 bgutils-js@4.0.3 esbuild@0.25.12
+  node buildpage.mjs
+
+The apps load it into a hidden browser page on https://www.youtube.com, after handing it yt-dlp's solver
+(common/ejs) with __thSabr.setSolver().

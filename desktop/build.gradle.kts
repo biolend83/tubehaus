@@ -25,6 +25,9 @@ kotlin {
 
 // Pretendard, the type face of the web app 1.0 (one copy for every platform: common/fonts)
 sourceSets["main"].resources.srcDir("../common/fonts")
+// SABR (BrowserSabr): the page script and yt-dlp's solver it runs
+sourceSets["main"].resources.srcDir("../common/sabr")
+sourceSets["main"].resources.srcDir("../common/ejs")
 
 dependencies {
     implementation(compose.desktop.currentOs)

@@ -316,6 +316,20 @@ class Playback(private val app: AppState) {
     }
 
     /** the same video again from [posMs] on whichever player is in use now (casting started or stopped) */
+    /** the codec this video plays with instead of the one in Settings (picked with a quality only it reaches) */
+    var codecFor: Pair<String, String>? = null
+
+    /** the codec family playing now: this video's own pick, else Settings' (empty: the device's choice) */
+    fun codecNow(): String = codecFor?.takeIf { it.first == stream?.id }?.second ?: store.settings.value.codec
+
+    /** plays this video with codec [c] at [height] (a quality the codec playing doesn't reach) */
+    fun playWithCodec(c: String, height: Int) {
+        val s = stream ?: return
+        codecFor = s.id to c
+        replay(player.state.value.positionMs)
+        player.setHeight(height)
+    }
+
     fun replay(posMs: Long, autoplay: Boolean = true) {
         val s = stream ?: return
         endHandled = false
@@ -334,7 +348,7 @@ class Playback(private val app: AppState) {
                 autoplay = autoplay,
                 speed = if (music) 1f else speedFor(video?.channelId ?: s.channelId),
                 audioOnly = music && set.musicAudioOnly && !withVideo,
-                codec = set.codec,
+                codec = codecFor?.takeIf { it.first == s.id }?.second ?: set.codec,
                 captions = choice?.first?.takeIf { set.captions || s.client == "offline" },
                 captionLang = set.captionLang.ifEmpty { lang() },
                 standbyCaption = choice?.first,
