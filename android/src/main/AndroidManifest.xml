@@ -27,13 +27,15 @@
 
     <application
         android:name=".TubeApp"
+        android:networkSecurityConfig="@xml/network_security"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
-        android:label="TubeHaus"
+        android:label="${appLabel}"
         android:banner="@drawable/tv_banner"
         android:supportsRtl="true"
         android:theme="@style/Theme.TubeHaus">
+        <meta-data android:name="tubehaus.sabrOnly" android:value="${sabrOnly}" />
 
         <activity
             android:name=".MainActivity"
