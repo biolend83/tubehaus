@@ -430,6 +430,10 @@ private fun SettingsRows(
         }
         // ------------------------------------------------------------------ player
         val speeds = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+        if (!app.platform.touch && !app.platform.tv) r.row("player", tr("Leaving the video page") + " mini player pip pause stop") {
+            Toggle(tr("Pause when leaving the video page"), tr("No mini player: the video pauses"), s.leaveVideo == 1) { b -> set { it.copy(leaveVideo = if (b) 1 else 0) } }
+            Toggle(tr("Stop when leaving the video page"), tr("No mini player: the video closes"), s.leaveVideo == 2) { b -> set { it.copy(leaveVideo = if (b) 2 else 0) } }
+        }
         r.row("player", tr("Default speed") + " speed") {
             Choice(tr("Default speed"), if (s.speed == 1f) tr("Normal") else "${s.speed}x", speeds.map { "$it" to if (it == 1f) tr("Normal") else "${it}x" }) { c -> set { it.copy(speed = c.toFloat()) } }
         }

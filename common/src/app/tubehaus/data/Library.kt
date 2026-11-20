@@ -120,6 +120,8 @@ data class Settings(
     val groupDays: Int = 7,
     /** nothing is learned from what you watch (no taste profile) */
     val learnOff: Boolean = false,
+    /** leaving the video page: 0 the mini player, 1 pause, 2 stop */
+    val leaveVideo: Int = 0,
     /** the desktop window as it was left: size in dp, maximised */
     val winW: Int = 0,
     val winH: Int = 0,

@@ -253,6 +253,16 @@ private fun Shell(app: AppState) {
     val now = app.current
     val compact = LocalCompact.current
     val root = app.stack.firstOrNull()
+    // leaving the video page: as set, the mini player, or paused, or stopped
+    val wasWatch = remember { mutableStateOf(false) }
+    LaunchedEffect(now) {
+        val w = now is Screen.Watch
+        if (wasWatch.value && !w && now !is Screen.NowPlaying && !app.platform.touch) when (app.store.settings.value.leaveVideo) {
+            1 -> app.player.pause()
+            2 -> app.playback.close()
+        }
+        wasWatch.value = w
+    }
     // phones: the video page is a sheet over the page it was opened from, which stays put under it
     // and is what the rest of the shell lays out (WatchSheet)
     val sheet = compact && app.platform.touch && !app.platform.tv && app.playback.video != null && app.playback.song == null

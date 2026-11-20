@@ -119,7 +119,7 @@ fun SubsScreen(app: AppState) {
                 // above the search, where they're seen at once
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (group != null) Text(
-                        tr("Each channel's newest video from the last 7 days, if you haven't watched it"),
+                        tr(if (app.store.settings.value.groupDays >= 30) "Each channel's newest video from the last 30 days, if you haven't watched it" else "Each channel's newest video from the last 7 days, if you haven't watched it"),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f).padding(start = 4.dp, end = 8.dp),
                     ) else Spacer(Modifier.weight(1f))
