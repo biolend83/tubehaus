@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Polish interface** (Polski): every string translated (`web/y/lang/pl.js`), and trending and search default to Poland
+
 ## v1.7.0 — 2026-11-20
 
 ### Added

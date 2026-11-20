@@ -169,8 +169,8 @@ TV에서 멈추고 폰에서 이어 봐요. 집의 모든 기기와 브라우저
 </td>
 <td valign="top">
 
-**🌍 14개 언어**<br>
-한국어 · English · 日本語 · 简体中文 · Español · Português · Français · Deutsch · Русский · हिन्दी · Bahasa Indonesia · Türkçe · বাংলা · Tiếng Việt. 조회수와 날짜도 언어마다 그 나라 방식으로 보여요.
+**🌍 15개 언어**<br>
+한국어 · English · 日本語 · 简体中文 · Español · Português · Français · Deutsch · Русский · हिन्दी · Bahasa Indonesia · Türkçe · বাংলা · Tiếng Việt · Polski. 조회수와 날짜도 언어마다 그 나라 방식으로 보여요.
 
 </td>
 </tr>

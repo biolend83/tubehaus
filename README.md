@@ -169,8 +169,8 @@ Cloud addresses often get "Sign in to confirm you're not a bot". TubeHaus goes o
 </td>
 <td valign="top">
 
-**🌍 14 languages**<br>
-한국어 · English · 日本語 · 简体中文 · Español · Português · Français · Deutsch · Русский · हिन्दी · Bahasa Indonesia · Türkçe · বাংলা · Tiếng Việt. View counts and dates follow each language's own style.
+**🌍 15 languages**<br>
+한국어 · English · 日本語 · 简体中文 · Español · Português · Français · Deutsch · Русский · हिन्दी · Bahasa Indonesia · Türkçe · বাংলা · Tiếng Việt · Polski. View counts and dates follow each language's own style.
 
 </td>
 </tr>
@@ -508,7 +508,7 @@ Running one? [Add it here](https://github.com/biolend83/tubehaus/issues/new?temp
 - **Questions and setup help:** [Discussions](https://github.com/biolend83/tubehaus/discussions) (please include the `--doctor` output)
 - **Bugs and feature requests:** [Issues](https://github.com/biolend83/tubehaus/issues/new/choose)
 - **Contributing:** see [CONTRIBUTING.md](CONTRIBUTING.md). Start with a [`good first issue`](https://github.com/biolend83/tubehaus/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22); [ROADMAP.md](ROADMAP.md) shows what's planned and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) maps the code
-- **Translations:** interface text lives in `web/y/lang/<code>.js` (the key is the original Korean text). The 14 languages are complete; corrections are very welcome
+- **Translations:** interface text lives in `web/y/lang/<code>.js` (the key is the original Korean text). The 15 languages are complete; corrections are very welcome
 - **Security problems:** report them privately, see [SECURITY.md](SECURITY.md)
 - **What changed:** [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/biolend83/tubehaus/releases)
 
