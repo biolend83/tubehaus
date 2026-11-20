@@ -1,0 +1,14 @@
+{
+  "name": "tubehaus-sabr-vendor",
+  "private": true,
+  "description": "the npm libraries server/sabr/sabr.mjs uses, bundled into ../vendor.mjs by build-vendor.mjs",
+  "type": "module",
+  "dependencies": {
+    "bgutils-js": "4.0.3",
+    "googlevideo": "5.0.1",
+    "jsdom": "31.0.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}
