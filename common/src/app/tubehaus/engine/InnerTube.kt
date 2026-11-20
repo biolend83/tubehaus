@@ -76,6 +76,16 @@ object Clients {
         "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/2.4.0 TV Safari/538.1",
         mapOf("osName" to "Tizen", "osVersion" to "2.4.0", "deviceMake" to "Samsung", "deviceModel" to "SmartTV"),
     )
+    /**
+     * YouTube Kids for Android: it serves only what YouTube Kids allows, but those with plain links
+     * (no signature to solve, no start ad to wait out), up to 2160p. The first try for what the others
+     * call "not available" (videos made for kids), before [TV]; the only one where there is no solver
+     */
+    val KIDS = Client(
+        "ANDROID_KIDS", "7.36.1", 18,
+        "com.google.android.apps.youtube.kids/7.36.1 (Linux; U; Android 11) gzip",
+        mapOf("androidSdkVersion" to 30, "osName" to "Android", "osVersion" to "11"),
+    )
     /** in the order the player tries them; replaced by the list on GitHub when there is a newer one (Remote) */
     @Volatile var PLAYERS = listOf(VISIONOS, ANDROID_VR)
 }
