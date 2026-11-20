@@ -80,7 +80,10 @@ object YouTube {
                 }
             }
             // the token-free clients said "not available" (made for kids, some labels) or are walled:
-            // the TV client, with its links unlocked, still serves those
+            // YouTube Kids serves the ones made for kids as they are, the TV client (links unlocked) the rest
+            if (attempt == 0 && first?.kind != YtError.Kind.AGE) {
+                try { return player(id, Clients.KIDS) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e }
+            }
             if (attempt == 0 && first?.kind != YtError.Kind.AGE && Cipher.available) {
                 try { return tv(id) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
             }

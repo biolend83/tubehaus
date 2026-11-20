@@ -14,7 +14,7 @@
 // collects those with __drain(), answers each with __reply(rid, json), and reads the outcome
 // with __take(id).
 
-var ENGINE_VERSION = 10;
+var ENGINE_VERSION = 11;
 
 // ------------------------------------------------------------------------------ host bridge
 var ENV = { hl: "en", gl: "US", players: null };
@@ -405,6 +405,13 @@ var DEFAULT_PLAYERS = [
     extra: { deviceMake: "Oculus", deviceModel: "Quest 3", androidSdkVersion: 32, osName: "Android", osVersion: "12L" },
   },
 ];
+// YouTube Kids for Android: only what YouTube Kids allows, but with plain links (no solver, no start ad), up to
+// 2160p. Tried first for what the others call "not available" (videos made for kids), before tv()
+var KIDS = {
+  name: "ANDROID_KIDS", version: "7.36.1", id: 18,
+  userAgent: "com.google.android.apps.youtube.kids/7.36.1 (Linux; U; Android 11) gzip",
+  extra: { androidSdkVersion: 30, osName: "Android", osVersion: "11" },
+};
 function players() { return ENV.players && ENV.players.length ? ENV.players : DEFAULT_PLAYERS; }
 
 function headers(c, visitor) {
@@ -480,9 +487,11 @@ async function stream(id) {
         if (e.kind !== "LOGIN") walled = false;
       }
     }
-    // "not available" to the token-free clients (made for kids, some labels) or walled: the TV client,
-    // with its locked links opened by yt-dlp's solver (at the end of this file), still serves those
+    // "not available" to the token-free clients (made for kids, some labels) or walled: YouTube Kids serves
+    // the ones made for kids as they are; the TV client, its locked links opened by yt-dlp's solver
+    // (at the end of this file), the rest
     if (attempt === 0 && (!first || first.kind !== "AGE")) {
+      try { return await player(id, KIDS); } catch (e) { if (e.kind === "NETWORK") throw e; }
       try { return await tv(id); } catch (e) { if (e.kind === "NETWORK") throw e; }
     }
     // every client asked to sign in: the wall is on this visitor identity, so try a new one
