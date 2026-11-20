@@ -344,6 +344,21 @@ enum Settings {
         set { UserDefaults.standard.set(newValue, forKey: "autoplayNext") }
     }
 
+    static var sponsorBlock: Bool {
+        get { UserDefaults.standard.object(forKey: "sponsorBlock") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "sponsorBlock") }
+    }
+
+    static var sponsorBlockCategories: Set<SponsorBlock.Category> {
+        get {
+            guard let keys = UserDefaults.standard.stringArray(forKey: "sponsorBlockCategories") else {
+                return SponsorBlock.Category.defaultAutoSkip
+            }
+            return Set(keys.compactMap(SponsorBlock.Category.init(rawValue:)))
+        }
+        set { UserDefaults.standard.set(newValue.map(\.rawValue).sorted(), forKey: "sponsorBlockCategories") }
+    }
+
     /// "This video at a glance" under the video
     static var glance: Bool {
         get { UserDefaults.standard.object(forKey: "glance") as? Bool ?? true }

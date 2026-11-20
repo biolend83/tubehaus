@@ -657,6 +657,8 @@ struct SettingsView: View {
     @State private var hideComments = Settings.hideComments
     @State private var hideRelated = Settings.hideRelated
     @State private var autoplay = Settings.autoplayNext
+    @State private var sponsorBlock = Settings.sponsorBlock
+    @State private var autoSkip = Settings.sponsorBlockCategories
     @State private var glance = Settings.glance
     @State private var captions = Settings.captions
     @State private var captionSize = Settings.captionSize
@@ -686,6 +688,22 @@ struct SettingsView: View {
                 item("Language", language.isEmpty ? "\(name(language: Settings.hl)) (from this device)" : name(language: language)) { dialog = .language }
                     .firstFocus()
                 item("Region", region.isEmpty ? "\(regionName(Settings.gl)) (from this device)" : regionName(region)) { dialog = .region }
+
+                group("SponsorBlock")
+                toggle("SponsorBlock",
+                       "Only the first 4 characters of a video ID hash are sent to SponsorBlock.",
+                       $sponsorBlock) { Settings.sponsorBlock = $0 }
+                Text("Auto-skip is on for selected categories. Other detected segments offer a Skip button.")
+                    .font(Fonts.bodySmall).foregroundStyle(Theme.sub)
+                    .padding(.horizontal, 32).padding(.vertical, 12)
+                ForEach(SponsorBlock.Category.skippable, id: \.self) { category in
+                    let enabled = Binding(get: { autoSkip.contains(category) }, set: { on in
+                        if on { autoSkip.insert(category) } else { autoSkip.remove(category) }
+                    })
+                    toggle(category.label, "", enabled) { _ in Settings.sponsorBlockCategories = autoSkip }
+                        .disabled(!sponsorBlock)
+                        .opacity(sponsorBlock ? 1 : 0.4)
+                }
 
                 group("Focus")
                 toggle("Hide comments", "No comments under videos", $hideComments) { Settings.hideComments = $0 }
