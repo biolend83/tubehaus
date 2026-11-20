@@ -20,6 +20,9 @@ Apple's own player (HLS), so the Siri Remote, subtitles and AirPlay work as in a
   FreeTube, Invidious, TubeHaus or OPML file (or paste channel links) over your home network
 - Subtitles (YouTube's own tracks, or auto-translated into the TV's language) and playback speed in
   the full screen player's top bar; the next video plays on its own (Settings)
+- SponsorBlock: sponsors, self-promotion and subscribe reminders skipped on their own (Settings),
+  with Undo. The player offers a button for other marked parts and the highlight. Only 4 characters
+  of a hash of the video ID are sent.
 - Search with filters (videos, channels, playlists) as a list or as cards; a pasted link or @handle
   opens it. Channels with their Videos, Shorts, Live and Playlists; likes, dislikes, Watch later and
   history, kept on the Apple TV only (no account, no server)

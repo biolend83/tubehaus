@@ -12,6 +12,7 @@ final class PlayerModel {
     static let shared = PlayerModel()
 
     let player = AVPlayer()
+    let sponsorBlock = SponsorBlockPlayer()
     private(set) var video: Video?
     private(set) var stream: StreamInfo?
     private(set) var details: Details?
@@ -73,6 +74,7 @@ final class PlayerModel {
         }
         leave()
         video = v
+        sponsorBlock.open(v.id)
         stream = nil
         details = nil
         related = Feed()
@@ -96,6 +98,7 @@ final class PlayerModel {
         guard player.currentItem != nil else { return }
         if ended {
             ended = false
+            sponsorBlock.replay()
             player.seek(to: .zero)
             player.play()
         } else if player.timeControlStatus == .paused {
@@ -246,6 +249,7 @@ final class PlayerModel {
 
     /// the video before (if any) is done with: remember it and learn from it
     private func leave() {
+        sponsorBlock.close()
         guard let v = video else { return }
         let t = player.currentTime().seconds
         if t.isFinite && t > 0 { last = t }
@@ -398,6 +402,7 @@ struct FullPlayer: UIViewControllerRepresentable {
         }
         model.screen = vc
         model.menu()
+        model.sponsorBlock.attach(to: vc)
         model.player.play()
         return vc
     }
@@ -405,6 +410,7 @@ struct FullPlayer: UIViewControllerRepresentable {
     func updateUIViewController(_ vc: AVPlayerViewController, context: Context) {}
 
     static func dismantleUIViewController(_ vc: AVPlayerViewController, coordinator: ()) {
+        PlayerModel.shared.sponsorBlock.detach(from: vc)
         vc.player = nil
     }
 }
