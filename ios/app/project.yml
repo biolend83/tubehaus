@@ -19,6 +19,13 @@ targets:
       # TubePatch replacements, built in (a newer patch.js may sit in the same folder)
       - path: ../patch/patch.js
         buildPhase: resources
+      # SABR (WebSabr): the page script and yt-dlp's solver it runs (common/sabr, common/ejs)
+      - path: ../../common/sabr/sabr-page.js
+        buildPhase: resources
+      - path: ../../common/ejs/yt.solver.lib.min.js
+        buildPhase: resources
+      - path: ../../common/ejs/yt.solver.core.min.js
+        buildPhase: resources
       # Pretendard, the typeface of the web app 1.0 (SIL Open Font License, common/fonts)
       - path: ../../common/fonts/PretendardVariable.ttf
         buildPhase: resources

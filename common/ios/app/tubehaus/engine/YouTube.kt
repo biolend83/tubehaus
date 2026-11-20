@@ -49,12 +49,33 @@ object YouTube {
      * [ServerVideo.streamHls]), from this device when there isn't or the server can't.
      */
     suspend fun stream(id: String): Stream {
-        if (!ServerVideo.on) return stream(run("stream", id))
+        // a test copy that plays everything the SABR way: no other client, no server
+        if (Sabr.only && Sabr.available) return Sabr.stream(id)
+        if (!ServerVideo.on) return device(id)
         return try {
             ServerVideo.streamHls(id)
         } catch (e: YtError) {
-            try { stream(run("stream", id)) } catch (x: Exception) { if (x is kotlinx.coroutines.CancellationException) throw x; throw e }
+            try { device(id) } catch (x: Exception) { if (x is kotlinx.coroutines.CancellationException) throw x; throw e }
         }
+    }
+
+    /**
+     * From this iPad: the engine's answer, made into HLS here when it has no list (YouTube Kids, the TV
+     * client), and when nothing with addresses plays the video, YouTube's web player way (SABR).
+     */
+    private suspend fun device(id: String): Stream {
+        val s = try {
+            stream(run("stream", id))
+        } catch (e: YtError) {
+            if (e.kind == YtError.Kind.AGE || e.kind == YtError.Kind.NETWORK || !Sabr.available) throw e
+            return try { Sabr.stream(id) } catch (x: Exception) { if (x is kotlinx.coroutines.CancellationException) throw x; throw e }
+        }
+        if (s.hls != null) return s
+        val local = Sabr.withHls(s)
+        if (local.hls != null) return local
+        // nothing the iPad plays in it (no H.264 or AAC): the web player's way
+        if (!Sabr.available) return s
+        return try { Sabr.stream(id) } catch (x: Exception) { if (x is kotlinx.coroutines.CancellationException) throw x; s }
     }
     suspend fun details(id: String): Details = details(run("details", id))
     suspend fun relatedMore(token: String): Page<Item> = itemPage(run("relatedMore", token))

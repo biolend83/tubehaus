@@ -35,6 +35,16 @@ class IosPlatform : Platform {
     override val dataDir: Path = folder(NSApplicationSupportDirectory) / "tubehaus"
     override val cacheDir: Path = folder(NSCachesDirectory)
     override val touch = true
+
+    init {
+        // what nothing else plays: SABR from a hidden page on www.youtube.com, its formats kept in Caches while they play;
+        // a file named "sabr-only" in Files → On My iPad → TubeHaus plays everything that way (for testing)
+        val sabr = cacheDir / "sabr"
+        runCatching { okio.FileSystem.SYSTEM.deleteRecursively(sabr) }
+        app.tubehaus.engine.Sabr.dir = sabr.toString()
+        app.tubehaus.engine.Sabr.host = WebSabr()
+        app.tubehaus.engine.Sabr.only = okio.FileSystem.SYSTEM.exists(folder(platform.Foundation.NSDocumentDirectory) / "sabr-only")
+    }
     /** Pretendard, the web app 1.0's typeface, from the app bundle (one variable file, its weight axis set for each weight) */
     override val font by lazy {
         val path = platform.Foundation.NSBundle.mainBundle.pathForResource("PretendardVariable", "ttf") ?: return@lazy null

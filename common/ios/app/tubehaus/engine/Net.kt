@@ -1,6 +1,7 @@
 package app.tubehaus.engine
 
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.engine.darwin.Darwin
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.header
@@ -56,6 +57,18 @@ object Net {
             throw okio.IOException(e.message ?: "network error")
         }
         return r.status.value to r.bodyAsText()
+    }
+
+    /** a GET whose answer is bytes (a range of a video format): its status and body; only a failed connection throws */
+    suspend fun bytes(url: String, headers: Map<String, String>): Pair<Int, ByteArray> {
+        val r: HttpResponse = try {
+            client.request(url) { this.method = HttpMethod.Get; headers.forEach { (k, v) -> header(k, v) } }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw okio.IOException(e.message ?: "network error")
+        }
+        return r.status.value to r.body<ByteArray>()
     }
 
     private suspend fun call(method: HttpMethod, url: String, body: String?, headers: Map<String, String>): String {
