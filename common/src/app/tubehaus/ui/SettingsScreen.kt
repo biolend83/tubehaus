@@ -542,6 +542,8 @@ private fun SettingsRows(
         r.row("focus", tr("Hide thumbnails")) { Toggle(tr("Hide thumbnails"), tr("Titles only, no pictures to click on"), s.hideThumbs) { b -> set { it.copy(hideThumbs = b) } } }
         r.row("focus", tr("Hide comments")) { Toggle(tr("Hide comments"), tr("No comments under videos"), s.hideComments) { b -> set { it.copy(hideComments = b) } } }
         r.row("focus", tr("Turn off the home feed")) { Toggle(tr("Turn off the home feed"), tr("Home becomes a search page"), s.homeOff) { b -> set { it.copy(homeOff = b) } } }
+        r.row("focus", tr("Fade watched videos")) { Toggle(tr("Fade watched videos"), tr("In Subscriptions, videos you've watched are drawn faded"), s.dimWatched) { b -> set { it.copy(dimWatched = b) } } }
+        r.row("focus", tr("Group feeds: last 30 days")) { Toggle(tr("Group feeds: last 30 days"), tr("A subscription group shows the last 30 days instead of 7"), s.groupDays >= 30) { b -> set { it.copy(groupDays = if (b) 30 else 7) } } }
         r.row("focus", tr("Turn off the subscription feed")) { Toggle(tr("Turn off the subscription feed"), tr("Subscriptions shows your channels, not their new videos"), s.subsFeedOff) { b -> set { it.copy(subsFeedOff = b) } } }
         r.row("focus", tr("Only my groups in Subscriptions")) { Toggle(tr("Only my groups in Subscriptions"), tr("With subscription groups: no \"All\" tab, just the groups"), s.subsHideAll) { b -> set { it.copy(subsHideAll = b) } } }
         r.row("focus", tr("Hide Shorts")) { Toggle(tr("Hide Shorts"), tr("No Shorts tab, no Shorts in lists"), s.hideShorts || s.calm) { b -> set { it.copy(hideShorts = b) } } }
@@ -618,6 +620,7 @@ private fun SettingsRows(
         }
         // ------------------------------------------------------------------ data
         r.row("data", tr("Pause watch history") + " history") { Toggle(tr("Pause watch history"), tr("Videos you watch aren't added to history and don't shape recommendations"), s.historyOff) { b -> set { it.copy(historyOff = b) } } }
+        r.row("data", tr("Don't learn from what I watch")) { Toggle(tr("Don't learn from what I watch"), tr("History stays, but nothing goes into what TubeHaus learned about you"), s.learnOff) { b -> set { it.copy(learnOff = b) } } }
         r.row("data", tr("What TubeHaus learned about you") + " taste recommendations") { SItem(tr("What TubeHaus learned about you"), tr("See and change what your recommendations are based on")) { app.go(Screen.Learned) } }
         r.row("data", tr("Import") + " takeout newpipe freetube invidious opml") { SItem(tr("Import"), tr("Subscriptions, history and playlists from YouTube (Google Takeout), NewPipe, FreeTube, Invidious, TubeHaus or OPML")) { importFile(app) } }
         r.row("data", tr("Manage subscriptions")) { SItem(tr("Manage subscriptions"), tr("Remove channels, or all of them")) { app.go(Screen.ManageSubs) } }
@@ -628,6 +631,22 @@ private fun SettingsRows(
         r.group("data", tr("TubeHaus server"))
         r.row("data", tr("TubeHaus server") + " sync server") { ServerItems(app) { dialog = "server" } }
         // ------------------------------------------------------------------ about
+        if (!app.platform.touch && !app.platform.tv) {
+            r.group("about", tr("Keyboard shortcuts"))
+            r.row("about", tr("Keyboard shortcuts") + " keys hotkeys") {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    for ((k, d) in listOf(
+                        "Space / K" to tr("Play / pause"), "J / L" to tr("Back / forward 10 s"), "← / →" to tr("Back / forward 5 s"),
+                        "↑ / ↓" to tr("Volume"), "M" to tr("Mute"), "F" to tr("Full screen"), "C" to tr("Captions"),
+                        ", / ." to tr("Slower / faster"), "N / P" to tr("Next / previous video"), "0–9" to tr("Jump to 0–90%"),
+                        "F5" to tr("Refresh the page"), "F11" to tr("Full screen window"), "Esc" to tr("Back"), "Alt+← / Alt+→" to tr("Back / forward"),
+                    )) Row(Modifier.padding(vertical = 3.dp)) {
+                        Text(k, Modifier.width(150.dp), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                        Text(d, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
         r.row("about", tr("Check for updates") + " update") {
             Toggle(tr("Check for updates"), tr("Each time the app opens, on GitHub: a newer version, and fixes for when YouTube changes something. Nothing about you is sent."), s.checkUpdates) { b -> set { it.copy(checkUpdates = b) } }
         }

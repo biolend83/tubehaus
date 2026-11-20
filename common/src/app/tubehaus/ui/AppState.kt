@@ -57,7 +57,10 @@ val TABS = listOf(Screen.Home, Screen.Shorts, Screen.Subs, Screen.Library, Scree
 
 class AppState(val platform: Platform, val store: Store) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    val stack = mutableStateListOf<Screen>(Screen.Home)
+    /** F5: bumped to build the page again, which loads it afresh */
+    val reload = androidx.compose.runtime.mutableIntStateOf(0)
+    val stack = mutableStateListOf<Screen>(if (store.settings.value.homeOff) Screen.Subs else Screen.Home)
+    private val homeRoot: Screen get() = if (store.settings.value.homeOff) Screen.Subs else Screen.Home
     val current: Screen get() = stack.last()
     val translations = CommentTranslations()
     init {
@@ -202,7 +205,7 @@ class AppState(val platform: Platform, val store: Store) {
     val ahead = mutableStateListOf<Screen>()
 
     /** there is a page to go back to (the side menu's Back button) */
-    val canBack: Boolean get() = stack.size > 1 || stack.lastOrNull() != Screen.Home
+    val canBack: Boolean get() = stack.size > 1 || stack.lastOrNull() != homeRoot
 
     fun forward(): Boolean {
         if (fullscreen || ahead.isEmpty()) return false
@@ -242,7 +245,7 @@ class AppState(val platform: Platform, val store: Store) {
         }
         if (fullscreen) { setFull(false); return true }
         if (stack.size > 1) { lastMove = -1; ahead.add(stack.removeAt(stack.size - 1)); return true }
-        if (stack.last() != Screen.Home) { lastMove = 0; stack[0] = Screen.Home; return true }
+        if (stack.last() != homeRoot) { lastMove = 0; stack[0] = homeRoot; return true }
         return false
     }
 
@@ -260,7 +263,7 @@ class AppState(val platform: Platform, val store: Store) {
         playback.close()
         store.switchPerson(id)
         sync.personChanged()
-        stack.clear(); stack.add(Screen.Home)
+        stack.clear(); stack.add(homeRoot)
         sync.refreshSoon()
     }
 

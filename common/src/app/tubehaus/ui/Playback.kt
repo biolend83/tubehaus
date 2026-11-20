@@ -411,7 +411,7 @@ class Playback(private val app: AppState) {
 
     private fun learnNow() {
         val v = video ?: return
-        if (learned || app.store.settings.value.historyOff) return
+        if (learned || app.store.settings.value.historyOff || app.store.settings.value.learnOff) return
         learned = true
         val len = (v.lengthSec.takeIf { it > 0 } ?: (player.state.value.durationMs / 1000).toInt()).toDouble()
         Learn.learn(

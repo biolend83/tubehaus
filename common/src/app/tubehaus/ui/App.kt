@@ -37,6 +37,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableStateOf
@@ -239,7 +240,7 @@ private data class Tab(val screen: Screen, val label: String, val on: ImageVecto
 @Composable
 private fun tabs(app: AppState, phone: Boolean): List<Tab> {
     return listOfNotNull(
-        Tab(Screen.Home, tr("Home"), Sym.Home.fill, Sym.Home.outline),
+        if (app.store.settings.value.homeOff && !phone) null else Tab(Screen.Home, tr("Home"), Sym.Home.fill, Sym.Home.outline),
         if (app.noShorts) null else Tab(Screen.Shorts, tr("Shorts"), Sym.Bolt.fill, Sym.Bolt.outline),
         if (phone) null else Tab(Screen.Subs, tr("Subscriptions"), Sym.Subscriptions.fill, Sym.Subscriptions.outline),
         if (app.store.settings.value.hideMusicTab) null else Tab(Screen.Music, tr("Music"), Sym.Music.fill, Sym.Music.outline),
@@ -386,7 +387,7 @@ private fun Shell(app: AppState) {
                           // a tab: the page rises in a little, as on the web
                           else -> translationY = rest * 10.dp.toPx()
                       }
-                  }) {
+                  }) { key(app.reload.value) {
                     when (cur) {
                         Screen.Home -> HomeScreen(app)
                         Screen.Shorts -> ShortsScreen(app)
@@ -409,7 +410,7 @@ private fun Shell(app: AppState) {
                         is Screen.Artist -> ArtistScreen(app, cur.id, cur.name)
                         is Screen.SettingsPage -> SettingsPageScreen(app, cur.key)
                         Screen.Stats -> StatsScreen(app)
-                    }
+                    } }
                   }
                 }
                 // the plain one: inside a Box that sits in a Column, the Column version would be picked
