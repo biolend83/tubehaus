@@ -3014,6 +3014,23 @@ def _ejs_ready():
         return _ejs["sts"]
 
 
+# YouTube Kids for Android serves only what YouTube Kids allows, but those with plain links (no solver,
+# no start ad to wait out), up to 2160p: tried before the TV client.
+KIDS_UA = "com.google.android.apps.youtube.kids/7.36.1 (Linux; U; Android 11) gzip"
+ENG_KIDS = ({"clientName": "ANDROID_KIDS", "clientVersion": "7.36.1", "androidSdkVersion": 30,
+             "osName": "Android", "osVersion": "11"}, 18, KIDS_UA)
+
+
+def eng_kids(vid):
+    """YouTube Kids' player answer when it has playable links, or None"""
+    client, cid, ua = ENG_KIDS
+    d = it_call("player", {"videoId": vid, "contentCheckOk": True, "racyCheckOk": True}, client, cid, ua, timeout=20)
+    sd = d.get("streamingData") or {}
+    if (d.get("playabilityStatus") or {}).get("status") == "OK" and any(f.get("url") for f in sd.get("adaptiveFormats") or []):
+        return d
+    return None
+
+
 def eng_tv(vid):
     """the TV client's player answer with its links unlocked, or None"""
     sts = _ejs_ready()
@@ -3159,7 +3176,16 @@ def eng_video(vid, hl="", gl="", fast=False):
     meta = (web.get("microformat") or {}).get("playerMicroformatRenderer") or {}
     ps = d.get("playabilityStatus") or {}
     reason = ps.get("reason") or ""
-    # "not available" to the token-free clients (made for kids, some labels): the TV client, unlocked
+    # "not available" to the token-free clients (made for kids, some labels): YouTube Kids for the ones
+    # made for kids, the TV client (links unlocked) for the rest
+    if not client and (ps.get("status") == "UNPLAYABLE" or ps.get("status") == "LOGIN_REQUIRED" and "age" not in reason.lower()):
+        try:
+            kids = eng_kids(vid)
+        except Exception as ex:
+            kids = None
+            log("engine", "video %s KIDS FAIL %s" % (vid, repr(ex)[:120]), t0, every=0)
+        if kids:
+            d, client = kids, "ANDROID_KIDS"
     if not client and (ps.get("status") == "UNPLAYABLE" or ps.get("status") == "LOGIN_REQUIRED" and "age" not in reason.lower()):
         try:
             tv = eng_tv(vid)
