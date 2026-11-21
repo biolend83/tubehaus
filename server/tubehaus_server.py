@@ -1362,17 +1362,30 @@ def warp_rotate(why, started):
             log("warp", f"rotate skipped: {len(recent)} in 30 min ({why})", every=600)
             return False
         old = warp_ip()
-        subprocess.run(["warp-cli", "--accept-tos", "disconnect"], capture_output=True, timeout=20)
+        cli = lambda *a: subprocess.run(["warp-cli", "--accept-tos", *a], capture_output=True, timeout=30)
+
+        def wait():
+            # until traffic flows again (in a container the status line can stay at
+            # "Validating proxy configuration" while the proxy already works)
+            for _ in range(40):
+                time.sleep(1)
+                ip = warp_ip()
+                if ip != "?":
+                    return ip
+            return "?"
+        cli("disconnect")
         time.sleep(1)
-        subprocess.run(["warp-cli", "--accept-tos", "connect"], capture_output=True, timeout=20)
-        # wait until traffic flows again (in a container the status line can stay at
-        # "Validating proxy configuration" while the proxy already works)
-        new = "?"
-        for _ in range(40):
-            time.sleep(1)
-            new = warp_ip()
-            if new != "?":
-                break
+        cli("connect")
+        new = wait()
+        # a reconnect often keeps the same address: a new registration is a new one
+        if new in (old, "?"):
+            port = YT_PROXY.rsplit(":", 1)[-1]
+            cli("registration", "delete")
+            cli("registration", "new")
+            cli("mode", "proxy")
+            cli("proxy", "port", port)
+            cli("connect")
+            new = wait()
         rot_hist.append(time.time())
         del rot_hist[:-20]
         log("warp", f"rotated {old} -> {new} ({why}) in {time.time() - now:.1f}s", every=0)
@@ -2999,7 +3012,18 @@ def sabr_get(path, rng=None, timeout=60):
     return urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:%d%s" % (SABR_PORT, path), headers=h), timeout=timeout)
 
 
-def eng_sabr(vid, hl="", gl=""):
+def warp_sorry():
+    """True when YouTube's watch page answers with Google's "sorry" check"""
+    try:
+        with YT.open(urllib.request.Request("https://www.youtube.com/watch?v=jNQXAC9IVRw", headers={"User-Agent": BROWSER_UA}), timeout=10) as r:
+            return "google.com/sorry" in r.geturl()
+    except urllib.error.HTTPError as ex:
+        return "google.com/sorry" in (ex.geturl() or "") or ex.code == 429
+    except Exception:
+        return False
+
+
+def eng_sabr(vid, hl="", gl="", retry=False):
     """the watch page's player answer with its formats at /companion/sabr, or None"""
     if SABR == "0" or not _sabr["ok"]:
         return None
@@ -3009,6 +3033,9 @@ def eng_sabr(vid, hl="", gl=""):
             d = json.loads(r.read())
     except Exception as ex:
         log("engine", "video %s SABR FAIL %s" % (vid, repr(ex)[:120]), t0, every=0)
+        # Google's "sorry" check in place of the watch page: the address is flagged
+        if isinstance(ex, urllib.error.HTTPError) and ex.code == 502 and not retry and warp_sorry() and warp_rotate("watch page sorry", t0):
+            return eng_sabr(vid, hl, gl, retry=True)
         return None
     if (d.get("playabilityStatus") or {}).get("status") != "OK" or not (d.get("streamingData") or {}).get("adaptiveFormats"):
         return None
