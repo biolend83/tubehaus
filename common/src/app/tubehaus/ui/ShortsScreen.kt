@@ -144,7 +144,7 @@ fun ShortsScreen(app: AppState) {
         if (to != pager.currentPage) scope.launch { pager.animateScrollToPage(to) }
     }
 
-    LaunchedEffect(pager, list.size) {
+    LaunchedEffect(pager) {
         snapshotFlow { pager.currentPage }.collect { page ->
             val v = list.getOrNull(page) ?: return@collect
             if (current?.id == v.id) return@collect
@@ -158,6 +158,7 @@ fun ShortsScreen(app: AppState) {
                 watchStart = Sys.nowMs()
                 player.load(s, PlayOptions(maxHeight = 720, loop = true, volume = app.store.settings.value.volume, title = s.title, artist = s.author, artwork = v.thumb))
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) { if (current?.id == v.id) current = null; throw e }
                 app.toast(if ((e as? YtError)?.kind == YtError.Kind.LOGIN) tr(BOT_CHECK) else e.message ?: tr("This video can't be played"))
                 // one that can't be played is skipped
                 if ((e as? YtError)?.kind != YtError.Kind.LOGIN) {
