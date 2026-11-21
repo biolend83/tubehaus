@@ -37,6 +37,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableStateOf
@@ -131,7 +132,9 @@ fun App(app: AppState) {
         ImageLoader.Builder(ctx)
             .components { Sys.imageNetwork(this) }
             .diskCache { DiskCache.Builder().directory(app.platform.cacheDir / "images").maxSizeBytes(150L shl 20).build() }
-            .crossfade(true)
+            // a small TV stick: a smaller picture memory and no fades, so scrolling a row doesn't stall
+            .memoryCache { coil3.memory.MemoryCache.Builder().maxSizePercent(ctx, if (app.platform.weak) 0.12 else 0.25).build() }
+            .crossfade(!app.platform.weak)
             .build()
     }
     key(lang, settings.tvMode) {
@@ -239,7 +242,7 @@ private data class Tab(val screen: Screen, val label: String, val on: ImageVecto
 @Composable
 private fun tabs(app: AppState, phone: Boolean): List<Tab> {
     return listOfNotNull(
-        Tab(Screen.Home, tr("Home"), Sym.Home.fill, Sym.Home.outline),
+        if (app.store.settings.value.homeOff && !phone) null else Tab(Screen.Home, tr("Home"), Sym.Home.fill, Sym.Home.outline),
         if (app.noShorts) null else Tab(Screen.Shorts, tr("Shorts"), Sym.Bolt.fill, Sym.Bolt.outline),
         if (phone) null else Tab(Screen.Subs, tr("Subscriptions"), Sym.Subscriptions.fill, Sym.Subscriptions.outline),
         if (app.store.settings.value.hideMusicTab) null else Tab(Screen.Music, tr("Music"), Sym.Music.fill, Sym.Music.outline),
@@ -252,6 +255,16 @@ private fun Shell(app: AppState) {
     val now = app.current
     val compact = LocalCompact.current
     val root = app.stack.firstOrNull()
+    // leaving the video page: as set, the mini player, or paused, or stopped
+    val wasWatch = remember { mutableStateOf(false) }
+    LaunchedEffect(now) {
+        val w = now is Screen.Watch
+        if (wasWatch.value && !w && now !is Screen.NowPlaying && !app.platform.touch) when (app.store.settings.value.leaveVideo) {
+            1 -> app.player.pause()
+            2 -> app.playback.close()
+        }
+        wasWatch.value = w
+    }
     // phones: the video page is a sheet over the page it was opened from, which stays put under it
     // and is what the rest of the shell lays out (WatchSheet)
     val sheet = compact && app.platform.touch && !app.platform.tv && app.playback.video != null && app.playback.song == null
@@ -386,7 +399,7 @@ private fun Shell(app: AppState) {
                           // a tab: the page rises in a little, as on the web
                           else -> translationY = rest * 10.dp.toPx()
                       }
-                  }) {
+                  }) { key(app.reload.value) {
                     when (cur) {
                         Screen.Home -> HomeScreen(app)
                         Screen.Shorts -> ShortsScreen(app)
@@ -409,7 +422,7 @@ private fun Shell(app: AppState) {
                         is Screen.Artist -> ArtistScreen(app, cur.id, cur.name)
                         is Screen.SettingsPage -> SettingsPageScreen(app, cur.key)
                         Screen.Stats -> StatsScreen(app)
-                    }
+                    } }
                   }
                 }
                 // the plain one: inside a Box that sits in a Column, the Column version would be picked

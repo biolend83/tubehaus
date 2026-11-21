@@ -206,6 +206,7 @@ private fun DownloadFolder(app: AppState) {
 fun DownloadsScreen(app: AppState) {
     val saved by app.offline.saved.collectAsState()
     val items = saved.items.values.sortedByDescending { it.at }
+    var note by remember { mutableStateOf("") }
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             SectionTitle(tr("Downloads"))
@@ -217,6 +218,8 @@ fun DownloadsScreen(app: AppState) {
             )
             // desktop: where the files are, and a button to keep them somewhere else
             if (app.platform.canPickFolder) DownloadFolder(app)
+            if (note.isNotEmpty()) Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp))
         }
         items(app.offline.pending.values.toList(), key = { "p" + it.id }) { v ->
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -230,7 +233,13 @@ fun DownloadsScreen(app: AppState) {
             }
         }
         items(items, key = { "s" + it.id }) { s ->
-            VideoRow(s.asVideo(), app, extra = listOf(tr("Remove download") to { app.offline.remove(s.id) }))
+            VideoRow(s.asVideo(), app, extra = listOfNotNull(
+                tr("Remove download") to { app.offline.remove(s.id) },
+                if (app.platform.canPickFolder) tr("Save as one file") to {
+                    note = tr("Saving as one file...")
+                    app.offline.export(s.id) { p -> note = if (p != null) tr("Saved: ") + p else tr("Couldn't put it into one file.") }
+                } else null,
+            ))
             Text(
                 listOfNotNull("${s.video.height}p", s.audioName.ifEmpty { null }, s.caption?.name, sizeText(s.size)).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,

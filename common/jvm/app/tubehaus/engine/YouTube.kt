@@ -1,5 +1,6 @@
 package app.tubehaus.engine
 
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 import kotlin.concurrent.Volatile
 
@@ -67,6 +68,8 @@ object YouTube {
         }
     }
 
+    private val warmScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
     /** From this device. Tries each player client until one gives playable URLs. */
     private suspend fun device(id: String): Stream {
         var first: YtError? = null
@@ -82,16 +85,19 @@ object YouTube {
                 }
             }
             // the token-free clients said "not available" (made for kids, some labels) or are walled:
-            // YouTube Kids serves the ones made for kids as they are, the TV client (links unlocked) the rest
+            // YouTube Kids serves the ones made for kids as they are, SABR or the TV client (links unlocked) the rest
+            // the SABR host (a hidden browser on a computer) starts while YouTube Kids is asked, so it is
+            // ready if Kids refuses too; a video the usual clients play never starts it
+            if (attempt == 0 && first?.kind != YtError.Kind.AGE) Sabr.host?.let { h -> if (Sabr.available) warmScope.launch { runCatching { h.warm() } } }
             if (attempt == 0 && first?.kind != YtError.Kind.AGE) {
                 try { return player(id, Clients.KIDS) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e }
             }
-            if (attempt == 0 && first?.kind != YtError.Kind.AGE && Cipher.available) {
-                try { return tv(id) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
-            }
-            // nothing with links plays it: YouTube's web player way (SABR, with its own web token)
+            // then SABR, YouTube's web player way with its own web token, before the TV client (whose links wait behind an ad)
             if (attempt == 0 && first?.kind != YtError.Kind.AGE && Sabr.available) {
                 try { return sabr(id) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
+            }
+            if (attempt == 0 && first?.kind != YtError.Kind.AGE && Cipher.available) {
+                try { return tv(id) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
             }
             // every client asked to sign in: the wall is on this visitor identity, so try a new one
             if (!walled || attempt == 1 || !InnerTube.reroll()) break
@@ -112,9 +118,19 @@ object YouTube {
         val urls = Cipher.urls(raw)
         val s = parse(id, d, Clients.TV) { i -> urls[i] }
         if (s.video.isEmpty() || s.audio.isEmpty()) throw YtError("No playable streams", YtError.Kind.UNAVAILABLE)
-        // YouTube holds the links back behind the start ad it placed: wait it out (a few seconds)
-        val wait = Cipher.prerollMs(d) - (Sys.nowMs() - answeredAt)
-        if (wait > 0) kotlinx.coroutines.delay(wait)
+        // YouTube holds the links back behind the start ad it placed (up to 0.8 of its skip offset), but they
+        // often open sooner: ask for one byte every half second instead of waiting it all out
+        val until = answeredAt + Cipher.prerollMs(d)
+        val probe = s.video.first().url
+        while (Sys.nowMs() < until) {
+            val open = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    Net.client.newCall(okhttp3.Request.Builder().url("$probe&range=0-0").build()).execute().use { it.isSuccessful }
+                }.getOrDefault(false)
+            }
+            if (open) break
+            kotlinx.coroutines.delay(500)
+        }
         return s
     }
 

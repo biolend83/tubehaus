@@ -148,6 +148,7 @@ class Casting(private val app: AppState) {
             app.player.target.value = l
             app.player.local.stop()
             app.playback.replay(pos)
+            app.starNote(cast = true)
             // until the device goes away by itself
             val why = l.lost.filterNotNull().first()
             if (link === l) {

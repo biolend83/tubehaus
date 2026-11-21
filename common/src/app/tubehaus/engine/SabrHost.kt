@@ -16,4 +16,6 @@ interface SabrHost {
     /** fetch [run] may go on up to byte [upTo] of its format for now */
     fun allow(run: Int, upTo: Long)
     fun stop(run: Int)
+    /** gets ready ahead of a video that may need it (a browser to start); nothing by default */
+    suspend fun warm() {}
 }
