@@ -2663,6 +2663,11 @@ def it_call(endpoint, body, client=None, cid=1, ua=BROWSER_UA, hl="en", gl="US",
         try:
             status, raw = _it_post(path, data, headers, timeout)
         except (http.client.HTTPException, OSError) as e:
+            if rot_lock.locked():
+                # WARP is changing its address (a few seconds without a proxy): wait for it, not an error
+                with rot_lock:
+                    pass
+                continue
             if attempt < 1:
                 continue
             raise EngError("No connection to YouTube (%s)" % repr(e)[:80], 502)
