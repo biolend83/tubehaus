@@ -82,16 +82,16 @@ object YouTube {
                 }
             }
             // the token-free clients said "not available" (made for kids, some labels) or are walled:
-            // YouTube Kids serves the ones made for kids as they are, the TV client (links unlocked) the rest
+            // YouTube Kids serves the ones made for kids as they are, SABR or the TV client (links unlocked) the rest
             if (attempt == 0 && first?.kind != YtError.Kind.AGE) {
                 try { return player(id, Clients.KIDS) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e }
             }
-            if (attempt == 0 && first?.kind != YtError.Kind.AGE && Cipher.available) {
-                try { return tv(id) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
-            }
-            // nothing with links plays it: YouTube's web player way (SABR, with its own web token)
+            // then SABR, YouTube's web player way with its own web token, before the TV client (whose links wait behind an ad)
             if (attempt == 0 && first?.kind != YtError.Kind.AGE && Sabr.available) {
                 try { return sabr(id) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
+            }
+            if (attempt == 0 && first?.kind != YtError.Kind.AGE && Cipher.available) {
+                try { return tv(id) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
             }
             // every client asked to sign in: the wall is on this visitor identity, so try a new one
             if (!walled || attempt == 1 || !InnerTube.reroll()) break

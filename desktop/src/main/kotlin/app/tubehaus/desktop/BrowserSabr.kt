@@ -49,7 +49,37 @@ class BrowserSabr(private val profile: File) : SabrHost {
     // to the browser on this computer: no proxy, and a DevTools socket that may be quiet for long
     private val http = Net.client.newBuilder().proxy(java.net.Proxy.NO_PROXY).readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS).build()
 
-    init { Runtime.getRuntime().addShutdownHook(Thread { proc?.destroy() }) }
+    /** the DevTools port of the browser in use */
+    @Volatile private var devPort = 0
+
+    init { Runtime.getRuntime().addShutdownHook(Thread { closeBrowser() }) }
+
+    /** the DevTools targets of a browser on [port], or null */
+    private fun targets(port: Int): String? = runCatching {
+        http.newCall(Request.Builder().url("http://127.0.0.1:$port/json").build()).execute().use { if (it.isSuccessful) it.body!!.string() else null }
+    }.getOrNull()
+
+    /**
+     * The browser closed for good, also one this app found already running: a launch's own process
+     * (what destroy() stops) can be gone while the browser it started lives on, and a browser left over
+     * holds the profile, so the next launch hands over to it and quits at once, and SABR never came up.
+     */
+    private fun closeBrowser() {
+        val port = devPort
+        if (port > 0) runCatching {
+            val v = http.newCall(Request.Builder().url("http://127.0.0.1:$port/json/version").build()).execute().use { it.body!!.string() }
+            val url = Json.parseToJsonElement(v).jsonObject["webSocketDebuggerUrl"]!!.jsonPrimitive.content
+            val done = java.util.concurrent.CountDownLatch(1)
+            http.newWebSocket(Request.Builder().url(url).build(), object : WebSocketListener() {
+                override fun onOpen(webSocket: WebSocket, response: Response) { webSocket.send("{\"id\":1,\"method\":\"Browser.close\"}") }
+                override fun onMessage(webSocket: WebSocket, text: String) { done.countDown() }
+                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { done.countDown() }
+                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { done.countDown() }
+            })
+            done.await(2, java.util.concurrent.TimeUnit.SECONDS)
+        }
+        proc?.destroy()
+    }
 
     companion object {
         private const val PAGE = "https://www.youtube.com/tubehaus-sabr"
@@ -130,11 +160,33 @@ class BrowserSabr(private val profile: File) : SabrHost {
         withContext(Dispatchers.IO) { start() }
     }
 
-    private suspend fun start(): Boolean {
+    /** the browsers that have this profile open (one left from before a crash): ended */
+    private fun endLeftovers() {
+        val os = System.getProperty("os.name").lowercase()
+        val cmd = if (os.contains("win")) {
+            // as -EncodedCommand: quotes inside a Windows command line don't survive the trip
+            val ps = "Get-CimInstance Win32_Process -Filter \"Name='msedge.exe' or Name='chrome.exe'\" | " +
+                "Where-Object { \$_.CommandLine -like '*" + profile.absolutePath.replace("'", "''") + "*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }"
+            listOf("powershell", "-NoProfile", "-EncodedCommand", java.util.Base64.getEncoder().encodeToString(ps.toByteArray(Charsets.UTF_16LE)))
+        } else listOf("pkill", "-f", "--user-data-dir=" + profile.absolutePath)
+        runCatching { ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start().waitFor(15, java.util.concurrent.TimeUnit.SECONDS) }
+    }
+
+    private suspend fun start(): Boolean = launch(true)
+
+    private suspend fun launch(again: Boolean): Boolean {
         val exe = browser() ?: return false
         val page = resource("sabr-page.js") ?: return false
         val solver = (resource("yt.solver.lib.min.js") ?: return false) + "\n;var meriyah=lib.meriyah,astring=lib.astring;\n" + (resource("yt.solver.core.min.js") ?: return false)
         profile.mkdirs()
+        // a browser left from before (the app was killed) still has this profile: use it, a new one would quit
+        val left = runCatching { File(profile, "tubehaus-port").readText().trim().toInt() }.getOrNull()
+        val leftList = left?.let { targets(it) }
+        if (left != null && leftList != null) {
+            if (debug) System.err.println("sabr browser left running on $left: using it")
+            devPort = left
+            return attach(leftList, page, solver)
+        }
         // a free port picked here: with --remote-debugging-port=0 (the browser picks) YouTube turns its tokens down
         val free = runCatching { java.net.ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress()).use { it.localPort } }.getOrNull() ?: return false
         val p = runCatching {
@@ -145,11 +197,25 @@ class BrowserSabr(private val profile: File) : SabrHost {
         proc = p
         var list: String? = null
         for (i in 0 until 100) {
-            list = runCatching { http.newCall(Request.Builder().url("http://127.0.0.1:$free/json").build()).execute().use { if (it.isSuccessful) it.body!!.string() else null } }.getOrNull()
-            if (list != null || !p.isAlive) break
+            list = targets(free)
+            // not "|| !p.isAlive": Edge's launcher can hand off to a new browser process and quit while that one comes up
+            if (list != null) break
             delay(100)
         }
         if (debug) System.err.println("sabr browser ${exe.name} on $free: " + (if (list == null) "no DevTools (alive ${p.isAlive})" else "up"))
+        if (list == null && again) {
+            // it handed over to a browser that still holds the profile and quit: end that one, start again
+            proc = null
+            endLeftovers()
+            delay(500)
+            return launch(false)
+        }
+        devPort = free
+        runCatching { File(profile, "tubehaus-port").writeText(free.toString()) }
+        return attach(list, page, solver)
+    }
+
+    private suspend fun attach(list: String?, page: String, solver: String): Boolean {
         val url = list?.let { runCatching { Json.parseToJsonElement(it).jsonArray.firstOrNull { t -> t.jsonObject["type"]?.jsonPrimitive?.content == "page" }
             ?.jsonObject?.get("webSocketDebuggerUrl")?.jsonPrimitive?.content }.getOrNull() } ?: run { drop(); return false }
         val open = CompletableDeferred<Boolean>()
