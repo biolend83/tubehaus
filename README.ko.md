@@ -14,7 +14,7 @@ TV, 폰, PC, 아이패드에서. 내 서버에 돌리거나, 그냥 앱을 깔�
 ![Docker: amd64 | arm64](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white)
 [![Featured in selfh.st Weekly](https://img.shields.io/badge/featured%20in-selfh.st%20weekly-2ea44f)](https://selfh.st/weekly/2026-10-23/)
 
-**[⬇ 앱 받기](#앱-받기)** &nbsp;·&nbsp; **[🖥️ 서버 설치](#빠른-설치-docker)** &nbsp;·&nbsp; **[✨ 1.6 새 기능](#16-새-기능-자체-유튜브-엔진-그리고-빠름)** &nbsp;·&nbsp; [English](README.md) · **한국어**
+**[⬇ 앱 받기](#앱-받기)** &nbsp;·&nbsp; **[🖥️ 서버 설치](#빠른-설치-docker)** &nbsp;·&nbsp; **[✨ 1.7 새 기능: SABR](#17-새-기능-sabr-유튜브-공식-플레이어-방식)** &nbsp;·&nbsp; [English](README.md) · **한국어**
 
 <img src="docs/devices.jpg" alt="Android TV, iPad, Android 폰에서 돌아가는 TubeHaus" width="860">
 
@@ -45,6 +45,14 @@ TV, 폰, PC, 아이패드에서. 내 서버에 돌리거나, 그냥 앱을 깔�
 
 ### 🏠 온 집이 보관함 하나
 TV에서 멈추고 폰에서 이어 봐요. 집의 모든 기기와 브라우저가 보관함 하나를 같이 쓰거나, 사람마다 따로 써요.
+
+</td>
+</tr>
+<tr>
+<td colspan="3" valign="top">
+
+### 🛡️ 유튜브가 막아도 계속 재생
+다른 길이 막히면 youtube.com이 직접 쓰는 **SABR**로 넘어가요. BotGuard 토큰도 직접 만들고 계정은 필요 없어요. 서버에서는 막힌 주소를 스스로 새 주소로 바꿔요. [어떻게 돌아가나요](#17-새-기능-sabr-유튜브-공식-플레이어-방식)
 
 </td>
 </tr>
@@ -81,6 +89,14 @@ TV에서 멈추고 폰에서 이어 봐요. 집의 모든 기기와 브라우저
 ## 1.7 새 기능: SABR, 유튜브 공식 플레이어 방식
 
 유튜브는 다른 플레이어들이 쓰는 뒷문을 계속 닫고 있어요. 어떤 클라이언트는 영상 주소를 못 받게 되고, 음반사 뮤직비디오는 "볼 수 없음"이 뜨고, 어린이 영상은 키즈 앱에서만 재생돼요. 하지만 자기 웹사이트가 쓰는 정문은 닫을 수 없어요. 그 정문이 **SABR**(Server ABR)이에요. 지금 youtube.com이 거의 모든 영상을 이 방식으로 보내요. TubeHaus 1.7은 모든 기기와 서버에서 SABR을 써요.
+
+```
+              ┌── POST: "1:23, 40초 받아 둠, 1080p + Opus" (protobuf) ──┐
+  TubeHaus ───┤                                                                  ├──► YouTube
+   (player)   └◄── UMP: 영상 조각, "이 서버로", "2초 쉬어", 형식 ──┘
+       │
+       └─► 조각을 바이트 범위로 되돌림 ─► ExoPlayer · mpv · AVPlayer · browser MSE
+```
 
 **어떻게 돌아가나요.** 플레이어는 화질마다 주소를 받는 대신 스트리밍 주소 하나만 받아요. 그리고 유튜브에 작은 protobuf 요청을 보내요("지금 1:23, 이만큼 받아 뒀고, 1080p 원해요"). 유튜브는 UMP라는 조각 묶음으로 답하고, 중간에 다른 서버로 보내거나 형식을 바꾸거나 잠깐 쉬라고 하기도 해요. TubeHaus는 그 조각을 보통 파일의 바이트 범위로 되돌려요. 그래서 원래 쓰던 플레이어(안드로이드 ExoPlayer, 데스크톱 mpv, 애플 기기 AVPlayer, 웹앱의 브라우저 MSE)가 그대로 재생해요. 탐색, 화질 바꾸기, 음성 트랙도 다 돼요.
 

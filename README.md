@@ -14,7 +14,7 @@ On the TV, the phone, the PC and the iPad. Run it on your own server, or just in
 ![Docker: amd64 | arm64](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white)
 [![Featured in selfh.st Weekly](https://img.shields.io/badge/featured%20in-selfh.st%20weekly-2ea44f)](https://selfh.st/weekly/2026-10-23/)
 
-**[⬇ Get the app](#get-the-app)** &nbsp;·&nbsp; **[🖥️ Run the server](#quick-start-docker)** &nbsp;·&nbsp; **[✨ What's new in 1.6](#new-in-16-its-own-youtube-engine-and-fast)** &nbsp;·&nbsp; **English** · [한국어](README.ko.md)
+**[⬇ Get the app](#get-the-app)** &nbsp;·&nbsp; **[🖥️ Run the server](#quick-start-docker)** &nbsp;·&nbsp; **[✨ What's new in 1.7: SABR](#new-in-17-sabr-the-way-youtubes-own-player-streams)** &nbsp;·&nbsp; **English** · [한국어](README.ko.md)
 
 <img src="docs/devices.jpg" alt="TubeHaus on Android TV, iPad and an Android phone" width="860">
 
@@ -45,6 +45,14 @@ No Google account, no ads, no tracking scripts. Subscriptions, history and playl
 
 ### 🏠 One library for the house
 Pause on the TV, carry on on the phone. Every device and every browser in the house shares one library, or each person gets their own.
+
+</td>
+</tr>
+<tr>
+<td colspan="3" valign="top">
+
+### 🛡️ Keeps playing when YouTube pushes back
+When a side door closes, TubeHaus falls back to **SABR**, the protocol youtube.com itself streams with, with its own BotGuard token and no account. On the server a flagged address is swapped for a new one by itself. [How it works](#new-in-17-sabr-the-way-youtubes-own-player-streams)
 
 </td>
 </tr>
@@ -81,6 +89,14 @@ All files, Windows portable and ARM builds: **[latest release](https://github.co
 ## New in 1.7: SABR, the way YouTube's own player streams
 
 YouTube keeps closing the side doors that third-party players use: a client stops getting plain video addresses, a label's music videos come back "not available", a kids' video only plays in the Kids app. Its own website can't close the front door without breaking itself. That front door is **SABR** (Server ABR), the protocol youtube.com uses to stream almost every video now. TubeHaus 1.7 speaks it on every device and on the server.
+
+```
+              ┌── POST: "at 1:23, 40 s buffered, want 1080p + Opus" (protobuf) ──┐
+  TubeHaus ───┤                                                                  ├──► YouTube
+   (player)   └◄── UMP: media pieces, "go to this server", "wait 2 s", formats ──┘
+       │
+       └─► pieces laid back out as byte ranges ─► ExoPlayer · mpv · AVPlayer · browser MSE
+```
 
 **How it works.** The player doesn't get one address per quality. It gets a single streaming address and sends YouTube small protobuf requests ("I'm at 1:23, I have this much buffered, I want 1080p"). YouTube answers with UMP, a stream of media pieces, and can redirect it, change formats or ask it to back off along the way. TubeHaus turns those pieces back into ordinary byte ranges, so the same players as before (ExoPlayer on Android, mpv on the desktop, AVPlayer on Apple devices and the browser's MSE in the web app) play them like any other file. Seeking, quality changes and audio tracks all keep working.
 
