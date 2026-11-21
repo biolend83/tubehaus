@@ -409,6 +409,20 @@ Without `HT_ACCOUNTS=1`, anyone who can open it shares the same library: put you
 ## FAQ
 
 <details>
+<summary><b>What happens when YouTube blocks it?</b></summary>
+
+There are three layers. A refused video moves on to the next way in (visionOS client → YouTube Kids → SABR → TV client), so one closed door doesn't stop playback. An address YouTube has flagged ("Sign in to confirm you're not a bot", Google's "sorry" page) is swapped for a new WARP address by the server itself, and the request is replayed. And every day a [check](.github/workflows/engine-check.yml) runs each engine call against live YouTube and opens an issue the moment one breaks, so a fix usually ships before most people notice.
+
+</details>
+
+<details>
+<summary><b>What is SABR, and do I have to turn it on?</b></summary>
+
+It's how youtube.com itself streams: one address, and the player tells YouTube where it is and what it wants in small requests ([details](#new-in-17-sabr-the-way-youtubes-own-player-streams)). It's on by default as the fallback; nothing to set up. `HT_SABR=only` makes it the main way in on the server, at about 3 s per new video instead of under 1 s.
+
+</details>
+
+<details>
 <summary><b>Do I still need Invidious?</b></summary>
 
 No, not since 1.6: the server asks YouTube itself. It answers in Invidious' API format, so apps that can use an Invidious instance's API (Yattee, FreeTube's API mode, ...) may work with it too; the parts that need an Invidious account (its own subscriptions and login) aren't there. A running Invidious instance doesn't get in the way; TubeHaus just no longer uses it.
