@@ -55,7 +55,24 @@ object YouTube {
      * The streams of one video: through the connected TubeHaus server when there is one
      * (see [ServerVideo]), and from this device when there isn't or the server can't.
      */
+    /**
+     * The way to play videos picked in the player (Settings → Playback method): "" the usual order, else one of
+     * [methods]. A picked one is asked straight from this device, nothing else tried, so a video it can't play says so.
+     */
+    @Volatile var force: String = ""
+
+    /** the ways this device can play a video, for the player's menu */
+    val methods: List<String> get() = listOfNotNull("VISIONOS", "ANDROID_VR", "KIDS",
+        if (Sabr.available) "SABR" else null, if (Cipher.available) "TV" else null)
+
     suspend fun stream(id: String): Stream {
+        when (force) {
+            "VISIONOS" -> return player(id, Clients.VISIONOS)
+            "ANDROID_VR" -> return player(id, Clients.ANDROID_VR)
+            "KIDS" -> return player(id, Clients.KIDS)
+            "SABR" -> if (Sabr.available) return sabr(id)
+            "TV" -> if (Cipher.available) return tv(id)
+        }
         // a test build that plays everything the SABR way (TUBEHAUS_SABR_ONLY / -PsabrOnly): no other client, no server
         if (Sabr.only && Sabr.available) return sabr(id)
         if (!ServerVideo.on) return device(id)

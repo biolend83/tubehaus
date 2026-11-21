@@ -126,6 +126,8 @@ data class Settings(
     val watchedCount: Int = 0,
     /** the GitHub star note was shown (once, ever) */
     val starAsked: Boolean = false,
+    /** the playback method picked in the player: "" the usual order, else a client (YouTube.methods) */
+    val playMethod: String = "",
     /** the desktop window as it was left: size in dp, maximised */
     val winW: Int = 0,
     val winH: Int = 0,
