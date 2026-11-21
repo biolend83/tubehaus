@@ -295,7 +295,8 @@ def vid_bg(key, prefetch_from=None):
         ids = [v.get("videoId") for v in (prefetch_from.get("recommendedVideos") or [])]
         warmed = 0
         for vid in ids:
-            if warmed >= VID_PREFETCH:
+            # with SABR only each one is a watch page fetched, which gets the address flagged: just the next
+            if warmed >= (min(VID_PREFETCH, 1) if SABR == "only" else VID_PREFETCH):
                 break
             if not vid or not re.fullmatch(r"[\w-]{11}", vid):
                 continue
