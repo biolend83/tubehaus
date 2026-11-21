@@ -275,7 +275,9 @@ class AppState(val platform: Platform, val store: Store) {
         if (v.short && !noShorts) {
             playback.close()
             shortFirst = v
-            go(Screen.Shorts)
+            // on top of where it was tapped, so Back returns there (the Shorts tab itself starts over)
+            ahead.clear(); lastMove = 1
+            if (current != Screen.Shorts) stack.add(Screen.Shorts)
             return
         }
         playback.open(v, queue)
