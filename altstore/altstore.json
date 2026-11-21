@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.7.1",
+          "buildVersion": "53",
+          "date": "2026-11-21T07:12:57+00:00",
+          "localizedDescription": "1.7.1: faster held-back videos, one-file downloads, new options.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.7.1/TubeHaus-1.7.1-ipad.ipa",
+          "size": 22375620,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.7.0",
           "buildVersion": "52",
           "date": "2026-11-20T14:15:38+00:00",
@@ -266,11 +275,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.7.0",
-      "versionDate": "2026-11-20T14:15:38+00:00",
-      "versionDescription": "1.7.0: videos YouTube plays only in its web player work again (SABR), kids videos, more qualities.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.7.0/TubeHaus-1.7.0-ipad.ipa",
-      "size": 22342494
+      "version": "1.7.1",
+      "versionDate": "2026-11-21T07:12:57+00:00",
+      "versionDescription": "1.7.1: faster held-back videos, one-file downloads, new options.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.7.1/TubeHaus-1.7.1-ipad.ipa",
+      "size": 22375620
     }
   ],
   "news": [],
