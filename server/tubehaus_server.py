@@ -33,7 +33,7 @@ PUBLIC = env("HT_PUBLIC_URL", "http://localhost:8080").rstrip("/")   # where bro
 # which listens on 127.0.0.1:40000 and speaks HTTP CONNECT) is what makes this work.
 YT_PROXY = env("HT_YT_PROXY", "127.0.0.1:40000")        # "" = connect to YouTube directly
 WARP_ROTATE = env("HT_WARP_ROTATE", "1") == "1"         # get a new WARP address when YouTube blocks us
-SABR = env("HT_SABR", "1")                               # "1": SABR when no other client plays a video, "first": before them, "0": never
+SABR = env("HT_SABR", "1")                               # "1": SABR when no other client plays a video, "first": before them, "only": SABR for every video but live and age-restricted ones, "0": never
 SABR_PORT = int(env("HT_SABR_PORT", "3033"))             # the SABR helper (server/sabr/sabr.mjs, run by deno), on 127.0.0.1
 YTDLP = env("HT_YTDLP", "yt-dlp")
 LT = env("HT_LIBRETRANSLATE", "")                        # optional LibreTranslate URL (translation fallback)
@@ -3239,15 +3239,31 @@ def eng_video(vid, hl="", gl="", fast=False):
         if f:
             fp, fm, fn = f[:3]
         else:
-            fp = ENG_POOL.submit(eng_player, vid)
+            fp = None if SABR == "only" else ENG_POOL.submit(eng_player, vid)
             fm = ENG_POOL.submit(it_call, "player", {"videoId": vid, "contentCheckOk": True, "racyCheckOk": True}, None, 1, BROWSER_UA, hl, gl)
             fn = ENG_POOL.submit(it_call, "next", {"videoId": vid}, None, 1, BROWSER_UA, hl, gl)
             eng_futs[(vid, hl, gl)] = (fp, fm, fn, now)
-    d, client = fp.result()
     try:
         web = fm.result()
     except Exception:
         web = {}
+    d, client = {}, None
+    if fp is None:
+        # SABR only: what YouTube's own web player plays; live streams and age-restricted videos as before
+        wps = web.get("playabilityStatus") or {}
+        live = (web.get("videoDetails") or {}).get("isLive") or "liveStreamability" in wps
+        if not live and "age" not in (wps.get("reason") or "").lower():
+            sb = eng_sabr(vid, hl, gl)
+            if sb:
+                d, client = sb, "WEB_SABR"
+        if not client:
+            with eng_futs_lk:
+                f = eng_futs.get((vid, hl, gl))
+                fp = f[0] if f and f[0] else ENG_POOL.submit(eng_player, vid)
+                if f and not f[0]:
+                    eng_futs[(vid, hl, gl)] = (fp,) + f[1:]
+    if not client:
+        d, client = fp.result()
     meta = (web.get("microformat") or {}).get("playerMicroformatRenderer") or {}
     ps = d.get("playabilityStatus") or {}
     reason = ps.get("reason") or ""
@@ -3262,7 +3278,7 @@ def eng_video(vid, hl="", gl="", fast=False):
         if kids:
             d, client = kids, "ANDROID_KIDS"
     # nothing gave plain addresses (or SABR is asked for first): what YouTube's own web player gets
-    if (not client and "age" not in reason.lower()) or (SABR == "first" and client):
+    if (not client and "age" not in reason.lower() and SABR != "only") or (SABR == "first" and client):
         sb = eng_sabr(vid, hl, gl)
         if sb:
             d, client = sb, "WEB_SABR"
