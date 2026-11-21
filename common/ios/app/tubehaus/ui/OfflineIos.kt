@@ -129,6 +129,9 @@ class Offline(private val app: AppState) {
         tasks[id]?.cancel() ?: finish(id)
     }
 
+    /** one file of picture and sound: the desktop does it; iOS keeps them apart (it plays them as HLS) */
+    fun export(id: String, done: (String?) -> Unit) = done(null)
+
     fun remove(id: String) {
         val s = index.value.items[id] ?: return
         index.update { it.copy(items = it.items - id) }
