@@ -1,9 +1,20 @@
 # Changelog
 
-## Unreleased
+## v1.7.1 — 2026-11-21
 
 ### Added
 - **Polish interface** (Polski): every string translated (`web/y/lang/pl.js`), and trending and search default to Poland
+- `HT_SABR=only`: SABR for every video except live streams and age-restricted ones. With it, only the next recommended video is prefetched instead of four, since each one is a watch page fetched
+- Translated captions show as they are translated: the original lines first, swapped for the translation as it lands (`?part=1`, `X-Sub-Done`)
+
+### Changed
+- SABR comes before the TV client when the usual clients refuse a video: it opens in 2-3 s, the TV client's links wait behind its start ad
+- The TV client's links are handed over as soon as YouTube opens them (asked for one byte every half second) instead of after the whole ad wait: about 4 s instead of up to 8
+- Captions are translated six chunks at a time, and once per video when several ask at once: a long video in about 10 s instead of a minute and a half
+
+### Fixed
+- WARP: when a reconnect keeps the same address, a new registration gets a new one; Google's "sorry" check on the watch page (which SABR reads) now counts as blocked too, and requests made while the address changes wait for it instead of failing
+- A deleted or closed channel in the subscriptions is asked again in a day, not every 15 minutes
 
 ## v1.7.0 — 2026-11-20
 
