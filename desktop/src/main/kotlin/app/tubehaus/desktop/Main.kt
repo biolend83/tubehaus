@@ -211,10 +211,17 @@ private fun startApp() {
     // macOS Control Center and the media keys: what plays and its buttons
     MacMediaControls(state, File(platform.cacheDir.toString(), "nowplaying")).start()
     application {
-        val ws = rememberWindowState(size = DpSize(1280.dp, 820.dp))
+        val s0 = state.store.settings.value
+        val ws = rememberWindowState(
+            size = if (s0.winW >= 400 && s0.winH >= 300) DpSize(s0.winW.dp, s0.winH.dp) else DpSize(1280.dp, 820.dp),
+            placement = if (s0.winMax) WindowPlacement.Maximized else WindowPlacement.Floating,
+        )
         platform.window = ws
         Window(
             onCloseRequest = {
+                val max = ws.placement == WindowPlacement.Maximized
+                val sz = ws.size
+                state.store.settings.update { it.copy(winMax = max, winW = if (max || ws.placement == WindowPlacement.Fullscreen) it.winW else sz.width.value.toInt(), winH = if (max || ws.placement == WindowPlacement.Fullscreen) it.winH else sz.height.value.toInt()) }
                 state.playback.close()
                 state.store.flush()
                 platform.mpv.shutdown()
@@ -232,6 +239,7 @@ private fun startApp() {
                         ws.placement = WindowPlacement.Floating; true
                     } else state.back()
                     Key.F11 -> { state.setFull(!state.fullscreen); true }
+                    Key.F5 -> { state.reload.value++; true }
                     // back and forward as in a browser: Alt+Left/Right, on a Mac also Cmd+[ and Cmd+]
                     Key.DirectionLeft, Key.DirectionRight, Key.LeftBracket, Key.RightBracket -> {
                         val arrow = e.key == Key.DirectionLeft || e.key == Key.DirectionRight

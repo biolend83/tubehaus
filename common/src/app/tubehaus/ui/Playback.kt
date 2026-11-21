@@ -411,7 +411,7 @@ class Playback(private val app: AppState) {
 
     private fun learnNow() {
         val v = video ?: return
-        if (learned || app.store.settings.value.historyOff) return
+        if (learned || app.store.settings.value.historyOff || app.store.settings.value.learnOff) return
         learned = true
         val len = (v.lengthSec.takeIf { it > 0 } ?: (player.state.value.durationMs / 1000).toInt()).toDouble()
         Learn.learn(
@@ -425,6 +425,7 @@ class Playback(private val app: AppState) {
         val s = player.state.value
         if (s.videoId == v.id && s.positionMs > 0) store.savePosition(v, s.positionMs / 1000, s.durationMs / 1000)
         if (watchedMs > 0) learnNow()
+        if (watchedMs >= 60_000) app.starNote()
     }
 
     /** close the video entirely */

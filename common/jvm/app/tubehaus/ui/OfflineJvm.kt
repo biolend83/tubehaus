@@ -141,6 +141,19 @@ class Offline(private val app: AppState) {
 
     fun cancel(id: String) { jobs[id]?.cancel() }
 
+    /** the picture and the sound put together into one file next to the downloads; [done] gets its path, or null */
+    fun export(id: String, done: (String?) -> Unit) {
+        val s = index.value.items[id] ?: return done(null)
+        io.launch {
+            done(runCatching {
+                val name = s.title.replace(Regex("[\\/:*?\"<>|\\p{Cntrl}]"), "_").trim().take(120).ifEmpty { id }
+                val out = File(dir, name + "." + s.video.file.substringAfterLast('.'))
+                Mux.join(File(dir, s.video.file), File(dir, s.audio.file), out)
+                out.absolutePath
+            }.getOrNull())
+        }
+    }
+
     fun remove(id: String) {
         index.update { it.copy(items = it.items - id) }
         io.launch { File(dir, id).deleteRecursively() }
