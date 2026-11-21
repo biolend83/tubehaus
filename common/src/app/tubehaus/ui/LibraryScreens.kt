@@ -109,7 +109,7 @@ fun SubsScreen(app: AppState) {
     }
     val base = items.filter { (!it.short || !app.noShorts) && it.channelId in shown }
     // a group: its own short feed (unwatched, the last 7 days, every channel's newest first, at most 20)
-    val feed = if (group != null) groupFeed(base, lib.hist.mapTo(HashSet()) { it.id }) else base
+    val feed = if (group != null) groupFeed(base, lib.hist.mapTo(HashSet()) { it.id }, app.store.settings.value.groupDays) else base
     ItemGrid(
         feed.filter { v -> words.all { w -> w in v.title.lowercase() || w in v.author.lowercase() } }, app, loading = loading,
         refresh = { load(true) },
@@ -119,7 +119,7 @@ fun SubsScreen(app: AppState) {
                 // above the search, where they're seen at once
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (group != null) Text(
-                        tr("Each channel's newest video from the last 7 days, if you haven't watched it"),
+                        tr(if (app.store.settings.value.groupDays >= 30) "Each channel's newest video from the last 30 days, if you haven't watched it" else "Each channel's newest video from the last 7 days, if you haven't watched it"),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f).padding(start = 4.dp, end = 8.dp),
                     ) else Spacer(Modifier.weight(1f))
@@ -145,8 +145,8 @@ fun SubsScreen(app: AppState) {
  * out in the last 7 days and you haven't watched it yet; members-only videos left out. So it ends
  * after a screen or so instead of scrolling on, and a busy channel can't fill it.
  */
-private fun groupFeed(items: List<Video>, watched: Set<String>): List<Video> {
-    val since = Sys.nowMs() / 1000 - 7 * 86400
+private fun groupFeed(items: List<Video>, watched: Set<String>, days: Int): List<Video> {
+    val since = Sys.nowMs() / 1000 - days.coerceAtLeast(1) * 86400L
     return items.filter { !it.members }.distinctBy { it.id }.groupBy { it.channelId }.values
         .map { l -> l.maxBy { it.publishedAt } }
         .filter { it.id !in watched && (it.publishedAt == 0L || it.publishedAt >= since) }

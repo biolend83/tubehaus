@@ -6,6 +6,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.input.pointer.pointerInput
 
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -337,7 +338,8 @@ fun VideoCard(v: Video, app: AppState, queue: List<Video> = emptyList()) {
     // one video per row), the avatar lined up with its edge, a bold title, the rows well apart
     val phone = LocalCompact.current
     Column(Modifier.fillMaxWidth().padding(horizontal = if (phone) 12.dp else 0.dp)
-        .warmOnPress(app, v).tvClickable(RoundedCornerShape(18.dp), onLongClick = { menu.value = true }) { app.watch(v, queue) }.padding(bottom = if (phone) 22.dp else 32.dp)) {
+        .warmOnPress(app, v).tvClickable(RoundedCornerShape(18.dp), onLongClick = { menu.value = true }) { app.watch(v, queue) }.padding(bottom = if (phone) 22.dp else 32.dp)
+        .let { m -> if (app.store.settings.value.dimWatched && app.current == Screen.Subs && app.store.lib.state.value.hist.any { it.id == v.id }) m.alpha(0.45f) else m }) {
         if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.fillMaxWidth(), rounded = 16)
         Row(Modifier.padding(top = if (phone) 10.dp else 12.dp)) {
             if (v.channelId.isNotEmpty()) {
@@ -999,7 +1001,7 @@ fun HeroCard(v: Video, app: AppState, queue: List<Video> = emptyList()) {
             .aspectRatio(if (phone) 16f / 9f else 2.6f)
             .clip(shape).tvClickable(shape, onLongClick = { menu.value = true }) { app.watch(v, queue) },
     ) {
-        Img(if (phone) v.thumb else v.thumbHigh, Modifier.fillMaxSize())
+        Img(if (phone || app.platform.weak) v.thumb else v.thumbHigh, Modifier.fillMaxSize())
         Box(Modifier.matchParentSize().background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color(0xD9000000))))
         val label = v.badge()
         if (label.isNotEmpty()) Text(label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
