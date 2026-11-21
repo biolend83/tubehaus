@@ -1,0 +1,5 @@
+- Desktop: F5 refreshes, keyboard shortcuts in Settings, window size remembered
+- Downloads can be saved as one file with picture and sound
+- Options: fade watched videos, 30-day group feeds, pause or stop when leaving a video, don't learn from history
+- Videos YouTube holds back open faster (SABR before the TV client); desktop SABR fixed
+- Smoother on small TVs
