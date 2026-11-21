@@ -613,6 +613,8 @@ def log(tag, msg, t0=None, every=LOG_EVERY):
 # ---------- machine-translated subtitles ----------
 SUBS = f"{STATE}/subs"
 SUB_MAX = 1200                        # cues; longer videos get truncated, not dropped
+SUB_PAR = 6                           # chunks translated at once
+sub_busy, sub_busy_lk = {}, threading.Lock()   # (video, language) -> the translation under way
 
 
 def _inv(path, timeout=60):
@@ -668,20 +670,25 @@ def _translate(lines, tl=SUB_LANG):
         t = json.loads(urllib.request.urlopen(req, timeout=120).read()).get("translatedText")
         return t if isinstance(t, list) and len(t) == len(chunk) else chunk
 
-    done, engine = [], "google"
-    for i in range(0, len(lines), 20):
-        chunk = lines[i:i + 20]
+    engine = ["google"]
+
+    def one(chunk):
         try:
-            done += google(chunk)
+            return google(chunk)
         except Exception as ex:
             log("sub", "google FAIL %s (falling back)" % repr(ex)[:70])
-            engine = "libretranslate"
+            engine[0] = "libretranslate"
             try:
-                done += libre(chunk)
+                return libre(chunk)
             except Exception as ex2:
                 log("sub", "libre FAIL %s" % repr(ex2)[:70])
-                done += chunk
-        time.sleep(0.2)
+                return chunk
+    # a few chunks at once: one after another a long video took a minute and a half
+    import concurrent.futures
+    chunks = [lines[i:i + 20] for i in range(0, len(lines), 20)]
+    with concurrent.futures.ThreadPoolExecutor(SUB_PAR) as ex:
+        done = [x for part in ex.map(one, chunks) for x in part]
+    engine = engine[0]
     log("sub", "translated %d lines via %s" % (len(lines), engine), every=0)
     return done
 
@@ -765,7 +772,30 @@ def titles_tr(b):
 
 
 def sub_vtt(vid, tl=SUB_LANG):
-    """Translated VTT for one video id, cached on disk."""
+    """Translated VTT for one video id, cached on disk. Asked again while it's being made (the
+    player, the prefetch and a second tab often ask at once), it waits for that one."""
+    key = (vid, tl)
+    with sub_busy_lk:
+        fut = sub_busy.get(key)
+        mine = fut is None
+        if mine:
+            import concurrent.futures
+            fut = sub_busy[key] = concurrent.futures.Future()
+    if not mine:
+        return fut.result(timeout=300)
+    try:
+        data = _sub_vtt(vid, tl)
+        fut.set_result(data)
+        return data
+    except BaseException as ex:
+        fut.set_exception(ex)
+        raise
+    finally:
+        with sub_busy_lk:
+            sub_busy.pop(key, None)
+
+
+def _sub_vtt(vid, tl):
     # both end up in a file name: only a video id and a language code may get through
     if not re.fullmatch(r"[\w-]{11}", vid) or not re.fullmatch(r"[a-z]{2}(-[A-Za-z]{2,4})?", tl):
         raise ValueError("bad video id or language")
