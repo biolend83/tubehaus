@@ -3216,9 +3216,17 @@ def eng_tv(vid):
         if _dig(r, "config", "adPlacementConfig", "kind") == "AD_PLACEMENT_KIND_START":
             off = _dig(r, "renderer", "instreamVideoAdRenderer", "skipOffsetMilliseconds")
             wait = max(wait, min(8.0, int(off) * 0.8 / 1000 if off else 8.0))
-    left = wait - (time.time() - answered)
-    if left > 0:
-        time.sleep(left)
+    # ... but often opens sooner than that: ask for one byte until it answers instead of sleeping it all
+    if wait > 0:
+        probe = next((f["url"] for f in sd.get("adaptiveFormats") or [] if f.get("url")), None)
+        while time.time() - answered < wait:
+            if probe:
+                try:
+                    with YT.open(urllib.request.Request(probe + "&range=0-0", headers={"User-Agent": ua}), timeout=5):
+                        break
+                except Exception:
+                    pass
+            time.sleep(0.5)
     return d
 
 
