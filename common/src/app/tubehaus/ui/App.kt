@@ -132,7 +132,9 @@ fun App(app: AppState) {
         ImageLoader.Builder(ctx)
             .components { Sys.imageNetwork(this) }
             .diskCache { DiskCache.Builder().directory(app.platform.cacheDir / "images").maxSizeBytes(150L shl 20).build() }
-            .crossfade(true)
+            // a small TV stick: a smaller picture memory and no fades, so scrolling a row doesn't stall
+            .memoryCache { coil3.memory.MemoryCache.Builder().maxSizePercent(ctx, if (app.platform.weak) 0.12 else 0.25).build() }
+            .crossfade(!app.platform.weak)
             .build()
     }
     key(lang, settings.tvMode) {
