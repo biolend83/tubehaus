@@ -302,4 +302,23 @@ class AppState(val platform: Platform, val store: Store) {
     fun toast(msg: String) {
         scope.launch { snackbar.showSnackbar(msg) }
     }
+
+    /**
+     * Once, ever: after the fifth video watched for a while, or the first cast to a TV, a small note
+     * with a link to star the project on GitHub. Not on TVs (no browser to open it), never again after.
+     */
+    fun starNote(cast: Boolean = false) {
+        val s = store.settings.value
+        if (s.starAsked || platform.tv) return
+        if (!cast) {
+            store.settings.update { it.copy(watchedCount = it.watchedCount + 1) }
+            if (s.watchedCount + 1 < 5) return
+        }
+        store.settings.update { it.copy(starAsked = true) }
+        scope.launch {
+            val r = snackbar.showSnackbar(tr("Enjoying TubeHaus? A star on GitHub helps others find it."), actionLabel = tr("Star"),
+                withDismissAction = true, duration = androidx.compose.material3.SnackbarDuration.Long)
+            if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) platform.openExternal("https://github.com/biolend83/tubehaus")
+        }
+    }
 }

@@ -122,6 +122,10 @@ data class Settings(
     val learnOff: Boolean = false,
     /** leaving the video page: 0 the mini player, 1 pause, 2 stop */
     val leaveVideo: Int = 0,
+    /** videos watched for a while, counted up to the one-time GitHub star note */
+    val watchedCount: Int = 0,
+    /** the GitHub star note was shown (once, ever) */
+    val starAsked: Boolean = false,
     /** the desktop window as it was left: size in dp, maximised */
     val winW: Int = 0,
     val winH: Int = 0,

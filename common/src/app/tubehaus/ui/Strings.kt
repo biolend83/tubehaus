@@ -309,6 +309,8 @@ private val KO by lazy { mapOf(
     "Stop when leaving the video page" to "영상 페이지를 나가면 닫기",
     "No mini player: the video closes" to "미니 플레이어 없이 영상이 닫혀요",
     "Save as one file" to "한 파일로 저장",
+    "Enjoying TubeHaus? A star on GitHub helps others find it." to "TubeHaus가 마음에 드세요? GitHub에 별을 달아 주시면 다른 사람이 찾기 쉬워져요.",
+    "Star" to "별 달기",
     "Saving as one file..." to "한 파일로 저장 중...",
     "Saved: " to "저장됨: ",
     "Couldn't put it into one file." to "한 파일로 합치지 못했어요.",
