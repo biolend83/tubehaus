@@ -78,6 +78,25 @@ There are two ways to run it. Same name, same look; they differ in *where* the w
 
 All files, Windows portable and ARM builds: **[latest release](https://github.com/biolend83/tubehaus/releases/latest)**. Install notes and source per platform: [`android-app`](https://github.com/biolend83/tubehaus/tree/android-app) · [`windows-app`](https://github.com/biolend83/tubehaus/tree/windows-app) · [`mac-app`](https://github.com/biolend83/tubehaus/tree/mac-app) · [`linux-app`](https://github.com/biolend83/tubehaus/tree/linux-app) · [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). The rest of this README is about the server.
 
+## New in 1.7: SABR, the way YouTube's own player streams
+
+YouTube keeps closing the side doors that third-party players use: a client stops getting plain video addresses, a label's music videos come back "not available", a kids' video only plays in the Kids app. Its own website can't close the front door without breaking itself. That front door is **SABR** (Server ABR), the protocol youtube.com uses to stream almost every video now. TubeHaus 1.7 speaks it on every device and on the server.
+
+**How it works.** The player doesn't get one address per quality. It gets a single streaming address and sends YouTube small protobuf requests ("I'm at 1:23, I have this much buffered, I want 1080p"). YouTube answers with UMP, a stream of media pieces, and can redirect it, change formats or ask it to back off along the way. TubeHaus turns those pieces back into ordinary byte ranges, so the same players as before (ExoPlayer on Android, mpv on the desktop, AVPlayer on Apple devices and the browser's MSE in the web app) play them like any other file. Seeking, quality changes and audio tracks all keep working.
+
+**The token.** SABR only streams to a player that passes YouTube's BotGuard check and shows a PO token bound to the video. TubeHaus runs that check itself and binds the token to the video id, so no account and no cookies are needed, and nothing leaves your server or device apart from what youtube.com would send.
+
+**When it's used.** By default the fast clients go first (a video opens in under a second) and SABR takes over when they're refused. On the server you can turn this around:
+
+| `HT_SABR` | What plays a video | Opens in |
+|---|---|---|
+| `1` (default) | visionOS client; Kids, then SABR, then the TV client when it's refused | ~0.7 s, SABR ~3 s |
+| `first` | SABR, then the others | ~3 s |
+| `only` | SABR for everything except live streams and age-restricted videos | ~3 s |
+| `0` | never SABR | – |
+
+SABR reads YouTube's watch page, and too many of those from one address bring up Google's "sorry" check. With WARP the server notices it, gets a new address (a new WARP registration when a reconnect keeps the old one) and tries again. With `only` it also prefetches just the next video instead of four.
+
 ## New in 1.6: its own YouTube engine, and fast
 
 The server no longer sits on Invidious. It talks to YouTube itself, so the stack is **three containers lighter** (no Invidious, no companion, no PostgreSQL). 1.6.3 then made it quick: a video starts on the streams alone and the title, description and related videos fill in a moment later, answers are kept and refreshed in the background, the stream connections to YouTube stay open, and a video's comments are fetched as it opens.
@@ -332,7 +351,7 @@ browser ──► Caddy ─┬─ /y/*, page navigations ──► web/ (the app
                                                 YouTube
 ```
 
-The engine asks YouTube the way YouTube's own apps do: lists (search, channels, playlists, comments) from the web client, the video streams from the visionOS client (plain addresses, no PO token), and the exact upload time and category from the web player, over kept-open, compressed connections. It answers in Invidious' API shapes (`/api/v1/videos`, `/api/v1/search`, ...; `?local=true` included), so tools that speak that API can use it too. Streams, captions and pictures come through the server, so the viewer's browser only ever talks to it. More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+The engine asks YouTube the way YouTube's own apps do: lists (search, channels, playlists, comments) from the web client, the video streams from the visionOS client (plain addresses, no PO token) or over SABR when that one is refused, and the exact upload time and category from the web player, over kept-open, compressed connections. It answers in Invidious' API shapes (`/api/v1/videos`, `/api/v1/search`, ...; `?local=true` included), so tools that speak that API can use it too. Streams, captions and pictures come through the server, so the viewer's browser only ever talks to it. More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Manual setup
 
@@ -482,8 +501,8 @@ Running one? [Add it here](https://github.com/biolend83/tubehaus/issues/new?temp
 | `HT_STATE` | `./state` | library and subtitle cache |
 | `HT_PUBLIC_URL` | `http://localhost:8080` | the address browsers use |
 | `HT_YT_PROXY` | `127.0.0.1:40000` | WARP proxy (empty = direct) |
-| `HT_WARP_ROTATE` | `1` | reconnect WARP when YouTube blocks |
-| `HT_SABR` | `1` | SABR (what YouTube's own web player gets) when no other way plays a video; `first` to use it before them, `0` off. Needs deno |
+| `HT_WARP_ROTATE` | `1` | new WARP address when YouTube blocks (a reconnect, or a new registration when that keeps the address) |
+| `HT_SABR` | `1` | SABR (what YouTube's own web player gets) when no other way plays a video; `first` to use it before them, `only` for every video but live and age-restricted ones, `0` off. Needs deno. See [New in 1.7](#new-in-17-sabr-the-way-youtubes-own-player-streams) |
 | `HT_REGION` | `US` | default region of searches and trending |
 | `HT_HL` | (the viewer's language) | YouTube's language for its texts |
 | `HT_YTDLP` | `yt-dlp` | for live streams |

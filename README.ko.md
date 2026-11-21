@@ -78,6 +78,25 @@ TV에서 멈추고 폰에서 이어 봐요. 집의 모든 기기와 브라우저
 
 전체 파일, Windows portable, ARM 빌드: **[최신 릴리스](https://github.com/biolend83/tubehaus/releases/latest)**. 플랫폼별 설치 안내와 소스: [`android-app`](https://github.com/biolend83/tubehaus/tree/android-app) · [`windows-app`](https://github.com/biolend83/tubehaus/tree/windows-app) · [`mac-app`](https://github.com/biolend83/tubehaus/tree/mac-app) · [`linux-app`](https://github.com/biolend83/tubehaus/tree/linux-app) · [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). 이 README의 나머지는 서버판 이야기예요.
 
+## 1.7 새 기능: SABR, 유튜브 공식 플레이어 방식
+
+유튜브는 다른 플레이어들이 쓰는 뒷문을 계속 닫고 있어요. 어떤 클라이언트는 영상 주소를 못 받게 되고, 음반사 뮤직비디오는 "볼 수 없음"이 뜨고, 어린이 영상은 키즈 앱에서만 재생돼요. 하지만 자기 웹사이트가 쓰는 정문은 닫을 수 없어요. 그 정문이 **SABR**(Server ABR)이에요. 지금 youtube.com이 거의 모든 영상을 이 방식으로 보내요. TubeHaus 1.7은 모든 기기와 서버에서 SABR을 써요.
+
+**어떻게 돌아가나요.** 플레이어는 화질마다 주소를 받는 대신 스트리밍 주소 하나만 받아요. 그리고 유튜브에 작은 protobuf 요청을 보내요("지금 1:23, 이만큼 받아 뒀고, 1080p 원해요"). 유튜브는 UMP라는 조각 묶음으로 답하고, 중간에 다른 서버로 보내거나 형식을 바꾸거나 잠깐 쉬라고 하기도 해요. TubeHaus는 그 조각을 보통 파일의 바이트 범위로 되돌려요. 그래서 원래 쓰던 플레이어(안드로이드 ExoPlayer, 데스크톱 mpv, 애플 기기 AVPlayer, 웹앱의 브라우저 MSE)가 그대로 재생해요. 탐색, 화질 바꾸기, 음성 트랙도 다 돼요.
+
+**토큰.** SABR은 유튜브의 BotGuard 검사를 통과하고 영상에 묶인 PO 토큰을 보여 주는 플레이어에게만 영상을 보내요. TubeHaus가 그 검사를 직접 하고 토큰을 영상 ID에 묶어요. 그래서 계정도 쿠키도 필요 없고, youtube.com이 보내는 것 말고는 서버나 기기 밖으로 나가는 게 없어요.
+
+**언제 쓰나요.** 기본은 빠른 클라이언트가 먼저(1초 안에 열림)이고, 거절되면 SABR이 이어받아요. 서버에서는 바꿀 수 있어요.
+
+| `HT_SABR` | 영상을 여는 방식 | 열리는 시간 |
+|---|---|---|
+| `1` (기본) | visionOS 클라이언트, 거절되면 키즈 → SABR → TV 클라이언트 | 약 0.7초, SABR 약 3초 |
+| `first` | SABR 먼저, 그다음 나머지 | 약 3초 |
+| `only` | 라이브와 연령 제한 영상만 빼고 모두 SABR | 약 3초 |
+| `0` | SABR 안 씀 | – |
+
+SABR은 유튜브 영상 페이지를 읽는데, 한 주소에서 너무 많이 읽으면 구글의 "sorry" 확인이 떠요. WARP를 쓰면 서버가 이걸 알아채고 새 주소를 받은 뒤(다시 연결해도 주소가 같으면 WARP를 새로 등록) 다시 시도해요. `only`에서는 미리 받아 두는 영상도 네 개가 아니라 다음 하나만이에요.
+
 ## 1.6 새 기능: 자체 유튜브 엔진, 그리고 빠름
 
 서버판이 이제 Invidious 위에서 돌지 않아요. 유튜브에 직접 물어봐서 **컨테이너가 세 개 줄었어요**(Invidious, companion, PostgreSQL 없음). 1.6.3에서는 속도를 올렸어요. 영상은 스트림만 받으면 바로 재생되고 제목·설명·관련 영상은 잠깐 뒤에 채워져요. 받은 답은 보관해 두고 뒤에서 새로 고치고, 유튜브 영상 서버와의 연결은 열어 둔 채 다시 쓰고, 댓글은 영상을 열 때 같이 받아 둬요.
@@ -306,7 +325,7 @@ WARP, 유튜브 연결, 검색, 실제 영상 조회(스트림 몇 바이트까�
                                            YouTube
 ```
 
-엔진은 유튜브 공식 앱들과 같은 방식으로 물어봐요. 목록(검색, 채널, 재생목록, 댓글)은 웹 클라이언트로, 영상 스트림은 visionOS 클라이언트로(PO 토큰 없는 그냥 주소), 정확한 업로드 시각과 분류는 웹 플레이어로, 열어 둔 채 압축한 연결로요. 답은 Invidious API 모양(`/api/v1/videos`, `/api/v1/search` 등, `?local=true` 포함)이라 그 API를 쓰는 도구도 붙일 수 있어요. 자세히: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)(영어).
+엔진은 유튜브 공식 앱들과 같은 방식으로 물어봐요. 목록(검색, 채널, 재생목록, 댓글)은 웹 클라이언트로, 영상 스트림은 visionOS 클라이언트로(PO 토큰 없는 그냥 주소), 그게 거절되면 SABR로, 정확한 업로드 시각과 분류는 웹 플레이어로, 열어 둔 채 압축한 연결로요. 답은 Invidious API 모양(`/api/v1/videos`, `/api/v1/search` 등, `?local=true` 포함)이라 그 API를 쓰는 도구도 붙일 수 있어요. 자세히: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)(영어).
 
 ## 공개 서버로 열기
 
