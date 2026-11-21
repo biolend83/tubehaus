@@ -87,6 +87,10 @@ class AndroidPlatform(private val app: Application) : Platform {
         (app.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager).currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
             app.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
     }
+    override val weak: Boolean by lazy {
+        Runtime.getRuntime().maxMemory() <= 300L * 1024 * 1024 ||
+            (app.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice
+    }
     // Settings → TV mode can force it either way (a TV box that doesn't say it is one)
     override val tv: Boolean
         get() = when (runCatching { (app as TubeApp).state.store.settings.value.tvMode }.getOrDefault(0)) {

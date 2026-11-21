@@ -1001,7 +1001,7 @@ fun HeroCard(v: Video, app: AppState, queue: List<Video> = emptyList()) {
             .aspectRatio(if (phone) 16f / 9f else 2.6f)
             .clip(shape).tvClickable(shape, onLongClick = { menu.value = true }) { app.watch(v, queue) },
     ) {
-        Img(if (phone) v.thumb else v.thumbHigh, Modifier.fillMaxSize())
+        Img(if (phone || app.platform.weak) v.thumb else v.thumbHigh, Modifier.fillMaxSize())
         Box(Modifier.matchParentSize().background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color(0xD9000000))))
         val label = v.badge()
         if (label.isNotEmpty()) Text(label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
