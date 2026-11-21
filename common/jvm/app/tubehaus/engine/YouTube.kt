@@ -112,9 +112,19 @@ object YouTube {
         val urls = Cipher.urls(raw)
         val s = parse(id, d, Clients.TV) { i -> urls[i] }
         if (s.video.isEmpty() || s.audio.isEmpty()) throw YtError("No playable streams", YtError.Kind.UNAVAILABLE)
-        // YouTube holds the links back behind the start ad it placed: wait it out (a few seconds)
-        val wait = Cipher.prerollMs(d) - (Sys.nowMs() - answeredAt)
-        if (wait > 0) kotlinx.coroutines.delay(wait)
+        // YouTube holds the links back behind the start ad it placed (up to 0.8 of its skip offset), but they
+        // often open sooner: ask for one byte every half second instead of waiting it all out
+        val until = answeredAt + Cipher.prerollMs(d)
+        val probe = s.video.first().url
+        while (Sys.nowMs() < until) {
+            val open = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    Net.client.newCall(okhttp3.Request.Builder().url("$probe&range=0-0").build()).execute().use { it.isSuccessful }
+                }.getOrDefault(false)
+            }
+            if (open) break
+            kotlinx.coroutines.delay(500)
+        }
         return s
     }
 
