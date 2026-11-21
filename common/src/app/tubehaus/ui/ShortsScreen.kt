@@ -102,7 +102,10 @@ fun ShortsScreen(app: AppState) {
             if (list.isEmpty()) error = e.message
         } finally { loading = false }
     }
-    LaunchedEffect(Unit) { more() }
+    LaunchedEffect(Unit) {
+        app.shortFirst?.let { list.add(it); app.shortFirst = null }
+        more()
+    }
     val pager = rememberPagerState { list.size }
     val streams = remember { mutableStateMapOf<String, Stream>() }
     val fetching = remember { HashMap<String, Deferred<Result<Stream>>>() }
