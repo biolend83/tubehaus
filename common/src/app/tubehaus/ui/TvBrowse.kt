@@ -242,7 +242,11 @@ fun TvHome(app: AppState) {
         if (rec.size > 32) add(Triple(tr("More to watch"), rec.drop(32), null))
     }
     var hero by remember { mutableStateOf<Video?>(null) }
-    val shown = hero ?: shelves.firstOrNull()?.second?.firstOrNull()
+    // the picture behind follows the focus once it rests (a quick run along a row doesn't load each one)
+    var rested by remember { mutableStateOf<Video?>(null) }
+    LaunchedEffect(hero) { kotlinx.coroutines.delay(if (app.platform.weak) 450 else 200); rested = hero }
+    val shown = rested ?: shelves.firstOrNull()?.second?.firstOrNull()
+    val weak = app.platform.weak
 
     if (shelves.isEmpty()) {
         when {
@@ -256,10 +260,11 @@ fun TvHome(app: AppState) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val heroH = maxHeight * 0.48f
         // the chosen video's picture, large behind the top of the page
-        if (shown != null) Crossfade(shown.id, Modifier.align(Alignment.TopEnd).fillMaxWidth(0.72f).height(maxHeight * 0.66f), animationSpec = tween(Motion.LONG)) { id ->
+        if (shown != null) Crossfade(shown.id, Modifier.align(Alignment.TopEnd).fillMaxWidth(0.72f).height(maxHeight * 0.66f), animationSpec = tween(if (weak) 0 else Motion.LONG)) { id ->
             Box(Modifier.fillMaxSize()) {
                 AsyncImage("https://i.ytimg.com/vi/$id/hqdefault.jpg", null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                AsyncImage("https://i.ytimg.com/vi/$id/maxresdefault.jpg", null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                // the 1280x720 one only where memory allows: on a small stick each is 3.7 MB decoded
+                if (!weak) AsyncImage("https://i.ytimg.com/vi/$id/maxresdefault.jpg", null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             }
         }
         val bg = MaterialTheme.colorScheme.background
