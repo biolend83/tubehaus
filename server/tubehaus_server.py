@@ -4950,7 +4950,13 @@ def yt_feed_channel_page(cid):
     return out
 
 
+CH_GONE = {}   # channel id -> until when it's skipped: its feed and its page both said it isn't there
+
+
 def yt_feed_one(cid):
+    if CH_GONE.get(cid, 0) > time.time():
+        return
+    gone = False
     ns = {"a": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015",
           "m": "http://search.yahoo.com/mrss/"}
     root = None
@@ -4962,6 +4968,7 @@ def yt_feed_one(cid):
             # many 404s or 5xx in a row are YouTube's feed service, not the channels: skip RSS for an
             # hour. One alone is usually a deleted channel, and with a big subscription list that used
             # to send every channel to Invidious all the time (#33)
+            gone = isinstance(ex, urllib.error.HTTPError) and ex.code == 404
             if isinstance(ex, urllib.error.HTTPError) and (ex.code == 404 or ex.code >= 500):
                 RSS_DOWN["fails"] += 1
                 if RSS_DOWN["fails"] >= RSS_DOWN_AFTER:
@@ -4973,6 +4980,9 @@ def yt_feed_one(cid):
         if got is not None:
             _feed_lengths(cid, got)
             yt_feed["items"][cid] = got
+        elif gone:
+            # a deleted or closed channel: asked again in a day, not every 15 minutes
+            CH_GONE[cid] = time.time() + 86400
         return
     out = []
     for e in root.findall("a:entry", ns)[:15]:
