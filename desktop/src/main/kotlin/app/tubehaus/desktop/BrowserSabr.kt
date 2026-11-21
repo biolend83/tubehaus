@@ -155,7 +155,8 @@ class BrowserSabr(private val profile: File) : SabrHost {
 
     /** the browser and its page, started when first needed and again when it went away */
     private suspend fun ready(): Boolean = lock.withLock {
-        if (ws != null && proc?.isAlive == true) return@withLock true
+        // the DevTools socket, not the launched process: Edge's launcher quits once it has handed off
+        if (ws != null) return@withLock true
         drop()
         withContext(Dispatchers.IO) { start() }
     }
@@ -249,6 +250,7 @@ class BrowserSabr(private val profile: File) : SabrHost {
 
     private fun fire(expr: String) { if (ws != null) send("Runtime.evaluate", buildJsonObject { put("expression", expr) }) }
 
+    override suspend fun warm() { ready() }
     override suspend fun prepare(id: String, hl: String, gl: String) = ask("__thSabr.prepare(${q(id)},${q(hl)},${q(gl)})")
     override suspend fun caption(id: String, url: String) = ask("__thSabr.caption(${q(id)},${q(url)})")
     override fun start(run: Int, id: String, index: Int, startMs: Long) = if (debug) { System.err.println("sabr start $run $id #$index from $startMs ms"); fire("__thSabr.start($run,${q(id)},$index,$startMs)") } else fire("__thSabr.start($run,${q(id)},$index,$startMs)")

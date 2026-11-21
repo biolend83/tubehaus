@@ -1,5 +1,6 @@
 package app.tubehaus.engine
 
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 import kotlin.concurrent.Volatile
 
@@ -67,6 +68,8 @@ object YouTube {
         }
     }
 
+    private val warmScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
     /** From this device. Tries each player client until one gives playable URLs. */
     private suspend fun device(id: String): Stream {
         var first: YtError? = null
@@ -83,6 +86,9 @@ object YouTube {
             }
             // the token-free clients said "not available" (made for kids, some labels) or are walled:
             // YouTube Kids serves the ones made for kids as they are, SABR or the TV client (links unlocked) the rest
+            // the SABR host (a hidden browser on a computer) starts while YouTube Kids is asked, so it is
+            // ready if Kids refuses too; a video the usual clients play never starts it
+            if (attempt == 0 && first?.kind != YtError.Kind.AGE) Sabr.host?.let { h -> if (Sabr.available) warmScope.launch { runCatching { h.warm() } } }
             if (attempt == 0 && first?.kind != YtError.Kind.AGE) {
                 try { return player(id, Clients.KIDS) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e }
             }
