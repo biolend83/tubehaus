@@ -615,6 +615,7 @@ SUBS = f"{STATE}/subs"
 SUB_MAX = 1200                        # cues; longer videos get truncated, not dropped
 SUB_PAR = 6                           # chunks translated at once
 sub_busy, sub_busy_lk = {}, threading.Lock()   # (video, language) -> the translation under way
+sub_part = {}                                  # (video, language) -> the VTT so far, original lines where not yet translated
 
 
 def _inv(path, timeout=60):
@@ -639,7 +640,7 @@ def _vtt_cues(text):
     return out
 
 
-def _translate(lines, tl=SUB_LANG):
+def _translate(lines, tl=SUB_LANG, on_chunk=None):
     """Google first - a small local model turns "All right" into nonsense - and fall
     back to LibreTranslate (if configured) when Google refuses. Google's dict-chrome endpoint
     takes repeated q= parameters and answers one string per line, in order.
@@ -686,8 +687,15 @@ def _translate(lines, tl=SUB_LANG):
     # a few chunks at once: one after another a long video took a minute and a half
     import concurrent.futures
     chunks = [lines[i:i + 20] for i in range(0, len(lines), 20)]
+    parts = [None] * len(chunks)
     with concurrent.futures.ThreadPoolExecutor(SUB_PAR) as ex:
-        done = [x for part in ex.map(one, chunks) for x in part]
+        futs = {ex.submit(one, c): i for i, c in enumerate(chunks)}
+        for fu in concurrent.futures.as_completed(futs):
+            i = futs[fu]
+            parts[i] = fu.result()
+            if on_chunk:
+                on_chunk(i * 20, parts[i])
+    done = [x for part in parts for x in part]
     engine = engine[0]
     log("sub", "translated %d lines via %s" % (len(lines), engine), every=0)
     return done
@@ -838,13 +846,24 @@ def _sub_vtt(vid, tl):
             if ln.strip():
                 idx.append((ci, li))
                 flat.append(re.sub(r"<[^>]+>", "", ln).strip())
-    ko = _translate(flat, tl)
-    for (ci, li), text in zip(idx, ko):
-        cues[ci][1][li] = text
-    out = ["WEBVTT", ""]
-    for timing, lines in cues:
-        out += [timing] + lines + [""]
-    data = "\n".join(out).encode("utf-8")
+    def vtt():
+        out = ["WEBVTT", ""]
+        for timing, lines in cues:
+            out += [timing] + lines + [""]
+        return "\n".join(out).encode("utf-8")
+    key = (vid, tl)
+
+    def landed(at, texts):
+        # the player shows what is translated while the rest is still on its way
+        for (ci, li), text in zip(idx[at:at + len(texts)], texts):
+            cues[ci][1][li] = text
+        sub_part[key] = vtt()
+    sub_part[key] = vtt()
+    try:
+        _translate(flat, tl, landed)
+    finally:
+        sub_part.pop(key, None)
+    data = vtt()
     tmp = cache + ".part"
     open(tmp, "wb").write(data)
     os.replace(tmp, cache)
@@ -6715,14 +6734,30 @@ class H(BaseHTTPRequestHandler):
                 tl = self.qs().get("tl") or SUB_LANG     # the viewer's interface language
                 if not re.fullmatch(r"[a-z]{2}(-[A-Za-z]{2,4})?", tl):
                     return self.send(400, {"error": "bad language"})
-                data = sub_vtt(vid, tl)
+                done = True
+                if self.qs().get("part") == "1":
+                    # ?part=1: what is translated so far, untranslated lines in the original; X-Sub-Done says
+                    # whether to ask again. The translation goes on in the background meanwhile
+                    fut = ENG_POOL.submit(sub_vtt, vid, tl)
+                    t1 = time.time()
+                    while not fut.done() and (vid, tl) not in sub_part and time.time() - t1 < 20:
+                        time.sleep(0.1)
+                    part = None if fut.done() else sub_part.get((vid, tl))
+                    if part is None:
+                        data = fut.result(timeout=300)
+                    else:
+                        data, done = part, False
+                else:
+                    data = sub_vtt(vid, tl)
             except Exception as ex:
                 log("sub", "%s FAIL %s" % (vid, repr(ex)[:100]))
                 return self.send(502, {"error": str(ex)})
             self.send_response(200)
             self.send_header("Content-Type", "text/vtt; charset=utf-8")
             self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Cache-Control", "public, max-age=86400")
+            self.send_header("X-Sub-Done", "1" if done else "0")
+            self.send_header("Access-Control-Expose-Headers", "X-Sub-Done")
+            self.send_header("Cache-Control", "public, max-age=86400" if done else "no-store")
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)

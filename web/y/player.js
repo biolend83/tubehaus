@@ -606,6 +606,21 @@ export class Player {
       return;
     }
     const info = this.info;
+    if (c.tr) {
+      // machine translation: what is translated so far first (the rest in the original), then again until done
+      const more = async () => {
+        try {
+          const r = await fetch(c.url + "&part=1", { credentials: "same-origin" });
+          if (!r.ok) throw new Error(String(r.status));
+          const t = await r.text();
+          if (this.info !== info || this.capTrack !== c) return;
+          this.cues = parseVtt(t);
+          this.renderCaption(true);
+          if (r.headers.get("X-Sub-Done") === "0") setTimeout(more, 1500);
+        } catch { if (this.capTrack === c) toast($t("자막을 불러오지 못했어요")); }
+      };
+      return more();
+    }
     try {
       const cues = parseVtt(await capText(c, info?.videoId));
       if (this.info === info && this.capTrack === c) { this.cues = cues; this.renderCaption(true); }
