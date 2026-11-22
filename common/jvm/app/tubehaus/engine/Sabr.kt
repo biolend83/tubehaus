@@ -56,6 +56,8 @@ object Sabr {
         val ranges = ArrayList<LongArray>()          // on disk: [start, end) sorted, merged
         val points = ArrayList<LongArray>()          // [byte, ms] of the pieces seen
         var headEnd = 0L
+        /** where each segment starts, from the header piece (it carries the index): exact times, no guessing */
+        @Volatile var toc: SabrIndex? = null
         @Volatile var run: Run? = null
         @Volatile var want = 0L
         var fails = 0
@@ -76,6 +78,7 @@ object Sabr {
         /** the start time of the piece holding byte [n]: from the pieces seen around it, else the average bitrate */
         fun timeOf(n: Long): Long {
             if (n <= headEnd) return 0
+            toc?.let { return it.timeOf(n) }
             var lo: LongArray? = null; var hi: LongArray? = null
             for (p in points) { if (p[0] <= n && (lo == null || p[0] > lo[0])) lo = p; if (p[0] > n && (hi == null || p[0] < hi[0])) hi = p }
             val a = lo ?: longArrayOf(headEnd, 0); val b = hi ?: longArrayOf(max(length, 1), durationMs)
@@ -122,7 +125,10 @@ object Sabr {
         synchronized(t.lock) {
             val r = t.run
             if (r == null || r.id != run) { host?.stop(run); return }
-            if (init) t.headEnd = max(t.headEnd, data.size.toLong())
+            if (init) {
+                t.headEnd = max(t.headEnd, data.size.toLong())
+                if (t.toc == null) t.toc = SabrIndex.parse(data)
+            }
             else {
                 if (ms >= 0) t.points.add(longArrayOf(at, ms))
                 if (r.media++ == 0 && at > max(r.from, t.headEnd)) {
