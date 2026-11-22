@@ -138,12 +138,15 @@ object YouTube {
         // YouTube holds the links back behind the start ad it placed (up to 0.8 of its skip offset), but they
         // often open sooner: ask for one byte every half second instead of waiting it all out
         val until = answeredAt + Cipher.prerollMs(d)
-        val probe = s.video.first().url
+        // the sound too: the player needs both, and one open does not always mean the other is
+        val probes = listOf(s.video.first().url, s.audio.first().url)
         while (Sys.nowMs() < until) {
             val open = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runCatching {
-                    Net.client.newCall(okhttp3.Request.Builder().url("$probe&range=0-0").build()).execute().use { it.isSuccessful }
-                }.getOrDefault(false)
+                probes.all { probe ->
+                    runCatching {
+                        Net.client.newCall(okhttp3.Request.Builder().url("$probe&range=0-0").build()).execute().use { it.isSuccessful }
+                    }.getOrDefault(false)
+                }
             }
             if (open) break
             kotlinx.coroutines.delay(500)
