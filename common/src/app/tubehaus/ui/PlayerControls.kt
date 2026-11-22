@@ -844,7 +844,7 @@ private fun MouseOverlay(
                 if (app.playback.next != null) Bar(Sym.SkipNext.fill, tr("Next")) { app.playback.skipNext() }
                 if (player.hasVolume) Volume(app, st)
                 Spacer(Modifier.width(8.dp))
-                TimeText(app, st, dragging)
+                TimeText(app, st, dragging) { player.seekTo(st.durationMs) }
                 Spacer(Modifier.weight(1f))
                 if (st.speed != 1f) Text("${st.speed}x", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(end = 6.dp).clip(CircleShape).background(PILL).clickable { setSettings(true) }.padding(horizontal = 10.dp, vertical = 3.dp))
@@ -886,13 +886,21 @@ private fun Volume(app: AppState, st: PlayerState) {
 
 /** the time, and the chapter playing (which opens the list of chapters), as on YouTube */
 @Composable
-private fun TimeText(app: AppState, st: PlayerState, dragging: Float?) {
+private fun TimeText(app: AppState, st: PlayerState, dragging: Float?, toLive: () -> Unit = {}) {
     val pos = dragging?.let { (it * st.durationMs).toLong() } ?: st.positionMs
     var list by remember { mutableStateOf(false) }
     val chapter = app.playback.chapters.lastOrNull { it.startMs <= pos }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            if (app.playback.video?.live == true) "● " + tr("LIVE") else "${durationMs(pos)} / ${durationMs(st.durationMs)}",
+        if (app.playback.video?.live == true) {
+            // behind the edge: grey, and a tap goes back to live
+            val edge = st.durationMs - st.positionMs < 30_000
+            Row(Modifier.clip(CircleShape).clickable(enabled = !edge, onClick = toLive).padding(horizontal = 4.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text("● ", color = if (edge) Color(0xFFFF0033) else Color(0xFF9E9E9E), fontSize = 13.sp)
+                Text(tr("LIVE"), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+        } else Text(
+            "${durationMs(pos)} / ${durationMs(st.durationMs)}",
             color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium,
         )
         if (chapter != null && chapter.title.isNotEmpty()) Text(
