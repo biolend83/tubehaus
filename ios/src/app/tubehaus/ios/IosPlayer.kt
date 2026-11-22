@@ -60,6 +60,8 @@ import platform.AVFoundation.duration
 import platform.AVFoundation.pause
 import platform.AVFoundation.playImmediatelyAtRate
 import platform.AVFoundation.preferredForwardBufferDuration
+import platform.AVFoundation.configuredTimeOffsetFromLive
+import platform.AVFoundation.automaticallyPreservesTimeOffsetFromLive
 import platform.AVFoundation.preferredMaximumResolution
 import platform.AVFoundation.rate
 import platform.AVFoundation.replaceCurrentItemWithPlayerItem
@@ -191,6 +193,8 @@ class IosPlayer : VideoPlayer {
             else AVPlayerItem(asset = AVURLAsset(uRL = NSURL(string = hls), options = mapOf<Any?, Any>("AVURLAssetHTTPHeaderFieldsKey" to headers)))
         limit(item, o.maxHeight)
         if (readAhead) item.preferredForwardBufferDuration = 1200.0
+        // live: 8 s behind the edge (two segments), kept there
+        if (s.live) { item.configuredTimeOffsetFromLive = CMTimeMake(8_000, 1000); item.automaticallyPreservesTimeOffsetFromLive = true }
         av.replaceCurrentItemWithPlayerItem(item)
         audioPicked = false
         startAt = o.startMs
