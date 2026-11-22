@@ -11,6 +11,9 @@ import kotlinx.serialization.json.JsonPrimitive
  * and turned into the app's own types here.
  */
 object YouTube {
+    /** the player's playback method: on iOS the engine picks (the menu is not shown, [methods] is empty) */
+    var force: String = ""
+    val methods: List<String> get() = emptyList()
 
     enum class Filter(val params: String?) {
         ALL(null),

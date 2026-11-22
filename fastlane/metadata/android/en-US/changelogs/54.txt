@@ -1,0 +1,2 @@
+- Shorts tapped in a list open upright in the Shorts player, and Back returns to the list
+- Player: pick the playback method (visionOS, Android VR, YouTube Kids, SABR, TV)
