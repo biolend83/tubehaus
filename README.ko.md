@@ -14,7 +14,7 @@ TV, 폰, PC, 아이패드에서. 내 서버에 돌리거나, 그냥 앱을 깔�
 ![Docker: amd64 | arm64](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white)
 [![Featured in selfh.st Weekly](https://img.shields.io/badge/featured%20in-selfh.st%20weekly-2ea44f)](https://selfh.st/weekly/2026-10-23/)
 
-**[⬇ 앱 받기](#앱-받기)** &nbsp;·&nbsp; **[🖥️ 서버 설치](#빠른-설치-docker)** &nbsp;·&nbsp; **[🛡️ 계속 재생되는 비결](#계속-재생되는-비결-sabr)** &nbsp;·&nbsp; **[❓ 자주 묻는 질문](#자주-묻는-질문)** &nbsp;·&nbsp; [English](README.md) · **한국어**
+**[⬇ 앱 받기](#앱-받기)** &nbsp;·&nbsp; **[🖥️ 서버 설치](#빠른-설치-docker)** &nbsp;·&nbsp; **[🛡️ 계속 재생되는 비결](#계속-재생되는-비결-sabr)** &nbsp;·&nbsp; **[📖 기술 이야기](docs/HOW-IT-WORKS.ko.md)** &nbsp;·&nbsp; **[❓ 자주 묻는 질문](#자주-묻는-질문)** &nbsp;·&nbsp; [English](README.md) · **한국어**
 
 <img src="docs/devices.jpg" alt="Android TV, iPad, Android 폰에서 돌아가는 TubeHaus" width="860">
 
@@ -114,6 +114,8 @@ TV에서 멈추고 폰에서 이어 봐요. 집의 모든 기기와 브라우저
 SABR은 유튜브 영상 페이지를 읽는데, 한 주소에서 너무 많이 읽으면 구글의 "sorry" 확인이 떠요. WARP를 쓰면 서버가 이걸 알아채고 새 주소를 받은 뒤(다시 연결해도 주소가 같으면 WARP를 새로 등록) 다시 시도해요. `only`에서는 미리 받아 두는 영상도 네 개가 아니라 다음 하나만이에요.
 
 **앱에서도** 같은 순서가 기기에서 돌아가고, 플레이어 설정에 **재생 방식**이 있어요. 보통은 *자동*으로 두고, 한 가지 방법으로만 나오는 영상이면 visionOS, Android VR, YouTube Kids, SABR, TV 중 하나로 고정할 수 있어요.
+
+InnerTube 클라이언트와 잠긴 주소부터 BotGuard 토큰, 성긴 파일 기법, WARP 주소 바꾸기까지 **전체 이야기는 [TubeHaus는 유튜브를 어떻게 재생하나](docs/HOW-IT-WORKS.ko.md)**에 있어요.
 
 ## 빠름, 자체 유튜브 엔진으로
 

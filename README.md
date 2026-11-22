@@ -14,7 +14,7 @@ On the TV, the phone, the PC and the iPad. Run it on your own server, or just in
 ![Docker: amd64 | arm64](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white)
 [![Featured in selfh.st Weekly](https://img.shields.io/badge/featured%20in-selfh.st%20weekly-2ea44f)](https://selfh.st/weekly/2026-10-23/)
 
-**[⬇ Get the app](#get-the-app)** &nbsp;·&nbsp; **[🖥️ Run the server](#quick-start-docker)** &nbsp;·&nbsp; **[🛡️ How it keeps playing](#how-it-keeps-playing-sabr)** &nbsp;·&nbsp; **[❓ FAQ](#faq)** &nbsp;·&nbsp; **English** · [한국어](README.ko.md)
+**[⬇ Get the app](#get-the-app)** &nbsp;·&nbsp; **[🖥️ Run the server](#quick-start-docker)** &nbsp;·&nbsp; **[🛡️ How it keeps playing](#how-it-keeps-playing-sabr)** &nbsp;·&nbsp; **[📖 How it works](docs/HOW-IT-WORKS.md)** &nbsp;·&nbsp; **[❓ FAQ](#faq)** &nbsp;·&nbsp; **English** · [한국어](README.ko.md)
 
 <img src="docs/devices.jpg" alt="TubeHaus on Android TV, iPad and an Android phone" width="860">
 
@@ -114,6 +114,8 @@ YouTube keeps closing the side doors that third-party players use: a client stop
 SABR reads YouTube's watch page, and too many of those from one address bring up Google's "sorry" check. With WARP the server notices it, gets a new address (a new WARP registration when a reconnect keeps the old one) and tries again. With `only` it also prefetches just the next video instead of four.
 
 **In the apps** the same order runs on the device, and the player's settings have **Playback method**: leave it on *Auto*, or pin one way (visionOS, Android VR, YouTube Kids, SABR, TV) when a video only plays one way.
+
+**The whole story**, from InnerTube clients and locked links to BotGuard tokens, the sparse-file trick and WARP rotation, is in **[How TubeHaus plays YouTube](docs/HOW-IT-WORKS.md)**.
 
 ## Fast, with its own YouTube engine
 

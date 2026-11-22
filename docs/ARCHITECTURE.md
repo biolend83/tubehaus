@@ -1,5 +1,7 @@
 # How TubeHaus is put together
 
+*For the engine itself (clients, locked links, SABR, PO tokens, WARP), see [How TubeHaus plays YouTube](HOW-IT-WORKS.md).*
+
 A map for finding your way around the code. TubeHaus is two small pieces with no build step and no
 dependencies of their own: a web app (plain ES modules) and a server (Python standard library only).
 
