@@ -11,6 +11,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import app.tubehaus.engine.Sabr
 import app.tubehaus.engine.SabrHost
+import androidx.webkit.WebMessageCompat
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -41,7 +44,8 @@ class WebSabr(private val context: Context) : SabrHost {
 
     /** what the page sends back (on a WebView thread) */
     inner class Bridge {
-        @JavascriptInterface fun post(text: String) {
+        @JavascriptInterface fun post(text: String) { if (bin) pieces.execute { handle(text) } else handle(text) }
+        private fun handle(text: String) {
             val o = runCatching { Json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return
             when (o["t"]?.jsonPrimitive?.content) {
                 "piece" -> {
@@ -69,6 +73,15 @@ class WebSabr(private val context: Context) : SabrHost {
                 val chrome = Regex("Chrome/[\\d.]+").find(WebSettings.getDefaultUserAgent(context))?.value ?: "Chrome/130.0.0.0"
                 settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) $chrome Safari/537.36"
                 addJavascriptInterface(Bridge(), "__thBridge")
+                // pieces as bytes over a message port where this WebView can (no base64 on the way)
+                if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_ARRAY_BUFFER)) {
+                    runCatching {
+                        WebViewCompat.addWebMessageListener(this, "__thBinPort", setOf("https://www.youtube.com")) { _, msg, _, _, _ ->
+                            if (msg.type == WebMessageCompat.TYPE_ARRAY_BUFFER) { val b = msg.arrayBuffer; pieces.execute { binary(b) } }
+                        }
+                        bin = true
+                    }
+                }
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) { ready.complete(Unit) }
                 }
@@ -81,10 +94,24 @@ class WebSabr(private val context: Context) : SabrHost {
         val page = withContext(Dispatchers.IO) { asset("sabr-page.js") }
         val quoted = withContext(Dispatchers.Default) { JsonPrimitive(solver).toString() }
         val ok = CompletableDeferred<String?>()
-        w.evaluateJavascript("window.__thHost=function(s){__thBridge.post(s)};\n$page\n;__thSabr.setSolver($quoted)") { ok.complete(it) }
+        w.evaluateJavascript("window.__thHost=function(s){__thBridge.post(s)};" + (if (bin) "window.__thBin=window.__thBinPort;" else "") + "\n$page\n;__thSabr.setSolver($quoted)") { ok.complete(it) }
         if (withTimeoutOrNull(15_000) { ok.await() } != "\"ok\"") { w.destroy(); return@withContext null }
         web = w
         w
+    }
+
+    @Volatile private var bin = false
+    // off the main thread (the listener runs there), in order
+    private val pieces = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    /** one piece as bytes: [4-byte length][its JSON header][the piece] */
+    private fun binary(b: ByteArray) {
+        if (b.size < 4) return
+        val n = ((b[0].toInt() and 0xff) shl 24) or ((b[1].toInt() and 0xff) shl 16) or ((b[2].toInt() and 0xff) shl 8) or (b[3].toInt() and 0xff)
+        if (n <= 0 || 4 + n > b.size) return
+        val o = runCatching { Json.parseToJsonElement(String(b, 4, n, Charsets.UTF_8)).jsonObject }.getOrNull() ?: return
+        Sabr.piece(o["run"]?.jsonPrimitive?.intOrNull ?: return, o["at"]?.jsonPrimitive?.longOrNull ?: return,
+            o["init"]?.jsonPrimitive?.booleanOrNull == true, o["ms"]?.jsonPrimitive?.longOrNull ?: -1, b.copyOfRange(4 + n, b.size))
     }
 
     private fun asset(name: String) = context.assets.open(name).use { it.readBytes().decodeToString() }

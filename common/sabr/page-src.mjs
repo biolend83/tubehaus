@@ -62,13 +62,23 @@ function jsc(input) {
   }
   return new Promise((ok, no) => { const id = ++wid; pending.set(id, [ok, no]); worker.postMessage({ id, input }); });
 }
-const players = new Map();
+const players = new Map(), scripts = new Map();
+function playerJs(jsUrl) {
+  let p = scripts.get(jsUrl);
+  if (!p) {
+    p = fetch(jsUrl, { credentials: "omit" }).then((r) => { if (!r.ok) throw new Error("player script " + r.status); return r.text(); });
+    p.catch(() => scripts.delete(jsUrl));
+    scripts.set(jsUrl, p);
+    if (scripts.size > 3) scripts.delete(scripts.keys().next().value);
+  }
+  return p;
+}
 async function solveWith(url, jsUrl) {
   const u = new URL(url), n = u.searchParams.get("n");
   if (!n) return url;
   let pre = players.get(jsUrl);
   if (!pre) {
-    const js = await (await fetch(jsUrl, { credentials: "omit" })).text();
+    const js = await playerJs(jsUrl);
     pre = (await jsc({ type: "player", player: js, requests: [], output_preprocessed: true })).preprocessed_player;
     players.set(jsUrl, pre);
     if (players.size > 3) players.delete(players.keys().next().value);
@@ -113,6 +123,19 @@ function osOf(ua) {
   if ((m = ua.match(/Mac OS X ([\d_]+)/))) return { osName: "Macintosh", osVersion: m[1].replace(/_/g, ".") };
   if ((m = ua.match(/Android ([\d.]+)/))) return { osName: "Android", osVersion: m[1] };
   return { osName: "X11", osVersion: "" };
+}
+function sendPiece(o, u8) {
+  if (window.__thBin) {
+    try {
+      const head = new TextEncoder().encode(JSON.stringify(o));
+      const buf = new Uint8Array(4 + head.length + u8.length);
+      new DataView(buf.buffer).setUint32(0, head.length);
+      buf.set(head, 4); buf.set(u8, 4 + head.length);
+      window.__thBin.postMessage(buf.buffer);
+      return;
+    } catch (e) { window.__thBin = null; }
+  }
+  send({ ...o, data: b64(u8) });
 }
 const b64 = (u8) => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
 
@@ -198,7 +221,7 @@ window.__thSabr = {
         const at = h.isInitializationSegment ? 0 : +(h.segmentByteRangeStart ?? -1);
         if (at < 0) continue;
         if (!h.isInitializationSegment) head = at + u8.length;
-        send({ t: "piece", run, at, init: !!h.isInitializationSegment, ms: h.startMs != null ? +h.startMs : -1, data: b64(u8) });
+        sendPiece({ t: "piece", run, at, init: !!h.isInitializationSegment, ms: h.startMs != null ? +h.startMs : -1 }, u8);
       }
       stream.abort().catch(() => {});
       runs.delete(run);
@@ -271,7 +294,7 @@ window.__thSabr = {
           const init = !!h?.isInitializationSegment;
           const seq = init ? 0 : (h?.num != null && +h.num > 0 ? +h.num : n + 1);
           if (!init) n = seq;
-          send({ t: "piece", run, at: seq, init, ms: h?.start != null ? +h.start : -1, data: b64(u8) });
+          sendPiece({ t: "piece", run, at: seq, init, ms: h?.start != null ? +h.start : -1 }, u8);
         }
         stream.abort().catch(() => {});
       };
