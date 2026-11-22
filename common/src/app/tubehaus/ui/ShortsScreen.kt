@@ -145,8 +145,9 @@ fun ShortsScreen(app: AppState) {
     }
 
     LaunchedEffect(pager) {
-        snapshotFlow { pager.currentPage }.collect { page ->
-            val v = list.getOrNull(page) ?: return@collect
+        // the page and the Short on it: the first Short arrives after the pager exists
+        snapshotFlow { pager.currentPage to list.getOrNull(pager.currentPage) }.collect { (page, got) ->
+            val v = got ?: return@collect
             if (current?.id == v.id) return@collect
             current?.let { learnFrom(it) }
             current = v
