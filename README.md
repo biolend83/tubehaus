@@ -14,7 +14,7 @@ On the TV, the phone, the PC and the iPad. Run it on your own server, or just in
 ![Docker: amd64 | arm64](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white)
 [![Featured in selfh.st Weekly](https://img.shields.io/badge/featured%20in-selfh.st%20weekly-2ea44f)](https://selfh.st/weekly/2026-10-23/)
 
-**[⬇ Get the app](#get-the-app)** &nbsp;·&nbsp; **[🖥️ Run the server](#quick-start-docker)** &nbsp;·&nbsp; **[🛡️ How it keeps playing](#how-it-keeps-playing-sabr)** &nbsp;·&nbsp; **[📖 How it works](docs/HOW-IT-WORKS.md)** &nbsp;·&nbsp; **[❓ FAQ](#faq)** &nbsp;·&nbsp; **English** · [한국어](README.ko.md)
+**[⬇ Get the app](#get-the-app)** &nbsp;·&nbsp; **[🖥️ Run the server](#quick-start-docker)** &nbsp;·&nbsp; **[📖 How it works](#how-it-works)** &nbsp;·&nbsp; **[❓ FAQ](#faq)** &nbsp;·&nbsp; **English** · [한국어](README.ko.md)
 
 <img src="docs/devices.jpg" alt="TubeHaus on Android TV, iPad and an Android phone" width="860">
 
@@ -52,7 +52,7 @@ Pause on the TV, carry on on the phone. Every device and every browser in the ho
 <td colspan="3" valign="top">
 
 ### 🛡️ Keeps playing when YouTube pushes back
-When a side door closes, TubeHaus falls back to **SABR**, the protocol youtube.com itself streams with, with its own BotGuard token and no account. On the server a flagged address is swapped for a new one by itself. [How it works](#how-it-keeps-playing-sabr)
+When a side door closes, TubeHaus falls back to **SABR**, the protocol youtube.com itself streams with, with its own BotGuard token and no account. On the server a flagged address is swapped for a new one by itself. [How it works](#how-it-works)
 
 </td>
 </tr>
@@ -85,24 +85,50 @@ There are two ways to run it. Same name, same look; they differ in *where* the w
 | 📱 **iPad / iPhone** | [.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v1.7.2/TubeHaus-1.7.2-ipad.ipa) (beta) | iOS 16+, installed with [Sideloadly](https://sideloadly.io/) and your Apple ID (re-signed every 7 days with a free one). Apple's player up to 4K, background play, picture-in-picture, offline downloads. Rather not sideload? Use the server in Safari |
 
 All files, Windows portable and ARM builds: **[latest release](https://github.com/biolend83/tubehaus/releases/latest)**. Install notes and source per platform: [`android-app`](https://github.com/biolend83/tubehaus/tree/android-app) · [`windows-app`](https://github.com/biolend83/tubehaus/tree/windows-app) · [`mac-app`](https://github.com/biolend83/tubehaus/tree/mac-app) · [`linux-app`](https://github.com/biolend83/tubehaus/tree/linux-app) · [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). The rest of this README is about the server.
+## How it works
 
-## How it keeps playing: SABR
+What YouTube does to third-party players, and what TubeHaus does about it, from the first request to the last byte. In short: it asks YouTube the way YouTube's own apps do, falls down a chain of ways when one is refused, ends at **SABR** (the protocol youtube.com itself streams with, with its own BotGuard token and no account), and on the server swaps a flagged address for a new one by itself.
 
-YouTube keeps closing the side doors that third-party players use: a client stops getting plain video addresses, a label's music videos come back "not available", a kids' video only plays in the Kids app. Its own website can't close the front door without breaking itself. That front door is **SABR** (Server ABR), the protocol youtube.com uses to stream almost every video now. Since 1.7 TubeHaus speaks it on every device and on the server.
+### 1. The problem: YouTube is an app API, not a website
+
+When you open a video on youtube.com, the page doesn't contain the video. It contains a JavaScript player that asks a private API, **InnerTube**, for a *player response*: a JSON document with the title, the captions, the chapters and, most importantly, the **streaming data**, which is the list of formats (each resolution and codec of the picture, each language and bitrate of the sound) and how to get them.
+
+Every official YouTube app (Android, iOS, TV, the Kids app, the VR app) asks the same API, saying who it is. YouTube answers each one differently. That's the whole game: a third-party player is only as good as the answers it can get, and YouTube keeps changing which clients get which answers.
+
+TubeHaus never scrapes HTML for streams and never uses an account. It asks InnerTube the way the official apps do, and has several ways to ask.
+
+### 2. InnerTube, and why the client matters
+
+An InnerTube request is a POST to `www.youtube.com/youtubei/v1/player` (or `/search`, `/browse`, `/next`) with a `context.client` block: client name, version, device, OS, language and country. Examples:
+
+| Client | What it gets today |
+|---|---|
+| `WEB` | Lists (search, channels, playlists, comments) work well. Streams come through SABR (below), with a PO token required |
+| `VISIONOS` (Apple Vision Pro) | **Plain stream addresses, no PO token needed.** The fastest way to a playable video, and TubeHaus' first choice |
+| `ANDROID_VR` (Quest) | Plain addresses too, a close second |
+| `ANDROID_KIDS` | Videos *made for kids*, which the others refuse |
+| `TVHTML5` (a smart TV) | Nearly everything, but the addresses are **locked** and held behind an ad |
+
+TubeHaus keeps a small table of these clients (`clients.json` in the apps, `ENG_*` in the server) with exact versions and user agents. Every known client was tried against live YouTube in November 2026: most were dead or half-working, and VISIONOS was the only clean one. The table is the result.
+
+A **visitor ID** goes with each request, like a browser's anonymous cookie. When YouTube walls one off ("Sign in to confirm you're not a bot"), TubeHaus takes a new one and asks again before trying anything heavier.
+
+### 3. The fallback chain
+
+No single client plays everything, so a video goes down a chain until one way works:
 
 ```
-              ┌── POST: "at 1:23, 40 s buffered, want 1080p + Opus" (protobuf) ──┐
-  TubeHaus ───┤                                                                  ├──► YouTube
-   (player)   └◄── UMP: media pieces, "go to this server", "wait 2 s", formats ──┘
-       │
-       └─► pieces laid back out as byte ranges ─► ExoPlayer · mpv · AVPlayer · browser MSE
+visionOS ──refused──► (new visitor ID) ──► YouTube Kids ──► SABR ──► TV client
+  ~0.2 s                                     ~1 s           2-3 s     3-8 s
 ```
 
-**How it works.** The player doesn't get one address per quality. It gets a single streaming address and sends YouTube small protobuf requests ("I'm at 1:23, I have this much buffered, I want 1080p"). YouTube answers with UMP, a stream of media pieces, and can redirect it, change formats or ask it to back off along the way. TubeHaus turns those pieces back into ordinary byte ranges, so the same players as before (ExoPlayer on Android, mpv on the desktop, AVPlayer on Apple devices and the browser's MSE in the web app) play them like any other file. Seeking, quality changes and audio tracks all keep working.
+- A refusal that says *"not available"* goes to the next way at once.
+- A refusal that says *"sign in"* means the visitor ID or the address is walled, so those are changed first.
+- Age-restricted videos stop early, since none of these clients can pass an age check without an account.
+- Live streams skip SABR, because they have their own HLS manifest.
 
-**The token.** SABR only streams to a player that passes YouTube's BotGuard check and shows a PO token bound to the video. TubeHaus runs that check itself and binds the token to the video id, so no account and no cookies are needed, and nothing leaves your server or device apart from what youtube.com would send.
+On the server, `HT_SABR` reorders the chain (`first` puts SABR before the others, `only` uses it for everything but live and age-restricted videos). In the apps, the player's **Playback method** setting pins one way, which helps when a video only plays one way.
 
-**When it's used.** By default the fast clients go first (a video opens in under a second) and SABR takes over when they're refused. On the server you can turn this around:
 
 | `HT_SABR` | What plays a video | Opens in |
 |---|---|---|
@@ -111,11 +137,171 @@ YouTube keeps closing the side doors that third-party players use: a client stop
 | `only` | SABR for everything except live streams and age-restricted videos | ~3 s |
 | `0` | never SABR | – |
 
-SABR reads YouTube's watch page, and too many of those from one address bring up Google's "sorry" check. With WARP the server notices it, gets a new address (a new WARP registration when a reconnect keeps the old one) and tries again. With `only` it also prefetches just the next video instead of four.
+### 4. Videos made for kids: YouTube Kids and the TV client
 
-**In the apps** the same order runs on the device, and the player's settings have **Playback method**: leave it on *Auto*, or pin one way (visionOS, Android VR, YouTube Kids, SABR, TV) when a video only plays one way.
+A video marked *made for kids* (BabyBus, CoComelon…) comes back "This video is not available" from VISIONOS and ANDROID_VR. YouTube wants it played in the Kids app. So TubeHaus asks as the Kids app (`ANDROID_KIDS`), which usually just works.
 
-**The whole story**, from InnerTube clients and locked links to BotGuard tokens, the sparse-file trick and WARP rotation, is in **[How TubeHaus plays YouTube](docs/HOW-IT-WORKS.md)**.
+When it doesn't, the TV client always does. The catch is that the TV client's links are locked (next section) and come with an ad.
+
+### 5. Locked links: signatures and the n parameter
+
+The TV client returns `signatureCipher` instead of `url`: a scrambled signature that must be unscrambled by a function hidden in YouTube's current player JavaScript (`base.js`). Every address also carries an `n` parameter that must be transformed by another hidden function. Without it, YouTube throttles the download to a crawl or refuses it.
+
+Older projects found those functions with regular expressions. That stopped working on current players. TubeHaus uses the **EJS solver from yt-dlp** (Unlicense), which parses the player script properly and runs the functions:
+
+- **Server:** `server/ejs/solve.js` under deno or node. The preprocessed player is cached on disk, so a new player version is parsed once.
+- **Android:** the same solver in a hidden WebView (`WebSolver.kt`).
+- **iPad:** embedded in the engine script and run in JavaScriptCore.
+
+The *signature timestamp* of that player version goes into the TV request (`playbackContext.contentPlaybackContext.signatureTimestamp`), so YouTube scrambles the links for the player TubeHaus can unscramble.
+
+### 6. The ad that holds the links back
+
+The TV client's answer includes `adPlacements`, typically a start ad with a skip offset. Until roughly 80% of that offset has passed, googlevideo answers **403** to the video's links, because a real TV would be showing the ad meanwhile.
+
+The first version simply waited out the offset (up to 8 s). Now TubeHaus asks for a single byte (`&range=0-0`) of both the picture and the sound every half second, and hands the links to the player the moment both answer. That's about 4 s on average instead of up to 8.
+
+If the player still gets a 403 later (on a phone that moved from Wi-Fi to mobile data, say), the Android app asks for fresh links **once** and then shows the error. In 1.7.0 it asked forever, which looked like a video flicking between play and stop ([#101](https://github.com/biolend83/tubehaus/issues/101)).
+
+### 7. SABR: speaking youtube.com's own streaming protocol
+
+The clients above are side doors, and YouTube closes them one by one. The front door, the one youtube.com uses for almost every video, is **SABR** (*Server-side Adaptive Bit Rate*). YouTube can't close it without breaking its own website.
+
+With SABR, the player gets no address per format. It gets **one** `serverAbrStreamingUrl` and has a conversation with it:
+
+```
+player ── POST (protobuf VideoPlaybackAbrRequest) ─────────────────────► googlevideo
+          "I'm at 1:23.4, I have 40 s of 1080p + Opus buffered,
+           my bandwidth is about 25 Mbit/s, here is my PO token"
+
+player ◄── UMP stream ─────────────────────────────────────────────────── googlevideo
+          MEDIA_HEADER (format, byte range in the file, time range)
+          MEDIA (the bytes)  MEDIA_END
+          NEXT_REQUEST_POLICY ("wait 2 s"), SABR_REDIRECT ("use this host"),
+          FORMAT_INITIALIZATION_METADATA, STREAM_PROTECTION_STATUS, ...
+```
+
+**UMP** (*Universal Media Protocol*) is a simple framing: a varint part type, a varint size, then the payload, back to back. TubeHaus uses the protobuf definitions and UMP reader from [googlevideo](https://github.com/LuanRT/googlevideo) (MIT), and keeps the playback state the request needs (player time, buffered ranges, selected formats, the cookie-like `playbackCookie` YouTube sends back) the way a real player does.
+
+The player response for SABR comes from the **watch page** itself (`ytInitialPlayerResponse`), because the WEB client's answer must match the current web player version. Its `serverAbrStreamingUrl` also carries an `n` parameter, solved with the same EJS solver.
+
+### 8. PO tokens and BotGuard, without an account
+
+SABR only keeps streaming to a player that proves it is a real browser, with a **PO token** (*proof of origin*). Without one, it stops after about a minute.
+
+A PO token comes from **BotGuard**, Google's obfuscated anti-bot VM:
+
+1. Load the BotGuard *challenge*. TubeHaus takes it from the YouTube home page's own bootstrap (`ytAtN(...)`), the same place youtube.com gets it.
+2. Run the challenge's interpreter script and take a *snapshot*: BotGuard looks at its environment and produces an opaque blob.
+3. Send that blob to YouTube's **GenerateIT** endpoint (through youtube.com's own `/api/jnn/v1`), which returns an *integrity token*.
+4. With the integrity token, **mint** a PO token bound to the **video ID**.
+
+The binding matters. Tokens bound to the visitor ID or to a session were accepted at first and then turned down after about a minute. Tokens bound to the video ID keep streaming to the end. YouTube reports its verdict in-band as `STREAM_PROTECTION_STATUS`, and TubeHaus watches it:
+
+- On the **server**, BotGuard runs in deno with jsdom. Roughly half of the minters it creates turn out bad, so a first status of 1 (good) keeps the minter and 2 (bad) replaces it at once.
+- In a **real browser**, the first status is 2 even for good tokens, so only three 3s in a row (*attestation failed*) count as bad.
+
+No cookies, no Google account, no headless browser on the server.
+
+### 9. Turning SABR back into a file
+
+Players like ExoPlayer, mpv and AVPlayer expect a file they can read by byte range. SABR delivers *pieces*. So TubeHaus rebuilds the file:
+
+- Every `MEDIA_HEADER` says where its bytes belong in YouTube's original file (`segmentByteRangeStart`) and which time range they cover.
+- The bytes are written **at that offset** into a **sparse file**: only the pieces received take disk space, so a 2-hour 4K video costs nothing until it's watched.
+- A sorted list of the ranges already on disk, plus the `(byte, ms)` points seen, is kept per format.
+- A small HTTP server on `127.0.0.1` answers the player's `Range:` requests from that file.
+- When a requested byte isn't there yet, it estimates the time of that byte from the known points and **starts a new SABR conversation at that time**. A seek to 70% starts at 70% instead of downloading everything before it (0.77 s in tests).
+- It reads at most 24 MB past what the player asked for, then pauses, and the file is dropped after 20 idle minutes.
+
+To the player it's an ordinary file. Seeking, quality switching, audio tracks and captions all work unchanged. The server serves the same files to the web app as `/companion/sabr?v=&itag=`, behind the same DASH manifest as every other video.
+
+### 10. SABR in the apps: a hidden browser page
+
+The apps can't run deno. They run SABR in a **hidden browser page whose origin is `https://www.youtube.com`**, so BotGuard sees what it expects:
+
+| | Hidden page | Local file server |
+|---|---|---|
+| **Android** | a WebView, `loadDataWithBaseURL("https://www.youtube.com/tubehaus-sabr", …)` with a desktop Chrome user agent | Kotlin, `common/jvm/Sabr.kt` |
+| **Desktop** | Edge or Chrome, headless, driven over the DevTools protocol, the page served at a youtube.com URL with `Fetch.fulfillRequest` | the same Kotlin |
+| **iPad / iPhone** | a 1-point WKWebView, `loadHTMLString(…, baseURL: youtube.com)` | Kotlin/Native over POSIX sockets, serving **HLS** (AVPlayer only plays HLS) built from each format's index |
+
+The page (`sabr-page.js`, about 180 KB, bundled with esbuild) does the BotGuard and SABR work and posts each piece (format, offset, bytes) to the native side, which keeps the sparse file and serves the player.
+
+Things that cost a day each to find:
+
+- The EJS solver must run in a **Web Worker**. Inside the page, the player script navigates the page away.
+- BotGuard's interpreter must load through a `<script src>`, because `fetch` is refused by CORS.
+- `window.yt.config_` must hold the home page's `ytcfg`, or every token is turned down.
+- The SABR request body goes as `text/plain`, so no forbidden headers are needed.
+- `--remote-debugging-port=0` (a random port) makes YouTube turn every token down. TubeHaus picks a free port itself.
+- On Android, `InetAddress.getLoopbackAddress()` is `::1`, so the server binds `127.0.0.1` explicitly.
+- Newer Edge hands off to another process at start, so the app waits for the DevTools port instead of watching the process.
+
+The desktop keeps the hidden browser warm while YouTube Kids is being asked, so if SABR is needed it's ready. That turns 12.8 s into 5.8 s for a cold start and 1.6 s for the next video.
+
+### 11. WARP: an address YouTube will talk to
+
+Cloud servers' addresses are the first ones YouTube asks to "sign in to confirm you're not a bot". The server goes out through **Cloudflare WARP in proxy mode**. `warp-cli` listens on `127.0.0.1:40000`, only YouTube traffic goes through it, and the rest of the server's routing is untouched.
+
+When YouTube flags an address (a "sign in" wall on InnerTube, or Google's **sorry** page on the watch page that SABR reads), the server rotates:
+
+1. `warp-cli disconnect` then `connect`, and wait until traffic flows.
+2. If the exit address didn't change (it often doesn't), delete the registration and **register again**, which gets a new address. Then put back proxy mode and the port.
+3. Replay the request.
+
+Requests arriving during a rotation **wait** on the rotation's lock and then retry, instead of failing or starting a second rotation. Rotations are rate-limited (a minimum gap, and a cap per 30 minutes) so a YouTube-wide outage doesn't churn registrations. A rotation takes about 2 s.
+
+### 12. Making it fast
+
+A video page used to take 1.3 s through Invidious. Now the video starts in **0.16 s**:
+
+- **Fast answer first.** The player needs only the streams. The title, description and related videos come from a second call and fill in a moment later.
+- **One request, not several.** Identical requests in flight share one call to YouTube (`api_busy` events), and translated captions do the same.
+- **Stale while refreshing.** Answers are cached for a time per kind (search 15 min, channels 10 min, suggestions 1 h, …) and served up to 6 hours stale while a background refresh runs.
+- **Prefetch.** Hovering a video, or a list of search results appearing, fetches the first few player answers. A click usually lands on something already fetched. With `HT_SABR=only` it prefetches just the next video, since each one costs a watch page.
+- **Kept-open connections.** Stream pieces reuse pooled connections to googlevideo (a new TLS connection costs 0.17 s), and InnerTube calls are compressed.
+- **Comments early.** A video's comments are fetched when it opens, so they're there when you scroll (0.002 s).
+
+### 13. Captions: translated in seconds, written live
+
+**Translated captions.** YouTube's own machine translation (`&tlang=`) often comes back empty or 429 for long videos. So the server splits the caption into chunks and translates **six at a time**. The player asks with `?part=1` and gets what's done so far: the original lines first, swapped for the translation as each chunk lands, with an `X-Sub-Done` header saying when it's complete. A 1-hour video went from 93 s to about 10 s, with the first lines in 0.3 s.
+
+**Live captions.** YouTube has none for most live streams. The server pulls the stream's audio a few seconds ahead of the viewer and runs **whisper.cpp** (`ggml-base-q5_1`, one CPU core) on it, then serves the text as a WebVTT track in time with the picture.
+
+### 14. The players
+
+| Where | Player | Notes |
+|---|---|---|
+| Web app | [Shaka Player](https://github.com/shaka-project/shaka-player) over a DASH manifest the server writes | storyboards, chapters, the "most replayed" wave |
+| Android, Android TV | ExoPlayer (Media3) | hardware codec first (AV1 → VP9 → H.264 by what the device decodes in hardware), 60 fps first, an 8K-sized buffer |
+| Windows, macOS, Linux | **mpv** (libmpv), GPU decoding | the same DASH manifest, so quality switching is seamless |
+| iPad, iPhone, Apple TV | AVPlayer | HLS built from each format's `sidx` index, up to 4K |
+
+Nothing is ever transcoded. The device decodes what YouTube sends, in a format it can decode.
+
+### 15. One file from two streams, without ffmpeg
+
+Above 720p YouTube sends picture and sound separately. The desktop app's **Save as one file** joins them without ffmpeg (`Mux.kt`): it reads both containers' boxes (fragmented MP4) or elements (WebM/Matroska), writes one container with both tracks, and copies the samples as they are. Nothing is re-encoded, so it takes seconds.
+
+### 16. Casting without Google's SDK
+
+The apps cast to Chromecast and Google TV and AirPlay to Apple TV without Google's or Apple's SDKs:
+
+- **Google Cast:** mDNS discovery, then the Cast v2 protocol (protobuf `CastMessage` frames over TLS on port 8009) to launch the Default Media Receiver and load the stream.
+- **AirPlay:** discovery over mDNS and playback over AirPlay's HTTP API.
+
+That code became its own library, [Castwire](https://github.com/biolend83/castwire).
+
+### 17. Recommendations that never leave the device
+
+The Home feed in the apps (and Shorts on the server) is learned locally. Each video you watch adds to a score per channel and per *word* of its title and keywords. The score is weighted by how much of the video you watched, whether you looped, liked, disliked, hid or skipped it, and the time of day. Every fourth Short is something new, so the feed doesn't close in on itself. The scores are a small file on the device or your server. Nothing is sent anywhere, and you can turn learning off or reset it.
+
+### 18. Knowing when it breaks
+
+YouTube changes things without notice, so every day a [GitHub Actions check](.github/workflows/engine-check.yml) runs each engine call against live YouTube through a fresh WARP address. If one breaks, it opens an issue. It also runs a repair tool that probes the known clients and versions (from the app, yt-dlp and YouTube.js) and proposes an updated `clients.json`, so a fix usually ships before most people notice.
+
+On your own server, `--doctor` runs the same checks one line each: WARP, YouTube, a search, a real video and a few bytes of its stream.
 
 ## Fast, with its own YouTube engine
 
@@ -422,7 +608,7 @@ There are three layers. A refused video moves on to the next way in (visionOS cl
 <details>
 <summary><b>What is SABR, and do I have to turn it on?</b></summary>
 
-It's how youtube.com itself streams: one address, and the player tells YouTube where it is and what it wants in small requests ([details](#how-it-keeps-playing-sabr)). It's on by default as the fallback; nothing to set up. `HT_SABR=only` makes it the main way in on the server, at about 3 s per new video instead of under 1 s.
+It's how youtube.com itself streams: one address, and the player tells YouTube where it is and what it wants in small requests ([details](#how-it-works)). It's on by default as the fallback; nothing to set up. `HT_SABR=only` makes it the main way in on the server, at about 3 s per new video instead of under 1 s.
 
 </details>
 
@@ -557,7 +743,7 @@ Running one? [Add it here](https://github.com/biolend83/tubehaus/issues/new?temp
 | `HT_PUBLIC_URL` | `http://localhost:8080` | the address browsers use |
 | `HT_YT_PROXY` | `127.0.0.1:40000` | WARP proxy (empty = direct) |
 | `HT_WARP_ROTATE` | `1` | new WARP address when YouTube blocks (a reconnect, or a new registration when that keeps the address) |
-| `HT_SABR` | `1` | SABR (what YouTube's own web player gets) when no other way plays a video; `first` to use it before them, `only` for every video but live and age-restricted ones, `0` off. Needs deno. See [How it keeps playing](#how-it-keeps-playing-sabr) |
+| `HT_SABR` | `1` | SABR (what YouTube's own web player gets) when no other way plays a video; `first` to use it before them, `only` for every video but live and age-restricted ones, `0` off. Needs deno. See [How it keeps playing](#how-it-works) |
 | `HT_REGION` | `US` | default region of searches and trending |
 | `HT_HL` | (the viewer's language) | YouTube's language for its texts |
 | `HT_YTDLP` | `yt-dlp` | for live streams |
