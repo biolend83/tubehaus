@@ -85,6 +85,337 @@ TV에서 멈추고 폰에서 이어 봐요. 집의 모든 기기와 브라우저
 | 📱 **아이패드 / 아이폰** | [.ipa](https://github.com/biolend83/tubehaus/releases/download/app-v1.7.2/TubeHaus-1.7.2-ipad.ipa) (베타) | iOS 16 이상, [Sideloadly](https://sideloadly.io/)와 내 Apple ID로 설치(무료 ID는 7일마다 다시 서명). 애플 플레이어로 4K까지, 백그라운드 재생, PIP, 오프라인 저장. 설치가 싫다면 사파리에서 서버판을 쓰세요 |
 
 전체 파일, Windows portable, ARM 빌드: **[최신 릴리스](https://github.com/biolend83/tubehaus/releases/latest)**. 플랫폼별 설치 안내와 소스: [`android-app`](https://github.com/biolend83/tubehaus/tree/android-app) · [`windows-app`](https://github.com/biolend83/tubehaus/tree/windows-app) · [`mac-app`](https://github.com/biolend83/tubehaus/tree/mac-app) · [`linux-app`](https://github.com/biolend83/tubehaus/tree/linux-app) · [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). 이 README의 나머지는 서버판 이야기예요.
+## 빠름, 자체 유튜브 엔진으로
+
+1.6부터 서버판은 Invidious 위에서 돌지 않아요. 유튜브에 직접 물어봐서 **컨테이너가 세 개 줄었어요**(Invidious, companion, PostgreSQL 없음). 속도도 빨라요. 영상은 스트림만 받으면 바로 재생되고 제목·설명·관련 영상은 잠깐 뒤에 채워져요. 받은 답은 보관해 두고 뒤에서 새로 고치고, 유튜브 영상 서버와의 연결은 열어 둔 채 다시 쓰고, 댓글은 영상을 열 때 같이 받아 둬요.
+
+| | TubeHaus 1.6.3 | Invidious |
+|---|---|---|
+| **영상 재생 시작** | **0.16초** `▇▇` | 1.29초 `▇▇▇▇▇▇▇▇▇▇▇▇▇` |
+| 영상 화면 전체 (제목, 설명, 관련 영상) | **0.59초** `▇▇▇▇▇▇` | 1.29초 `▇▇▇▇▇▇▇▇▇▇▇▇▇` |
+| 채널 | **0.38초** `▇▇▇▇` | 0.66초 `▇▇▇▇▇▇▇` |
+| 채널의 영상 목록 | **0.28초** `▇▇▇` | 0.61초 `▇▇▇▇▇▇` |
+| 검색 | **0.56초** `▇▇▇▇▇▇` | 0.56초 `▇▇▇▇▇▇` |
+| 댓글 (영상을 연 뒤) | **0.002초** `▏` | 0.16초 `▇▇` |
+| **다시 여는 것 전부** | **0.002초** `▏` | – |
+| 스트림 조각 하나 | **0.07초** `▇` | – |
+
+각각 처음 여는 10~12번의 중앙값이에요. 같은 서버, 같은 WARP 주소에서 쟀어요(TubeHaus는 2026-11-17, Invidious는 서버에서 내리기 전 1.6.0 비교 때). 검색이나 채널은 대부분 유튜브가 답하는 시간이라 더 줄이기 어려워요. 대신 TubeHaus는 화면이 다 차기 전에 영상부터 틀고, 다음에 누를 것을 보는 동안 미리 받고, 같은 것을 두 번 받지 않아요. 스트림 조각은 열린 연결을 다시 써요(새 연결은 0.17초).
+
+영상에 마우스를 올리거나 검색 결과가 뜨면 앞의 몇 개를 미리 받아 둬서, 누르면 대개 이미 준비된 화면이 열려요. 답은 여전히 [Invidious](https://invidious.io) API 모양이라 웹 화면, 앱의 서버 모드, 그 API를 쓰는 다른 도구가 그대로 돌아가요. 1.5까지는 Invidious와 [invidious-companion](https://github.com/iv-org/invidious-companion) 위에서 동작했고, 유튜브에 대해 아는 많은 것을 두 프로젝트에서 배웠어요. Invidious 팀에 감사드려요. 1.5에서 업데이트한다면 [아래](#빠른-설치-docker)를 보세요.
+
+<div align="center">
+<img src="docs/tour.gif" alt="TubeHaus: 첫 화면, 검색, 영상과 &quot;이 영상 한눈에&quot;" width="860">
+</div>
+
+## 서버판이 좋은 점
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**⚡ 누르자마자, 늘 최고 화질로**<br>
+영상 정보를 서버에 받아 두고 뒤에서 새로 고치고, 다음에 누를 만한 영상도 미리 받아 둬요. 화질을 알아서 낮추지 않아요. 60프레임과 기기가 하드웨어로 푸는 코덱을 먼저 고르고, 8K도 버퍼에 맞춰요.
+
+</td>
+<td width="50%" valign="top">
+
+**🔒 기기가 구글과 통신하지 않아요**<br>
+영상, 썸네일, 페이지가 전부 내 서버를 거쳐요. 구글 쿠키도 유튜브 스크립트도 브라우저에 들어오지 않아요. 유튜브는 Cloudflare WARP 주소만 보고, 우리 집 주소는 몰라요.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**🎙️ 라이브 실시간 자막**<br>
+유튜브는 라이브에 자막을 안 줘요. TubeHaus는 [whisper.cpp](https://github.com/ggml-org/whisper.cpp)로 받아써서 재생보다 몇 초 앞서 자막을 만들어요. CPU 코어 하나면 돼요. 라이브도 조각을 미리 받아 정확히 이어 붙여서 끊기지 않아요.
+
+</td>
+<td valign="top">
+
+**📺 TV에도 맞춰서**<br>
+리모컨의 방향키, 확인, 뒤로만으로 움직이는 TV 모드, 그리고 **TV로 보내기**: 폰에서 고르면 TV에서 재생돼요(크롬캐스트 필요 없음). **같이 보기**는 방 안의 모두를 같은 초에 맞춰요.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**🌿 차분 모드**<br>
+스위치 하나로 유튜브를 다시 "도구"로: 홈에는 구독 채널의 새 영상만, 쇼츠·인기·추천은 사라지고, 다음 영상 자동 재생도 없고, 댓글은 눌러야 펼쳐져요. 검색은 그대로예요.
+
+</td>
+<td valign="top">
+
+**🧠 내 서버에서 배우는 쇼츠**<br>
+몇 초 봤는지, 반복했는지, 좋아요를 눌렀는지, 넘겼는지가 채널·주제별 점수가 되어 내 서버의 작은 파일에 저장돼요. 네 번째 칸마다 새로운 것을 섞어요. 서버 밖으로 나가는 건 없고, 언제든 초기화할 수 있어요.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**🚫 낚시 제목·광고 읽기 끝**<br>
+[DeArrow](https://dearrow.ajay.app)로 올린 사람 대신 사람들이 고른 제목과 썸네일, [SponsorBlock](https://sponsor.ajay.app)으로 광고 구간 건너뛰기와 "하이라이트로 이동", Return YouTube Dislike로 싫어요 수.
+
+</td>
+<td valign="top">
+
+**💾 원본 화질로 저장**<br>
+1080p와 4K는 영상과 소리가 따로 와요. 서버가 둘 다 받아서 ffmpeg로 합쳐 줘요. 내 언어 자막이 없는 영상은 번역 자막으로 봐요.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**☁️ 값싼 클라우드 서버에서도**<br>
+클라우드 주소는 "봇이 아닌지 확인하려면 로그인하세요"가 자주 떠요. TubeHaus는 **Cloudflare WARP(프록시 모드)**로 나가고, 막히면 방문자 정보를 새로 받고, 그래도 막히면 WARP 주소를 바꿔요.
+
+</td>
+<td valign="top">
+
+**🌍 15개 언어**<br>
+한국어 · English · 日本語 · 简体中文 · Español · Português · Français · Deutsch · Русский · हिन्दी · Bahasa Indonesia · Türkçe · বাংলা · Tiếng Việt · Polski. 조회수와 날짜도 언어마다 그 나라 방식으로 보여요.
+
+</td>
+</tr>
+</table>
+
+<details>
+<summary><b>그 밖의 기능</b></summary>
+
+- 유튜브와 같은 화면: 홈, 검색, 채널, 재생목록, 구독, 기록, 보관함, 인기 급상승, 그리고 유튜브의 주제 페이지(음악, 실시간, 뉴스, 게임, 스포츠, 학습, 패션·뷰티)를 선반 그대로
+- [Shaka Player](https://github.com/shaka-project/shaka-player) 기반 플레이어: 챕터, 탐색 미리보기, 재생바 위 **"가장 많이 다시 본 장면"** 물결, 재생 속도, 수면 타이머, 통계, 미니 플레이어, 영화관 모드, 앰비언트 모드, 잠금 화면과 블루투스 버튼 조작
+- 모든 기기가 같은 보관함: 구독(RSS 기반 피드), 시청 기록, 이어보기, 나중에 볼 동영상, 좋아요, 재생목록
+- 댓글, 스크립트, 마우스를 올리면 정확한 업로드 시각
+- 구글 Takeout, Invidious, NewPipe, FreeTube, OPML, TubeHaus 백업에서 가져오기, 그리고 그 모든 형식으로 내보내기
+
+브라우저가 직접 하는 선택 기능: SponsorBlock과 DeArrow(둘 다 영상 ID 대신 해시 앞부분만 보내요), Return YouTube Dislike. DeArrow 썸네일은 서버를 거쳐 받아서, DeArrow에는 보는 사람 대신 서버가 보여요.
+
+</details>
+
+## FreeTube, NewPipe와 뭐가 다른가요?
+
+FreeTube와 NewPipe는 오래되고 훌륭한 프로젝트이고, TubeHaus도 많은 걸 배웠어요. 차이는 주로 어디서 돌아가는지와 생김새예요.
+
+| | **TubeHaus** | **FreeTube** | **NewPipe** |
+|---|---|---|---|
+| **돌아가는 곳** | 안드로이드 폰과 안드로이드 TV / 구글 TV, 윈도우, macOS, 리눅스, 아이패드/아이폰(사이드로드), 서버판으로는 모든 브라우저 | 윈도우, macOS, 리눅스 | 안드로이드 폰과 태블릿 |
+| **생김새** | 유튜브와 같음: 같은 배치, 같은 단축키 | 자체 디자인 | 자체 디자인 |
+| **구글 계정** | 필요 없음 | 필요 없음 | 필요 없음 |
+| **첫 화면** | 본 것·좋아요·건너뛴 것·숨긴 것으로 기기 안에서 배운 추천, 밖으로 나가는 건 없음 | 구독, 인기 | 구독 피드, 인기 |
+| **여러 기기에서 하나의 보관함** | 선택: 앱들을 내 TubeHaus 서버에 연결 | 파일로 내보내기/가져오기 | 파일로 내보내기/가져오기 |
+| **SponsorBlock, DeArrow** | 둘 다 기본 포함 | 둘 다 기본 포함 | 공식 앱에는 없음(포크인 Tubular에 SponsorBlock) |
+| **TV에서** | 리모컨용: 방향키로 움직이는 TV 화면 | TV판 없음 | 되긴 하지만 폰용 화면 |
+| **역사** | 새 프로젝트(2026), 베타, 관리자 1명 | 2018년부터, 큰 커뮤니티 | 2015년부터, 큰 커뮤니티, F-Droid에 있음 |
+
+**다른 걸 고르면 좋을 때:** 컴퓨터용 앱 하나만 필요하고 가장 검증된 걸 원하면 FreeTube가 아주 좋아요. 안드로이드 폰만 쓰고 오랜 역사와 F-Droid를 원하면 NewPipe가 아주 좋아요. TubeHaus는 TV, 폰, PC, 아이패드에서 유튜브처럼 생긴 같은 앱을 쓰고, 원하면 보관함까지 하나로 묶고 싶을 때를 위한 거예요.
+
+## 빠른 설치 (Docker)
+
+| 필요한 것 | |
+|---|---|
+| **서버** | Docker와 docker compose가 있는 리눅스, x86-64 또는 ARM64(오라클 클라우드 무료 ARM 서버로 충분해요) |
+| **CPU / 메모리** | 2코어 이상, 메모리 약 4GB. 라이브 자막을 켜고 라이브를 볼 때만 코어 하나를 더 써요 |
+| **디스크** | 약 10~20GB, 대부분 이미지예요. 영상은 저장하지 않고 흘려보내요 |
+| **주소** | HTTPS용 도메인, 또는 sslip.io 같은 무료 와일드카드 이름. 집 안에서만 쓰면 HTTP도 돼요 |
+
+```sh
+git clone https://github.com/biolend83/tubehaus && cd tubehaus
+cp .env.example .env        # 도메인을 넣어요
+docker compose pull         # 미리 빌드된 이미지 (amd64, arm64)
+docker compose up -d
+```
+
+끝이에요. Caddy, 자체 유튜브 엔진과 Cloudflare WARP가 들어 있는 TubeHaus 서버, 라이브용 PO 토큰 제공기, 라이브 자막용 whisper.cpp가 한 번에 올라와요. 도메인을 열면 돼요.
+
+> [!NOTE]
+> **TrueNAS를 쓰나요?** TubeHaus가 TrueNAS 앱 목록에 있어요. **Apps → Discover Apps**에서 **TubeHaus**를 검색하세요(community 트레인). 클론할 필요가 없어요.
+
+> [!IMPORTANT]
+> **공개 도메인에 올릴 거라면 `.env`에 로그인부터 넣으세요:** `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER`, `TUBEHAUS_PASSWORD_HASH` (해시는 `docker compose run --rm caddy caddy hash-password`로 만들고, `$`는 모두 `$$`로 써요). 이게 없으면 주소를 여는 사람 모두가 같은 보관함을 써요. 다른 방법: [외부에 열기 전에 로그인 붙이기](#외부에-열기-전에-로그인-붙이기).
+
+> [!TIP]
+> **1.5 이하에서 업데이트하나요?** 이제 Invidious, companion, PostgreSQL은 필요 없어요. `git pull` 다음에 `docker compose pull && docker compose up -d --remove-orphans`로 내리면 돼요. `.env`의 그쪽 비밀값은 지워도 돼요. 보관함은 `tubehaus-data` 볼륨에 그대로 있어요. 자세히: [업데이트와 백업](README.md#updating-and-backups)(영어).
+
+<details>
+<summary><b>도메인이 없거나, 이미 쓰는 리버스 프록시 뒤에 둘 때</b></summary>
+
+Caddy가 아무 포트에서나 HTTP로 열 수 있어요. 설정 예시와 nginx·Traefik 전체 예시는 [영어 README](README.md#quick-start-docker)와 [Running behind your own reverse proxy](README.md#running-tubehaus-behind-your-own-reverse-proxy)(영어)에 있어요.
+
+</details>
+
+<details>
+<summary><b>docker compose 대신 Flisk로</b></summary>
+
+같은 컨테이너 세 개가 [Flisk](https://flisk.sh)용으로도 적혀 있고 같은 `.env`를 읽어요. 선택 사항이고, 기본은 계속 docker compose예요.
+
+```sh
+npm install -g @flisk-sh/flisk   # Flisk 1.4.26 이상
+git clone https://github.com/biolend83/tubehaus && cd tubehaus
+cp .env.example .env
+flisk up                          # flisk status / flisk logs --service tubehaus / flisk down
+```
+
+한 서버에서는 둘 중 하나만 쓰세요. 포트, 볼륨, 업데이트, 기존 설치 옮기기는 [Running with Flisk](README.md#running-tubehaus-with-flisk-optional)에 있어요. Flisk 구성은 @odykyi 님이 만들어 주셨어요 (#40, #42).
+
+</details>
+
+### 외부에 열기 전에 로그인 붙이기
+
+기본으로는 계정이 없어서, 로그인을 안 붙이면 주소를 아는 사람 모두가 같은 보관함을 봐요.
+
+- **내장 비밀번호:** `.env`에 `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER`, `TUBEHAUS_PASSWORD_HASH` (해시는 `docker compose run --rm caddy caddy hash-password`, `$`는 모두 `$$`로)
+- **사람마다 계정:** `TUBEHAUS_AUTH=accounts`면 로그인 화면이 생기고 보관함이 사람마다 따로예요
+- **통합 로그인(SSO):** 계정을 켠 상태에서 `TUBEHAUS_OIDC_ISSUER`, `TUBEHAUS_OIDC_CLIENT_ID`, `TUBEHAUS_OIDC_CLIENT_SECRET`을 넣으면 OpenID Connect 제공자(Authentik, Authelia, Keycloak, Pocket ID 등)로 "…(으)로 계속하기" 버튼이 생겨요. 리디렉션 주소는 `<TUBEHAUS_URL>/api/p/auth/oidc/callback`, `TUBEHAUS_OIDC_ONLY=1`이면 비밀번호 로그인은 꺼져요
+- **내 문지기:** Authelia, Authentik, 패스키 게이트를 `forward_auth`로 앞에
+- **아예 안 열기:** 집 네트워크에서만, 또는 Tailscale·WireGuard로 어디서든
+
+차례로 적어 둔 안내: [가족에게 TubeHaus 열어 주기](README.md#opening-tubehaus-to-your-household)(영어).
+
+### 잘 돌아가는지 점검
+
+```sh
+docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
+```
+
+WARP, 유튜브 연결, 검색, 실제 영상 조회(스트림 몇 바이트까지), 선택 기능(yt-dlp, ffmpeg, whisper)을 한 줄씩 점검해요. 문제가 있으면 [문제 해결](README.md#troubleshooting)(영어)을 보세요. 직접 설치(Docker 없이)와 설정 항목 전체는 [영어 README](README.md#manual-setup)에 있어요.
+
+### 이미지 두 개: tubehaus와 tubehaus-web
+
+둘 중에 고르는 판(에디션)이 아니라, 하나는 서버고 하나는 웹 화면이에요. 어떤 설치든 서버 하나에 웹 화면을 보여 주는 쪽이 하나 붙어요.
+
+| 이미지 | 하는 일 | 포트 |
+|---|---|---|
+| `ghcr.io/biolend83/tubehaus` | **서버.** 유튜브와 통신하고, 보관함, 라이브 자막, 오프라인 저장, 같이 보기 방. 화면은 없어요 | 3010 (안쪽) |
+| `ghcr.io/biolend83/tubehaus-web` | **웹 화면과 출입구.** 화면과, 나머지 요청을 서버로 보내는 Caddy. 밖으로 여는 포트는 이것 하나 | 8080 |
+
+- **이 저장소에서 `docker compose up`** 하면 `tubehaus`만 써요. 화면은 받아 둔 저장소의 `web/` 폴더를 일반 `caddy` 이미지가 보여 줘요
+- **앱 스토어**(Umbrel, CasaOS, TrueNAS)는 둘 다 써요. 앱은 하나로 보이고 포트는 8796 하나만 열려요
+- **Unraid**는 **TubeHaus**, **TubeHaus-Web** 템플릿 두 개로 보여요. 또는 Docker Compose Manager 플러그인과 [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml)로 한 번에
+- **저장소 없이 집 서버에 바로:** [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml)이 스토어와 같은 구성이에요(포트 하나, WARP 없음, 추가 권한 없음)
+
+두 이미지는 서버 릴리스마다 같은 버전 번호로 함께 나와요. 버전을 맞춰 쓰세요.
+
+## 어떻게 이어져 있나요
+
+```
+브라우저 ──► Caddy ─┬─ /y/*, 페이지 이동 ──► web/ (화면)
+                    └─ 나머지 전부 ───────► TubeHaus 서버
+                                              │  보관함, 라이브, 자막, 저장,
+                                              │  그리고 자체 유튜브 엔진 (/api/v1/*,
+                                              │  영상 스트림, 자막, 썸네일)
+                                              ▼
+                                  Cloudflare WARP (프록시 모드)
+                                              │
+                                           YouTube
+```
+
+엔진은 유튜브 공식 앱들과 같은 방식으로 물어봐요. 목록(검색, 채널, 재생목록, 댓글)은 웹 클라이언트로, 영상 스트림은 visionOS 클라이언트로(PO 토큰 없는 그냥 주소), 그게 거절되면 SABR로, 정확한 업로드 시각과 분류는 웹 플레이어로, 열어 둔 채 압축한 연결로요. 답은 Invidious API 모양(`/api/v1/videos`, `/api/v1/search` 등, `?local=true` 포함)이라 그 API를 쓰는 도구도 붙일 수 있어요. 자세히: [How TubeHaus is put together](README.md#how-tubehaus-is-put-together)(영어).
+
+## 공개 서버로 열기
+
+<details>
+<summary><b>설치 없이 써 보게 해 주기: <code>TUBEHAUS_PUBLIC=1</code></b></summary>
+
+- **방문자 기록은 각자의 브라우저에 저장돼요.** 구독, 시청 기록, 이어보기, 재생목록이 서버에 남지 않아서, 모르는 사람끼리 서로의 기록을 볼 수 없어요
+- **서버는 저장 없는 일만 해요:** 피드 받아오기, 가져오기 파일 읽기, 내보내기 변환, 영상 재생
+- **꺼지는 기능:** TV로 보내기, 서버 다운로드(낯선 사람끼리 공유되기 때문), 쇼츠 추천 학습
+- **사람이 몰려도 버티게:** `.env`에서 동시 시청자 수(`TUBEHAUS_MAX_VIEWERS`), 최고 화질(`TUBEHAUS_MAX_HEIGHT`, 예: 1080), 한 사람당 분당 요청 수(`TUBEHAUS_RATE_PER_MIN`, 공개 서버 기본 120)를 정할 수 있어요. 자리가 차면 새로 온 사람에게 "바빠요, 잠시 뒤에"라고 알려주고, 이미 보는 사람은 끊기지 않아요. 같은 영상이나 같은 채널을 여러 명이 동시에 열면 유튜브에는 한 번만 물어보고, 라이브는 몇 명이 보든 한 번만 받아와요
+- **바로 쓰는 공개 서버 구성:** `deploy/docker-compose.public.yml`에 다 들어 있어요. 들어오면 먼저 봇 확인 화면(Anubis, 몇 초 계산)이 뜨고, 그다음 계정 만들기(사용자 이름과 비밀번호만, 이메일 없음)를 해야 볼 수 있어요. 비밀번호는 60만 번 해싱해서 저장하고, 가입과 로그인은 네트워크마다 횟수를 제한해요
+- **열기 전에:** 영상이 서버를 거쳐서 데이터 사용량이 커요. 사람이 많으면 유튜브에 더 빨리 막힐 수 있어요. 내장 비밀번호는 끄고 두세요
+
+</details>
+
+## 자주 묻는 질문
+
+<details>
+<summary><b>유튜브가 막으면 어떻게 되나요?</b></summary>
+
+세 겹으로 막아요. 영상이 거절되면 다음 방법으로 넘어가요(visionOS 클라이언트 → 유튜브 키즈 → SABR → TV 클라이언트). 그래서 문 하나가 닫혀도 재생이 멈추지 않아요. 유튜브가 주소를 의심하면("봇이 아님을 확인", 구글 "sorry" 페이지) 서버가 스스로 새 WARP 주소로 바꾸고 요청을 다시 보내요. 그리고 매일 [검사](.github/workflows/engine-check.yml)가 엔진의 모든 기능을 실제 유튜브에 돌려 보고, 하나라도 깨지면 바로 이슈를 열어요. 그래서 대부분 알아채기 전에 고쳐져요.
+
+</details>
+
+<details>
+<summary><b>SABR이 뭐고, 따로 켜야 하나요?</b></summary>
+
+youtube.com이 직접 쓰는 방식이에요. 주소 하나로, 플레이어가 지금 위치와 원하는 걸 작은 요청으로 알려요([자세히](#어떻게-재생하나)). 기본으로 예비 방법으로 켜져 있어서 설정할 건 없어요. 서버에서 `HT_SABR=only`로 하면 SABR이 주 방법이 돼요. 대신 새 영상마다 1초 안이 아니라 3초쯤 걸려요.
+
+</details>
+
+<details>
+<summary><b>아직 Invidious가 필요한가요? 쓰던 건 그대로 둬도 되나요?</b></summary>
+
+아니요, 1.6부터는 서버가 유튜브에 직접 물어봐요. 답은 Invidious API와 같은 모양이라, Invidious 인스턴스의 API를 쓰는 앱(Yattee, FreeTube의 API 모드 등)도 붙을 수 있어요. 다만 Invidious 계정이 필요한 부분(그쪽 구독, 로그인)은 없어요. 쓰던 Invidious는 그대로 둬도 서로 방해하지 않아요. TubeHaus가 더 이상 쓰지 않을 뿐이에요.
+
+</details>
+
+<details>
+<summary><b>영상은 어디서 오나요? 서버에 저장되나요?</b></summary>
+
+전부 유튜브에서 와요. 보관함(구독, 기록, 재생목록)과, 저장할 때 잠깐 쓰는 임시 파일 말고는 아무것도 저장하지 않아요.
+
+</details>
+
+<details>
+<summary><b>추천 알고리즘이 있나요?</b></summary>
+
+쇼츠에는 있어요. 전부 내 서버에서 돌아가요(위의 "내 서버에서 배우는 쇼츠"). 일반 영상은 구독 피드, 인기와 분야별 탭, 영상마다 유튜브가 주는 관련 영상 목록을 보여줘요. 구글 계정이 없으니 구글이 내 시청을 학습하는 일은 없어요.
+
+</details>
+
+<details>
+<summary><b>연령 제한 영상은요?</b></summary>
+
+대부분 재생되지 않아요. 나이 확인을 통과할 로그인 계정이 없기 때문이에요.
+
+</details>
+
+<details>
+<summary><b>구독을 가져오거나, 내 데이터를 빼낼 수 있나요?</b></summary>
+
+네. 설정 → 내 데이터(또는 구독 관리 화면)의 **파일에서 가져오기**로 구글 Takeout(구독 CSV, `watch-history.json` 시청 기록), Invidious, NewPipe, FreeTube 내보내기 파일, OPML, TubeHaus 백업을 가져올 수 있어요. **내보내기**로는 TubeHaus 전체 백업(구독, 시청 기록, 이어보기, 재생목록, 좋아요), Invidious 형식, Takeout과 같은 CSV, RSS 리더용 OPML을 받을 수 있어요. 내 데이터가 TubeHaus에 갇히는 일은 없어요.
+
+</details>
+
+<details>
+<summary><b>밖으로 정보를 보내나요?</b></summary>
+
+아니요. 계정도 원격 수집도 없어요. 밖으로 나가는 요청은 유튜브(서버에서, WARP를 거쳐서), DeArrow 썸네일 서버(서버에서, DeArrow 썸네일을 켰을 때), 그리고 브라우저의 선택 기능(SponsorBlock, DeArrow, Return YouTube Dislike)뿐이에요.
+
+</details>
+
+<details>
+<summary><b>폰과 TV에서는 어떻게 접속하나요?</b></summary>
+
+웹앱이에요. 브라우저에서 내 주소를 열거나, "홈 화면에 추가"로 앱처럼 설치하면 돼요. TV 브라우저에서는 리모컨으로 조작하는 TV 모드가 켜져요. 또는 [TubeHaus 앱](#앱-받기)을 따로, 또는 내 서버에 연결해서 쓰세요.
+
+</details>
+
+
+<details>
+<summary><b>서버가 변환(트랜스코딩)하나요? 제 NAS는 AV1을 못 풀어요.</b></summary>
+
+변환은 전혀 안 해요. 서버는 유튜브에서 받은 영상을 그대로 넘기기만 해서, 작은 NAS나 라즈베리 파이도 거의 일을 안 해요. 영상을 푸는 건 보는 기기이고, 플레이어가 그 기기가 하드웨어로 풀 수 있는 형식(AV1, VP9, H.264 모두 유튜브가 줘요)을 골라요. AV1을 못 푸는 예전 폰은 그냥 VP9이나 H.264를 받아요. 예외는 1080p·4K 내려받기 하나로, 이때 ffmpeg가 화면과 소리를 다시 인코딩 없이 합쳐요.
+
+</details>
+
+<details>
+<summary><b>집 밖에서는 어떻게 보나요?</b></summary>
+
+가장 쉬운 건 사설망이에요. [Tailscale](https://tailscale.com)이나 WireGuard를 켜고 집에서와 같은 주소로, 브라우저나 앱에서 보면 돼요. 인터넷에 직접 열려면 도메인을 붙이고(HTTPS 인증서는 Caddy가 알아서 받아요) 먼저 [로그인을 붙이세요](#외부에-열기-전에-로그인-붙이기).
+
+</details>
+
+<details>
+<summary><b>영상이 안 나와요. 뭘 해 볼 수 있나요?</b></summary>
+
+먼저 몇 초 기다려 보세요. 평소 방법이 막히면 다음 방법을 알아서 시도해요(SABR은 2~3초). 앱에서는 플레이어 설정 → **재생 방식**에서 한 가지를 고정할 수 있어요. 다른 방법으로 안 되는 영상은 대부분 *SABR*이나 *TV*로, 어린이용 영상은 대부분 *YouTube Kids*로 나와요. 서버라면 위의 `--doctor`로 유튜브가 응답하는지 볼 수 있어요. 그래도 안 되면 영상 링크와 함께 [이슈를 남겨 주세요](https://github.com/biolend83/tubehaus/issues).
+
+</details>
+
 ## 어떻게 재생하나
 
 긴 버전이에요. 유튜브가 자기 것이 아닌 플레이어에게 뭘 하는지, TubeHaus는 거기에 어떻게 대응하는지, 첫 요청부터 화면에 뜨는 마지막 바이트까지. 궁금한 사람을 위한 글이라 TubeHaus를 쓰는 데는 몰라도 돼요. 다만 다른 유튜브 앱들이 왜 몇 달마다 망가지는지, 이건 왜 계속 되는지 궁금했다면 여기에 답이 있어요.
@@ -521,343 +852,12 @@ TubeHaus가 Invidious 위에서 돌 때 영상 페이지가 1.3초 걸렸어요.
 
 TubeHaus는 다른 이들의 작업 위에 서 있어요. [yt-dlp](https://github.com/yt-dlp/yt-dlp)(EJS 풀이기, 그리고 유튜브에 대한 수년간의 공개 지식), [googlevideo](https://github.com/LuanRT/googlevideo), [BgUtils](https://github.com/LuanRT/BgUtils), [YouTube.js](https://github.com/LuanRT/YouTube.js)(SABR, UMP, BotGuard), [Invidious](https://invidious.io)와 invidious-companion(1.5까지 TubeHaus의 바탕), [whisper.cpp](https://github.com/ggml-org/whisper.cpp), Shaka Player, ExoPlayer, mpv. 고마워요.
 
-## 빠름, 자체 유튜브 엔진으로
-
-1.6부터 서버판은 Invidious 위에서 돌지 않아요. 유튜브에 직접 물어봐서 **컨테이너가 세 개 줄었어요**(Invidious, companion, PostgreSQL 없음). 속도도 빨라요. 영상은 스트림만 받으면 바로 재생되고 제목·설명·관련 영상은 잠깐 뒤에 채워져요. 받은 답은 보관해 두고 뒤에서 새로 고치고, 유튜브 영상 서버와의 연결은 열어 둔 채 다시 쓰고, 댓글은 영상을 열 때 같이 받아 둬요.
-
-| | TubeHaus 1.6.3 | Invidious |
-|---|---|---|
-| **영상 재생 시작** | **0.16초** `▇▇` | 1.29초 `▇▇▇▇▇▇▇▇▇▇▇▇▇` |
-| 영상 화면 전체 (제목, 설명, 관련 영상) | **0.59초** `▇▇▇▇▇▇` | 1.29초 `▇▇▇▇▇▇▇▇▇▇▇▇▇` |
-| 채널 | **0.38초** `▇▇▇▇` | 0.66초 `▇▇▇▇▇▇▇` |
-| 채널의 영상 목록 | **0.28초** `▇▇▇` | 0.61초 `▇▇▇▇▇▇` |
-| 검색 | **0.56초** `▇▇▇▇▇▇` | 0.56초 `▇▇▇▇▇▇` |
-| 댓글 (영상을 연 뒤) | **0.002초** `▏` | 0.16초 `▇▇` |
-| **다시 여는 것 전부** | **0.002초** `▏` | – |
-| 스트림 조각 하나 | **0.07초** `▇` | – |
-
-각각 처음 여는 10~12번의 중앙값이에요. 같은 서버, 같은 WARP 주소에서 쟀어요(TubeHaus는 2026-11-17, Invidious는 서버에서 내리기 전 1.6.0 비교 때). 검색이나 채널은 대부분 유튜브가 답하는 시간이라 더 줄이기 어려워요. 대신 TubeHaus는 화면이 다 차기 전에 영상부터 틀고, 다음에 누를 것을 보는 동안 미리 받고, 같은 것을 두 번 받지 않아요. 스트림 조각은 열린 연결을 다시 써요(새 연결은 0.17초).
-
-영상에 마우스를 올리거나 검색 결과가 뜨면 앞의 몇 개를 미리 받아 둬서, 누르면 대개 이미 준비된 화면이 열려요. 답은 여전히 [Invidious](https://invidious.io) API 모양이라 웹 화면, 앱의 서버 모드, 그 API를 쓰는 다른 도구가 그대로 돌아가요. 1.5까지는 Invidious와 [invidious-companion](https://github.com/iv-org/invidious-companion) 위에서 동작했고, 유튜브에 대해 아는 많은 것을 두 프로젝트에서 배웠어요. Invidious 팀에 감사드려요. 1.5에서 업데이트한다면 [아래](#빠른-설치-docker)를 보세요.
-
-<div align="center">
-<img src="docs/tour.gif" alt="TubeHaus: 첫 화면, 검색, 영상과 &quot;이 영상 한눈에&quot;" width="860">
-</div>
-
-## 서버판이 좋은 점
-
-<table>
-<tr>
-<td width="50%" valign="top">
-
-**⚡ 누르자마자, 늘 최고 화질로**<br>
-영상 정보를 서버에 받아 두고 뒤에서 새로 고치고, 다음에 누를 만한 영상도 미리 받아 둬요. 화질을 알아서 낮추지 않아요. 60프레임과 기기가 하드웨어로 푸는 코덱을 먼저 고르고, 8K도 버퍼에 맞춰요.
-
-</td>
-<td width="50%" valign="top">
-
-**🔒 기기가 구글과 통신하지 않아요**<br>
-영상, 썸네일, 페이지가 전부 내 서버를 거쳐요. 구글 쿠키도 유튜브 스크립트도 브라우저에 들어오지 않아요. 유튜브는 Cloudflare WARP 주소만 보고, 우리 집 주소는 몰라요.
-
-</td>
-</tr>
-<tr>
-<td valign="top">
-
-**🎙️ 라이브 실시간 자막**<br>
-유튜브는 라이브에 자막을 안 줘요. TubeHaus는 [whisper.cpp](https://github.com/ggml-org/whisper.cpp)로 받아써서 재생보다 몇 초 앞서 자막을 만들어요. CPU 코어 하나면 돼요. 라이브도 조각을 미리 받아 정확히 이어 붙여서 끊기지 않아요.
-
-</td>
-<td valign="top">
-
-**📺 TV에도 맞춰서**<br>
-리모컨의 방향키, 확인, 뒤로만으로 움직이는 TV 모드, 그리고 **TV로 보내기**: 폰에서 고르면 TV에서 재생돼요(크롬캐스트 필요 없음). **같이 보기**는 방 안의 모두를 같은 초에 맞춰요.
-
-</td>
-</tr>
-<tr>
-<td valign="top">
-
-**🌿 차분 모드**<br>
-스위치 하나로 유튜브를 다시 "도구"로: 홈에는 구독 채널의 새 영상만, 쇼츠·인기·추천은 사라지고, 다음 영상 자동 재생도 없고, 댓글은 눌러야 펼쳐져요. 검색은 그대로예요.
-
-</td>
-<td valign="top">
-
-**🧠 내 서버에서 배우는 쇼츠**<br>
-몇 초 봤는지, 반복했는지, 좋아요를 눌렀는지, 넘겼는지가 채널·주제별 점수가 되어 내 서버의 작은 파일에 저장돼요. 네 번째 칸마다 새로운 것을 섞어요. 서버 밖으로 나가는 건 없고, 언제든 초기화할 수 있어요.
-
-</td>
-</tr>
-<tr>
-<td valign="top">
-
-**🚫 낚시 제목·광고 읽기 끝**<br>
-[DeArrow](https://dearrow.ajay.app)로 올린 사람 대신 사람들이 고른 제목과 썸네일, [SponsorBlock](https://sponsor.ajay.app)으로 광고 구간 건너뛰기와 "하이라이트로 이동", Return YouTube Dislike로 싫어요 수.
-
-</td>
-<td valign="top">
-
-**💾 원본 화질로 저장**<br>
-1080p와 4K는 영상과 소리가 따로 와요. 서버가 둘 다 받아서 ffmpeg로 합쳐 줘요. 내 언어 자막이 없는 영상은 번역 자막으로 봐요.
-
-</td>
-</tr>
-<tr>
-<td valign="top">
-
-**☁️ 값싼 클라우드 서버에서도**<br>
-클라우드 주소는 "봇이 아닌지 확인하려면 로그인하세요"가 자주 떠요. TubeHaus는 **Cloudflare WARP(프록시 모드)**로 나가고, 막히면 방문자 정보를 새로 받고, 그래도 막히면 WARP 주소를 바꿔요.
-
-</td>
-<td valign="top">
-
-**🌍 15개 언어**<br>
-한국어 · English · 日本語 · 简体中文 · Español · Português · Français · Deutsch · Русский · हिन्दी · Bahasa Indonesia · Türkçe · বাংলা · Tiếng Việt · Polski. 조회수와 날짜도 언어마다 그 나라 방식으로 보여요.
-
-</td>
-</tr>
-</table>
-
-<details>
-<summary><b>그 밖의 기능</b></summary>
-
-- 유튜브와 같은 화면: 홈, 검색, 채널, 재생목록, 구독, 기록, 보관함, 인기 급상승, 그리고 유튜브의 주제 페이지(음악, 실시간, 뉴스, 게임, 스포츠, 학습, 패션·뷰티)를 선반 그대로
-- [Shaka Player](https://github.com/shaka-project/shaka-player) 기반 플레이어: 챕터, 탐색 미리보기, 재생바 위 **"가장 많이 다시 본 장면"** 물결, 재생 속도, 수면 타이머, 통계, 미니 플레이어, 영화관 모드, 앰비언트 모드, 잠금 화면과 블루투스 버튼 조작
-- 모든 기기가 같은 보관함: 구독(RSS 기반 피드), 시청 기록, 이어보기, 나중에 볼 동영상, 좋아요, 재생목록
-- 댓글, 스크립트, 마우스를 올리면 정확한 업로드 시각
-- 구글 Takeout, Invidious, NewPipe, FreeTube, OPML, TubeHaus 백업에서 가져오기, 그리고 그 모든 형식으로 내보내기
-
-브라우저가 직접 하는 선택 기능: SponsorBlock과 DeArrow(둘 다 영상 ID 대신 해시 앞부분만 보내요), Return YouTube Dislike. DeArrow 썸네일은 서버를 거쳐 받아서, DeArrow에는 보는 사람 대신 서버가 보여요.
-
-</details>
-
-## FreeTube, NewPipe와 뭐가 다른가요?
-
-FreeTube와 NewPipe는 오래되고 훌륭한 프로젝트이고, TubeHaus도 많은 걸 배웠어요. 차이는 주로 어디서 돌아가는지와 생김새예요.
-
-| | **TubeHaus** | **FreeTube** | **NewPipe** |
-|---|---|---|---|
-| **돌아가는 곳** | 안드로이드 폰과 안드로이드 TV / 구글 TV, 윈도우, macOS, 리눅스, 아이패드/아이폰(사이드로드), 서버판으로는 모든 브라우저 | 윈도우, macOS, 리눅스 | 안드로이드 폰과 태블릿 |
-| **생김새** | 유튜브와 같음: 같은 배치, 같은 단축키 | 자체 디자인 | 자체 디자인 |
-| **구글 계정** | 필요 없음 | 필요 없음 | 필요 없음 |
-| **첫 화면** | 본 것·좋아요·건너뛴 것·숨긴 것으로 기기 안에서 배운 추천, 밖으로 나가는 건 없음 | 구독, 인기 | 구독 피드, 인기 |
-| **여러 기기에서 하나의 보관함** | 선택: 앱들을 내 TubeHaus 서버에 연결 | 파일로 내보내기/가져오기 | 파일로 내보내기/가져오기 |
-| **SponsorBlock, DeArrow** | 둘 다 기본 포함 | 둘 다 기본 포함 | 공식 앱에는 없음(포크인 Tubular에 SponsorBlock) |
-| **TV에서** | 리모컨용: 방향키로 움직이는 TV 화면 | TV판 없음 | 되긴 하지만 폰용 화면 |
-| **역사** | 새 프로젝트(2026), 베타, 관리자 1명 | 2018년부터, 큰 커뮤니티 | 2015년부터, 큰 커뮤니티, F-Droid에 있음 |
-
-**다른 걸 고르면 좋을 때:** 컴퓨터용 앱 하나만 필요하고 가장 검증된 걸 원하면 FreeTube가 아주 좋아요. 안드로이드 폰만 쓰고 오랜 역사와 F-Droid를 원하면 NewPipe가 아주 좋아요. TubeHaus는 TV, 폰, PC, 아이패드에서 유튜브처럼 생긴 같은 앱을 쓰고, 원하면 보관함까지 하나로 묶고 싶을 때를 위한 거예요.
-
-## 빠른 설치 (Docker)
-
-| 필요한 것 | |
-|---|---|
-| **서버** | Docker와 docker compose가 있는 리눅스, x86-64 또는 ARM64(오라클 클라우드 무료 ARM 서버로 충분해요) |
-| **CPU / 메모리** | 2코어 이상, 메모리 약 4GB. 라이브 자막을 켜고 라이브를 볼 때만 코어 하나를 더 써요 |
-| **디스크** | 약 10~20GB, 대부분 이미지예요. 영상은 저장하지 않고 흘려보내요 |
-| **주소** | HTTPS용 도메인, 또는 sslip.io 같은 무료 와일드카드 이름. 집 안에서만 쓰면 HTTP도 돼요 |
-
-```sh
-git clone https://github.com/biolend83/tubehaus && cd tubehaus
-cp .env.example .env        # 도메인을 넣어요
-docker compose pull         # 미리 빌드된 이미지 (amd64, arm64)
-docker compose up -d
-```
-
-끝이에요. Caddy, 자체 유튜브 엔진과 Cloudflare WARP가 들어 있는 TubeHaus 서버, 라이브용 PO 토큰 제공기, 라이브 자막용 whisper.cpp가 한 번에 올라와요. 도메인을 열면 돼요.
-
-> [!NOTE]
-> **TrueNAS를 쓰나요?** TubeHaus가 TrueNAS 앱 목록에 있어요. **Apps → Discover Apps**에서 **TubeHaus**를 검색하세요(community 트레인). 클론할 필요가 없어요.
-
-> [!IMPORTANT]
-> **공개 도메인에 올릴 거라면 `.env`에 로그인부터 넣으세요:** `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER`, `TUBEHAUS_PASSWORD_HASH` (해시는 `docker compose run --rm caddy caddy hash-password`로 만들고, `$`는 모두 `$$`로 써요). 이게 없으면 주소를 여는 사람 모두가 같은 보관함을 써요. 다른 방법: [외부에 열기 전에 로그인 붙이기](#외부에-열기-전에-로그인-붙이기).
-
-> [!TIP]
-> **1.5 이하에서 업데이트하나요?** 이제 Invidious, companion, PostgreSQL은 필요 없어요. `git pull` 다음에 `docker compose pull && docker compose up -d --remove-orphans`로 내리면 돼요. `.env`의 그쪽 비밀값은 지워도 돼요. 보관함은 `tubehaus-data` 볼륨에 그대로 있어요. 자세히: [업데이트와 백업](docs/UPGRADING.md)(영어).
-
-<details>
-<summary><b>도메인이 없거나, 이미 쓰는 리버스 프록시 뒤에 둘 때</b></summary>
-
-Caddy가 아무 포트에서나 HTTP로 열 수 있어요. 설정 예시와 nginx·Traefik 전체 예시는 [영어 README](README.md#quick-start-docker)와 [docs/reverse-proxy.md](docs/reverse-proxy.md)(영어)에 있어요.
-
-</details>
-
-<details>
-<summary><b>docker compose 대신 Flisk로</b></summary>
-
-같은 컨테이너 세 개가 [Flisk](https://flisk.sh)용으로도 적혀 있고 같은 `.env`를 읽어요. 선택 사항이고, 기본은 계속 docker compose예요.
-
-```sh
-npm install -g @flisk-sh/flisk   # Flisk 1.4.26 이상
-git clone https://github.com/biolend83/tubehaus && cd tubehaus
-cp .env.example .env
-flisk up                          # flisk status / flisk logs --service tubehaus / flisk down
-```
-
-한 서버에서는 둘 중 하나만 쓰세요. 포트, 볼륨, 업데이트, 기존 설치 옮기기는 [docs/FLISK.md](docs/FLISK.md)에 있어요. Flisk 구성은 @odykyi 님이 만들어 주셨어요 (#40, #42).
-
-</details>
-
-### 외부에 열기 전에 로그인 붙이기
-
-기본으로는 계정이 없어서, 로그인을 안 붙이면 주소를 아는 사람 모두가 같은 보관함을 봐요.
-
-- **내장 비밀번호:** `.env`에 `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER`, `TUBEHAUS_PASSWORD_HASH` (해시는 `docker compose run --rm caddy caddy hash-password`, `$`는 모두 `$$`로)
-- **사람마다 계정:** `TUBEHAUS_AUTH=accounts`면 로그인 화면이 생기고 보관함이 사람마다 따로예요
-- **통합 로그인(SSO):** 계정을 켠 상태에서 `TUBEHAUS_OIDC_ISSUER`, `TUBEHAUS_OIDC_CLIENT_ID`, `TUBEHAUS_OIDC_CLIENT_SECRET`을 넣으면 OpenID Connect 제공자(Authentik, Authelia, Keycloak, Pocket ID 등)로 "…(으)로 계속하기" 버튼이 생겨요. 리디렉션 주소는 `<TUBEHAUS_URL>/api/p/auth/oidc/callback`, `TUBEHAUS_OIDC_ONLY=1`이면 비밀번호 로그인은 꺼져요
-- **내 문지기:** Authelia, Authentik, 패스키 게이트를 `forward_auth`로 앞에
-- **아예 안 열기:** 집 네트워크에서만, 또는 Tailscale·WireGuard로 어디서든
-
-차례로 적어 둔 안내: [가족에게 TubeHaus 열어 주기](docs/SELF-HOSTING.md)(영어).
-
-### 잘 돌아가는지 점검
-
-```sh
-docker compose exec tubehaus python3 /app/server/tubehaus_server.py --doctor
-```
-
-WARP, 유튜브 연결, 검색, 실제 영상 조회(스트림 몇 바이트까지), 선택 기능(yt-dlp, ffmpeg, whisper)을 한 줄씩 점검해요. 문제가 있으면 [문제 해결](docs/TROUBLESHOOTING.md)(영어)을 보세요. 직접 설치(Docker 없이)와 설정 항목 전체는 [영어 README](README.md#manual-setup)에 있어요.
-
-### 이미지 두 개: tubehaus와 tubehaus-web
-
-둘 중에 고르는 판(에디션)이 아니라, 하나는 서버고 하나는 웹 화면이에요. 어떤 설치든 서버 하나에 웹 화면을 보여 주는 쪽이 하나 붙어요.
-
-| 이미지 | 하는 일 | 포트 |
-|---|---|---|
-| `ghcr.io/biolend83/tubehaus` | **서버.** 유튜브와 통신하고, 보관함, 라이브 자막, 오프라인 저장, 같이 보기 방. 화면은 없어요 | 3010 (안쪽) |
-| `ghcr.io/biolend83/tubehaus-web` | **웹 화면과 출입구.** 화면과, 나머지 요청을 서버로 보내는 Caddy. 밖으로 여는 포트는 이것 하나 | 8080 |
-
-- **이 저장소에서 `docker compose up`** 하면 `tubehaus`만 써요. 화면은 받아 둔 저장소의 `web/` 폴더를 일반 `caddy` 이미지가 보여 줘요
-- **앱 스토어**(Umbrel, CasaOS, TrueNAS)는 둘 다 써요. 앱은 하나로 보이고 포트는 8796 하나만 열려요
-- **Unraid**는 **TubeHaus**, **TubeHaus-Web** 템플릿 두 개로 보여요. 또는 Docker Compose Manager 플러그인과 [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml)로 한 번에
-- **저장소 없이 집 서버에 바로:** [`deploy/docker-compose.home.yml`](deploy/docker-compose.home.yml)이 스토어와 같은 구성이에요(포트 하나, WARP 없음, 추가 권한 없음)
-
-두 이미지는 서버 릴리스마다 같은 버전 번호로 함께 나와요. 버전을 맞춰 쓰세요.
-
-## 어떻게 이어져 있나요
-
-```
-브라우저 ──► Caddy ─┬─ /y/*, 페이지 이동 ──► web/ (화면)
-                    └─ 나머지 전부 ───────► TubeHaus 서버
-                                              │  보관함, 라이브, 자막, 저장,
-                                              │  그리고 자체 유튜브 엔진 (/api/v1/*,
-                                              │  영상 스트림, 자막, 썸네일)
-                                              ▼
-                                  Cloudflare WARP (프록시 모드)
-                                              │
-                                           YouTube
-```
-
-엔진은 유튜브 공식 앱들과 같은 방식으로 물어봐요. 목록(검색, 채널, 재생목록, 댓글)은 웹 클라이언트로, 영상 스트림은 visionOS 클라이언트로(PO 토큰 없는 그냥 주소), 그게 거절되면 SABR로, 정확한 업로드 시각과 분류는 웹 플레이어로, 열어 둔 채 압축한 연결로요. 답은 Invidious API 모양(`/api/v1/videos`, `/api/v1/search` 등, `?local=true` 포함)이라 그 API를 쓰는 도구도 붙일 수 있어요. 자세히: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)(영어).
-
-## 공개 서버로 열기
-
-<details>
-<summary><b>설치 없이 써 보게 해 주기: <code>TUBEHAUS_PUBLIC=1</code></b></summary>
-
-- **방문자 기록은 각자의 브라우저에 저장돼요.** 구독, 시청 기록, 이어보기, 재생목록이 서버에 남지 않아서, 모르는 사람끼리 서로의 기록을 볼 수 없어요
-- **서버는 저장 없는 일만 해요:** 피드 받아오기, 가져오기 파일 읽기, 내보내기 변환, 영상 재생
-- **꺼지는 기능:** TV로 보내기, 서버 다운로드(낯선 사람끼리 공유되기 때문), 쇼츠 추천 학습
-- **사람이 몰려도 버티게:** `.env`에서 동시 시청자 수(`TUBEHAUS_MAX_VIEWERS`), 최고 화질(`TUBEHAUS_MAX_HEIGHT`, 예: 1080), 한 사람당 분당 요청 수(`TUBEHAUS_RATE_PER_MIN`, 공개 서버 기본 120)를 정할 수 있어요. 자리가 차면 새로 온 사람에게 "바빠요, 잠시 뒤에"라고 알려주고, 이미 보는 사람은 끊기지 않아요. 같은 영상이나 같은 채널을 여러 명이 동시에 열면 유튜브에는 한 번만 물어보고, 라이브는 몇 명이 보든 한 번만 받아와요
-- **바로 쓰는 공개 서버 구성:** `deploy/docker-compose.public.yml`에 다 들어 있어요. 들어오면 먼저 봇 확인 화면(Anubis, 몇 초 계산)이 뜨고, 그다음 계정 만들기(사용자 이름과 비밀번호만, 이메일 없음)를 해야 볼 수 있어요. 비밀번호는 60만 번 해싱해서 저장하고, 가입과 로그인은 네트워크마다 횟수를 제한해요
-- **열기 전에:** 영상이 서버를 거쳐서 데이터 사용량이 커요. 사람이 많으면 유튜브에 더 빨리 막힐 수 있어요. 내장 비밀번호는 끄고 두세요
-
-</details>
-
-## 자주 묻는 질문
-
-<details>
-<summary><b>유튜브가 막으면 어떻게 되나요?</b></summary>
-
-세 겹으로 막아요. 영상이 거절되면 다음 방법으로 넘어가요(visionOS 클라이언트 → 유튜브 키즈 → SABR → TV 클라이언트). 그래서 문 하나가 닫혀도 재생이 멈추지 않아요. 유튜브가 주소를 의심하면("봇이 아님을 확인", 구글 "sorry" 페이지) 서버가 스스로 새 WARP 주소로 바꾸고 요청을 다시 보내요. 그리고 매일 [검사](.github/workflows/engine-check.yml)가 엔진의 모든 기능을 실제 유튜브에 돌려 보고, 하나라도 깨지면 바로 이슈를 열어요. 그래서 대부분 알아채기 전에 고쳐져요.
-
-</details>
-
-<details>
-<summary><b>SABR이 뭐고, 따로 켜야 하나요?</b></summary>
-
-youtube.com이 직접 쓰는 방식이에요. 주소 하나로, 플레이어가 지금 위치와 원하는 걸 작은 요청으로 알려요([자세히](#어떻게-재생하나)). 기본으로 예비 방법으로 켜져 있어서 설정할 건 없어요. 서버에서 `HT_SABR=only`로 하면 SABR이 주 방법이 돼요. 대신 새 영상마다 1초 안이 아니라 3초쯤 걸려요.
-
-</details>
-
-<details>
-<summary><b>아직 Invidious가 필요한가요? 쓰던 건 그대로 둬도 되나요?</b></summary>
-
-아니요, 1.6부터는 서버가 유튜브에 직접 물어봐요. 답은 Invidious API와 같은 모양이라, Invidious 인스턴스의 API를 쓰는 앱(Yattee, FreeTube의 API 모드 등)도 붙을 수 있어요. 다만 Invidious 계정이 필요한 부분(그쪽 구독, 로그인)은 없어요. 쓰던 Invidious는 그대로 둬도 서로 방해하지 않아요. TubeHaus가 더 이상 쓰지 않을 뿐이에요.
-
-</details>
-
-<details>
-<summary><b>영상은 어디서 오나요? 서버에 저장되나요?</b></summary>
-
-전부 유튜브에서 와요. 보관함(구독, 기록, 재생목록)과, 저장할 때 잠깐 쓰는 임시 파일 말고는 아무것도 저장하지 않아요.
-
-</details>
-
-<details>
-<summary><b>추천 알고리즘이 있나요?</b></summary>
-
-쇼츠에는 있어요. 전부 내 서버에서 돌아가요(위의 "내 서버에서 배우는 쇼츠"). 일반 영상은 구독 피드, 인기와 분야별 탭, 영상마다 유튜브가 주는 관련 영상 목록을 보여줘요. 구글 계정이 없으니 구글이 내 시청을 학습하는 일은 없어요.
-
-</details>
-
-<details>
-<summary><b>연령 제한 영상은요?</b></summary>
-
-대부분 재생되지 않아요. 나이 확인을 통과할 로그인 계정이 없기 때문이에요.
-
-</details>
-
-<details>
-<summary><b>구독을 가져오거나, 내 데이터를 빼낼 수 있나요?</b></summary>
-
-네. 설정 → 내 데이터(또는 구독 관리 화면)의 **파일에서 가져오기**로 구글 Takeout(구독 CSV, `watch-history.json` 시청 기록), Invidious, NewPipe, FreeTube 내보내기 파일, OPML, TubeHaus 백업을 가져올 수 있어요. **내보내기**로는 TubeHaus 전체 백업(구독, 시청 기록, 이어보기, 재생목록, 좋아요), Invidious 형식, Takeout과 같은 CSV, RSS 리더용 OPML을 받을 수 있어요. 내 데이터가 TubeHaus에 갇히는 일은 없어요.
-
-</details>
-
-<details>
-<summary><b>밖으로 정보를 보내나요?</b></summary>
-
-아니요. 계정도 원격 수집도 없어요. 밖으로 나가는 요청은 유튜브(서버에서, WARP를 거쳐서), DeArrow 썸네일 서버(서버에서, DeArrow 썸네일을 켰을 때), 그리고 브라우저의 선택 기능(SponsorBlock, DeArrow, Return YouTube Dislike)뿐이에요.
-
-</details>
-
-<details>
-<summary><b>폰과 TV에서는 어떻게 접속하나요?</b></summary>
-
-웹앱이에요. 브라우저에서 내 주소를 열거나, "홈 화면에 추가"로 앱처럼 설치하면 돼요. TV 브라우저에서는 리모컨으로 조작하는 TV 모드가 켜져요. 또는 [TubeHaus 앱](#앱-받기)을 따로, 또는 내 서버에 연결해서 쓰세요.
-
-</details>
-
-
-<details>
-<summary><b>서버가 변환(트랜스코딩)하나요? 제 NAS는 AV1을 못 풀어요.</b></summary>
-
-변환은 전혀 안 해요. 서버는 유튜브에서 받은 영상을 그대로 넘기기만 해서, 작은 NAS나 라즈베리 파이도 거의 일을 안 해요. 영상을 푸는 건 보는 기기이고, 플레이어가 그 기기가 하드웨어로 풀 수 있는 형식(AV1, VP9, H.264 모두 유튜브가 줘요)을 골라요. AV1을 못 푸는 예전 폰은 그냥 VP9이나 H.264를 받아요. 예외는 1080p·4K 내려받기 하나로, 이때 ffmpeg가 화면과 소리를 다시 인코딩 없이 합쳐요.
-
-</details>
-
-<details>
-<summary><b>집 밖에서는 어떻게 보나요?</b></summary>
-
-가장 쉬운 건 사설망이에요. [Tailscale](https://tailscale.com)이나 WireGuard를 켜고 집에서와 같은 주소로, 브라우저나 앱에서 보면 돼요. 인터넷에 직접 열려면 도메인을 붙이고(HTTPS 인증서는 Caddy가 알아서 받아요) 먼저 [로그인을 붙이세요](#외부에-열기-전에-로그인-붙이기).
-
-</details>
-
-<details>
-<summary><b>영상이 안 나와요. 뭘 해 볼 수 있나요?</b></summary>
-
-먼저 몇 초 기다려 보세요. 평소 방법이 막히면 다음 방법을 알아서 시도해요(SABR은 2~3초). 앱에서는 플레이어 설정 → **재생 방식**에서 한 가지를 고정할 수 있어요. 다른 방법으로 안 되는 영상은 대부분 *SABR*이나 *TV*로, 어린이용 영상은 대부분 *YouTube Kids*로 나와요. 서버라면 위의 `--doctor`로 유튜브가 응답하는지 볼 수 있어요. 그래도 안 되면 영상 링크와 함께 [이슈를 남겨 주세요](https://github.com/biolend83/tubehaus/issues).
-
-</details>
-
 ## 함께하기
 
 - **질문과 설치 도움:** [Discussions](https://github.com/biolend83/tubehaus/discussions) (`--doctor` 결과를 같이 붙여 주세요)
 - **버그와 기능 제안:** [Issues](https://github.com/biolend83/tubehaus/issues/new/choose)
-- **기여:** [CONTRIBUTING.md](CONTRIBUTING.md)(영어). 번역 고치기가 첫 기여로 좋아요
-- **보안 문제:** 공개 이슈 말고 [비공개로 알려 주세요](SECURITY.md)
+- **기여:** [Contributing](README.md#contributing)(영어). 번역 고치기가 첫 기여로 좋아요
+- **보안 문제:** 공개 이슈 말고 [비공개로 알려 주세요](README.md#security)
 - **바뀐 것:** [CHANGELOG.md](CHANGELOG.md)와 [릴리스](https://github.com/biolend83/tubehaus/releases)
 
 ## 고마운 사람들

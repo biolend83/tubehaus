@@ -93,7 +93,7 @@ It is also quicker. Side by side with Invidious on the same server, through the 
 
 ### Changed
 - **A built-in YouTube engine** in the server, in place of Invidious and its companion. It asks YouTube the way the TubeHaus apps do (lists from the web client, streams from the visionOS client, the exact upload time from the web player) and answers in Invidious' API format, so the web app, the apps' server mode and other tools that speak that API keep working. Video streams, captions and pictures come through the server as before
-- **Updating:** after `git pull`, `docker compose up -d --remove-orphans` stops the old Invidious, companion and PostgreSQL containers; their volumes and the `COMPANION_KEY`, `INVIDIOUS_HMAC_KEY`, `POSTGRES_PASSWORD`, `TUBEHAUS_DOMAIN`, `TUBEHAUS_HTTPS` and `TUBEHAUS_EXTERNAL_PORT` settings can go (see [Updating](docs/UPGRADING.md)). The store packages (Umbrel, CasaOS, Unraid) are two containers now
+- **Updating:** after `git pull`, `docker compose up -d --remove-orphans` stops the old Invidious, companion and PostgreSQL containers; their volumes and the `COMPANION_KEY`, `INVIDIOUS_HMAC_KEY`, `POSTGRES_PASSWORD`, `TUBEHAUS_DOMAIN`, `TUBEHAUS_HTTPS` and `TUBEHAUS_EXTERNAL_PORT` settings can go (see [Updating](README.md#updating-and-backups)). The store packages (Umbrel, CasaOS, Unraid) are two containers now
 - New settings: `HT_REGION` (the default region of searches and trending) and `HT_HL` (YouTube's language for its texts)
 - `--doctor` checks a search, a video lookup and a few bytes of its stream instead of Invidious
 - Requests to YouTube reuse open connections and come gzip'd (about a tenth of the bytes); the first page of comments is one request instead of two
@@ -183,8 +183,8 @@ Security fixes for personal servers, a guide to opening TubeHaus only to your ho
 - Player beacons can't write extra lines into the server log
 
 ### Added
-- [Opening TubeHaus to your household](docs/SELF-HOSTING.md): home network only, Tailscale or WireGuard, or the internet with a login
-- [SECURITY.md](SECURITY.md) now says what the server protects against and what it doesn't
+- [Opening TubeHaus to your household](README.md#opening-tubehaus-to-your-household): home network only, Tailscale or WireGuard, or the internet with a login
+- [Security](README.md#security) now says what the server protects against and what it doesn't
 - A daily engine check runs every call of the apps' YouTube engine against live YouTube and opens an issue when one breaks
 
 ## v1.0.2 — 2026-11-08
@@ -271,7 +271,7 @@ The biggest update so far: a Music tab, a new look with motion throughout, and a
 ## v0.7.18 — 2026-11-02
 
 ### Added
-- The server stack can also run with [Flisk](https://flisk.sh) (`flisk up`), as an option: the same six containers as `docker-compose.yml`, one `service.json` each under `services/tubehaus/`, reading the same `.env` (#40, #42, thanks @odykyi). docker compose stays the main way; see [docs/FLISK.md](docs/FLISK.md)
+- The server stack can also run with [Flisk](https://flisk.sh) (`flisk up`), as an option: the same six containers as `docker-compose.yml`, one `service.json` each under `services/tubehaus/`, reading the same `.env` (#40, #42, thanks @odykyi). docker compose stays the main way; see [Running with Flisk](README.md#running-tubehaus-with-flisk-optional)
 
 ### Changed
 - README: the Flisk setup in *Quick start*, app download links to 0.5.13, a project page and launch badges
@@ -472,7 +472,7 @@ The biggest update so far: a Music tab, a new look with motion throughout, and a
   YouTube, Invidious, a real video lookup and the optional tools
 - `GET /api/p/health` and a Docker healthcheck for the TubeHaus container
 - Optional built-in login for the docker compose setup (`TUBEHAUS_AUTH=basic`)
-- [Troubleshooting](docs/TROUBLESHOOTING.md) and [Updating and backups](docs/UPGRADING.md) guides
+- [Troubleshooting](README.md#troubleshooting) and [Updating and backups](README.md#updating-and-backups) guides
 - Server unit tests and a translation completeness check, both run in CI
 - **Prebuilt images** for amd64 and arm64 (`ghcr.io/biolend83/tubehaus`): `docker compose pull` instead of compiling whisper.cpp on your server
 - CodeQL code scanning

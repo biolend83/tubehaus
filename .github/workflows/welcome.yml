@@ -24,7 +24,7 @@ jobs:
               body: [
                 "Thanks for your first pull request to TubeHaus! 🎉",
                 "",
-                "CI runs the same checks as CONTRIBUTING.md, and a maintainer will reply within a day or two.",
-                "If anything in the code is unclear, docs/ARCHITECTURE.md is a map of where things live.",
+                "CI runs the same checks as the README's Contributing section, and a maintainer will reply within a day or two.",
+                "If anything in the code is unclear, the README's How TubeHaus is put together section is a map of where things live.",
               ].join("\n"),
             });

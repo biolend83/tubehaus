@@ -5,7 +5,7 @@
 ## How did you test it?
 
 - [ ] Opened the app and tried the change
-- [ ] Ran the checks from CONTRIBUTING.md (JS syntax, `py_compile`, unit tests, `i18n-check`)
+- [ ] Ran the checks from the README's Contributing section (JS syntax, `py_compile`, unit tests, `i18n-check`)
 - [ ] Tested on: <!-- browser / device -->
 
 ## AI assistance
