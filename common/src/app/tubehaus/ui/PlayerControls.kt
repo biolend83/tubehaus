@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.YouTube
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -1171,6 +1172,10 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
             SheetGroup(app) {
             SheetRow(Sym.HighQuality.outline, tr("Quality"), (if (st.height > 0) "${st.height}p" else tr("Auto")) + codecName(codec).let { if (it.isEmpty()) "" else " · $it" }) { page = "q" }
             if (families.size > 1) SheetRow(Sym.Tune.outline, tr("Video codec"), codecName(codec).ifEmpty { tr("Auto") }) { page = "k" }
+            if (YouTube.methods.isNotEmpty()) {
+                SheetRow(Sym.Tune.outline, tr("Playback method"), methodName(app.store.settings.state.collectAsState().value.playMethod) +
+                    (pb.stream?.client?.let { c -> if (app.store.settings.value.playMethod.isEmpty() && c.isNotEmpty()) " · " + methodName(c) else "" } ?: "")) { page = "m" }
+            }
             if (st.audioTracks.size > 1) {
                 SheetRow(Sym.VolumeUp.outline, tr("Audio track"), st.audioTracks.firstOrNull { it.first == st.audioTrack }?.second ?: "") { page = "a" }
             }
@@ -1211,6 +1216,11 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
             val families = app.playback.stream?.video?.map { it.codecFamily }?.distinct().orEmpty()
             Pick(tr("Auto"), now.isEmpty()) { setCodec(app, ""); dismiss() }
             for (f in listOf("h264", "vp9", "av1")) if (f in families) Pick(codecName(f), now == f) { setCodec(app, f); dismiss() }
+        }
+        "m" -> {
+            val now = app.store.settings.value.playMethod
+            Pick(tr("Auto"), now.isEmpty()) { app.playback.playWith(""); dismiss() }
+            for (m in YouTube.methods) Pick(methodName(m), now == m) { app.playback.playWith(m); dismiss() }
         }
         "t" -> {
             val pb = app.playback
@@ -1481,4 +1491,15 @@ private fun UpNextCard(app: AppState, n: Video, fullscreen: Boolean) {
             }
         }
     }
+}
+
+/** a playback method's name in the player's menu ("" = automatic) */
+internal fun methodName(m: String): String = when (m) {
+    "" -> tr("Auto")
+    "VISIONOS" -> "visionOS"
+    "ANDROID_VR" -> "Android VR"
+    "KIDS", "ANDROID_KIDS" -> "YouTube Kids"
+    "SABR", "WEB_SABR" -> "SABR (web)"
+    "TV", "TVHTML5" -> "TV"
+    else -> m
 }

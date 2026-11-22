@@ -267,7 +267,19 @@ class AppState(val platform: Platform, val store: Store) {
         sync.refreshSoon()
     }
 
+    /** a Short opened from a list: the Shorts player starts on it (then goes on with others) */
+    var shortFirst: Video? = null
+
     fun watch(v: Video, queue: List<Video> = emptyList()) {
+        // a Short plays upright in the Shorts player, as on YouTube, not in the wide video page
+        if (v.short && !noShorts) {
+            playback.close()
+            shortFirst = v
+            // on top of where it was tapped, so Back returns there (the Shorts tab itself starts over)
+            ahead.clear(); lastMove = 1
+            if (current != Screen.Shorts) stack.add(Screen.Shorts)
+            return
+        }
         playback.open(v, queue)
         go(Screen.Watch(v.id))
     }

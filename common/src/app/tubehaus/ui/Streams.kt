@@ -56,6 +56,9 @@ object Streams {
 
     /** a link stopped working (403 and the like): ask afresh next time */
     fun forget(id: String) { done.remove(id) }
+
+    /** everything kept: the playback method changed */
+    fun clear() { done.clear() }
 }
 
 /**
