@@ -1466,6 +1466,9 @@ export class Player {
     const v = this.video, k = e.key;
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
     const frame = 1 / (this.curTrack()?.frameRate || 30);
+    // speed by the key's place as well as its character: Shift + the comma/period keys, whatever the layout puts there
+    const step = k === "<" || (e.shiftKey && e.code === "Comma") ? -1 : k === ">" || (e.shiftKey && e.code === "Period") ? 1 : 0;
+    if (step) { v.playbackRate = Math.min(2, Math.max(0.25, +(v.playbackRate + step * 0.25).toFixed(2))); this.flash(v.playbackRate + "x"); e.preventDefault?.(); return true; }
     switch (k) {
       case " ": case "k": case "K": this.toggle(); break;
       case "j": case "J": this.seek(-10, true); this.seekFx(-1, 10); break;
@@ -1483,8 +1486,6 @@ export class Player {
       case "End": this.seek(this.range()[1]); break;
       case ",": if (v.paused) v.currentTime = Math.max(0, v.currentTime - frame); break;
       case ".": if (v.paused) v.currentTime += frame; break;
-      case "<": v.playbackRate = Math.max(0.25, +(v.playbackRate - 0.25).toFixed(2)); this.flash(v.playbackRate + "x"); break;
-      case ">": v.playbackRate = Math.min(2, +(v.playbackRate + 0.25).toFixed(2)); this.flash(v.playbackRate + "x"); break;
       case "N": if (e.shiftKey) this.on.next?.(); else return false; break;
       case "P": if (e.shiftKey) this.on.prev?.(); else return false; break;
       case "Escape": if (this.menuOpen) this.closeMenu(); else return false; break;
