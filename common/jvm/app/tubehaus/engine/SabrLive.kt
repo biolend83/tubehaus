@@ -109,6 +109,8 @@ internal object SabrLive {
         Sabr.host?.stop(c.runV)
     }
 
+    fun hostGone() { for (run in byRun.keys.toList()) end(run, false, null) }
+
     /** stops the conversations nobody has asked for in a minute (from [Sabr]'s sweep) */
     fun sweep() {
         val now = System.currentTimeMillis()

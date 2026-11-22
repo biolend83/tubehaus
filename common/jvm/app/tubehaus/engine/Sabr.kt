@@ -40,6 +40,12 @@ object Sabr {
     /** when the page last gave a playable answer: while it is recent the host is up and every video goes this way first */
     @Volatile var okAt = 0L
     val warm get() = available && System.currentTimeMillis() - okAt < 30 * 60_000L
+    /** the host closed its page (idle): fetches on their way there are over, and start again when wanted */
+    fun hostGone() {
+        cool()
+        for (run in runs.keys.toList()) end(run, false, null)
+        SabrLive.hostGone()
+    }
     /** a SABR fetch failed for good: the usual clients first again until the page answers well */
     fun cool() { okAt = 0 }
 
@@ -248,8 +254,10 @@ object Sabr {
         SabrLive.sweep()
         val now = System.currentTimeMillis()
         var total = tracks.values.sumOf { it.size() }
+        // at most 2 GB, and never more than a tenth of the free room on the disk
+        val cap = min(DISK_MAX, ((dir?.usableSpace ?: DISK_MAX) + total) / 10)
         for ((k, t) in tracks.entries.sortedBy { it.value.used }) {
-            if (now - t.used > IDLE_MS || total > DISK_MAX) {
+            if (now - t.used > IDLE_MS || total > cap) {
                 total -= t.size()
                 tracks.remove(k)
                 synchronized(t.lock) { t.run?.let { end(t, it) }; t.failed = true; t.lock.notifyAll() }

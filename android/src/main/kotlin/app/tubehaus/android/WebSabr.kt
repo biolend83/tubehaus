@@ -20,6 +20,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -36,6 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * It identifies as desktop Chrome of the WebView's own version, so YouTube answers as to its web player.
  */
 class WebSabr(private val context: Context) : SabrHost {
+    private companion object { const val IDLE_MS = 10 * 60_000L }
     private var web: WebView? = null
     private val lock = Mutex()
     private val main = Handler(Looper.getMainLooper())
@@ -46,6 +48,7 @@ class WebSabr(private val context: Context) : SabrHost {
     inner class Bridge {
         @JavascriptInterface fun post(text: String) { if (bin) pieces.execute { handle(text) } else handle(text) }
         private fun handle(text: String) {
+            used()
             val o = runCatching { Json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return
             when (o["t"]?.jsonPrimitive?.content) {
                 "piece" -> {
@@ -97,6 +100,8 @@ class WebSabr(private val context: Context) : SabrHost {
         w.evaluateJavascript("window.__thHost=function(s){__thBridge.post(s)};" + (if (bin) "window.__thBin=window.__thBinPort;" else "") + "\n$page\n;__thSabr.setSolver($quoted)") { ok.complete(it) }
         if (withTimeoutOrNull(15_000) { ok.await() } != "\"ok\"") { w.destroy(); return@withContext null }
         web = w
+        used()
+        main.postDelayed(idle, 60_000)
         w
     }
 
@@ -106,6 +111,7 @@ class WebSabr(private val context: Context) : SabrHost {
 
     /** one piece as bytes: [4-byte length][its JSON header][the piece] */
     private fun binary(b: ByteArray) {
+        used()
         if (b.size < 4) return
         val n = ((b[0].toInt() and 0xff) shl 24) or ((b[1].toInt() and 0xff) shl 16) or ((b[2].toInt() and 0xff) shl 8) or (b[3].toInt() and 0xff)
         if (n <= 0 || 4 + n > b.size) return
@@ -116,10 +122,31 @@ class WebSabr(private val context: Context) : SabrHost {
 
     private fun asset(name: String) = context.assets.open(name).use { it.readBytes().decodeToString() }
 
-    private fun js(script: String) { main.post { web?.evaluateJavascript(script, null) } }
+    private fun js(script: String) {
+        used()
+        if (web != null) { main.post { web?.evaluateJavascript(script, null) }; return }
+        // closed while idle: made again first
+        scope.launch { (lock.withLock { view() })?.let { w -> withContext(Dispatchers.Main) { w.evaluateJavascript(script, null) } } }
+    }
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
+
+    // a hidden browser left open costs battery: closed after 10 minutes nobody asked it anything (made again when needed)
+    @Volatile private var lastUse = System.currentTimeMillis()
+    private val idle = object : Runnable {
+        override fun run() {
+            val w = web ?: return
+            if (System.currentTimeMillis() - lastUse < IDLE_MS) { main.postDelayed(this, 60_000); return }
+            web = null
+            replies.values.forEach { it.complete(null) }; replies.clear()
+            w.destroy()
+            Sabr.hostGone()
+        }
+    }
+    private fun used() { lastUse = System.currentTimeMillis() }
 
     /** calls a page function that answers with a promise of text */
     private suspend fun ask(call: String, timeoutMs: Long): String? {
+        used()
         val w = lock.withLock { view() } ?: return null
         val id = ids.incrementAndGet()
         val d = CompletableDeferred<String?>()
