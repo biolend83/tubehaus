@@ -111,6 +111,11 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
     }
 
     val exo: ExoPlayer = ExoPlayer.Builder(ctx)
+        // the phone's own decoders first (hardware, and its software ones); FFmpeg's when none of them plays a track
+        // or one fails to start, so a codec this phone lacks or gets wrong still plays
+        .setRenderersFactory(io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory(ctx)
+            .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            .setEnableDecoderFallback(true))
         .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
         .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
         .setHandleAudioBecomingNoisy(true)
