@@ -119,7 +119,8 @@ fun TopTabs(app: AppState) {
                 )
             }
         }
-        if (onHome) {
+        // the desktop keeps the row to the pages, as YouTube's site: region and profiles are in Settings, and All again is a fresh feed
+        if (onHome && (app.platform.touch || app.platform.tv)) {
             // a thin line between the pages and the feed's own settings
             Box(Modifier.width(1.dp).height(22.dp).background(MaterialTheme.colorScheme.outline))
             RegionPicker(app) { HomeCtl.changed() }
