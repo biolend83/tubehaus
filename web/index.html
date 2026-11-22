@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="/y/font/pretendard.css?v=1">
 <link rel="stylesheet" href="/y/app.css?v=__V__">
 <link rel="stylesheet" href="/y/spatial.css?v=__V__">
+<script>/* older TV browsers (Chromium 85, #106) */if(!Array.prototype.at)Object.defineProperty(Array.prototype,"at",{value:function(i){i=Math.trunc(i)||0;if(i<0)i+=this.length;return this[i]},writable:true,configurable:true});if(!Object.hasOwn)Object.hasOwn=function(o,k){return Object.prototype.hasOwnProperty.call(o,k)};</script>
 <script>
   // apply the theme early so the first paint does not flash white
   try { var s = JSON.parse(localStorage.getItem("yt.settings") || "{}"), t = s.theme || "light";
@@ -143,6 +144,7 @@
     if (isTvUa) setTimeout(function () { beacon({ ev: "alive10s", tv: document.documentElement.className, cards: document.querySelectorAll(".card").length, step: window.__step || "" }); }, 10000);
   })();
 </script>
-<script type="module" src="/y/main.js?v=__V__"></script>
+<!-- the interface language first, then the app (#106: no top-level await for older TV browsers) -->
+<script type="module">import("/y/i18n.js").then((m) => m.ready).then(() => import("/y/main.js?v=__V__"));</script>
 </body>
 </html>

@@ -68,7 +68,8 @@
   </section>
 </main>
 <script type="module">
-  import { $t, $tMsg, LANG, LANGS, FIRST_VISIT, langLabel } from "/y/i18n.js";   // absolute: this page is served at /signup and /login
+  import { $t, $tMsg, LANG, LANGS, FIRST_VISIT, langLabel, ready } from "/y/i18n.js";   // absolute: this page is served at /signup and /login
+  ready.then(() => {
   const $ = (id) => document.getElementById(id);
   // the language comes first, like in the app: saved in the same settings, so the app follows it
   const setLang = (c) => {
@@ -155,6 +156,7 @@
     }
   }).catch(() => { });
   if (!FIRST_VISIT) $("u").focus();
+  });
 </script>
 </body>
 </html>

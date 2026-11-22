@@ -1,3 +1,4 @@
+import en from "./lang/en.js";
 // Interface language. Messages are written in Korean in the code (the original language)
 // and looked up in y/lang/<code>.js; anything missing falls back to English, then Korean.
 // English until a language is chosen (asked on the first visit, changeable in Settings).
@@ -27,9 +28,11 @@ export const REGION = (country || REGIONS[LANG] || "US").toUpperCase();
 export const LOCALE = LANG === "zh" ? "zh-CN" : `${LANG}-${REGION}`;
 document.documentElement.lang = LANG;
 
-// English is always loaded: it is the fallback, and the server speaks English
-const en = (await import("./lang/en.js")).default;
-const dict = LANG === "en" ? en : LANG === "ko" ? {} : (await import(`./lang/${LANG}.js`)).default;
+// English is always loaded: it is the fallback, and the server speaks English. The interface language comes with
+// [ready], which the pages wait for before they start (no top-level await: older TV browsers, Chromium < 89, #106)
+let dict = LANG === "en" ? en : {};
+export const ready = LANG === "en" || LANG === "ko" ? Promise.resolve()
+  : import(`./lang/${LANG}.js`).then((m) => { dict = m.default; }, () => {});
 
 /** "언어 · Language" - the English word stays, so a wrong language can always be found again */
 export const langLabel = () => (LANG === "en" ? "Language" : $t("언어") + " · Language");

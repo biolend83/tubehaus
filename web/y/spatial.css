@@ -15,7 +15,7 @@ html.spatial:not(.tv) {
 /* the backdrop: soft colour blobs, fixed behind everything */
 html.spatial:not(.tv) body { background: transparent; }
 html.spatial:not(.tv) body::before {
-  content: ""; position: fixed; inset: -10%; z-index: -1; pointer-events: none;
+  content: ""; position: fixed; top: -10%; right: -10%; bottom: -10%; left: -10%; z-index: -1; pointer-events: none;
   background:
     radial-gradient(40% 50% at 15% 20%, rgba(255, 80, 80, .35), transparent 70%),
     radial-gradient(45% 55% at 85% 15%, rgba(70, 120, 255, .35), transparent 70%),
