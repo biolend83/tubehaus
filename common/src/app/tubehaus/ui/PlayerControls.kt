@@ -968,8 +968,9 @@ private fun SeekBar(app: AppState, st: PlayerState, dragging: Float?, onDrag: (F
     val live = app.playback.video?.live == true
     val heat = app.playback.details?.heat?.takeIf { app.store.settings.value.heatmap && !live }
     Track(
-        value = dragging ?: (st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f),
-        buffered = (st.bufferedMs.toFloat() / st.durationMs).coerceIn(0f, 1f),
+        // live at the edge (the player stays a few seconds behind it): at the right end, not wandering with the buffer
+        value = dragging ?: if (live && st.durationMs - st.positionMs < 30_000) 1f else (st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f),
+        buffered = if (live && st.durationMs - st.positionMs < 30_000) 1f else (st.bufferedMs.toFloat() / st.durationMs).coerceIn(0f, 1f),
         color = Red, onDrag = onDrag, onDone = onDone,
         modifier = Modifier.fillMaxWidth(),
         marks = chapters.drop(1).map { it.startMs.toFloat() / st.durationMs },
