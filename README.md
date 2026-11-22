@@ -14,7 +14,7 @@ On the TV, the phone, the PC and the iPad. Run it on your own server, or just in
 ![Docker: amd64 | arm64](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white)
 [![Featured in selfh.st Weekly](https://img.shields.io/badge/featured%20in-selfh.st%20weekly-2ea44f)](https://selfh.st/weekly/2026-10-23/)
 
-**[⬇ Get the app](#get-the-app)** &nbsp;·&nbsp; **[🖥️ Run the server](#quick-start-docker)** &nbsp;·&nbsp; **[✨ What's new in 1.7: SABR](#new-in-17-sabr-the-way-youtubes-own-player-streams)** &nbsp;·&nbsp; **English** · [한국어](README.ko.md)
+**[⬇ Get the app](#get-the-app)** &nbsp;·&nbsp; **[🖥️ Run the server](#quick-start-docker)** &nbsp;·&nbsp; **[🛡️ How it keeps playing](#how-it-keeps-playing-sabr)** &nbsp;·&nbsp; **[❓ FAQ](#faq)** &nbsp;·&nbsp; **English** · [한국어](README.ko.md)
 
 <img src="docs/devices.jpg" alt="TubeHaus on Android TV, iPad and an Android phone" width="860">
 
@@ -52,7 +52,7 @@ Pause on the TV, carry on on the phone. Every device and every browser in the ho
 <td colspan="3" valign="top">
 
 ### 🛡️ Keeps playing when YouTube pushes back
-When a side door closes, TubeHaus falls back to **SABR**, the protocol youtube.com itself streams with, with its own BotGuard token and no account. On the server a flagged address is swapped for a new one by itself. [How it works](#new-in-17-sabr-the-way-youtubes-own-player-streams)
+When a side door closes, TubeHaus falls back to **SABR**, the protocol youtube.com itself streams with, with its own BotGuard token and no account. On the server a flagged address is swapped for a new one by itself. [How it works](#how-it-keeps-playing-sabr)
 
 </td>
 </tr>
@@ -86,9 +86,9 @@ There are two ways to run it. Same name, same look; they differ in *where* the w
 
 All files, Windows portable and ARM builds: **[latest release](https://github.com/biolend83/tubehaus/releases/latest)**. Install notes and source per platform: [`android-app`](https://github.com/biolend83/tubehaus/tree/android-app) · [`windows-app`](https://github.com/biolend83/tubehaus/tree/windows-app) · [`mac-app`](https://github.com/biolend83/tubehaus/tree/mac-app) · [`linux-app`](https://github.com/biolend83/tubehaus/tree/linux-app) · [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). The rest of this README is about the server.
 
-## New in 1.7: SABR, the way YouTube's own player streams
+## How it keeps playing: SABR
 
-YouTube keeps closing the side doors that third-party players use: a client stops getting plain video addresses, a label's music videos come back "not available", a kids' video only plays in the Kids app. Its own website can't close the front door without breaking itself. That front door is **SABR** (Server ABR), the protocol youtube.com uses to stream almost every video now. TubeHaus 1.7 speaks it on every device and on the server.
+YouTube keeps closing the side doors that third-party players use: a client stops getting plain video addresses, a label's music videos come back "not available", a kids' video only plays in the Kids app. Its own website can't close the front door without breaking itself. That front door is **SABR** (Server ABR), the protocol youtube.com uses to stream almost every video now. Since 1.7 TubeHaus speaks it on every device and on the server.
 
 ```
               ┌── POST: "at 1:23, 40 s buffered, want 1080p + Opus" (protobuf) ──┐
@@ -113,9 +113,11 @@ YouTube keeps closing the side doors that third-party players use: a client stop
 
 SABR reads YouTube's watch page, and too many of those from one address bring up Google's "sorry" check. With WARP the server notices it, gets a new address (a new WARP registration when a reconnect keeps the old one) and tries again. With `only` it also prefetches just the next video instead of four.
 
-## New in 1.6: its own YouTube engine, and fast
+**In the apps** the same order runs on the device, and the player's settings have **Playback method**: leave it on *Auto*, or pin one way (visionOS, Android VR, YouTube Kids, SABR, TV) when a video only plays one way.
 
-The server no longer sits on Invidious. It talks to YouTube itself, so the stack is **three containers lighter** (no Invidious, no companion, no PostgreSQL). 1.6.3 then made it quick: a video starts on the streams alone and the title, description and related videos fill in a moment later, answers are kept and refreshed in the background, the stream connections to YouTube stay open, and a video's comments are fetched as it opens.
+## Fast, with its own YouTube engine
+
+Since 1.6 the server no longer sits on Invidious. It talks to YouTube itself, so the stack is **three containers lighter** (no Invidious, no companion, no PostgreSQL). It's also quick: a video starts on the streams alone and the title, description and related videos fill in a moment later, answers are kept and refreshed in the background, the stream connections to YouTube stay open, and a video's comments are fetched as it opens.
 
 | | TubeHaus 1.6.3 | Invidious |
 |---|---|---|
@@ -418,7 +420,7 @@ There are three layers. A refused video moves on to the next way in (visionOS cl
 <details>
 <summary><b>What is SABR, and do I have to turn it on?</b></summary>
 
-It's how youtube.com itself streams: one address, and the player tells YouTube where it is and what it wants in small requests ([details](#new-in-17-sabr-the-way-youtubes-own-player-streams)). It's on by default as the fallback; nothing to set up. `HT_SABR=only` makes it the main way in on the server, at about 3 s per new video instead of under 1 s.
+It's how youtube.com itself streams: one address, and the player tells YouTube where it is and what it wants in small requests ([details](#how-it-keeps-playing-sabr)). It's on by default as the fallback; nothing to set up. `HT_SABR=only` makes it the main way in on the server, at about 3 s per new video instead of under 1 s.
 
 </details>
 
@@ -468,6 +470,27 @@ No. There is no telemetry. The only outside requests are YouTube (from the serve
 <summary><b>How do phones and TVs connect?</b></summary>
 
 It's a web app: open your address in the browser, or use "Add to Home Screen" to install it like an app. TV browsers get a TV mode with remote-control navigation. Or use the [TubeHaus apps](#get-the-app), on their own or connected to your server.
+
+</details>
+
+<details>
+<summary><b>Does the server transcode? My NAS can't decode AV1.</b></summary>
+
+It never transcodes. The server fetches the video from YouTube and passes it through, so even a small NAS or a Raspberry Pi barely notices. Decoding happens on the device you watch on, and the player picks a format that device decodes in hardware (AV1, VP9 or H.264, which YouTube all offers), so an older phone without AV1 simply gets VP9 or H.264. The one exception is a download in 1080p or 4K, where ffmpeg joins picture and sound without re-encoding.
+
+</details>
+
+<details>
+<summary><b>How do I watch away from home?</b></summary>
+
+The easy way is a private network: [Tailscale](https://tailscale.com) or WireGuard, then the same address as at home, in the browser or the apps. To open it on the internet instead, give it a domain (Caddy gets the HTTPS certificate by itself) and [add a login](#add-a-login-before-you-expose-it) first.
+
+</details>
+
+<details>
+<summary><b>A video won't play. What can I try?</b></summary>
+
+Wait a few seconds first: when the usual way is refused, the next one is tried by itself (SABR takes 2-3 s). In the apps, the player's settings → **Playback method** pins one way; *SABR* or *TV* plays most videos the others can't, *YouTube Kids* most videos made for kids. On a server, `--doctor` (above) shows whether YouTube is answering at all. If it still won't play, [open an issue](https://github.com/biolend83/tubehaus/issues) with the video link.
 
 </details>
 
@@ -532,7 +555,7 @@ Running one? [Add it here](https://github.com/biolend83/tubehaus/issues/new?temp
 | `HT_PUBLIC_URL` | `http://localhost:8080` | the address browsers use |
 | `HT_YT_PROXY` | `127.0.0.1:40000` | WARP proxy (empty = direct) |
 | `HT_WARP_ROTATE` | `1` | new WARP address when YouTube blocks (a reconnect, or a new registration when that keeps the address) |
-| `HT_SABR` | `1` | SABR (what YouTube's own web player gets) when no other way plays a video; `first` to use it before them, `only` for every video but live and age-restricted ones, `0` off. Needs deno. See [New in 1.7](#new-in-17-sabr-the-way-youtubes-own-player-streams) |
+| `HT_SABR` | `1` | SABR (what YouTube's own web player gets) when no other way plays a video; `first` to use it before them, `only` for every video but live and age-restricted ones, `0` off. Needs deno. See [How it keeps playing](#how-it-keeps-playing-sabr) |
 | `HT_REGION` | `US` | default region of searches and trending |
 | `HT_HL` | (the viewer's language) | YouTube's language for its texts |
 | `HT_YTDLP` | `yt-dlp` | for live streams |

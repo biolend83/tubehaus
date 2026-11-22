@@ -14,7 +14,7 @@ TV, 폰, PC, 아이패드에서. 내 서버에 돌리거나, 그냥 앱을 깔�
 ![Docker: amd64 | arm64](https://img.shields.io/badge/docker-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white)
 [![Featured in selfh.st Weekly](https://img.shields.io/badge/featured%20in-selfh.st%20weekly-2ea44f)](https://selfh.st/weekly/2026-10-23/)
 
-**[⬇ 앱 받기](#앱-받기)** &nbsp;·&nbsp; **[🖥️ 서버 설치](#빠른-설치-docker)** &nbsp;·&nbsp; **[✨ 1.7 새 기능: SABR](#17-새-기능-sabr-유튜브-공식-플레이어-방식)** &nbsp;·&nbsp; [English](README.md) · **한국어**
+**[⬇ 앱 받기](#앱-받기)** &nbsp;·&nbsp; **[🖥️ 서버 설치](#빠른-설치-docker)** &nbsp;·&nbsp; **[🛡️ 계속 재생되는 비결](#계속-재생되는-비결-sabr)** &nbsp;·&nbsp; **[❓ 자주 묻는 질문](#자주-묻는-질문)** &nbsp;·&nbsp; [English](README.md) · **한국어**
 
 <img src="docs/devices.jpg" alt="Android TV, iPad, Android 폰에서 돌아가는 TubeHaus" width="860">
 
@@ -52,7 +52,7 @@ TV에서 멈추고 폰에서 이어 봐요. 집의 모든 기기와 브라우저
 <td colspan="3" valign="top">
 
 ### 🛡️ 유튜브가 막아도 계속 재생
-다른 길이 막히면 youtube.com이 직접 쓰는 **SABR**로 넘어가요. BotGuard 토큰도 직접 만들고 계정은 필요 없어요. 서버에서는 막힌 주소를 스스로 새 주소로 바꿔요. [어떻게 돌아가나요](#17-새-기능-sabr-유튜브-공식-플레이어-방식)
+다른 길이 막히면 youtube.com이 직접 쓰는 **SABR**로 넘어가요. BotGuard 토큰도 직접 만들고 계정은 필요 없어요. 서버에서는 막힌 주소를 스스로 새 주소로 바꿔요. [어떻게 돌아가나요](#계속-재생되는-비결-sabr)
 
 </td>
 </tr>
@@ -86,9 +86,9 @@ TV에서 멈추고 폰에서 이어 봐요. 집의 모든 기기와 브라우저
 
 전체 파일, Windows portable, ARM 빌드: **[최신 릴리스](https://github.com/biolend83/tubehaus/releases/latest)**. 플랫폼별 설치 안내와 소스: [`android-app`](https://github.com/biolend83/tubehaus/tree/android-app) · [`windows-app`](https://github.com/biolend83/tubehaus/tree/windows-app) · [`mac-app`](https://github.com/biolend83/tubehaus/tree/mac-app) · [`linux-app`](https://github.com/biolend83/tubehaus/tree/linux-app) · [`ios-app`](https://github.com/biolend83/tubehaus/tree/ios-app). 이 README의 나머지는 서버판 이야기예요.
 
-## 1.7 새 기능: SABR, 유튜브 공식 플레이어 방식
+## 계속 재생되는 비결: SABR
 
-유튜브는 다른 플레이어들이 쓰는 뒷문을 계속 닫고 있어요. 어떤 클라이언트는 영상 주소를 못 받게 되고, 음반사 뮤직비디오는 "볼 수 없음"이 뜨고, 어린이 영상은 키즈 앱에서만 재생돼요. 하지만 자기 웹사이트가 쓰는 정문은 닫을 수 없어요. 그 정문이 **SABR**(Server ABR)이에요. 지금 youtube.com이 거의 모든 영상을 이 방식으로 보내요. TubeHaus 1.7은 모든 기기와 서버에서 SABR을 써요.
+유튜브는 다른 플레이어들이 쓰는 뒷문을 계속 닫고 있어요. 어떤 클라이언트는 영상 주소를 못 받게 되고, 음반사 뮤직비디오는 "볼 수 없음"이 뜨고, 어린이 영상은 키즈 앱에서만 재생돼요. 하지만 자기 웹사이트가 쓰는 정문은 닫을 수 없어요. 그 정문이 **SABR**(Server ABR)이에요. 지금 youtube.com이 거의 모든 영상을 이 방식으로 보내요. TubeHaus는 1.7부터 모든 기기와 서버에서 SABR을 써요.
 
 ```
               ┌── POST: "1:23, 40초 받아 둠, 1080p + Opus" (protobuf) ──┐
@@ -113,9 +113,11 @@ TV에서 멈추고 폰에서 이어 봐요. 집의 모든 기기와 브라우저
 
 SABR은 유튜브 영상 페이지를 읽는데, 한 주소에서 너무 많이 읽으면 구글의 "sorry" 확인이 떠요. WARP를 쓰면 서버가 이걸 알아채고 새 주소를 받은 뒤(다시 연결해도 주소가 같으면 WARP를 새로 등록) 다시 시도해요. `only`에서는 미리 받아 두는 영상도 네 개가 아니라 다음 하나만이에요.
 
-## 1.6 새 기능: 자체 유튜브 엔진, 그리고 빠름
+**앱에서도** 같은 순서가 기기에서 돌아가고, 플레이어 설정에 **재생 방식**이 있어요. 보통은 *자동*으로 두고, 한 가지 방법으로만 나오는 영상이면 visionOS, Android VR, YouTube Kids, SABR, TV 중 하나로 고정할 수 있어요.
 
-서버판이 이제 Invidious 위에서 돌지 않아요. 유튜브에 직접 물어봐서 **컨테이너가 세 개 줄었어요**(Invidious, companion, PostgreSQL 없음). 1.6.3에서는 속도를 올렸어요. 영상은 스트림만 받으면 바로 재생되고 제목·설명·관련 영상은 잠깐 뒤에 채워져요. 받은 답은 보관해 두고 뒤에서 새로 고치고, 유튜브 영상 서버와의 연결은 열어 둔 채 다시 쓰고, 댓글은 영상을 열 때 같이 받아 둬요.
+## 빠름, 자체 유튜브 엔진으로
+
+1.6부터 서버판은 Invidious 위에서 돌지 않아요. 유튜브에 직접 물어봐서 **컨테이너가 세 개 줄었어요**(Invidious, companion, PostgreSQL 없음). 속도도 빨라요. 영상은 스트림만 받으면 바로 재생되고 제목·설명·관련 영상은 잠깐 뒤에 채워져요. 받은 답은 보관해 두고 뒤에서 새로 고치고, 유튜브 영상 서버와의 연결은 열어 둔 채 다시 쓰고, 댓글은 영상을 열 때 같이 받아 둬요.
 
 | | TubeHaus 1.6.3 | Invidious |
 |---|---|---|
@@ -369,7 +371,7 @@ WARP, 유튜브 연결, 검색, 실제 영상 조회(스트림 몇 바이트까�
 <details>
 <summary><b>SABR이 뭐고, 따로 켜야 하나요?</b></summary>
 
-youtube.com이 직접 쓰는 방식이에요. 주소 하나로, 플레이어가 지금 위치와 원하는 걸 작은 요청으로 알려요([자세히](#17-새-기능-sabr-유튜브-공식-플레이어-방식)). 기본으로 예비 방법으로 켜져 있어서 설정할 건 없어요. 서버에서 `HT_SABR=only`로 하면 SABR이 주 방법이 돼요. 대신 새 영상마다 1초 안이 아니라 3초쯤 걸려요.
+youtube.com이 직접 쓰는 방식이에요. 주소 하나로, 플레이어가 지금 위치와 원하는 걸 작은 요청으로 알려요([자세히](#계속-재생되는-비결-sabr)). 기본으로 예비 방법으로 켜져 있어서 설정할 건 없어요. 서버에서 `HT_SABR=only`로 하면 SABR이 주 방법이 돼요. 대신 새 영상마다 1초 안이 아니라 3초쯤 걸려요.
 
 </details>
 
@@ -419,6 +421,28 @@ youtube.com이 직접 쓰는 방식이에요. 주소 하나로, 플레이어가 
 <summary><b>폰과 TV에서는 어떻게 접속하나요?</b></summary>
 
 웹앱이에요. 브라우저에서 내 주소를 열거나, "홈 화면에 추가"로 앱처럼 설치하면 돼요. TV 브라우저에서는 리모컨으로 조작하는 TV 모드가 켜져요. 또는 [TubeHaus 앱](#앱-받기)을 따로, 또는 내 서버에 연결해서 쓰세요.
+
+</details>
+
+
+<details>
+<summary><b>서버가 변환(트랜스코딩)하나요? 제 NAS는 AV1을 못 풀어요.</b></summary>
+
+변환은 전혀 안 해요. 서버는 유튜브에서 받은 영상을 그대로 넘기기만 해서, 작은 NAS나 라즈베리 파이도 거의 일을 안 해요. 영상을 푸는 건 보는 기기이고, 플레이어가 그 기기가 하드웨어로 풀 수 있는 형식(AV1, VP9, H.264 모두 유튜브가 줘요)을 골라요. AV1을 못 푸는 예전 폰은 그냥 VP9이나 H.264를 받아요. 예외는 1080p·4K 내려받기 하나로, 이때 ffmpeg가 화면과 소리를 다시 인코딩 없이 합쳐요.
+
+</details>
+
+<details>
+<summary><b>집 밖에서는 어떻게 보나요?</b></summary>
+
+가장 쉬운 건 사설망이에요. [Tailscale](https://tailscale.com)이나 WireGuard를 켜고 집에서와 같은 주소로, 브라우저나 앱에서 보면 돼요. 인터넷에 직접 열려면 도메인을 붙이고(HTTPS 인증서는 Caddy가 알아서 받아요) 먼저 [로그인을 붙이세요](#외부에-열기-전에-로그인-붙이기).
+
+</details>
+
+<details>
+<summary><b>영상이 안 나와요. 뭘 해 볼 수 있나요?</b></summary>
+
+먼저 몇 초 기다려 보세요. 평소 방법이 막히면 다음 방법을 알아서 시도해요(SABR은 2~3초). 앱에서는 플레이어 설정 → **재생 방식**에서 한 가지를 고정할 수 있어요. 다른 방법으로 안 되는 영상은 대부분 *SABR*이나 *TV*로, 어린이용 영상은 대부분 *YouTube Kids*로 나와요. 서버라면 위의 `--doctor`로 유튜브가 응답하는지 볼 수 있어요. 그래도 안 되면 영상 링크와 함께 [이슈를 남겨 주세요](https://github.com/biolend83/tubehaus/issues).
 
 </details>
 
