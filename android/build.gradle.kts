@@ -24,8 +24,6 @@ android {
         // the test build installs beside the real app: its own id and name
         manifestPlaceholders["appLabel"] = if (sabrOnly == "true") "TubeHaus-test" else "TubeHaus"
         if (sabrOnly == "true") applicationIdSuffix = ".test"
-        // phones and TVs are ARM, Chromebooks x86_64: the 32-bit x86 copy of the FFmpeg decoders would only add size
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
 
     // The shared code (engine, library, screens) is compiled into this module as plain sources.
@@ -101,8 +99,6 @@ dependencies {
     implementation("androidx.media3:media3-datasource-okhttp:1.7.1")
     implementation("androidx.media3:media3-session:1.7.1")
     implementation("androidx.media3:media3-ui:1.7.1")
-    // FFmpeg decoders (GPL-3.0, as this app) for what this phone's own decoders refuse
-    implementation("io.github.anilbeesetti:nextlib-media3ext:1.7.1-0.9.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
