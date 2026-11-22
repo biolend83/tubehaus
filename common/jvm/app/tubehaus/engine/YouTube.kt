@@ -55,7 +55,24 @@ object YouTube {
      * The streams of one video: through the connected TubeHaus server when there is one
      * (see [ServerVideo]), and from this device when there isn't or the server can't.
      */
+    /**
+     * The way to play videos picked in the player (Settings → Playback method): "" the usual order, else one of
+     * [methods]. A picked one is asked straight from this device, nothing else tried, so a video it can't play says so.
+     */
+    @Volatile var force: String = ""
+
+    /** the ways this device can play a video, for the player's menu */
+    val methods: List<String> get() = listOfNotNull("VISIONOS", "ANDROID_VR", "KIDS",
+        if (Sabr.available) "SABR" else null, if (Cipher.available) "TV" else null)
+
     suspend fun stream(id: String): Stream {
+        when (force) {
+            "VISIONOS" -> return player(id, Clients.VISIONOS)
+            "ANDROID_VR" -> return player(id, Clients.ANDROID_VR)
+            "KIDS" -> return player(id, Clients.KIDS)
+            "SABR" -> if (Sabr.available) return sabr(id)
+            "TV" -> if (Cipher.available) return tv(id)
+        }
         // a test build that plays everything the SABR way (TUBEHAUS_SABR_ONLY / -PsabrOnly): no other client, no server
         if (Sabr.only && Sabr.available) return sabr(id)
         if (!ServerVideo.on) return device(id)
@@ -121,12 +138,15 @@ object YouTube {
         // YouTube holds the links back behind the start ad it placed (up to 0.8 of its skip offset), but they
         // often open sooner: ask for one byte every half second instead of waiting it all out
         val until = answeredAt + Cipher.prerollMs(d)
-        val probe = s.video.first().url
+        // the sound too: the player needs both, and one open does not always mean the other is
+        val probes = listOf(s.video.first().url, s.audio.first().url)
         while (Sys.nowMs() < until) {
             val open = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runCatching {
-                    Net.client.newCall(okhttp3.Request.Builder().url("$probe&range=0-0").build()).execute().use { it.isSuccessful }
-                }.getOrDefault(false)
+                probes.all { probe ->
+                    runCatching {
+                        Net.client.newCall(okhttp3.Request.Builder().url("$probe&range=0-0").build()).execute().use { it.isSuccessful }
+                    }.getOrDefault(false)
+                }
             }
             if (open) break
             kotlinx.coroutines.delay(500)

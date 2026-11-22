@@ -311,6 +311,7 @@ private val KO by lazy { mapOf(
     "Save as one file" to "한 파일로 저장",
     "Enjoying TubeHaus? A star on GitHub helps others find it." to "TubeHaus가 마음에 드세요? GitHub에 별을 달아 주시면 다른 사람이 찾기 쉬워져요.",
     "Star" to "별 달기",
+    "Playback method" to "재생 방식",
     "Saving as one file..." to "한 파일로 저장 중...",
     "Saved: " to "저장됨: ",
     "Couldn't put it into one file." to "한 파일로 합치지 못했어요.",

@@ -377,6 +377,15 @@ class Playback(private val app: AppState) {
 
     fun retry() { video?.let { Streams.forget(it.id); open(it, queue) } }
 
+    /** plays this and the next videos the [method] way ("" the usual order), from where this one is */
+    fun playWith(method: String) {
+        store.settings.update { it.copy(playMethod = method) }
+        YouTube.force = method
+        Streams.clear()
+        val v = video ?: return
+        open(v, queue, startSec = player.state.value.positionMs / 1000)
+    }
+
     private fun onEnded() {
         val v = video ?: return
         learnNow()

@@ -193,6 +193,9 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         if (Build.VERSION.SDK_INT >= 29) c.isHardwareAccelerated
         else c.name.lowercase().let { !it.startsWith("omx.google.") && !it.startsWith("c2.android.") && !it.contains(".sw.") }
 
+    private var refreshedId: String? = null
+    private var refreshedAt = 0L
+
     init {
         exo.addListener(object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) = sync()
@@ -201,7 +204,11 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
                 st.update { it.copy(error = error.message ?: error.errorCodeName) }
                 // stream URLs expire after a few hours: fetch fresh ones and carry on
                 val s = stream ?: return
-                if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) {
+                // once per video and few minutes: links refused again right away (a TV answer whose start ad
+                // still holds them, a blocked address) would otherwise load, fail and load again for ever (#101)
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && (refreshedId != s.id || now - refreshedAt > 180_000L)) {
+                    refreshedId = s.id; refreshedAt = now
                     val pos = exo.currentPosition
                     scope.launch {
                         runCatching { YouTube.stream(s.id) }.onSuccess { fresh ->
