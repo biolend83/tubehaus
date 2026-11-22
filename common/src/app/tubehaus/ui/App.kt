@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.YouTube
 import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.luminance
 import app.tubehaus.engine.Sys
@@ -128,6 +129,7 @@ fun App(app: AppState) {
     L.lang = lang
     InnerTube.hl = if (lang == "zh") "zh-CN" else lang
     InnerTube.gl = settings.region.ifEmpty { app.platform.deviceRegion() }.uppercase()
+    LaunchedEffect(Unit) { YouTube.force = settings.playMethod }
     setSingletonImageLoaderFactory { ctx ->
         ImageLoader.Builder(ctx)
             .components { Sys.imageNetwork(this) }
