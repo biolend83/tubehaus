@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.7.2",
+          "buildVersion": "54",
+          "date": "2026-11-22T01:41:55+00:00",
+          "localizedDescription": "1.7.2: Shorts open upright, pick the playback method.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.7.2/TubeHaus-1.7.2-ipad.ipa",
+          "size": 22386668,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.7.1",
           "buildVersion": "53",
           "date": "2026-11-21T07:12:57+00:00",
@@ -275,11 +284,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.7.1",
-      "versionDate": "2026-11-21T07:12:57+00:00",
-      "versionDescription": "1.7.1: faster held-back videos, one-file downloads, new options.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.7.1/TubeHaus-1.7.1-ipad.ipa",
-      "size": 22375620
+      "version": "1.7.2",
+      "versionDate": "2026-11-22T01:41:55+00:00",
+      "versionDescription": "1.7.2: Shorts open upright, pick the playback method.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.7.2/TubeHaus-1.7.2-ipad.ipa",
+      "size": 22386668
     }
   ],
   "news": [],
