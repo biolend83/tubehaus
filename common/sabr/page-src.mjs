@@ -206,6 +206,87 @@ window.__thSabr = {
     })().catch((e) => { runs.delete(run); send({ t: "end", run, bad: !!r?.bad, error: r?.bad ? undefined : String(e?.message || e).slice(0, 200) }); });
     return "ok";
   },
+  /** a live stream: one conversation for picture (format [index]) and sound together near the live edge (a
+   *  picture-only live conversation gets the same sound segment for ever). Picture pieces go as run [runV], sound
+   *  as [runA], each {at: segment number, ms: its start time, init}. stop(runV) ends both. */
+  liveStart(runV, runA, vid, index) {
+    let r = null;
+    (async () => {
+      const s = await session(vid);
+      if (!s.sabrUrl) throw new Error("no SABR address");
+      const raw = s.d.streamingData.adaptiveFormats;
+      const f = raw[index];
+      if (!f || !(f.mimeType || "").startsWith("video/")) throw new Error("no such picture format");
+      const formats = raw.map(buildSabrFormat), me = formats[index];
+      const sound = raw.map((x, i) => [x, i]).filter(([x]) => (x.mimeType || "").startsWith("audio/mp4"))
+        .sort((a, b) => (b[0].bitrate || 0) - (a[0].bitrate || 0))[0];
+      if (!sound) throw new Error("no mp4 sound");
+      const m = await getMinter();
+      let last = 0;
+      const stream = new SabrStream({
+        videoId: vid, formats, serverAbrStreamingUrl: s.sabrUrl, videoPlaybackUstreamerConfig: s.ustreamer,
+        clientInfo: { clientName: 1, clientVersion: s.ver, ...osOf(navigator.userAgent) },
+        poToken: await m.m.mintAsWebsafeString(vid),
+        callbacks: { onMintPoToken: async () => (await getMinter()).m.mint(vid) },
+        // at the live edge the library asks again at once: at most one request a second
+        fetchFunction: async (u, o = {}) => {
+          const gap = 1000 - (Date.now() - last);
+          if (gap > 0) await new Promise((ok) => setTimeout(ok, gap));
+          last = Date.now();
+          return fetch(u, { ...o, headers: { "content-type": "text/plain;charset=UTF-8", accept: "application/vnd.yt-ump" }, credentials: "omit" });
+        },
+      });
+      r = { stream, allow: Infinity, gate: null, bad: false };
+      if (stopped.delete(runV)) { stream.abort().catch(() => {}); return; }
+      runs.set(runV, r);
+      let refused = 0;
+      stream.on("streamProtectionStatusUpdate", (p) => {
+        if (p.status === 1) m.good = true;
+        refused = p.status === 3 ? refused + 1 : 0;
+        if (refused >= 3) { r.bad = true; m.good = false; turnedDown(m); stream.abort().catch(() => {}); }
+      });
+      stream.on("error", (e) => send({ t: "log", run: runV, msg: "live error " + String(e?.message || e).slice(0, 200) }));
+      const heads = { video: [], audio: [] };
+      const sb = stream.segmentBuffer, fin = sb.finalizeSegment.bind(sb);
+      let cur = null;
+      sb.finalizeSegment = (id) => {
+        const p = sb.pendingSegments.get(id);
+        cur = p ? { ...p.mediaHeader, num: p.segmentNumber, start: p.startTimeMs } : null;
+        try { return fin(id); } finally { cur = null; }
+      };
+      for (const kind of ["video", "audio"]) {
+        const out = stream.trackCollection[kind].output, enq = out.controller.enqueue.bind(out.controller);
+        out.controller.enqueue = (chunk) => { heads[kind].push(cur); enq(chunk); };
+      }
+      const st = stream.start({ videoFormat: me, audioFormat: formats[sound[1]], enabledTrackTypes: 0, isPostLiveDvr: false, stallDetectionMs: 1e12 });
+      const pump = async (rs, kind, run) => {
+        const rd = rs.getReader();
+        let n = 0;
+        for (;;) {
+          if (runs.get(runV) !== r) break;
+          const { done, value } = await rd.read();
+          if (done) break;
+          const h = heads[kind].shift();
+          const u8 = value instanceof Uint8Array ? value : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+          const init = !!h?.isInitializationSegment;
+          const seq = init ? 0 : (h?.num != null && +h.num > 0 ? +h.num : n + 1);
+          if (!init) n = seq;
+          send({ t: "piece", run, at: seq, init, ms: h?.start != null ? +h.start : -1, data: b64(u8) });
+        }
+        stream.abort().catch(() => {});
+      };
+      await Promise.all([pump(st.videoStream, "video", runV), pump(st.audioStream, "audio", runA)]);
+      runs.delete(runV);
+      send({ t: "end", run: runA, bad: r.bad });
+      send({ t: "end", run: runV, bad: r.bad });
+    })().catch((e) => {
+      runs.delete(runV);
+      const error = r?.bad ? undefined : String(e?.message || e).slice(0, 200);
+      send({ t: "end", run: runA, bad: !!r?.bad, error });
+      send({ t: "end", run: runV, bad: !!r?.bad, error });
+    });
+    return "ok";
+  },
   /** the app wants fetch [run] to go up to byte [n] for now */
   allow(run, n) { const r = runs.get(run); if (r) { r.allow = n; r.gate?.(); } else allows.set(run, n); return "ok"; },
   stop(run) { const r = runs.get(run); allows.delete(run); if (r) { runs.delete(run); r.gate?.(); r.stream.abort().catch(() => {}); } else { stopped.add(run); if (stopped.size > 200) stopped.delete(stopped.values().next().value); } return "ok"; },

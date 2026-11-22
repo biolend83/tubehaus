@@ -75,13 +75,13 @@ object YouTube {
         }
         // a test build that plays everything the SABR way (TUBEHAUS_SABR_ONLY / -PsabrOnly): no other client, no server
         if (Sabr.only && Sabr.available) return sabr(id)
-        if (!ServerVideo.on) return device(id)
+        if (!ServerVideo.on) return liveOr(id, device(id))
         return try {
-            ServerVideo.stream(id)
+            liveOr(id, ServerVideo.stream(id))
         } catch (e: YtError) {
             // the server is down or YouTube refused it: this device may still get through,
             // and when it can't either, the server's reason is the one worth showing
-            try { device(id) } catch (x: Exception) { if (x is kotlinx.coroutines.CancellationException) throw x; throw e }
+            try { liveOr(id, device(id)) } catch (x: Exception) { if (x is kotlinx.coroutines.CancellationException) throw x; throw e }
         }
     }
 
@@ -154,10 +154,17 @@ object YouTube {
         return s
     }
 
-    /** the web player's answer, its formats served by [Sabr] on this device */
+    /** a live stream that came without a playlist: the web player's way, its own live playlist on this device */
+    private suspend fun liveOr(id: String, s: Stream): Stream {
+        if (!s.live || s.hls != null || !Sabr.available || Sabr.host?.live != true) return s
+        return try { sabr(id) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; s }
+    }
+
+    /** the web player's answer, its formats served by [Sabr] on this device (a live stream: as a live playlist) */
     internal suspend fun sabr(id: String): Stream {
         val d = Sabr.prepare(id) ?: throw YtError("No SABR", YtError.Kind.UNAVAILABLE)
-        val s = parse(id, d, Clients.WEB_SABR) { i -> Sabr.url(id, i) }
+        val s0 = parse(id, d, Clients.WEB_SABR) { i -> Sabr.url(id, i) }
+        val s = if (!s0.live) s0 else s0.copy(hls = SabrLive.master(id) ?: throw YtError("No live SABR here", YtError.Kind.UNAVAILABLE))
         if (s.video.isEmpty() || s.audio.isEmpty()) throw YtError("No playable streams", YtError.Kind.UNAVAILABLE)
         return s.copy(captions = s.captions.map { it.copy(url = Sabr.captionUrl(id, it.url)) })
     }

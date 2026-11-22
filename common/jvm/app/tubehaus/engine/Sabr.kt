@@ -111,6 +111,7 @@ object Sabr {
 
     /** a piece of fetch [run]: [data] belongs at byte [at] of its format ([init]: the header at the start) */
     fun piece(run: Int, at: Long, init: Boolean, ms: Long, data: ByteArray) {
+        if (SabrLive.piece(run, at, init, ms, data)) return
         val t = runs[run] ?: run { host?.stop(run); return }
         synchronized(t.lock) {
             val r = t.run
@@ -137,6 +138,7 @@ object Sabr {
 
     /** fetch [run] is over; [bad]: YouTube turned its token down (the page makes a new one) */
     fun end(run: Int, bad: Boolean, error: String?) {
+        if (SabrLive.end(run, bad, error)) return
         val t = runs.remove(run) ?: return
         synchronized(t.lock) {
             if (t.run?.id == run) t.run = null
@@ -212,7 +214,10 @@ object Sabr {
 
     // ------------------------------------------------------------------ the server on 127.0.0.1
 
-    @Synchronized private fun port(): Int {
+    /** the watch page's answer already asked for video [id] */
+    internal fun session(id: String) = sessions[id]?.d
+
+    @Synchronized internal fun port(): Int {
         server?.let { if (!it.isClosed) return it.localPort }
         // 127.0.0.1 itself: Android's loopback address is ::1, which the addresses here don't name
         val s = ServerSocket(0, 32, InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1)))
@@ -228,6 +233,7 @@ object Sabr {
     }
 
     private fun sweep() {
+        SabrLive.sweep()
         val now = System.currentTimeMillis()
         var total = tracks.values.sumOf { it.size() }
         for ((k, t) in tracks.entries.sortedBy { it.value.used }) {
@@ -262,6 +268,7 @@ object Sabr {
             when {
                 path.startsWith("/sabr?") -> serveFormat(out, parts[0] == "HEAD", q, headers["range"])
                 path.startsWith("/api/timedtext?") -> serveCaption(out, q)
+                path.startsWith("/live/") -> SabrLive.serve(out, path, q) { code, type, body -> reply(out, code, type, body) }
                 else -> reply(out, 404, "text/plain", "not found".toByteArray())
             }
             out.flush()

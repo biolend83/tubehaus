@@ -16,6 +16,10 @@ interface SabrHost {
     /** fetch [run] may go on up to byte [upTo] of its format for now */
     fun allow(run: Int, upTo: Long)
     fun stop(run: Int)
+    /** whether [startLive] works here */
+    val live: Boolean get() = false
+    /** starts a live conversation: picture format [index] as fetch [runV] (pieces at = segment number), sound as [runA]; stop(runV) ends both */
+    fun startLive(runV: Int, runA: Int, id: String, index: Int) {}
     /** gets ready ahead of a video that may need it (a browser to start); nothing by default */
     suspend fun warm() {}
 }

@@ -112,4 +112,6 @@ class WebSabr(private val context: Context) : SabrHost {
     override fun start(run: Int, id: String, index: Int, startMs: Long) = js("__thSabr.start($run,${q(id)},$index,$startMs)")
     override fun allow(run: Int, upTo: Long) = js("__thSabr.allow($run,$upTo)")
     override fun stop(run: Int) = js("__thSabr.stop($run)")
+    override val live get() = true
+    override fun startLive(runV: Int, runA: Int, id: String, index: Int) = js("__thSabr.liveStart($runV,$runA,${q(id)},$index)")
 }
