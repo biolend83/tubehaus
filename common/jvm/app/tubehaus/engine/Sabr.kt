@@ -37,6 +37,11 @@ object Sabr {
     /** every video the SABR way (a test build) */
     @Volatile var only = false
     val available get() = host != null && dir != null
+    /** when the page last gave a playable answer: while it is recent the host is up and every video goes this way first */
+    @Volatile var okAt = 0L
+    val warm get() = available && System.currentTimeMillis() - okAt < 30 * 60_000L
+    /** a SABR fetch failed for good: the usual clients first again until the page answers well */
+    fun cool() { okAt = 0 }
 
     private const val AHEAD = 24L shl 20
     private const val NEAR = 6L shl 20
@@ -96,6 +101,7 @@ object Sabr {
         sessions[id]?.takeIf { System.currentTimeMillis() - it.at < 4 * 3600_000L }?.let { return it.d }
         val text = h.prepare(id, InnerTube.hl, InnerTube.gl) ?: return null
         val d = parse(text)
+        if (d.at("playabilityStatus.status").str == "OK") okAt = System.currentTimeMillis()
         sessions[id] = Session(d, System.currentTimeMillis())
         if (sessions.size > 40) sessions.entries.minByOrNull { it.value.at }?.let { sessions.remove(it.key) }
         return d
@@ -144,7 +150,7 @@ object Sabr {
             if (t.run?.id == run) t.run = null
             if (bad || error != null) {
                 t.fails++
-                if (t.fails >= 6) t.failed = true
+                if (t.fails >= 6) { t.failed = true; cool() }
                 if (t.fails == 3) sessions.remove(t.video)
             }
             t.lock.notifyAll()

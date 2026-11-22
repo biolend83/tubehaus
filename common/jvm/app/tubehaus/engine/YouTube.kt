@@ -85,10 +85,19 @@ object YouTube {
         }
     }
 
+    @Volatile private var warming = false
+    /** a video always there, asked once to see the page answer well */
+    private const val WARM_ID = "jNQXAC9IVRw"
     private val warmScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
 
     /** From this device. Tries each player client until one gives playable URLs. */
     private suspend fun device(id: String): Stream {
+        // the front door first: the web player's own way (SABR, a real browser's token) once its page is up; it
+        // starts in the background after the first video, so that one never waits for it
+        if (Sabr.warm) {
+            try { return sabr(id) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e; if (e.kind != YtError.Kind.AGE) Sabr.cool() }
+            catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; Sabr.cool() }
+        } else Sabr.host?.let { h -> if (Sabr.available && !warming) { warming = true; warmScope.launch { try { h.warm(); runCatching { Sabr.prepare(WARM_ID) } } finally { warming = false } } } }
         var first: YtError? = null
         for (attempt in 0..1) {
             var walled = true
