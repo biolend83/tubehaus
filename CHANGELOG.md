@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Live streams over SABR:** when the usual live HLS playlist can't be had, the server plays the stream over SABR (picture and sound in one conversation near the live edge) and serves it as its own live HLS playlist (fMP4), so every player plays it unchanged. `HT_SABR_LIVE=first` tries it before the usual HLS
+
 ## v1.7.1 — 2026-11-21
 
 ### Added

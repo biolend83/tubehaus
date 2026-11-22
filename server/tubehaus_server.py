@@ -3062,6 +3062,11 @@ def sabr_loop():
         time.sleep(min(600, 5 * 2 ** min(_sabr["fails"], 7)))
 
 
+def sabr_live_first(vid):
+    """HT_SABR_LIVE=first: live streams over SABR before the usual HLS (for trying it)"""
+    return SABR != "0" and env("HT_SABR_LIVE", "") == "first"
+
+
 def sabr_get(path, rng=None, timeout=60):
     h = {"Range": rng} if rng else {}
     return urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:%d%s" % (SABR_PORT, path), headers=h), timeout=timeout)
@@ -7189,10 +7194,37 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b)
 
+    def sabr_live(self, part, t0, vid=None):
+        """/api/p/live/sabr/<master.m3u8|media.m3u8|seg>?v=..: the SABR helper's live HLS, its relative
+        addresses kept relative (they resolve under /api/p/live/sabr/)"""
+        q = urllib.parse.urlsplit(self.path).query if vid is None else urllib.parse.urlencode({"v": vid})
+        try:
+            r = sabr_get("/live/%s?%s" % (part, q), None, 40)
+            b = r.read()
+        except urllib.error.HTTPError as e:
+            log("live", "SABR %s %d" % (part, e.code), t0, every=0)
+            return self.send(e.code if e.code in (400, 404) else 502, {"error": "No live SABR stream"})
+        except Exception as ex:
+            log("live", "SABR %s FAIL %s" % (part, repr(ex)[:80]), t0, every=0)
+            return self.send(502, {"error": "No live SABR stream"})
+        if vid is not None:                            # the master, asked at /api/p/live/<id>.m3u8: absolute addresses
+            b = re.sub(rb"(?m)^(media\.m3u8\?)", ("%s/api/p/live/sabr/" % LIVE_ORIGIN).encode() + rb"\1", b)
+            b = b.replace(b'URI="media.m3u8?', ('URI="%s/api/p/live/sabr/media.m3u8?' % LIVE_ORIGIN).encode())
+        self.send_response(200)
+        self.send_header("Content-Type", r.headers.get("Content-Type") or "application/octet-stream")
+        self.send_header("Cache-Control", r.headers.get("Cache-Control") or "no-cache")
+        self.send_header("Content-Length", str(len(b)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(b)
+
     def live(self, p):
         qs = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
         t0 = time.time()
         try:
+            ms = re.search(r"/live/sabr/(master\.m3u8|media\.m3u8|seg\.mp4)$", p)
+            if ms:                                     # a live stream over SABR (the helper's HLS)
+                return self.sabr_live(ms.group(1), t0)
             if "/live/s/" in p:                        # media segment
                 b = p.rsplit("/", 1)[1].removesuffix(".ts")
                 u = base64.urlsafe_b64decode(b + "=" * (-len(b) % 4)).decode()
@@ -7248,7 +7280,16 @@ class H(BaseHTTPRequestHandler):
             if not m:
                 return self.send(400, {"error": "video id"})
             vid, itag = m.group(1), m.group(2)
-            e = live_entry(vid)
+            if itag is None and sabr_live_first(vid):
+                return self.sabr_live("master.m3u8", t0, vid)
+            try:
+                e = live_entry(vid)
+            except Exception as ex:
+                # no HLS from the usual clients: SABR, the way youtube.com itself plays it
+                if itag is None and SABR != "0":
+                    log("live", "%s no HLS (%s) -> SABR" % (vid, repr(ex)[:80]), t0, every=0)
+                    return self.sabr_live("master.m3u8", t0, vid)
+                raise
             if itag is None:                           # master playlist
                 lines = ["#EXTM3U", "#EXT-X-INDEPENDENT-SEGMENTS"]
                 for t, (inf, _) in sorted(e["variants"].items(), key=lambda kv: int(kv[0])):

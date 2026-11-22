@@ -981,6 +981,7 @@ Running one? [Add it here](https://github.com/biolend83/tubehaus/issues/new?temp
 | `HT_YT_PROXY` | `127.0.0.1:40000` | WARP proxy (empty = direct) |
 | `HT_WARP_ROTATE` | `1` | new WARP address when YouTube blocks (a reconnect, or a new registration when that keeps the address) |
 | `HT_SABR` | `1` | SABR (what YouTube's own web player gets) when no other way plays a video; `first` to use it before them, `only` for every video but live and age-restricted ones, `0` off. Needs deno. See [How it keeps playing](#how-it-works) |
+| `HT_SABR_LIVE` | – | `first`: live streams over SABR before the usual HLS playlist (otherwise SABR only when that playlist can't be had) |
 | `HT_REGION` | `US` | default region of searches and trending |
 | `HT_HL` | (the viewer's language) | YouTube's language for its texts |
 | `HT_YTDLP` | `yt-dlp` | for live streams |
@@ -1219,7 +1220,7 @@ Each step reads the refusal before moving on:
 | `UNPLAYABLE`, private / removed / members only | the video itself | stop and show YouTube's reason |
 | network error | the device is offline | stop, nothing to retry |
 
-Live streams take a separate path: they come with an HLS playlist from the first client, so SABR and the TV client are never needed for them.
+Live streams take a separate path: they normally come as an HLS playlist, and when that's refused the server plays them over SABR too (section 16).
 
 The order is a trade-off between speed and reach. VISIONOS is instant but refuses more. SABR plays almost anything but costs a page load and a token, about 2-3 s. The TV client plays nearly everything but waits behind an ad. So the cheap ways go first.
 
@@ -1471,6 +1472,7 @@ Live streams come as an HLS playlist that changes every few seconds, with segmen
 
 - **Addresses that die.** Live segment URLs stop working after a while, and need a PO token to last. The server keeps a fresh playlist per stream (refreshed in the background while anyone is watching), and the PO-token provider container keeps live URLs alive.
 - **Stalls.** Players fetch a segment when they need it, and a slow fetch is a stall. The server pulls segments **ahead** of the viewers, keeps about a minute per quality (~40 MB at 1080p), and serves them from memory with exact timing, so every viewer of a stream shares one download.
+- **When the HLS playlist is refused**, the server plays the stream over **live SABR**. There's no file to fill this time: one SABR conversation per quality carries picture and sound together near the live edge (a picture-only live conversation makes YouTube resend the same sound segment forever), and the server keeps the newest minute of segments in memory and writes its own **live HLS playlist** from them. The init part goes once as `EXT-X-MAP` and then the numbered media parts, with durations taken from each next segment's start time (live headers don't carry one). Every HLS player plays it unchanged. At the live edge the library would ask again immediately, so requests are spaced to one a second, and a quality nobody has asked for in a minute is stopped. `HT_SABR_LIVE=first` tries it before the usual HLS.
 
 ### 17. The players, and why nothing is transcoded
 

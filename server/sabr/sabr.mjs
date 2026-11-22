@@ -409,6 +409,224 @@ async function serveTrack(req, url) {
   return new Response(body, { status: m && length ? 206 : 200, headers: h });
 }
 
+// ---------------------------------------------------------------- live: SABR segments kept in memory, served as HLS
+// A live stream over SABR has no file to fill: YouTube sends numbered segments near the live edge. Each format
+// that a player watches gets one SABR conversation; its newest LIVE_KEEP segments stay in memory and are listed in
+// a live HLS playlist (fMP4: the init part once as EXT-X-MAP, then the media parts), so every player that plays
+// HLS (Shaka, ExoPlayer, mpv, AVPlayer) plays it. A format nobody asked for in LIVE_IDLE_MS is stopped.
+const LIVE_KEEP = 60;
+const LIVE_IDLE_MS = 60e3;
+const lives = new Map();   // "<vid>|<itag>" -> live track
+const MEDIA_BOX = new Set(["moof", "styp", "sidx", "emsg", "prft"]);
+function splitInit(b) {
+  // an fMP4 segment that carries its own init (ftyp + moov): [init, media]; else [null, b]
+  let o = 0, cut = -1;
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  while (o + 8 <= b.length) {
+    let size = dv.getUint32(o);
+    const type = String.fromCharCode(b[o + 4], b[o + 5], b[o + 6], b[o + 7]);
+    if (MEDIA_BOX.has(type)) { cut = o; break; }
+    if (size === 1 && o + 16 <= b.length) size = Number(dv.getBigUint64(o + 8));
+    if (size < 8) break;
+    o += size;
+  }
+  if (cut <= 0) return [null, b];
+  return [b.subarray(0, cut), b.subarray(cut)];
+}
+function codecsOf(f) { return ((f.mimeType || "").match(/codecs="([^"]+)"/) || [])[1] || ""; }
+function liveFormats(s) {
+  const all = [...s.formats.values()].filter((f) => (f.mimeType || "").includes("mp4"));
+  const video = all.filter((f) => f.mimeType.startsWith("video/") && /avc1/.test(codecsOf(f)) && f.height)
+    .sort((a, b) => a.height - b.height || (a.bitrate || 0) - (b.bitrate || 0));
+  const byHeight = new Map(); for (const f of video) byHeight.set(f.height, f);   // the best one per height
+  const audio = all.filter((f) => f.mimeType.startsWith("audio/") && /mp4a/.test(codecsOf(f))).sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+  return { video: [...byHeight.values()], audio: audio[0] || null };
+}
+function liveTrack(vid, f) {
+  const id = vid + "|" + f.itag;
+  let L = lives.get(id);
+  if (!L) {
+    L = { id, vid, f, video: (f.mimeType || "").startsWith("video/"), init: null, segs: [], waiters: [], last: 0, used: Date.now(),
+      running: false, runId: 0, fails: 0, failed: false, ended: false };
+    lives.set(id, L);
+  }
+  L.used = Date.now();
+  return L;
+}
+function liveWake(L) { const w = L.waiters; L.waiters = []; for (const f of w) f(); }
+function liveAudio(vid) { for (const L of lives.values()) if (L.vid === vid && !L.video) return L; return null; }
+function liveStart(vid, L, s) {
+  // a video format runs one conversation for picture and sound together (YouTube answers a picture-only live
+  // conversation with the same sound segment for ever); the sound goes to the stream's audio track. The audio
+  // playlist asked alone starts the lowest picture with it.
+  if (!L.video) {
+    const anyRun = [...lives.values()].find((x) => x.vid === vid && x.video && x.running && Date.now() - x.used < LIVE_IDLE_MS);
+    if (anyRun) return;
+    const low = liveFormats(s).video[0];
+    if (!low) return;
+    L = liveTrack(vid, low);
+  }
+  if (!L.running && !L.failed && !L.ended) liveRun(L);
+}
+function livePush(T, h, value, state) {
+  let b = value instanceof Uint8Array ? value : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  if (h?.isInitializationSegment) { T.init ??= b.slice(); return; }
+  const [init, media] = splitInit(b);
+  if (init && !T.init) T.init = init.slice();
+  const seq = h?.num != null && +h.num > 0 ? +h.num : state.n;
+  const last = T.segs[T.segs.length - 1];
+  if (last && seq <= last.seq) return;          // already have it
+  state.n = seq + 1;
+  const start = h?.start != null ? +h.start : null;
+  // a live segment's header has no duration: the next one's start tells it (else the one before's)
+  let dur = +h?.ms > 0 ? +h.ms / 1000 : 0;
+  if (last && last.start != null && start != null && seq === last.seq + 1 && start > last.start) last.dur = (start - last.start) / 1000;
+  if (!dur) dur = last?.dur || 2;
+  T.segs.push({ seq, start, dur, b: media.slice() });
+  if (T.segs.length > LIVE_KEEP) T.segs.splice(0, T.segs.length - LIVE_KEEP);
+  T.fails = 0;
+  liveWake(T);
+}
+async function liveRun(L) {
+  L.running = true;
+  const runId = ++L.runId;
+  let stream = null;
+  try {
+    const s = await prepare(L.vid);
+    if (s.failed) throw new Error("not playable over SABR");
+    const formats = [...s.formats.values()].map(buildSabrFormat);
+    const { audio } = liveFormats(s);
+    if (!audio) throw new Error("no mp4 sound");
+    const A = liveTrack(L.vid, audio);
+    const m = await getMinter();
+    stream = new SabrStream({
+      videoId: L.vid, formats, serverAbrStreamingUrl: s.sabrUrl, videoPlaybackUstreamerConfig: s.ustreamer,
+      clientInfo: { clientName: 1, clientVersion: s.ver, osName: "Windows", osVersion: "10.0" },
+      poToken: await m.m.mintAsWebsafeString(L.vid),
+      callbacks: { onMintPoToken: async () => (await getMinter()).m.mint(L.vid) },
+      fetchFunction: async (u, o = {}) => {
+        // at the live edge the library asks again at once: at most one request a second
+        const gap = 1000 - (Date.now() - L.last);
+        if (gap > 0) await new Promise((r) => setTimeout(r, gap));
+        L.last = Date.now();
+        return fetch(u, { ...o, headers: { ...(o.headers || {}), "User-Agent": UA, Origin: "https://www.youtube.com", Referer: "https://www.youtube.com/" } });
+      },
+    });
+    if (Deno.env.get("HT_SABR_DEBUG")) stream.logger.setLogLevels(99);
+    let first = true, bad = false;
+    stream.on("streamProtectionStatusUpdate", (p) => {
+      if (first) { first = false; if (p.status === 1) m.good = true; }
+      if ((p.status !== 1 && !m.good) || p.status === 3) { bad = true; m.good = false; turnedDown(m); stream.abort().catch(() => {}); }
+    });
+    stream.on("error", () => {});
+    // each piece's header, in the order the pieces reach each track's stream
+    const heads = { video: [], audio: [] };
+    const sb = stream.segmentBuffer, fin = sb.finalizeSegment.bind(sb);
+    let cur = null;
+    sb.finalizeSegment = (id) => {
+      const p = sb.pendingSegments.get(id);
+      cur = p ? { ...p.mediaHeader, num: p.segmentNumber, ms: p.durationMs, start: p.startTimeMs, type: p.type } : null;
+      try { return fin(id); } finally { cur = null; }
+    };
+    for (const kind of ["video", "audio"]) {
+      const out = stream.trackCollection[kind].output, enq = out.controller.enqueue.bind(out.controller);
+      out.controller.enqueue = (chunk) => { heads[kind].push(cur); enq(chunk); };
+    }
+    const { videoStream, audioStream } = stream.start({
+      videoFormat: buildSabrFormat(L.f), audioFormat: buildSabrFormat(audio), enabledTrackTypes: 0,
+      isPostLiveDvr: false, stallDetectionMs: 1e12,
+    });
+    const vs = { n: 0 }, as = { n: 0 };
+    let got = 0;
+    const watched = () => Date.now() - Math.max(L.used, A.used) < LIVE_IDLE_MS;
+    const pump = async (rs, kind, T, st) => {
+      const rd = rs.getReader();
+      for (;;) {
+        if (L.runId !== runId) break;
+        if (!watched()) { log("live", L.vid, L.f.itag, "nobody watching: stopped"); break; }
+        const { done, value } = await rd.read();
+        if (done) break;
+        livePush(T, heads[kind].shift(), value, st);
+        got++;
+      }
+      stream.abort().catch(() => {});
+    };
+    await Promise.all([pump(videoStream, "video", L, vs), pump(audioStream, "audio", A, as)]);
+    if (bad) L.fails++;
+    else if (!got) L.fails++;
+  } catch (e) {
+    L.fails++;
+    log("live", L.vid, L.f.itag, "FAIL", String(e?.message || e).slice(0, 160));
+    if (L.fails === 2) sessions.delete(L.vid);
+  } finally {
+    stream?.abort().catch(() => {});
+    if (L.runId === runId) L.running = false;
+    if (L.fails >= 6) { L.failed = true; log("live", L.vid, L.f.itag, "gave up"); }
+    liveWake(L);
+    const A = liveAudio(L.vid); if (A) liveWake(A);
+    // still watched: carry on with a new conversation
+    const still = () => Date.now() - Math.max(L.used, liveAudio(L.vid)?.used || 0) < LIVE_IDLE_MS;
+    if (L.runId === runId && !L.failed && !L.ended && still()) setTimeout(() => { if (!L.running) liveRun(L); }, 1000 * Math.max(1, L.fails));
+  }
+}
+async function liveReady(L, ms = 25e3) {
+  // the init part and a few segments, or a failure
+  const end = Date.now() + ms;
+  while ((!L.init || L.segs.length < 3) && !L.failed && !L.ended && Date.now() < end)
+    await new Promise((r) => { L.waiters.push(r); setTimeout(r, 2e3); });
+  if (!L.init || !L.segs.length) throw new Error(L.failed ? "live SABR failed" : "no live segments yet");
+}
+const M3U = { "Content-Type": "application/vnd.apple.mpegurl", "Cache-Control": "no-cache" };
+async function serveLive(url) {
+  const part = url.pathname.slice("/live/".length), vid = url.searchParams.get("v") || "";
+  if (!/^[\w-]{11}$/.test(vid)) return new Response("bad id", { status: 400 });
+  const s = await prepare(vid);
+  if (s.failed) return new Response("not playable", { status: 404 });
+  if (!/source=yt_(live|premiere)_broadcast/.test(s.sabrUrl)) return new Response("not a live stream", { status: 404 });
+  const lf = liveFormats(s);
+  if (!lf.audio || !lf.video.length) return new Response("no mp4 formats", { status: 404 });
+  if (part === "master.m3u8") {
+    const a = lf.audio, lines = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-INDEPENDENT-SEGMENTS",
+      `#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="a",NAME="audio",DEFAULT=YES,AUTOSELECT=YES,URI="media.m3u8?v=${vid}&itag=${a.itag}"`];
+    for (const f of lf.video)
+      lines.push(`#EXT-X-STREAM-INF:BANDWIDTH=${(f.bitrate || 1e6) + (a.bitrate || 128e3)},RESOLUTION=${f.width}x${f.height},` +
+        `FRAME-RATE=${f.fps || 30},CODECS="${codecsOf(f)},${codecsOf(a)}",AUDIO="a"`, `media.m3u8?v=${vid}&itag=${f.itag}`);
+    return new Response(lines.join("\n") + "\n", { headers: M3U });
+  }
+  const itag = url.searchParams.get("itag") || "";
+  const f = [...lf.video, lf.audio].find((x) => String(x.itag) === itag);
+  if (!f) return new Response("no such format", { status: 404 });
+  const L = liveTrack(vid, f);
+  liveStart(vid, L, s);
+  if (part === "media.m3u8") {
+    try { await liveReady(L); } catch (e) { return new Response(String(e.message), { status: 502 }); }
+    const segs = L.segs.slice();
+    const lines = ["#EXTM3U", "#EXT-X-VERSION:7", `#EXT-X-TARGETDURATION:${Math.ceil(Math.max(...segs.map((x) => x.dur)))}`,
+      `#EXT-X-MEDIA-SEQUENCE:${segs[0].seq}`, `#EXT-X-MAP:URI="seg.mp4?v=${vid}&itag=${itag}&s=init"`];
+    for (const x of segs) lines.push(`#EXTINF:${x.dur.toFixed(3)},`, `seg.mp4?v=${vid}&itag=${itag}&s=${x.seq}`);
+    if (L.ended) lines.push("#EXT-X-ENDLIST");
+    return new Response(lines.join("\n") + "\n", { headers: M3U });
+  }
+  if (part === "seg.mp4") {
+    const want = url.searchParams.get("s") || "";
+    const type = (f.mimeType || "video/mp4").split(";")[0];
+    if (want === "init") {
+      try { await liveReady(L); } catch (e) { return new Response(String(e.message), { status: 502 }); }
+      return new Response(L.init, { headers: { "Content-Type": type, "Cache-Control": "private, max-age=3600" } });
+    }
+    const seq = +want;
+    // a segment just past the newest one is waited for (a player a little ahead of the list)
+    const end = Date.now() + 15e3;
+    let x;
+    while (!(x = L.segs.find((y) => y.seq === seq)) && Date.now() < end && !L.failed && L.segs.length && seq > L.segs[L.segs.length - 1].seq)
+      await new Promise((r) => { L.waiters.push(r); setTimeout(r, 2e3); });
+    if (!x) return new Response("gone", { status: 404 });
+    return new Response(x.b, { headers: { "Content-Type": type, "Cache-Control": "private, max-age=3600" } });
+  }
+  return new Response("not found", { status: 404 });
+}
+setInterval(() => { for (const [k, L] of lives) if (!L.running && Date.now() - L.used > 5 * LIVE_IDLE_MS) lives.delete(k); }, 60e3);
+
 Deno.serve({ hostname: "127.0.0.1", port: PORT, onListen: () => log("listening on 127.0.0.1:" + PORT) }, async (req) => {
   const url = new URL(req.url);
   try {
@@ -421,6 +639,7 @@ Deno.serve({ hostname: "127.0.0.1", port: PORT, onListen: () => log("listening o
       return Response.json(await answer(vid, s));
     }
     if (url.pathname === "/track") return await serveTrack(req, url);
+    if (url.pathname.startsWith("/live/")) return await serveLive(url);
     if (url.pathname === "/caption") return await caption(url.searchParams.get("u") || "", url.searchParams.get("v") || "");
     return new Response("not found", { status: 404 });
   } catch (e) {
