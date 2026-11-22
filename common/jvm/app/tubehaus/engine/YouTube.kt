@@ -95,7 +95,8 @@ object YouTube {
         // the front door first: the web player's own way (SABR, a real browser's token) once its page is up; it
         // starts in the background after the first video, so that one never waits for it
         if (Sabr.warm) {
-            try { return sabr(id) } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e; if (e.kind != YtError.Kind.AGE) Sabr.cool() }
+            // not a live stream: the usual clients' live playlists go back hours, live SABR keeps only the last minute
+            try { sabr(id).let { if (!it.live) return it } } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e; if (e.kind != YtError.Kind.AGE) Sabr.cool() }
             catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; Sabr.cool() }
         } else Sabr.host?.let { h -> if (Sabr.available && !warming) { warming = true; warmScope.launch { try { h.warm(); runCatching { Sabr.prepare(WARM_ID) } } finally { warming = false } } } }
         var first: YtError? = null
