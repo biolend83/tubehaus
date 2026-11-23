@@ -272,16 +272,19 @@ private fun MusicHome(app: AppState, recent: List<Song>, opened: List<MusicCard>
             val greet: @Composable () -> Unit = {
                 Column {
                     Text(tr("Music"), color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, letterSpacing = 0.4.sp)
-                    Text(hello, fontSize = if (phone) 28.sp else 36.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp,
+                    Text(hello, fontSize = if (phone) 28.sp else 36.sp, lineHeight = if (phone) 32.sp else 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp,
                         modifier = Modifier.padding(top = 4.dp))
                 }
             }
-            if (phone) Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 10.dp)) {
+            // a narrow window is a phone here too: side by side, the greeting would wrap under the box
+            androidx.compose.foundation.layout.BoxWithConstraints { val narrow = phone || maxWidth < 640.dp
+            if (narrow) Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 10.dp)) {
                 greet()
                 box(Modifier.fillMaxWidth().padding(top = 14.dp))
             } else Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
                 Box(Modifier.weight(1f)) { greet() }
                 box(Modifier.widthIn(max = 520.dp).weight(1f))
+            }
             }
         }
         if (searches.isNotEmpty()) item {

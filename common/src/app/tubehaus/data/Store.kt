@@ -24,6 +24,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.contentOrNull
 import app.tubehaus.engine.Sys
 import app.tubehaus.engine.SysLock
 import app.tubehaus.engine.hex
@@ -230,21 +231,52 @@ class Store(dir: Path) {
     fun rememberSong(m: SongMeta) {
         if (settings.value.historyOff) return
         music.update { it.copy(recent = (listOf(m) + it.recent.filter { r -> r.id != m.id }).take(200)) }
+        push("/yt/mstate") { put("k", "recent"); put("item", songJson(m)) }
+    }
+
+    // the music tab's lists on the server (the web's shape: an opened page's "sub", a search as {id})
+    private fun songJson(m: SongMeta) = storeJson.encodeToJsonElement(SongMeta.serializer(), m)
+    private fun cardJson(c: CardMeta) = buildJsonObject { put("id", c.id); put("title", c.title); put("sub", c.subtitle); put("art", c.art); put("kind", c.kind) }
+
+    /** the server's music lists (from ServerSync), in place of this device's */
+    fun takeServerMusic(o: kotlinx.serialization.json.JsonObject) {
+        fun arr(k: String) = (o[k] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { it as? kotlinx.serialization.json.JsonObject }
+        fun str(x: kotlinx.serialization.json.JsonObject, k: String) = (x[k] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull.orEmpty()
+        val songs = { k: String -> arr(k).mapNotNull { x -> runCatching { storeJson.decodeFromJsonElement(SongMeta.serializer(), x) }.getOrNull() } }
+        music.update { it.copy(
+            recent = songs("recent"), liked = songs("likes"),
+            opened = arr("opened").map { x -> CardMeta(str(x, "id"), str(x, "title"), str(x, "sub"), str(x, "art"), str(x, "kind")) }.filter { c -> c.id.isNotEmpty() },
+            searches = arr("searches").map { x -> str(x, "id") }.filter { t -> t.isNotEmpty() },
+        ) }
+    }
+
+    /** this device's music lists, for the first sync with a server (it keeps its own first) */
+    fun musicLists() = buildJsonObject {
+        val m = music.value
+        put("lists", buildJsonObject {
+            put("recent", kotlinx.serialization.json.JsonArray(m.recent.map { songJson(it) }))
+            put("likes", kotlinx.serialization.json.JsonArray(m.liked.map { songJson(it) }))
+            put("opened", kotlinx.serialization.json.JsonArray(m.opened.map { cardJson(it) }))
+            put("searches", kotlinx.serialization.json.JsonArray(m.searches.map { buildJsonObject { put("id", it) } }))
+        })
     }
 
     fun rememberMusicSearch(q: String) {
         val t = q.trim()
         if (t.isEmpty() || settings.value.historyOff) return
         music.update { it.copy(searches = (listOf(t) + it.searches.filter { s -> !s.equals(t, true) }).take(20)) }
+        push("/yt/mstate") { put("k", "searches"); put("item", buildJsonObject { put("id", t) }) }
     }
 
     fun rememberCard(c: CardMeta) {
         if (settings.value.historyOff) return
         music.update { it.copy(opened = (listOf(c) + it.opened.filter { o -> o.id != c.id }).take(40)) }
+        push("/yt/mstate") { put("k", "opened"); put("item", cardJson(c)) }
     }
 
     fun likeSong(m: SongMeta, on: Boolean) {
         music.update { it.copy(liked = (if (on) listOf(m) else emptyList()) + it.liked.filter { l -> l.id != m.id }) }
+        push("/yt/mstate") { put("k", "likes"); if (on) put("item", songJson(m)) else put("drop", m.id) }
     }
 
     // ---------------------------------------------------------- subscriptions

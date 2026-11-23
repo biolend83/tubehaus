@@ -1,5 +1,6 @@
 package app.tubehaus.android
 
+import app.tubehaus.engine.YouTube
 import app.tubehaus.cast.Lan as NearLan
 import android.os.Build
 import androidx.compose.material3.ColorScheme
@@ -63,6 +64,7 @@ class AndroidPlatform(private val app: Application) : Platform {
         // what nothing else plays: SABR from a hidden page on www.youtube.com, its formats kept in the cache while they play
         Sabr.dir = java.io.File(app.cacheDir, "sabr").apply { deleteRecursively() }
         Sabr.host = WebSabr(app)
+        YouTube.prewarm(4_000)
         Sabr.only = runCatching {
             app.packageManager.getApplicationInfo(app.packageName, PackageManager.GET_META_DATA).metaData?.get("tubehaus.sabrOnly")?.toString() == "true"
         }.getOrDefault(false)

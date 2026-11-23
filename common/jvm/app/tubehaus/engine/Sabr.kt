@@ -37,6 +37,17 @@ object Sabr {
     /** every video the SABR way (a test build) */
     @Volatile var only = false
     val available get() = host != null && dir != null
+    /** when the page last gave a playable answer: while it is recent the host is up and every video goes this way first */
+    @Volatile var okAt = 0L
+    val warm get() = available && System.currentTimeMillis() - okAt < 30 * 60_000L
+    /** the host closed its page (idle): fetches on their way there are over, and start again when wanted */
+    fun hostGone() {
+        cool()
+        for (run in runs.keys.toList()) end(run, false, null)
+        SabrLive.hostGone()
+    }
+    /** a SABR fetch failed for good: the usual clients first again until the page answers well */
+    fun cool() { okAt = 0 }
 
     private const val AHEAD = 24L shl 20
     private const val NEAR = 6L shl 20
@@ -51,6 +62,8 @@ object Sabr {
         val ranges = ArrayList<LongArray>()          // on disk: [start, end) sorted, merged
         val points = ArrayList<LongArray>()          // [byte, ms] of the pieces seen
         var headEnd = 0L
+        /** where each segment starts, from the header piece (it carries the index): exact times, no guessing */
+        @Volatile var toc: SabrIndex? = null
         @Volatile var run: Run? = null
         @Volatile var want = 0L
         var fails = 0
@@ -71,6 +84,7 @@ object Sabr {
         /** the start time of the piece holding byte [n]: from the pieces seen around it, else the average bitrate */
         fun timeOf(n: Long): Long {
             if (n <= headEnd) return 0
+            toc?.let { return it.timeOf(n) }
             var lo: LongArray? = null; var hi: LongArray? = null
             for (p in points) { if (p[0] <= n && (lo == null || p[0] > lo[0])) lo = p; if (p[0] > n && (hi == null || p[0] < hi[0])) hi = p }
             val a = lo ?: longArrayOf(headEnd, 0); val b = hi ?: longArrayOf(max(length, 1), durationMs)
@@ -96,6 +110,7 @@ object Sabr {
         sessions[id]?.takeIf { System.currentTimeMillis() - it.at < 4 * 3600_000L }?.let { return it.d }
         val text = h.prepare(id, InnerTube.hl, InnerTube.gl) ?: return null
         val d = parse(text)
+        if (d.at("playabilityStatus.status").str == "OK") okAt = System.currentTimeMillis()
         sessions[id] = Session(d, System.currentTimeMillis())
         if (sessions.size > 40) sessions.entries.minByOrNull { it.value.at }?.let { sessions.remove(it.key) }
         return d
@@ -111,11 +126,15 @@ object Sabr {
 
     /** a piece of fetch [run]: [data] belongs at byte [at] of its format ([init]: the header at the start) */
     fun piece(run: Int, at: Long, init: Boolean, ms: Long, data: ByteArray) {
+        if (SabrLive.piece(run, at, init, ms, data)) return
         val t = runs[run] ?: run { host?.stop(run); return }
         synchronized(t.lock) {
             val r = t.run
             if (r == null || r.id != run) { host?.stop(run); return }
-            if (init) t.headEnd = max(t.headEnd, data.size.toLong())
+            if (init) {
+                t.headEnd = max(t.headEnd, data.size.toLong())
+                if (t.toc == null) t.toc = SabrIndex.parse(data)
+            }
             else {
                 if (ms >= 0) t.points.add(longArrayOf(at, ms))
                 if (r.media++ == 0 && at > max(r.from, t.headEnd)) {
@@ -137,12 +156,13 @@ object Sabr {
 
     /** fetch [run] is over; [bad]: YouTube turned its token down (the page makes a new one) */
     fun end(run: Int, bad: Boolean, error: String?) {
+        if (SabrLive.end(run, bad, error)) return
         val t = runs.remove(run) ?: return
         synchronized(t.lock) {
             if (t.run?.id == run) t.run = null
             if (bad || error != null) {
                 t.fails++
-                if (t.fails >= 6) t.failed = true
+                if (t.fails >= 6) { t.failed = true; cool() }
                 if (t.fails == 3) sessions.remove(t.video)
             }
             t.lock.notifyAll()
@@ -212,7 +232,10 @@ object Sabr {
 
     // ------------------------------------------------------------------ the server on 127.0.0.1
 
-    @Synchronized private fun port(): Int {
+    /** the watch page's answer already asked for video [id] */
+    internal fun session(id: String) = sessions[id]?.d
+
+    @Synchronized internal fun port(): Int {
         server?.let { if (!it.isClosed) return it.localPort }
         // 127.0.0.1 itself: Android's loopback address is ::1, which the addresses here don't name
         val s = ServerSocket(0, 32, InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1)))
@@ -228,10 +251,13 @@ object Sabr {
     }
 
     private fun sweep() {
+        SabrLive.sweep()
         val now = System.currentTimeMillis()
         var total = tracks.values.sumOf { it.size() }
+        // at most 2 GB, and never more than a tenth of the free room on the disk
+        val cap = min(DISK_MAX, ((dir?.usableSpace ?: DISK_MAX) + total) / 10)
         for ((k, t) in tracks.entries.sortedBy { it.value.used }) {
-            if (now - t.used > IDLE_MS || total > DISK_MAX) {
+            if (now - t.used > IDLE_MS || total > cap) {
                 total -= t.size()
                 tracks.remove(k)
                 synchronized(t.lock) { t.run?.let { end(t, it) }; t.failed = true; t.lock.notifyAll() }
@@ -262,6 +288,7 @@ object Sabr {
             when {
                 path.startsWith("/sabr?") -> serveFormat(out, parts[0] == "HEAD", q, headers["range"])
                 path.startsWith("/api/timedtext?") -> serveCaption(out, q)
+                path.startsWith("/live/") -> SabrLive.serve(out, path, q) { code, type, body -> reply(out, code, type, body) }
                 else -> reply(out, 404, "text/plain", "not found".toByteArray())
             }
             out.flush()

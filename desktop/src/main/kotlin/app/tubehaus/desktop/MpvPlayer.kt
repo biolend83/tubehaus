@@ -440,6 +440,8 @@ class MpvPlayer : VideoPlayer {
         set("force-media-title", opts.title.ifEmpty { s.title })
         // a live stream from the connected server is opened by mpv itself and needs the server's login
         set("http-header-fields", ServerVideo.authFor(url)?.let { "Authorization: $it" } ?: "")
+        // live: two segments behind the edge (FFmpeg starts three back)
+        cmd("set", "demuxer-lavf-o", if (s.live) "live_start_index=-2" else "")
         cmd("loadfile", url, "replace")
     }
 

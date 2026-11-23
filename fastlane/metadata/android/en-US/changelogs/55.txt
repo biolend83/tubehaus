@@ -1,0 +1,5 @@
+- Videos open the web player's way first (SABR), the first one included: about a second
+- Live: the seek bar stays at the live edge, less delay; tap LIVE to go back to it
+- Music: recent songs, likes and searches synced with your TubeHaus server
+- Desktop: a cleaner home; narrow windows no longer squeeze titles
+- Settings: overlapping options fixed

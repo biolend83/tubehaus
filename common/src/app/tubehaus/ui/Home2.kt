@@ -171,7 +171,7 @@ private fun Home2(app: AppState, items: List<Item>, loading: Boolean, onEnd: sus
         val cols = if (phone) 1 else ((maxWidth - edge * 2) / 320.dp).toInt().coerceAtLeast(1)
         LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(bottom = 32.dp)) {
             item(key = "head") { Column(Modifier.padding(horizontal = if (phone) 0.dp else edge - 12.dp)) { header() } }
-            item(key = "hello") { Greeting(app, edge) }
+            if (app.platform.touch || app.platform.tv) item(key = "hello") { Greeting(app, edge) }
             item(key = "continue") { Column(Modifier.padding(start = if (phone) 0.dp else edge - 4.dp, top = 8.dp)) { ContinueRow(app, forYou = false) } }
             item(key = "words") { Words(app, edge) }
             for ((n, s) in shelves.withIndex()) {

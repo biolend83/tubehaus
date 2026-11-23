@@ -205,6 +205,7 @@ private fun startApp() {
     if (BrowserSabr.browser() != null) {
         app.tubehaus.engine.Sabr.dir = File(platform.cacheDir.toString(), "sabr").apply { deleteRecursively() }
         app.tubehaus.engine.Sabr.host = BrowserSabr(File(platform.cacheDir.toString(), "sabr-browser"))
+        app.tubehaus.engine.YouTube.prewarm(4_000)
         app.tubehaus.engine.Sabr.only = System.getenv("TUBEHAUS_SABR_ONLY") != null
     }
     val state = AppState(platform, Store(platform.dataDir))
