@@ -104,7 +104,7 @@ object YouTube {
         // starts in the background after the first video, so that one never waits for it
         if (Sabr.warm) {
             // not a live stream: the usual clients' live playlists go back hours, live SABR keeps only the last minute
-            try { sabr(id).let { if (!it.live) return it } } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e; if (e.kind != YtError.Kind.AGE) Sabr.cool() }
+            try { sabr(id).let { if (!it.live) return it } } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e; if (e.kind == YtError.Kind.OTHER || e.kind == YtError.Kind.LOGIN) Sabr.cool() }  // a video that isn't there (ended live, removed, private) says nothing about the page
             catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; Sabr.cool() }
         } else prewarm()
         var first: YtError? = null
