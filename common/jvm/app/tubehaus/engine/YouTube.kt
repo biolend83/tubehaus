@@ -92,7 +92,7 @@ object YouTube {
 
     /** opens the front door in the background (at start, a few seconds in, so the first video is fast too) */
     fun prewarm(delayMs: Long = 0) {
-        if (Sabr.warm || warming) return
+        if (!Sabr.first || Sabr.warm || warming) return
         val h = Sabr.host ?: return
         warming = true
         warmScope.launch { try { if (delayMs > 0) kotlinx.coroutines.delay(delayMs); if (Sabr.available) { h.warm(); runCatching { Sabr.prepare(WARM_ID) } } } finally { warming = false } }
@@ -102,7 +102,7 @@ object YouTube {
     private suspend fun device(id: String): Stream {
         // the front door first: the web player's own way (SABR, a real browser's token) once its page is up; it
         // starts in the background after the first video, so that one never waits for it
-        if (Sabr.warm) {
+        if (Sabr.first && Sabr.warm) {
             // not a live stream: the usual clients' live playlists go back hours, live SABR keeps only the last minute
             try { sabr(id).let { if (!it.live) return it } } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e; if (e.kind == YtError.Kind.OTHER || e.kind == YtError.Kind.LOGIN) Sabr.cool() }  // a video that isn't there (ended live, removed, private) says nothing about the page
             catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; Sabr.cool() }

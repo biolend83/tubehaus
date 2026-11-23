@@ -27,6 +27,8 @@ import app.tubehaus.ui.AppState
 import app.tubehaus.ui.Platform
 import app.tubehaus.ui.Screen
 import app.tubehaus.ui.playerKey
+import app.tubehaus.ui.playerSpeedChar
+import androidx.compose.ui.input.key.utf16CodePoint
 import java.awt.Desktop
 import java.awt.FileDialog
 import java.awt.Point
@@ -258,7 +260,9 @@ private fun startApp() {
                         platform.tv -> false
                         state.current is Screen.Shorts -> state.shortsKeys?.invoke(e.key) ?: false
                         state.fullscreen || state.current is Screen.Watch ->
-                            !e.isCtrlPressed && !e.isMetaPressed && !e.isAltPressed && playerKey(state, e.key, e.isShiftPressed)
+                            // < and > by the character (an AZERTY or AltGr layout puts them elsewhere), then the keys by place
+                            playerSpeedChar(state, e.utf16CodePoint) ||
+                                !e.isCtrlPressed && !e.isMetaPressed && !e.isAltPressed && playerKey(state, e.key, e.isShiftPressed)
                         else -> false
                     }
                 }

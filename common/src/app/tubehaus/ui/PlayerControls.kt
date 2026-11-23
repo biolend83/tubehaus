@@ -135,6 +135,17 @@ fun VideoArea(app: AppState, modifier: Modifier = Modifier, fullscreen: Boolean 
     }
 }
 
+/** < and > by the character typed, whatever the keyboard layout (and AltGr) puts it on. True when it was one. */
+fun playerSpeedChar(app: AppState, ch: Int): Boolean {
+    val d = when (ch) { '<'.code -> -1; '>'.code -> 1; else -> return false }
+    val st = app.player.state.value
+    if (st.videoId == null) return false
+    val i = SPEEDS.indexOfFirst { it >= st.speed - 0.01f }.let { if (it < 0) SPEEDS.size - 1 else it }
+    val x = SPEEDS[(i + d).coerceIn(0, SPEEDS.size - 1)]
+    app.playback.setSpeed(x); app.toast(if (x == 1f) tr("Normal") else "${x}x")
+    return true
+}
+
 /** Keyboard shortcuts while a video is on screen (YouTube's). True when the key was used. */
 fun playerKey(app: AppState, key: Key, shift: Boolean = false): Boolean {
     val player = app.player
