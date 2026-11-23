@@ -339,15 +339,7 @@ private fun Shell(app: AppState) {
                         if (!(deskBar && showTop)) IconButton(onClick = { app.store.settings.update { it.copy(railCollapsed = true) } }) {
                             Icon(Sym.MenuOpen.fill, tr("Fold the menu"))
                         }
-                        // the desktop: back and forward, like a browser's, out of the video page's way; dim when there is nowhere to go
-                        if (!app.platform.touch && !app.platform.tv) Row {
-                            IconButton(onClick = { app.back() }, enabled = app.canBack, modifier = Modifier.size(36.dp)) {
-                                Icon(Sym.ArrowBack.fill, tr("Back"), Modifier.size(20.dp))
-                            }
-                            IconButton(onClick = { app.forward() }, enabled = app.ahead.isNotEmpty(), modifier = Modifier.size(36.dp)) {
-                                Icon(Sym.ArrowBack.fill, tr("Forward"), Modifier.size(20.dp).graphicsLayer { scaleX = -1f })
-                            }
-                        }
+                        // the desktop goes back with the mouse's side buttons and Alt+arrows, no buttons here
                     },
                 ) {
                     for (t in tabs(app, phone = false)) {

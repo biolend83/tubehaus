@@ -62,13 +62,23 @@ function jsc(input) {
   }
   return new Promise((ok, no) => { const id = ++wid; pending.set(id, [ok, no]); worker.postMessage({ id, input }); });
 }
-const players = new Map();
+const players = new Map(), scripts = new Map();
+function playerJs(jsUrl) {
+  let p = scripts.get(jsUrl);
+  if (!p) {
+    p = fetch(jsUrl, { credentials: "omit" }).then((r) => { if (!r.ok) throw new Error("player script " + r.status); return r.text(); });
+    p.catch(() => scripts.delete(jsUrl));
+    scripts.set(jsUrl, p);
+    if (scripts.size > 3) scripts.delete(scripts.keys().next().value);
+  }
+  return p;
+}
 async function solveWith(url, jsUrl) {
   const u = new URL(url), n = u.searchParams.get("n");
   if (!n) return url;
   let pre = players.get(jsUrl);
   if (!pre) {
-    const js = await (await fetch(jsUrl, { credentials: "omit" })).text();
+    const js = await playerJs(jsUrl);
     pre = (await jsc({ type: "player", player: js, requests: [], output_preprocessed: true })).preprocessed_player;
     players.set(jsUrl, pre);
     if (players.size > 3) players.delete(players.keys().next().value);
@@ -113,6 +123,19 @@ function osOf(ua) {
   if ((m = ua.match(/Mac OS X ([\d_]+)/))) return { osName: "Macintosh", osVersion: m[1].replace(/_/g, ".") };
   if ((m = ua.match(/Android ([\d.]+)/))) return { osName: "Android", osVersion: m[1] };
   return { osName: "X11", osVersion: "" };
+}
+function sendPiece(o, u8) {
+  if (window.__thBin) {
+    try {
+      const head = new TextEncoder().encode(JSON.stringify(o));
+      const buf = new Uint8Array(4 + head.length + u8.length);
+      new DataView(buf.buffer).setUint32(0, head.length);
+      buf.set(head, 4); buf.set(u8, 4 + head.length);
+      window.__thBin.postMessage(buf.buffer);
+      return;
+    } catch (e) { window.__thBin = null; }
+  }
+  send({ ...o, data: b64(u8) });
 }
 const b64 = (u8) => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
 
@@ -198,12 +221,93 @@ window.__thSabr = {
         const at = h.isInitializationSegment ? 0 : +(h.segmentByteRangeStart ?? -1);
         if (at < 0) continue;
         if (!h.isInitializationSegment) head = at + u8.length;
-        send({ t: "piece", run, at, init: !!h.isInitializationSegment, ms: h.startMs != null ? +h.startMs : -1, data: b64(u8) });
+        sendPiece({ t: "piece", run, at, init: !!h.isInitializationSegment, ms: h.startMs != null ? +h.startMs : -1 }, u8);
       }
       stream.abort().catch(() => {});
       runs.delete(run);
       send({ t: "end", run, bad: r.bad });
     })().catch((e) => { runs.delete(run); send({ t: "end", run, bad: !!r?.bad, error: r?.bad ? undefined : String(e?.message || e).slice(0, 200) }); });
+    return "ok";
+  },
+  /** a live stream: one conversation for picture (format [index]) and sound together near the live edge (a
+   *  picture-only live conversation gets the same sound segment for ever). Picture pieces go as run [runV], sound
+   *  as [runA], each {at: segment number, ms: its start time, init}. stop(runV) ends both. */
+  liveStart(runV, runA, vid, index) {
+    let r = null;
+    (async () => {
+      const s = await session(vid);
+      if (!s.sabrUrl) throw new Error("no SABR address");
+      const raw = s.d.streamingData.adaptiveFormats;
+      const f = raw[index];
+      if (!f || !(f.mimeType || "").startsWith("video/")) throw new Error("no such picture format");
+      const formats = raw.map(buildSabrFormat), me = formats[index];
+      const sound = raw.map((x, i) => [x, i]).filter(([x]) => (x.mimeType || "").startsWith("audio/mp4"))
+        .sort((a, b) => (b[0].bitrate || 0) - (a[0].bitrate || 0))[0];
+      if (!sound) throw new Error("no mp4 sound");
+      const m = await getMinter();
+      let last = 0;
+      const stream = new SabrStream({
+        videoId: vid, formats, serverAbrStreamingUrl: s.sabrUrl, videoPlaybackUstreamerConfig: s.ustreamer,
+        clientInfo: { clientName: 1, clientVersion: s.ver, ...osOf(navigator.userAgent) },
+        poToken: await m.m.mintAsWebsafeString(vid),
+        callbacks: { onMintPoToken: async () => (await getMinter()).m.mint(vid) },
+        // at the live edge the library asks again at once: at most one request a second
+        fetchFunction: async (u, o = {}) => {
+          const gap = 1000 - (Date.now() - last);
+          if (gap > 0) await new Promise((ok) => setTimeout(ok, gap));
+          last = Date.now();
+          return fetch(u, { ...o, headers: { "content-type": "text/plain;charset=UTF-8", accept: "application/vnd.yt-ump" }, credentials: "omit" });
+        },
+      });
+      r = { stream, allow: Infinity, gate: null, bad: false };
+      if (stopped.delete(runV)) { stream.abort().catch(() => {}); return; }
+      runs.set(runV, r);
+      let refused = 0;
+      stream.on("streamProtectionStatusUpdate", (p) => {
+        if (p.status === 1) m.good = true;
+        refused = p.status === 3 ? refused + 1 : 0;
+        if (refused >= 3) { r.bad = true; m.good = false; turnedDown(m); stream.abort().catch(() => {}); }
+      });
+      stream.on("error", (e) => send({ t: "log", run: runV, msg: "live error " + String(e?.message || e).slice(0, 200) }));
+      const heads = { video: [], audio: [] };
+      const sb = stream.segmentBuffer, fin = sb.finalizeSegment.bind(sb);
+      let cur = null;
+      sb.finalizeSegment = (id) => {
+        const p = sb.pendingSegments.get(id);
+        cur = p ? { ...p.mediaHeader, num: p.segmentNumber, start: p.startTimeMs } : null;
+        try { return fin(id); } finally { cur = null; }
+      };
+      for (const kind of ["video", "audio"]) {
+        const out = stream.trackCollection[kind].output, enq = out.controller.enqueue.bind(out.controller);
+        out.controller.enqueue = (chunk) => { heads[kind].push(cur); enq(chunk); };
+      }
+      const st = stream.start({ videoFormat: me, audioFormat: formats[sound[1]], enabledTrackTypes: 0, isPostLiveDvr: false, stallDetectionMs: 1e12 });
+      const pump = async (rs, kind, run) => {
+        const rd = rs.getReader();
+        let n = 0;
+        for (;;) {
+          if (runs.get(runV) !== r) break;
+          const { done, value } = await rd.read();
+          if (done) break;
+          const h = heads[kind].shift();
+          const u8 = value instanceof Uint8Array ? value : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+          const init = !!h?.isInitializationSegment;
+          const seq = init ? 0 : (h?.num != null && +h.num > 0 ? +h.num : n + 1);
+          if (!init) n = seq;
+          sendPiece({ t: "piece", run, at: seq, init, ms: h?.start != null ? +h.start : -1 }, u8);
+        }
+        stream.abort().catch(() => {});
+      };
+      await Promise.all([pump(st.videoStream, "video", runV), pump(st.audioStream, "audio", runA)]);
+      runs.delete(runV);
+      send({ t: "end", run: runA, bad: r.bad });
+      send({ t: "end", run: runV, bad: r.bad });
+    })().catch((e) => {
+      runs.delete(runV);
+      const error = r?.bad ? undefined : String(e?.message || e).slice(0, 200);
+      send({ t: "end", run: runA, bad: !!r?.bad, error });
+      send({ t: "end", run: runV, bad: !!r?.bad, error });
+    });
     return "ok";
   },
   /** the app wants fetch [run] to go up to byte [n] for now */
