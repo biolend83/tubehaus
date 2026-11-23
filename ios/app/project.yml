@@ -5,6 +5,10 @@ name: TubeHaus
 options:
   deploymentTarget:
     iOS: "16.0"
+settings:
+  base:
+    # the app's bundle id; the share extension's is this + ".share"
+    APP_BUNDLE_ID: io.github.biolend83.tubehaus
 targets:
   TubeHaus:
     type: application
@@ -32,6 +36,7 @@ targets:
       - path: ../../common/fonts/Pretendard-OFL.txt
         buildPhase: resources
     dependencies:
+      - target: TubeHausShare
       - framework: ../build/kit/TubeHausKit.framework
         embed: false
       # comment translation (iOS 18+): linked weakly so the app still opens on iOS 16 and 17,
@@ -40,7 +45,7 @@ targets:
         weak: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: io.github.biolend83.tubehaus
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
         PRODUCT_NAME: TubeHaus
         INFOPLIST_FILE: Info.plist
         TARGETED_DEVICE_FAMILY: "1,2"
@@ -48,5 +53,35 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         FRAMEWORK_SEARCH_PATHS: "$(inherited) $(SRCROOT)/../build/kit"
         ENABLE_BITCODE: NO
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+  # "Share → TubeHaus" from the YouTube app or Safari: the link opens in the app (tubehaus://open?url=…)
+  TubeHausShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Share
+    postBuildScripts:
+      # the same version and build as the app, which keeps them in its Info.plist
+      - name: Version of the app
+        basedOnDependencyAnalysis: false
+        # after Xcode has written the extension's Info.plist
+        inputFiles:
+          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
+          - $(SRCROOT)/Info.plist
+        script: |
+          plist="$TARGET_BUILD_DIR/$INFOPLIST_PATH"
+          for key in CFBundleShortVersionString CFBundleVersion; do
+            value=$(/usr/libexec/PlistBuddy -c "Print :$key" "$SRCROOT/Info.plist")
+            /usr/libexec/PlistBuddy -c "Set :$key $value" "$plist"
+          done
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).share
+        PRODUCT_NAME: TubeHausShare
+        INFOPLIST_FILE: Share/Info.plist
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.0"
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGNING_REQUIRED: NO

@@ -16,6 +16,8 @@ import app.tubehaus.data.Store
 import app.tubehaus.engine.Engine
 import app.tubehaus.patch.TubePatch
 import app.tubehaus.engine.Video
+import app.tubehaus.engine.YouTube
+import app.tubehaus.ui.Screen
 import kotlinx.coroutines.launch
 import app.tubehaus.ui.App
 import app.tubehaus.ui.AppState
@@ -34,6 +36,8 @@ fun MainViewController(hideBars: (Boolean) -> Unit): UIViewController {
     val platform = IosPlatform()
     platform.hideBars = hideBars
     val state = AppState(platform, Store(platform.dataDir))
+    app = state
+    shared?.let { shared = null; openShared(it) }
     // Control Center and the lock screen: what plays and its buttons
     MediaControls(state).start()
     val center = NSNotificationCenter.defaultCenter
@@ -71,6 +75,26 @@ fun MainViewController(hideBars: (Boolean) -> Unit): UIViewController {
             App(state)
         }
     }.also { platform.root = it }
+}
+
+private var app: AppState? = null
+/** a link shared before the app was there (a cold start), opened once it is */
+private var shared: String? = null
+
+/**
+ * A YouTube link shared to TubeHaus (the share extension, via tubehaus://open?url=…): a video,
+ * playlist or channel opens here, as on Android. Anything else is left alone.
+ */
+fun openShared(link: String) {
+    val state = app ?: run { shared = link; return }
+    state.scope.launch {
+        val r = runCatching { YouTube.resolve(link) }.getOrNull() ?: return@launch
+        when (r.first) {
+            "video" -> state.watch(Video(r.second, ""))
+            "playlist" -> state.go(Screen.Playlist(r.second))
+            "channel" -> state.go(Screen.Channel(r.second))
+        }
+    }
 }
 
 /** what the TubeHaus folder in Files is for */
