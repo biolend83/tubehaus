@@ -588,6 +588,28 @@ export function exportDialog() {
     document.body.append(a); a.click(); a.remove();
   }));
 }
+// Takeout's watch-history.html can be hundreds of MB, more than a request may carry: only the cells that
+// name a video are sent (the newest 20000, all the server keeps), the rest of the page is markup
+function slimTakeout(text) {
+  if (text.length >= 8e6 && /^\s*\[/.test(text)) {
+    // watch-history.json: the newest 20000 entries (Takeout lists newest first)
+    try { const a = JSON.parse(text); if (Array.isArray(a) && a[0] && "titleUrl" in a[0]) return JSON.stringify(a.slice(0, 20000)); } catch { }
+    return text;
+  }
+  if (text.length < 8e6 || !text.includes('<div class="content-cell') || !text.includes("youtube.com/watch?v=")) return text;
+  const out = [];
+  let pos = 0;
+  while (out.length < 20000) {
+    const i = text.indexOf('<div class="content-cell', pos);
+    if (i < 0) break;
+    const k = text.indexOf("</div>", i);
+    if (k < 0) break;
+    pos = k + 6;
+    const cell = text.slice(i, pos);
+    if (cell.includes("youtube.com/watch?v=")) out.push(cell);
+  }
+  return out.length ? "<html><body>" + out.join(" ") + "</body></html>" : text;
+}
 export async function importFile(file) { return importFiles(file ? [file] : []); }
 // several at once: Takeout gives one CSV per playlist
 export async function importFiles(files) {
@@ -598,7 +620,7 @@ export async function importFiles(files) {
   let ok = 0, err = null;
   for (const file of files) {
     try {
-      const res = await lib("import", { method: "POST", body: { name: file.name, text: await file.text() } });
+      const res = await lib("import", { method: "POST", body: { name: file.name, text: slimTakeout(await file.text()) } });
       for (const k in sum) sum[k] += res[k] || 0;
       ok++;
     } catch (e) { err = e; }

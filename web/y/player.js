@@ -1464,7 +1464,8 @@ export class Player {
   // ------------------------------------------------------------ keyboard shortcuts (same as YouTube)
   key(e) {
     const v = this.video, k = e.key;
-    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    // AltGr (Ctrl+Alt on Windows) types < and > on some layouts
+    if ((e.ctrlKey || e.metaKey || e.altKey) && !e.getModifierState?.("AltGraph")) return false;
     const frame = 1 / (this.curTrack()?.frameRate || 30);
     // speed by the key's place as well as its character: Shift + the comma/period keys, whatever the layout puts there
     const step = k === "<" || (e.shiftKey && e.code === "Comma") ? -1 : k === ">" || (e.shiftKey && e.code === "Period") ? 1 : 0;
