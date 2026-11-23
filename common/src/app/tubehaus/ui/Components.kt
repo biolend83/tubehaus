@@ -364,11 +364,13 @@ fun VideoRow(v: Video, app: AppState, queue: List<Video> = emptyList(), extra: L
     if (!app.kidsAllow(v.channelId)) return
     val calm = app.store.settings.value.calm
     val menu = remember { mutableStateOf(false) }
+    // a narrow column (a small window, a split screen): the picture gives way so the title stays readable
+    androidx.compose.foundation.layout.BoxWithConstraints { val tw = minOf(thumbWidth, maxWidth * 0.42f)
     Row(
         Modifier.fillMaxWidth().let { if (onClick == null) it.warmOnPress(app, v) else it }.tvClickable(RoundedCornerShape(16.dp), onLongClick = { menu.value = true }) { if (onClick != null) onClick() else app.watch(v, queue) }.padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         // big: YouTube's search results on a computer, a large picture and a larger title beside it
-        if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.width(thumbWidth), rounded = if (big) 18 else 12)
+        if (!app.store.settings.value.hideThumbs) Thumb(v, app, Modifier.width(tw), rounded = if (big) 18 else 12)
         Column(Modifier.weight(1f).padding(start = if (big) 16.dp else 10.dp)) {
             val title = titleOf(v, app)
             if (big) Text(title, fontSize = 18.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -377,6 +379,7 @@ fun VideoRow(v: Video, app: AppState, queue: List<Video> = emptyList(), extra: L
                 maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
         }
         VideoMenu(v, app, extra, openState = menu)
+    }
     }
 }
 
