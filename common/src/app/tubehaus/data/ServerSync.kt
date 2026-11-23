@@ -114,7 +114,27 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
         // a change made while it was on its way goes first; the next sync brings it back
         // the groups stay: the server doesn't keep them
         if (store.queue.value.isEmpty()) store.lib.update { cur -> lib.copy(groups = cur.groups) }
+        pullMusic(base)
         syncedAt.value = Sys.nowMs()
+    }
+
+    private var musicSent = false
+
+    /** the music tab's lists: this device's go up once (the server keeps its own first), then the server's come down;
+     *  an older server without them is left alone */
+    private suspend fun pullMusic(base: String) {
+        try {
+            if (!musicSent) {
+                musicSent = true
+                val m = store.music.value
+                if (m.recent.isNotEmpty() || m.liked.isNotEmpty() || m.opened.isNotEmpty() || m.searches.isNotEmpty())
+                    Net.post("$base/api/p/yt/mstate", store.musicLists().toString(), headers())
+            }
+            val o = storeJson.parseToJsonElement(Net.get("$base/api/p/yt/mstate", headers())) as? JsonObject ?: return
+            if (store.queue.value.none { it.path == "/yt/mstate" }) store.takeServerMusic(o)
+        } catch (e: HttpError) {
+            if (e.code == 401 || e.code == 403) throw e
+        }
     }
 
     /** the whole library to the server, which merges it with its own (adds, never removes) */
