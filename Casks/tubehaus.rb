@@ -4,9 +4,9 @@
 cask "tubehaus" do
   arch arm: "arm64", intel: "x64"
 
-  version "1.7.2"
-  sha256 arm:   "2ee193e2a232a8bc79bd3019e93212b4be55de2bd4554880b920f343d823a5a2",
-         intel: "83d911313174dcd30c4e9b91f078da8ee5cbc49d6fd01c1a6f92805785b06a01"
+  version "1.8.0"
+  sha256 arm:   "419ae624741b2ab81504e62cec8d17278b07959dcf665a3489f6e4694c221ffa",
+         intel: "196dc3352cd1e49e5cd3b952955f78d55aab7ee3c79f15bf906666fcffc60415"
 
   url "https://github.com/biolend83/tubehaus/releases/download/app-v#{version}/TubeHaus-#{version}-mac-#{arch}.dmg"
   name "TubeHaus"
