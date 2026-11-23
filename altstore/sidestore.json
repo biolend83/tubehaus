@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "1.8.0",
+          "buildVersion": "55",
+          "date": "2026-11-23T07:11:19+00:00",
+          "localizedDescription": "1.8.0: faster start, better live, music synced with your server.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.8.0/TubeHaus-1.8.0-ipad.ipa",
+          "size": 22395510,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.7.2",
           "buildVersion": "54",
           "date": "2026-11-22T01:41:55+00:00",
@@ -284,11 +293,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.7.2",
-      "versionDate": "2026-11-22T01:41:55+00:00",
-      "versionDescription": "1.7.2: Shorts open upright, pick the playback method.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.7.2/TubeHaus-1.7.2-ipad.ipa",
-      "size": 22386668
+      "version": "1.8.0",
+      "versionDate": "2026-11-23T07:11:19+00:00",
+      "versionDescription": "1.8.0: faster start, better live, music synced with your server.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.8.0/TubeHaus-1.8.0-ipad.ipa",
+      "size": 22395510
     }
   ],
   "news": [],
