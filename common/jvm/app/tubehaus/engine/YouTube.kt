@@ -75,20 +75,38 @@ object YouTube {
         }
         // a test build that plays everything the SABR way (TUBEHAUS_SABR_ONLY / -PsabrOnly): no other client, no server
         if (Sabr.only && Sabr.available) return sabr(id)
-        if (!ServerVideo.on) return device(id)
+        if (!ServerVideo.on) return liveOr(id, device(id))
         return try {
-            ServerVideo.stream(id)
+            liveOr(id, ServerVideo.stream(id))
         } catch (e: YtError) {
             // the server is down or YouTube refused it: this device may still get through,
             // and when it can't either, the server's reason is the one worth showing
-            try { device(id) } catch (x: Exception) { if (x is kotlinx.coroutines.CancellationException) throw x; throw e }
+            try { liveOr(id, device(id)) } catch (x: Exception) { if (x is kotlinx.coroutines.CancellationException) throw x; throw e }
         }
     }
 
+    @Volatile private var warming = false
+    /** a video always there, asked once to see the page answer well */
+    private const val WARM_ID = "jNQXAC9IVRw"
     private val warmScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
+    /** opens the front door in the background (at start, a few seconds in, so the first video is fast too) */
+    fun prewarm(delayMs: Long = 0) {
+        if (Sabr.warm || warming) return
+        val h = Sabr.host ?: return
+        warming = true
+        warmScope.launch { try { if (delayMs > 0) kotlinx.coroutines.delay(delayMs); if (Sabr.available) { h.warm(); runCatching { Sabr.prepare(WARM_ID) } } } finally { warming = false } }
+    }
 
     /** From this device. Tries each player client until one gives playable URLs. */
     private suspend fun device(id: String): Stream {
+        // the front door first: the web player's own way (SABR, a real browser's token) once its page is up; it
+        // starts in the background after the first video, so that one never waits for it
+        if (Sabr.warm) {
+            // not a live stream: the usual clients' live playlists go back hours, live SABR keeps only the last minute
+            try { sabr(id).let { if (!it.live) return it } } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e; if (e.kind == YtError.Kind.OTHER || e.kind == YtError.Kind.LOGIN) Sabr.cool() }  // a video that isn't there (ended live, removed, private) says nothing about the page
+            catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; Sabr.cool() }
+        } else prewarm()
         var first: YtError? = null
         for (attempt in 0..1) {
             var walled = true
@@ -154,10 +172,17 @@ object YouTube {
         return s
     }
 
-    /** the web player's answer, its formats served by [Sabr] on this device */
+    /** a live stream that came without a playlist: the web player's way, its own live playlist on this device */
+    private suspend fun liveOr(id: String, s: Stream): Stream {
+        if (!s.live || s.hls != null || !Sabr.available || Sabr.host?.live != true) return s
+        return try { sabr(id) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; s }
+    }
+
+    /** the web player's answer, its formats served by [Sabr] on this device (a live stream: as a live playlist) */
     internal suspend fun sabr(id: String): Stream {
         val d = Sabr.prepare(id) ?: throw YtError("No SABR", YtError.Kind.UNAVAILABLE)
-        val s = parse(id, d, Clients.WEB_SABR) { i -> Sabr.url(id, i) }
+        val s0 = parse(id, d, Clients.WEB_SABR) { i -> Sabr.url(id, i) }
+        val s = if (!s0.live) s0 else s0.copy(hls = SabrLive.master(id) ?: throw YtError("No live SABR here", YtError.Kind.UNAVAILABLE))
         if (s.video.isEmpty() || s.audio.isEmpty()) throw YtError("No playable streams", YtError.Kind.UNAVAILABLE)
         return s.copy(captions = s.captions.map { it.copy(url = Sabr.captionUrl(id, it.url)) })
     }
