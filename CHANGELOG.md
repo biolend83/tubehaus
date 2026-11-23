@@ -1,9 +1,15 @@
 # Changelog
 
-## Unreleased
+## v1.8.0 — 2026-11-23
 
 ### Added
+- **Music synced with the library:** the Music tab's recent songs, liked songs, opened albums and artists, and searches are kept on the server (`/api/p/yt/mstate`), so the web and the apps share them. A browser's or device's own lists go up the first time; a public instance keeps them in the browser as before
 - **Live streams over SABR:** when the usual live HLS playlist can't be had, the server plays the stream over SABR (picture and sound in one conversation near the live edge) and serves it as its own live HLS playlist (fMP4), so every player plays it unchanged. `HT_SABR_LIVE=first` tries it before the usual HLS
+
+### Fixed
+- The web app starts on older TV browsers (Chromium 85, 2022 Samsung TVs): no top-level `await`, small fallbacks for `Array.prototype.at` and `Object.hasOwn`, `inset` written out (#106)
+- Speed keys work on any keyboard layout: Shift + the comma and period keys by their position, and `<` / `>` typed with AltGr (#107)
+- A large Google Takeout watch history imports: the browser sends only the entries that name a video, the newest 20,000 (#110)
 
 ## v1.7.1 — 2026-11-21
 
