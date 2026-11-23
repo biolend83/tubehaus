@@ -1517,6 +1517,56 @@ def _pl_summary(pl):
             "updated": pl.get("updated", 0), "ids": [x["id"] for x in items]}
 
 
+# The music tab's memory (songs played, liked songs, albums and artists opened, searches), kept with
+# the library so the web and the apps share it. Newest first, each list capped.
+MUSIC_LISTS = {"recent": 200, "likes": 500, "opened": 40, "searches": 30}
+
+
+def _music_item(k, x):
+    if not isinstance(x, dict):
+        return None
+    i = str(x.get("id") or "")[:200].strip()
+    if not i or (k in ("recent", "likes") and not re.fullmatch(r"[\w-]{11}", i)):
+        return None
+    out = {"id": i}
+    if k == "searches":
+        return out
+    keys = ("title", "sub", "art", "kind") if k == "opened" else ("title", "artist", "artistId", "album", "albumId", "art")
+    for f in keys:
+        out[f] = str(x.get(f) or "")[:500]
+    if k != "opened":
+        try:
+            out["len"] = int(x.get("len") or 0)
+        except Exception:
+            out["len"] = 0
+    return out
+
+
+def music_state_post(d, b):
+    """{k, item} puts an item first in list k; {k, drop: id} takes it out; {lists: {k: [...]}} merges whole
+    lists (a device's first sync): what the server has stays first, the device's are added after"""
+    m = d.setdefault("music", {})
+    if isinstance(b.get("lists"), dict):
+        for k, cap in MUSIC_LISTS.items():
+            have = m.get(k, [])
+            ids = {x["id"] for x in have}
+            add = [y for y in (_music_item(k, x) for x in (b["lists"].get(k) or [])[:cap]) if y and y["id"] not in ids]
+            m[k] = (have + add)[:cap]
+        return True
+    k = b.get("k")
+    if k not in MUSIC_LISTS:
+        return False
+    l = m.get(k, [])
+    if b.get("drop") is not None:
+        m[k] = [x for x in l if x["id"] != str(b["drop"])]
+        return True
+    it = _music_item(k, b.get("item"))
+    if not it:
+        return False
+    m[k] = ([it] + [x for x in l if x["id"] != it["id"]])[:MUSIC_LISTS[k]]
+    return True
+
+
 def ytlib_get():
     with yt_lock:
         d = _yt_load()
@@ -1529,6 +1579,11 @@ def ytlib_post(path, b):
     with yt_lock:
         d = _yt_load()
         res = {"ok": True}
+        if path.endswith("/yt/mstate"):
+            if not music_state_post(d, b):
+                return 400, {"error": "bad music item"}
+            jsave(_ytlib_file(), d)
+            return 200, {k: d["music"].get(k, []) for k in MUSIC_LISTS}
         if path.endswith("/yt/pos"):
             vid = str(b.get("id", ""))
             if not re.fullmatch(r"[\w-]{11}", vid):
@@ -1634,6 +1689,9 @@ def ytlib_post(path, b):
 def ytlib_query(path, qs):
     with yt_lock:
         d = _yt_load()
+    if path.endswith("/yt/mstate"):
+        m = d.get("music") or {}
+        return {k: m.get(k, []) for k in MUSIC_LISTS}
     if path.endswith("/yt/pos"):
         ids = [i for i in qs.get("ids", "").split(",") if re.fullmatch(r"[\w-]{11}", i)][:200]
         return {i: d["pos"][i][:2] for i in ids if i in d["pos"]}

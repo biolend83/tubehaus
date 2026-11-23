@@ -1,7 +1,7 @@
 // Music: the apps' Music tab on the web. Albums and artists from YouTube Music, songs from YouTube,
 // lyrics from LRCLIB, all through this server (/api/p/yt/music/*). Sound only: an <audio> element with
 // Shaka leaving the video streams out, so a song plays like in a music app and keeps going on a locked phone.
-import { $, $$, esc, icon, api, local, toast, thumb, fmtTime, el, IPHONE, siteName } from "./util.js";
+import { $, $$, esc, icon, api, local, toast, thumb, fmtTime, el, IPHONE, siteName, modeReady } from "./util.js";
 import { player, navigate, popup, mi } from "./core.js";
 import { loadShaka } from "./player.js";
 import { $t, LANG, REGION } from "./i18n.js";
@@ -19,12 +19,30 @@ const imgTag = (s, big = false) => `<img loading="lazy" alt="" src="${esc(big ? 
 const slim = (s) => ({ id: s.id, title: s.title || "", artist: s.artist || "", artistId: s.artistId || "", len: s.len || 0, art: s.art || "", album: s.album || "", albumId: s.albumId || "" });
 
 // ---------------------------------------------------------------- what this browser remembers (only here)
+// kept in this browser, and on the server too when it keeps a library (not a public instance), so the
+// apps and other browsers share it: each change goes up, the server's lists come down when Music opens
+const MLISTS = ["recent", "likes", "opened", "searches"];
+const mstate = (body) => modeReady.then((pub) => pub ? null : api("/api/p/yt/mstate", body ? { method: "POST", body, quiet: true } : { quiet: true })).catch(() => null);
 const store = {
   get: (k) => { const v = local.get("music." + k, []); return Array.isArray(v) ? v : []; },
   set: (k, v) => local.set("music." + k, v),
-  push(k, item, max) { const l = [item, ...store.get(k).filter((x) => x.id !== item.id)].slice(0, max); store.set(k, l); return l; },
-  drop(k, id) { store.set(k, store.get(k).filter((x) => x.id !== id)); },
+  push(k, item, max) { const l = [item, ...store.get(k).filter((x) => x.id !== item.id)].slice(0, max); store.set(k, l); mstate({ k, item }); return l; },
+  drop(k, id) { store.set(k, store.get(k).filter((x) => x.id !== id)); mstate({ k, drop: id }); },
 };
+let mSynced = false;
+// the server's lists replace these; the first time, what only this browser had goes up first
+async function pullMusic() {
+  if (!mSynced) {
+    mSynced = true;
+    const lists = Object.fromEntries(MLISTS.map((k) => [k, store.get(k)]));
+    if (MLISTS.some((k) => lists[k].length)) await mstate({ lists });
+  }
+  const m = await mstate();
+  if (!m) return false;
+  let changed = false;
+  for (const k of MLISTS) if (Array.isArray(m[k]) && JSON.stringify(m[k]) !== JSON.stringify(store.get(k))) { store.set(k, m[k]); changed = true; }
+  return changed;
+}
 const liked = (id) => store.get("likes").some((x) => x.id === id);
 function toggleLike(s) {
   if (!s) return;
@@ -763,6 +781,8 @@ const marked = (page) => { paint(); return page; };
 
 export async function musicHome(page, m, alive) {
   document.title = $t("음악") + " - " + siteName();
+  // the other devices' songs: drawn again once they arrive
+  pullMusic().then((changed) => { if (changed && (!alive || alive()) && page.isConnected) musicHome(page, m, alive); });
   const recent = store.get("recent"), likes = store.get("likes"), opened = store.get("opened"), searches = store.get("searches");
   const hour = new Date().getHours();
   const hello = hour < 5 ? $t("늦은 밤의 음악") : hour < 12 ? $t("좋은 아침이에요") : hour < 18 ? $t("오후의 음악") : $t("오늘 저녁의 음악");

@@ -145,6 +145,22 @@ class Library(unittest.TestCase):
         self.assertEqual([x["id"] for x in ts.ytlib_query("/api/p/yt/hist", {})["items"]], ["bbbbbbbbbbb"])
 
 
+    def test_music_state(self):
+        song = {"id": "aaaaaaaaaaa", "title": "Song", "artist": "Band", "len": 200}
+        self.assertEqual(ts.ytlib_post("/api/p/yt/mstate", {"k": "recent", "item": song})[0], 200)
+        ts.ytlib_post("/api/p/yt/mstate", {"k": "recent", "item": dict(song, id="bbbbbbbbbbb")})
+        ts.ytlib_post("/api/p/yt/mstate", {"k": "recent", "item": song})          # played again: first again
+        ts.ytlib_post("/api/p/yt/mstate", {"k": "searches", "item": {"id": "iu blueming"}})
+        m = ts.ytlib_query("/api/p/yt/mstate", {})
+        self.assertEqual([x["id"] for x in m["recent"]], ["aaaaaaaaaaa", "bbbbbbbbbbb"])
+        self.assertEqual(m["searches"], [{"id": "iu blueming"}])
+        ts.ytlib_post("/api/p/yt/mstate", {"k": "recent", "drop": "aaaaaaaaaaa"})
+        # a device's whole lists: the server's stay first
+        ts.ytlib_post("/api/p/yt/mstate", {"lists": {"recent": [{"id": "ccccccccccc"}, {"id": "bbbbbbbbbbb"}]}})
+        self.assertEqual([x["id"] for x in ts.ytlib_query("/api/p/yt/mstate", {})["recent"]], ["bbbbbbbbbbb", "ccccccccccc"])
+        self.assertEqual(ts.ytlib_post("/api/p/yt/mstate", {"k": "recent", "item": {"id": "../x"}})[0], 400)
+        self.assertEqual(ts.ytlib_post("/api/p/yt/mstate", {"k": "nope", "item": song})[0], 400)
+
 class ShortsRecommender(unittest.TestCase):
     CAT, DOG = "UC" + "c" * 22, "UC" + "d" * 22
 
