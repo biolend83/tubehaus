@@ -109,6 +109,7 @@ fun WatchScreen(app: AppState) {
     var commentsOpen by remember(v.id) { mutableStateOf(false) }
     // the transcript: a tab beside the video (wide) or a panel over the space under it (phone)
     var transcriptOpen by remember(v.id) { mutableStateOf(false) }
+    var descOpen by remember(v.id) { mutableStateOf(false) }
     val hasCaptions = !pb.stream?.captions.isNullOrEmpty()
     // TV: the video plays on this page, beside what's next; OK on the video fills the screen
     // and Back comes back here (it used to fill the screen by itself, which got in the way)
@@ -196,7 +197,7 @@ fun WatchScreen(app: AppState) {
                     })
                 Box(Modifier.fillMaxSize().riseIn(v.id)) {
                     LazyColumn(Modifier.fillMaxSize()) {
-                        under(app, v)
+                        under(app, v, openDescription = { commentsOpen = false; transcriptOpen = false; descOpen = true })
                         if (token != null) item { CommentsTeaser(token) { commentsOpen = true } }
                         // phones: full-width cards; an upright tablet: rows with a larger picture
                         if (narrow) related(app, big = true) else related(app, big = false, thumb = 240.dp)
@@ -224,6 +225,16 @@ fun WatchScreen(app: AppState) {
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                             TranscriptPanel(app) { transcriptOpen = false }
                         }
+                    }
+                    // the description as on a phone: over the space under the video, which stays in sight
+                    androidx.compose.animation.AnimatedVisibility(
+                        descOpen,
+                        enter = androidx.compose.animation.slideInVertically(tween(Motion.MEDIUM, easing = Motion.emphasizedIn)) { it } +
+                            androidx.compose.animation.fadeIn(tween(Motion.SHORT)),
+                        exit = androidx.compose.animation.slideOutVertically(tween(Motion.SHORT + 50, easing = Motion.emphasizedOut)) { it } +
+                            androidx.compose.animation.fadeOut(tween(Motion.SHORT + 50)),
+                    ) {
+                        PullDown({ descOpen = false }) { grip -> DescriptionPanel(app, v, grip) { descOpen = false } }
                     }
                 }
             }
