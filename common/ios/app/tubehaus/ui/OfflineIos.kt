@@ -65,6 +65,12 @@ class Offline(private val app: AppState) {
     /** where each finished task put its .movpkg (relative to the app's home folder) */
     private val places = HashMap<String, String>()
     private val heights = HashMap<String, Int>()
+    /** for a second try from lists made here (OfflineBridge): the stream and the height asked for */
+    private val streams = HashMap<String, Stream>()
+    private val asked = HashMap<String, Int>()
+    private val bridged = HashSet<String>()
+    /** what answers a second try's list requests: kept here while it runs, as AVFoundation holds it weakly */
+    private val loaders = HashMap<String, Any>()
 
     private val delegate = Delegate(this)
     private val session: AVAssetDownloadURLSession by lazy {
@@ -104,22 +110,69 @@ class Offline(private val app: AppState) {
                 val s = YouTube.stream(v.id)
                 if (s.live) error(tr("Live streams can't be downloaded"))
                 val hls = s.hls ?: error(tr("This video can't be downloaded"))
-                // the variant for the chosen height: its bitrate is the floor AVFoundation saves at
-                val variants = Regex("BANDWIDTH=(\\d+)[^\\n]*RESOLUTION=\\d+x(\\d+)").findAll(Net.get(hls))
-                    .map { it.groupValues[2].toInt() to it.groupValues[1].toLong() }.toList()
-                val pick = variants.filter { it.first <= maxHeight }.maxByOrNull { it.first } ?: variants.minByOrNull { it.first }
+                val pick = variant(Net.get(hls), maxHeight)
                 val asset = AVURLAsset(uRL = NSURL(string = hls), options = ServerVideo.headersFor(hls)?.let { mapOf<Any?, Any>("AVURLAssetHTTPHeaderFieldsKey" to it) })
-                val options = pick?.let { mapOf<Any?, Any>(AVAssetDownloadTaskMinimumRequiredMediaBitrateKey to NSNumber(longLong = it.second)) }
-                val task = session.assetDownloadTaskWithURLAsset(asset, assetTitle = s.title.ifEmpty { v.title }, assetArtworkData = null, options = options)
-                    ?: error(tr("This video can't be downloaded"))
-                task.taskDescription = v.id
-                tasks[v.id] = task
+                streams[v.id] = s
+                asked[v.id] = maxHeight
                 heights[v.id] = pick?.first ?: 0
                 pending[v.id] = Video(v.id, s.title.ifEmpty { v.title }, s.author.ifEmpty { v.author }, s.channelId.ifEmpty { v.channelId },
                     s.lengthSec.takeIf { it > 0 } ?: v.lengthSec)
-                task.resume()
+                startTask(v.id, asset, s.title.ifEmpty { v.title }, pick?.second)
             } catch (e: Exception) {
                 finish(v.id)
+                app.toast(tr("Couldn't download: {e}").replace("{e}", e.message ?: e.toString()))
+            }
+        }
+    }
+
+    /** the variant for [maxHeight] in a master list, as (height, bitrate): its bitrate is the floor AVFoundation saves at */
+    private fun variant(master: String, maxHeight: Int): Pair<Int, Long>? {
+        val variants = Regex("BANDWIDTH=(\\d+)[^\\n]*RESOLUTION=\\d+x(\\d+)").findAll(master)
+            .map { it.groupValues[2].toInt() to it.groupValues[1].toLong() }.toList()
+        return variants.filter { it.first <= maxHeight }.maxByOrNull { it.first } ?: variants.minByOrNull { it.first }
+    }
+
+    private fun startTask(id: String, asset: AVURLAsset, title: String, minBitrate: Long?) {
+        val options = minBitrate?.let { mapOf<Any?, Any>(AVAssetDownloadTaskMinimumRequiredMediaBitrateKey to NSNumber(longLong = it)) }
+        val task = session.assetDownloadTaskWithURLAsset(asset, assetTitle = title, assetArtworkData = null, options = options)
+            ?: error(tr("This video can't be downloaded"))
+        task.taskDescription = id
+        tasks[id] = task
+        task.resume()
+    }
+
+    /**
+     * The same video once more, from lists made here from its MP4 files (OfflineBridge). If none can
+     * be made, the first error is the one shown.
+     */
+    private fun retryBridged(id: String, v: Video, first: NSError) {
+        bridged += id
+        tasks.remove(id)
+        progress[id] = 0f
+        val s = streams[id]
+        app.scope.launch {
+            val made = try {
+                s?.let { OfflineBridge.make?.invoke(it) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                println("Offline: no lists of our own for $id: ${e.message}")
+                null
+            }
+            // cancelled while the lists were made (no task to cancel, so it finished): nothing to start
+            if (!downloading(id)) return@launch
+            if (made == null) {
+                finish(id)
+                app.toast(tr("Couldn't download: {e}").replace("{e}", first.localizedDescription))
+                return@launch
+            }
+            loaders[id] = made.loader
+            val pick = variant(made.master, asked[id] ?: Int.MAX_VALUE)
+            heights[id] = pick?.first ?: 0
+            try {
+                startTask(id, made.asset, v.title, pick?.second)
+            } catch (e: Exception) {
+                finish(id)
                 app.toast(tr("Couldn't download: {e}").replace("{e}", e.message ?: e.toString()))
             }
         }
@@ -140,6 +193,7 @@ class Offline(private val app: AppState) {
 
     private fun finish(id: String) {
         progress.remove(id); pending.remove(id); tasks.remove(id); places.remove(id); heights.remove(id)
+        streams.remove(id); asked.remove(id); bridged.remove(id); loaders.remove(id)
     }
 
     // ---------------------------------------------------------------- from the delegate (main queue)
@@ -155,6 +209,13 @@ class Offline(private val app: AppState) {
     internal fun done(id: String, error: NSError?) {
         val v = pending[id]
         val rel = places[id]
+        // YouTube's list failed (on some fresh uploads its H.264 and audio lists answer 404, while the
+        // MP4 files are fine): once more from lists made here. Cancelled (-999) ends as before.
+        if (error != null && error.code != -999L && v != null && id !in bridged && OfflineBridge.make != null) {
+            rel?.let { NSFileManager.defaultManager.removeItemAtPath(absolute(it), error = null) }
+            places.remove(id)
+            return retryBridged(id, v, error)
+        }
         if (error == null && v != null && rel != null) {
             val size = folderSize(absolute(rel))
             val file = SavedFile(itag = 0, mime = "application/x-mpegURL", codecs = "", height = heights[id] ?: 0, size = size, file = rel)
@@ -202,4 +263,15 @@ private class Delegate(private val offline: Offline) : NSObject(), AVAssetDownlo
     override fun URLSession(session: NSURLSession, task: NSURLSessionTask, didCompleteWithError: NSError?) {
         task.taskDescription?.let { offline.done(it, didCompleteWithError) }
     }
+}
+
+/**
+ * Lists made on the device for a download whose YouTube HLS list failed: set by the app
+ * (IosPlatform), which has HlsBridge. Null, or a null result: no second try.
+ */
+object OfflineBridge {
+    var make: (suspend (Stream) -> Made?)? = null
+
+    /** the asset to download, its master list, and what answers its list requests (kept while the download runs) */
+    class Made(val asset: AVURLAsset, val master: String, val loader: Any)
 }
