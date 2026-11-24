@@ -20,6 +20,18 @@
 	<string>1.8.0</string>
 	<key>CFBundleVersion</key>
 	<string>55</string>
+	<!-- tubehaus://open?url=<a YouTube link>: what the share extension hands over -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>tubehaus</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!-- without a launch screen iOS shows the app letterboxed in an old phone size -->

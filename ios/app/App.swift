@@ -15,6 +15,14 @@ struct TubeHausApp: App {
                 .statusBarHidden(bars.hidden)
                 .persistentSystemOverlays(bars.hidden ? .hidden : .automatic)
                 .animation(.easeInOut(duration: 0.2), value: bars.hidden)
+                // a link shared to TubeHaus (Share/ShareViewController.swift)
+                .onOpenURL { url in
+                    guard url.scheme == "tubehaus",
+                          let link = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                              .queryItems?.first(where: { $0.name == "url" })?.value
+                    else { return }
+                    MainKt.openShared(link: link)
+                }
         }
     }
 }
