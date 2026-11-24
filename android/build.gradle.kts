@@ -24,6 +24,12 @@ android {
         // the test build installs beside the real app: its own id and name
         manifestPlaceholders["appLabel"] = if (sabrOnly == "true") "TubeHaus-test" else "TubeHaus"
         if (sabrOnly == "true") applicationIdSuffix = ".test"
+        // -Parm64=true: an APK for 64-bit ARM phones only (most phones; much smaller)
+        if (findProperty("arm64") == "true") ndk.abiFilters += "arm64-v8a"
+    }
+    // the same build with its native libraries compressed in the APK (smaller to send; unpacked once at install)
+    if (findProperty("arm64") == "true") packaging.jniLibs.useLegacyPackaging = true
+    defaultConfig {
     }
 
     // V8 for the SABR engine (arm64): built only when android/v8 holds the v8-build branch's library
