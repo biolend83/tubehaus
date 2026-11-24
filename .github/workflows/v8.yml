@@ -11,6 +11,11 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        # small: Sparkplug (the quick JIT) without TurboFan; full: both. Neither keeps unwind tables.
+        variant: [small, full]
     env:
       V8_BRANCH: "13.0"
     steps:
@@ -46,7 +51,8 @@ jobs:
             v8_enable_object_print=false v8_enable_verify_heap=false v8_enable_slow_dchecks=false
             v8_enable_debugging_features=false v8_enable_snapshot_compression=true
             symbol_level=0 use_custom_libcxx=false treat_warnings_as_errors=false
-            optimize_for_size=true'
+            optimize_for_size=true exclude_unwind_tables=true
+            ${{ matrix.variant == 'small' && 'v8_enable_turbofan=false v8_enable_sparkplug=true' || '' }}'
           ninja -C out/arm64 v8_monolith
           ls -la out/arm64/obj/libv8_monolith.a
 
@@ -63,6 +69,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: v8-android-arm64
+          name: v8-android-arm64-${{ matrix.variant }}
           path: ~/out
           retention-days: 30
