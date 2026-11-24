@@ -26,6 +26,13 @@ android {
         if (sabrOnly == "true") applicationIdSuffix = ".test"
     }
 
+    // V8 for the SABR engine (arm64): built only when android/v8 holds the v8-build branch's library
+    if (file("v8/lib/libv8_monolith.a").exists()) {
+        ndkVersion = "28.2.13676358"
+        defaultConfig.externalNativeBuild.cmake { arguments += "-DANDROID_STL=c++_static"; abiFilters += "arm64-v8a" }
+        externalNativeBuild.cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" }
+    }
+
     // The shared code (engine, library, screens) is compiled into this module as plain sources.
     sourceSets["main"].java.srcDirs("src/main/kotlin", "../common/src", "../common/jvm")
     // Pretendard, the type face of the web app 1.0 (one copy for every platform: common/fonts)

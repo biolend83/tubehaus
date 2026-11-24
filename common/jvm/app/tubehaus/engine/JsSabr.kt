@@ -1,8 +1,5 @@
 package app.tubehaus.engine
 
-import com.dokar.quickjs.QuickJs
-import com.dokar.quickjs.binding.asyncFunction
-import com.dokar.quickjs.binding.function
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -47,12 +44,16 @@ import java.util.concurrent.atomic.AtomicInteger
  * [load] reads a file the app carries (a resource on a computer, an asset on Android); [cache] keeps the
  * solver's work on YouTube's player script, which takes seconds here and changes every week or two.
  */
-class JsSabr(private val load: (String) -> String?, private val cache: File?) : SabrHost {
+class JsSabr(
+    private val load: (String) -> String?, private val cache: File?,
+    // the engine: QuickJS unless the platform has a faster one (V8 on Android)
+    private val runtime: (kotlinx.coroutines.CoroutineDispatcher) -> JsRuntime = { QuickJsRuntime(it, 1024L shl 20, 8L shl 20) },
+) : SabrHost {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val jsThread = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(null, r, "sabr-js", 64L shl 20).apply { isDaemon = true } }.asCoroutineDispatcher()
     private val lock = Mutex()
     private val debug = System.getenv("TUBEHAUS_SABRLOG") != null
-    @Volatile private var engine: QuickJs? = null
+    @Volatile private var engine: JsRuntime? = null
     @Volatile private var loop: Job? = null
     @Volatile private var cmds = Channel<String>(Channel.UNLIMITED)
     private val replies = ConcurrentHashMap<Int, CompletableDeferred<String?>>()
@@ -77,22 +78,20 @@ class JsSabr(private val load: (String) -> String?, private val cache: File?) : 
         // one thread of its own with a large stack: jsdom goes deep, and a phone's pool threads have about 1 MB (QuickJS ran past it and the app
         // went down); QuickJS also wants the same thread every time, which a pool does not promise
         // QuickJS's native library may be missing for this machine (an unusual processor or system): then never again
-        val q = try { QuickJs.create(jsThread) } catch (e: Throwable) { log("no QuickJS here: $e"); broken = true; return@withLock false }
-        q.memoryLimit = 1024L shl 20
-        q.maxStackSize = 8L shl 20
+        val q = try { runtime(jsThread) } catch (e: Throwable) { log("no engine here: $e"); broken = true; return@withLock false }
         bind(q)
         cmds = Channel(Channel.UNLIMITED)
         val started = CompletableDeferred<Boolean>()
         val t = System.currentTimeMillis()
         loop = scope.launch {
             try {
-                q.evaluate<Any?>("globalThis.__cores = ${Runtime.getRuntime().availableProcessors()};", "cores.js", false)
-                q.evaluate<Any?>(polyfill, "sabr-lite-polyfill.js", false)
-                q.evaluate<Any?>(page, "sabr-lite.js", false)
-                q.evaluate<Any?>("window.__thSabr.setSolver(${JsonPrimitive(solver)})", "solver.js", false)
+                q.evaluate("globalThis.__cores = ${Runtime.getRuntime().availableProcessors()};", "cores.js")
+                q.evaluate(polyfill, "sabr-lite-polyfill.js")
+                q.evaluate(page, "sabr-lite.js")
+                q.evaluate("window.__thSabr.setSolver(${JsonPrimitive(solver)})", "solver.js")
                 log("engine up in ${System.currentTimeMillis() - t} ms")
                 started.complete(true)
-                q.evaluate<Any?>("await __thLoop()", "loop.js", false)
+                q.await("__thLoop()", "loop.js")
             } catch (e: Throwable) {
                 log("engine stopped: $e")
                 started.complete(false)
@@ -119,7 +118,7 @@ class JsSabr(private val load: (String) -> String?, private val cache: File?) : 
         private set
     private var failedStarts = 0
 
-    private fun bind(q: QuickJs) {
+    private fun bind(q: JsRuntime) {
         q.function("__log") { a -> log(a.joinToString(" ")) }
         q.function("__now") { _ -> System.nanoTime() / 1e6 }
         q.function("__rand") { a -> val b = ByteArray((a[0] as Number).toInt()); java.security.SecureRandom().nextBytes(b); b.joinToString("") { "%02x".format(it) } }
@@ -155,7 +154,7 @@ class JsSabr(private val load: (String) -> String?, private val cache: File?) : 
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    private fun bytes(v: Any?): ByteArray? = when (v) { is UByteArray -> v.asByteArray(); is ByteArray -> v; else -> null }
+    private fun bytes(v: Any?): ByteArray? = v as? ByteArray
 
     private fun cacheFile(key: String): File? = cache?.let { File(it, key.replace(Regex("[^\\w.-]"), "_").take(120) + ".js") }
 
@@ -179,12 +178,12 @@ class JsSabr(private val load: (String) -> String?, private val cache: File?) : 
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    private suspend fun read(id: Int): UByteArray? = withContext(Dispatchers.IO) {
+    private suspend fun read(id: Int): ByteArray? = withContext(Dispatchers.IO) {
         val r = fetches[id] ?: return@withContext null
         val src = r.body?.source() ?: run { fetches.remove(id); r.close(); return@withContext null }
         val buf = ByteArray(64 shl 10)
         val n = runCatching { src.read(buf) }.getOrDefault(-1)
-        if (n <= 0) { fetches.remove(id); r.close(); null } else buf.copyOf(n).asUByteArray()
+        if (n <= 0) { fetches.remove(id); r.close(); null } else buf.copyOf(n)
     }
 
     /** a call into the page; its answer (a string), or null */
