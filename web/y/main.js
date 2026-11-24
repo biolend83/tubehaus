@@ -1,5 +1,5 @@
 // Entry point: header (search, notifications, account), side menu, routes, global shortcuts
-import { $, $$, esc, icon, api, lib, settings, local, toast, thumb, normVideo, ago, modeReady, siteName, pickName, LINKS } from "./util.js";
+import { $, $$, esc, icon, api, lib, settings, local, toast, thumb, normVideo, ago, modeReady, siteName, pickName, LINKS, SERVER_VERSION } from "./util.js";
 import { dialog } from "./core.js";
 import { player, routes, state, loadLib, navigate, render, renderGuideSubs, popup, mi, keysDialog, initCardHover, markRestore, saveScroll, known, videoMenu, pageCleanup } from "./core.js";
 import * as P from "./pages.js";
@@ -20,6 +20,13 @@ document.title = $t("튜브하우스");
 modeReady.then(() => {
   if (document.title === $t("튜브하우스")) document.title = siteName();
   for (const a of document.querySelectorAll(".logo[aria-label]")) a.setAttribute("aria-label", siteName());
+  if (SERVER_VERSION && !document.querySelector("#guide .g-ver")) {
+    const v = document.createElement("div");
+    v.className = "g-ver";
+    v.textContent = "TubeHaus v" + SERVER_VERSION;
+    v.style.cssText = "padding:12px 24px 20px;font-size:12px;color:var(--text2,#888)";
+    document.getElementById("guide")?.append(v);
+  }
   if (!LINKS.length) return;
   const sec = document.createElement("div");
   sec.className = "g-sec g-links";

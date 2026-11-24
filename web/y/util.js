@@ -174,6 +174,8 @@ let NAME = "";
 export let LINKS = [];
 // the server's live-caption engines (health), e.g. ["whisper", "sensevoice"]: one track each on a live stream
 export let LIVE_CC_ENGINES = [];
+// the server's release (health), shown at the end of the menu so a self-hoster can tell what runs
+export let SERVER_VERSION = "";
 // a name may come in several languages, {"ko": "홈튜브", "en": "HomeTube"}: the interface language, else English, else the first
 export const pickName = (v) => !v || typeof v === "string" ? v || "" : String(v[LANG] ?? v.en ?? Object.values(v)[0] ?? "");
 export const siteName = () => pickName(NAME) || $t("튜브하우스");
@@ -183,6 +185,7 @@ export const modeReady = fetch("/api/p/health", { credentials: "same-origin" })
     SERVER_MAX_H = +h.max_height || Infinity;
     NAME = typeof h.name === "string" || (h.name && typeof h.name === "object") ? h.name : "";
     LINKS = Array.isArray(h.links) ? h.links : [];
+    SERVER_VERSION = typeof h.version === "string" ? h.version : "";
     LIVE_CC_ENGINES = Array.isArray(h.live_caption_engines) ? h.live_caption_engines : h.live_captions ? ["whisper"] : [];
     if (h.accounts && !window.TUBEHAUS_LOGIN_URL) window.TUBEHAUS_LOGIN_URL = "/login?r=";   // sign-up required
     document.documentElement.classList.toggle("public", PUBLIC);

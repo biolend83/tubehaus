@@ -96,6 +96,7 @@ def _name(raw):
 
 # The instance's own name in the page title and menu (empty = TubeHaus, in the visitor's language)
 NAME = _name(env("HT_NAME", ""))
+VERSION = "1.8.0"   # this server's release: health() tells it, the web app shows it at the end of its menu
 
 
 def _links(raw):
@@ -4371,12 +4372,21 @@ def gv_fetch(url, headers, timeout=60):
 
 
 def eng_format_url(vid, itag):
-    """YouTube's address of one format of a video (for downloads)"""
+    """YouTube's address of one format of a video (for downloads). A sound itag may come once per audio track (dubs,
+    auto-dubs, stable volume), and YouTube does not always list the original first: the original track, not drc"""
     d = _video_json(vid)
-    for f in (d.get("adaptiveFormats") or []) + (d.get("formatStreams") or []):
-        if str(f.get("itag")) == str(itag) and f.get("url"):
+    same = [f for f in (d.get("adaptiveFormats") or []) + (d.get("formatStreams") or []) if str(f.get("itag")) == str(itag) and f.get("url")]
+    if not same:
+        raise ValueError("no such format")
+    for f in same:
+        t = _atrack(f) if f.get("audioTrack") or "xtags=" in f["url"] else None
+        if t and t["orig"] and not t["drc"]:
             return f["url"]
-    raise ValueError("no such format")
+    for f in same:                                      # no original marked: at least not the stable-volume copy
+        t = _atrack(f) if f.get("audioTrack") or "xtags=" in f["url"] else None
+        if not t or not t["drc"]:
+            return f["url"]
+    return same[0]["url"]
 
 
 
@@ -6315,7 +6325,7 @@ def health():
             "live_captions": bool(LIVECC_ENGINES), "live_caption_engines": list(LIVECC_ENGINES), "public": PUBLIC_MODE,
             "max_height": MAX_HEIGHT or None, "viewers": len([1 for t in list(viewers.values()) if now - t < 180]),
             "max_viewers": MAX_VIEWERS or None, "accounts": ACCOUNTS, "name": NAME or None, "links": LINKS,
-            "sso": OIDC_NAME if OIDC else None, "app_sign_in": ACCOUNTS}
+            "sso": OIDC_NAME if OIDC else None, "app_sign_in": ACCOUNTS, "version": VERSION}
 
 
 viewers, rate, load_lk = {}, {}, threading.Lock()   # ip -> last seen / (tokens, time)
