@@ -4,6 +4,7 @@ import app.tubehaus.engine.Format
 import app.tubehaus.engine.Net
 import app.tubehaus.engine.Stream
 import app.tubehaus.engine.originalFirst
+import app.tubehaus.ui.OfflineBridge
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -42,6 +43,18 @@ object HlsBridge {
     }
 
     const val MASTER = "master.m3u8"
+
+    /**
+     * For a download (Offline) whose YouTube list failed: the same lists, each piece at an address
+     * of its own ([numbered]). Null for a list that isn't YouTube's, or a video with no usable MP4.
+     */
+    suspend fun forDownload(s: Stream): OfflineBridge.Made? {
+        if (s.hls?.startsWith(YOUTUBE_HLS) != true) return null
+        val lists = build(s)?.mapValues { (name, text) -> if (name == MASTER) text else numbered(text) } ?: return null
+        val (asset, loader) = asset(s.id, lists)
+        return OfflineBridge.Made(asset, lists.getValue(MASTER), loader)
+    }
+
     private const val SCHEME = "tubehaus-hls"
 
     /** an asset that plays [lists]; keep the returned loader as long as the asset plays (AVFoundation holds it weakly) */
@@ -121,6 +134,16 @@ object HlsBridge {
         rows += "#EXT-X-ENDLIST"
         return rows.joinToString("\n", postfix = "\n")
     }
+}
+
+/**
+ * [list] with each piece's address made its own (&seg=n, which YouTube ignores). Where the pieces
+ * share one address, Apple's download asks for them as one range to the end of the file, and YouTube
+ * sends a range that long slowly: on an iPhone the download stayed at 0%.
+ */
+internal fun numbered(list: String): String {
+    var n = 0
+    return list.lines().joinToString("\n") { line -> if (line.startsWith("http")) "$line&seg=${n++}" else line }
 }
 
 /**

@@ -44,6 +44,8 @@ class IosPlatform : Platform {
         app.tubehaus.engine.Sabr.dir = sabr.toString()
         app.tubehaus.engine.Sabr.host = WebSabr()
         app.tubehaus.engine.Sabr.only = okio.FileSystem.SYSTEM.exists(folder(platform.Foundation.NSDocumentDirectory) / "sabr-only")
+        // a download YouTube's HLS list fails is tried once more from lists made here (as playback does)
+        app.tubehaus.ui.OfflineBridge.make = { HlsBridge.forDownload(it) }
     }
     /** Pretendard, the web app 1.0's typeface, from the app bundle (one variable file, its weight axis set for each weight) */
     override val font by lazy {

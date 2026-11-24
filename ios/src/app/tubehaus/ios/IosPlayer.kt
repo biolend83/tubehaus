@@ -83,7 +83,7 @@ import platform.UIKit.UIColor
 import platform.UIKit.UIView
 
 /** YouTube's own HLS lists: the only ones whose MP4 streams [HlsBridge] can make lists from */
-private const val YOUTUBE_HLS = "https://manifest.googlevideo.com/"
+internal const val YOUTUBE_HLS = "https://manifest.googlevideo.com/"
 /** the notice over the video when [IosPlayer.fallBack] plays from lists made on the device (a key of tr) */
 private const val OWN_LISTS = "YouTube's stream list for this video is broken, so it plays from one made on this device"
 /** how long that notice stays, from when the video starts showing */
