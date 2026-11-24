@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -30,6 +31,7 @@ import app.tubehaus.ui.PlayOptions
 import app.tubehaus.ui.PlayerState
 import app.tubehaus.ui.VideoPlayer
 import kotlinx.cinterop.CValue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
@@ -80,6 +82,13 @@ import platform.QuartzCore.CATransaction
 import platform.UIKit.UIColor
 import platform.UIKit.UIView
 
+/** YouTube's own HLS lists: the only ones whose MP4 streams [HlsBridge] can make lists from */
+private const val YOUTUBE_HLS = "https://manifest.googlevideo.com/"
+/** the notice over the video when [IosPlayer.fallBack] plays from lists made on the device (a key of tr) */
+private const val OWN_LISTS = "YouTube's stream list for this video is broken, so it plays from one made on this device"
+/** how long that notice stays, from when the video starts showing */
+private const val NOTICE_MS = 5000L
+
 /**
  * The iPad's player: AVPlayer on YouTube's HLS stream (one address, every quality from 144p to
  * 4K, sound included). Captions are drawn here in Compose from the cleaned WebVTT, because
@@ -108,6 +117,16 @@ class IosPlayer : VideoPlayer {
 
     override fun setCaptionStyle(size: Int, bg: Int, pos: Int) { capStyle = Triple(size, bg, pos) }
     private var readAhead = false
+    /** the lists made here after YouTube's HLS list failed (see [fallBack]) */
+    private enum class Fallback { NONE, TRYING, ON, GAVE_UP }
+    private var fallback = Fallback.NONE
+    private var fallbackJob: Job? = null
+    /** hands the made lists to AVPlayer; AVFoundation keeps only a weak reference, so it is kept here */
+    private var listsLoader: HlsBridge.Lists? = null
+    /** a line shown over the video for a few seconds ([NOTICE_MS]); [noticeDue]: show it once the item is ready */
+    private var notice by mutableStateOf<String?>(null)
+    private var noticeDue = false
+    private var noticeJob: Job? = null
 
     /**
      * The one picture of the player (one AVPlayerLayer, one picture-in-picture controller), moved into
@@ -157,6 +176,12 @@ class IosPlayer : VideoPlayer {
             audioPicked = true
             pickOriginalAudio(item)
         }
+        if (noticeDue && item.status == AVPlayerItemStatusReadyToPlay) {
+            noticeDue = false
+            notice = app.tubehaus.ui.tr(OWN_LISTS)
+            noticeJob?.cancel()
+            noticeJob = scope.launch { delay(NOTICE_MS); notice = null }
+        }
         val dur = secs(item.duration)
         val pos = secs(av.currentTime())
         val playing = av.timeControlStatus == AVPlayerTimeControlStatusPlaying
@@ -166,7 +191,10 @@ class IosPlayer : VideoPlayer {
             av.seekToTime(CMTimeMake(0, 1000))
             av.playImmediatelyAtRate(opts.speed)
         }
-        val failed = item.status == AVPlayerItemStatusFailed
+        val itemFailed = item.status == AVPlayerItemStatusFailed
+        if (itemFailed && fallback == Fallback.NONE) fallBack(maxOf(st.value.positionMs, startAt))
+        // while the lists are being made, the failure isn't one yet (Playback would start the video over)
+        val failed = itemFailed && fallback != Fallback.TRYING
         st.update {
             it.copy(
                 playing = playing,
@@ -179,9 +207,66 @@ class IosPlayer : VideoPlayer {
         }
     }
 
+    /**
+     * YouTube's HLS list failed (on some fresh uploads its H.264 and audio lists answer 404 while the
+     * MP4 files are fine): play the same video from HLS lists made here from those files ([HlsBridge]),
+     * from where it stopped, and say so once. Only for YouTube's own lists: a downloaded video or
+     * the server's list has nothing else to fall back on.
+     */
+    private fun fallBack(atMs: Long) {
+        val s = stream
+        if (s == null || s.hls?.startsWith(YOUTUBE_HLS) != true) {
+            fallback = Fallback.GAVE_UP
+            return
+        }
+        fallback = Fallback.TRYING
+        heightsJob?.cancel()
+        fallbackJob = scope.launch {
+            val lists = try {
+                HlsBridge.build(s)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                println("IosPlayer: couldn't make HLS lists for ${s.id}: ${e.message}")
+                null
+            }
+            if (stream !== s) return@launch
+            if (lists == null) {
+                fallback = Fallback.GAVE_UP
+                return@launch
+            }
+            fallback = Fallback.ON
+            val (asset, loader) = HlsBridge.asset(s.id, lists)
+            listsLoader = loader
+            val item = AVPlayerItem(asset = asset)
+            limit(item, opts.maxHeight)
+            if (readAhead) item.preferredForwardBufferDuration = 1200.0
+            av.replaceCurrentItemWithPlayerItem(item)
+            audioPicked = false
+            startAt = atMs
+            st.update { it.copy(heights = heights(lists.getValue(HlsBridge.MASTER))) }
+            noticeDue = true
+            if (opts.autoplay || atMs > 0) av.playImmediatelyAtRate(opts.speed) else av.pause()
+        }
+    }
+
+    private fun clearNotice() {
+        noticeJob?.cancel()
+        noticeDue = false
+        notice = null
+    }
+
+    /** the qualities a master list offers */
+    private fun heights(master: String): List<Int> =
+        Regex("RESOLUTION=\\d+x(\\d+)").findAll(master).mapNotNull { it.groupValues[1].toIntOrNull() }.distinct().sorted().toList()
+
     override fun load(s: Stream, o: PlayOptions) {
         stream = s
         opts = o
+        fallbackJob?.cancel()
+        fallback = Fallback.NONE
+        listsLoader = null
+        clearNotice()
         val hls = s.hls
         if (hls == null) {
             st.value = PlayerState(videoId = s.id, error = "This video has no stream the iPad can play")
@@ -205,8 +290,7 @@ class IosPlayer : VideoPlayer {
         heightsJob?.cancel()
         heightsJob = scope.launch {
             val text = runCatching { Net.get(hls) }.getOrNull() ?: return@launch
-            val heights = Regex("RESOLUTION=\\d+x(\\d+)").findAll(text).mapNotNull { it.groupValues[1].toIntOrNull() }.distinct().sorted().toList()
-            st.update { it.copy(heights = heights) }
+            st.update { it.copy(heights = heights(text)) }
         }
         val translate = if (o.captions != null && o.captionLang != null && o.captions.lang.substringBefore('-') != o.captionLang) o.captionLang else null
         captions(o.captions, translate)
@@ -284,7 +368,10 @@ class IosPlayer : VideoPlayer {
     override fun stop() {
         av.pause()
         av.replaceCurrentItemWithPlayerItem(null)
-        heightsJob?.cancel(); capsJob?.cancel()
+        heightsJob?.cancel(); capsJob?.cancel(); fallbackJob?.cancel()
+        fallback = Fallback.NONE
+        listsLoader = null
+        clearNotice()
         stream = null
         startAt = -1
         cues = emptyList()
@@ -312,6 +399,15 @@ class IosPlayer : VideoPlayer {
                 line, color = Color.White, fontSize = size.sp, lineHeight = (size * 1.25f).sp, textAlign = TextAlign.Center, style = style,
                 modifier = place.background(Color.Black.copy(alpha = bg / 100f)).padding(horizontal = (size / 2).dp, vertical = 2.dp),
             )
+            // above where captions sit at the bottom, so the two don't cover each other
+            notice?.let { text ->
+                val small = (base * 0.7f).coerceAtLeast(13f)
+                Text(
+                    text, color = Color.White, fontSize = small.sp, lineHeight = (small * 1.3f).sp, textAlign = TextAlign.Center,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(start = 24.dp, end = 24.dp, bottom = (base * 4f).dp)
+                        .background(Color(0xB3000000), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            }
         }
     }
 }
