@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="/y/app.css?v=__V__">
 <link rel="stylesheet" href="/y/spatial.css?v=__V__">
 <script>/* older TV browsers (Chromium 85, #106) */if(!Array.prototype.at)Object.defineProperty(Array.prototype,"at",{value:function(i){i=Math.trunc(i)||0;if(i<0)i+=this.length;return this[i]},writable:true,configurable:true});if(!Object.hasOwn)Object.hasOwn=function(o,k){return Object.prototype.hasOwnProperty.call(o,k)};</script>
+<script>/* and their stylesheets: y/legacy.js rewrites them */if(window.CSS&&!CSS.supports("color","color-mix(in srgb, red 50%, blue)"))addEventListener("DOMContentLoaded",function(){var j=document.createElement("script");j.src="/y/legacy.js?v=__V__";document.head.appendChild(j)});</script>
 <script>
   // apply the theme early so the first paint does not flash white
   try { var s = JSON.parse(localStorage.getItem("yt.settings") || "{}"), t = s.theme || "light";
