@@ -549,6 +549,7 @@ private val KO by lazy { mapOf(
     "Theme" to "테마",
     "This channel won't be recommended" to "이 채널은 추천하지 않을게요",
     "This video can't be played" to "이 영상은 재생할 수 없어요",
+    "YouTube's stream list for this video is broken, so it plays from one made on this device" to "YouTube의 이 영상 스트림 목록에 문제가 있어서, 기기에서 만든 목록으로 재생해요",
     "Topics" to "주제",
     "Try again" to "다시 시도",
     "TubeHaus backup (everything)" to "TubeHaus 백업 (전부)",
