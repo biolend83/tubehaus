@@ -68,7 +68,7 @@ jobject toJava(JNIEnv* e, v8::Isolate* iso, v8::Local<v8::Value> v) {
     v8::Local<v8::String> s = v.As<v8::String>();
     int n = s->Length();
     std::u16string w(n, u'\0');
-    s->WriteV2(iso, 0, n, reinterpret_cast<uint16_t*>(w.data()));
+    s->Write(iso, reinterpret_cast<uint16_t*>(w.data()), 0, n, v8::String::NO_NULL_TERMINATION);
     return e->NewString(reinterpret_cast<const jchar*>(w.data()), n);
   }
   if (v->IsNumber()) return e->NewObject(cDouble, mDoubleNew, v.As<v8::Number>()->Value());
