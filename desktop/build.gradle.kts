@@ -25,8 +25,9 @@ kotlin {
 
 // Pretendard, the type face of the web app 1.0 (one copy for every platform: common/fonts)
 sourceSets["main"].resources.srcDir("../common/fonts")
-// SABR (BrowserSabr): the page script and yt-dlp's solver it runs
+// SABR (JsSabr, BrowserSabr): the page scripts and yt-dlp's solver they run; not lite/, the sources sabr-lite.js is built from
 sourceSets["main"].resources.srcDir("../common/sabr")
+sourceSets["main"].resources.exclude("lite/**")
 sourceSets["main"].resources.srcDir("../common/ejs")
 
 dependencies {
@@ -35,6 +36,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // QuickJS, the JavaScript engine SABR runs in (JsSabr)
+    implementation("io.github.dokar3:quickjs-kt:1.0.5")
     implementation("io.coil-kt.coil3:coil-compose:3.2.0")
     implementation("com.squareup.okio:okio:3.10.2")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.2.0")

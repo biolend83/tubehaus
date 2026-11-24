@@ -292,6 +292,7 @@ object Sabr {
                 path.startsWith("/sabr?") -> serveFormat(out, parts[0] == "HEAD", q, headers["range"])
                 path.startsWith("/api/timedtext?") -> serveCaption(out, q)
                 path.startsWith("/live/") -> SabrLive.serve(out, path, q) { code, type, body -> reply(out, code, type, body) }
+                path.startsWith("/dvr/") -> LiveDvr.serve(out, path, q) { code, type, body -> reply(out, code, type, body) }
                 else -> reply(out, 404, "text/plain", "not found".toByteArray())
             }
             out.flush()

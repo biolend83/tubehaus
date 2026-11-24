@@ -174,6 +174,8 @@ object YouTube {
 
     /** a live stream that came without a playlist: the web player's way, its own live playlist on this device */
     private suspend fun liveOr(id: String, s: Stream): Stream {
+        // a live playlist: served on this device with hours more of the stream in front, to go back as on YouTube
+        if (s.live && s.hls != null) return LiveDvr.master(s.hls)?.let { s.copy(hls = it) } ?: s
         if (!s.live || s.hls != null || !Sabr.available || Sabr.host?.live != true) return s
         return try { sabr(id) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; s }
     }

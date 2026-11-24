@@ -587,7 +587,9 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
         // a thin progress line while the controls are hidden (not in full screen)
         if (!shown && !fullscreen && st.durationMs > 0 && st.playing) {
             Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(2.dp).background(Color(0x55FFFFFF))) {
-                Box(Modifier.fillMaxWidth((st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f)).height(2.dp).background(Red))
+                // live at the edge: full, as the seek bar shows it
+                val atEdge = app.playback.video?.live == true && st.durationMs - st.positionMs < 30_000
+                Box(Modifier.fillMaxWidth(if (atEdge) 1f else (st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f)).height(2.dp).background(Red))
             }
         }
     }

@@ -203,13 +203,15 @@ private fun startApp() {
     val bundled = System.getProperty("compose.application.resources.dir") ?: File("resources/windows").absolutePath
     System.setProperty("jna.library.path", if (isMac) "$bundled:/opt/homebrew/lib:/usr/local/lib:/opt/local/lib" else bundled)
     val platform = DesktopPlatform()
-    // what nothing else plays: SABR from a hidden Edge or Chrome page, its formats kept in the cache while they play
-    if (BrowserSabr.browser() != null) {
-        app.tubehaus.engine.Sabr.dir = File(platform.cacheDir.toString(), "sabr").apply { deleteRecursively() }
-        app.tubehaus.engine.Sabr.host = BrowserSabr(File(platform.cacheDir.toString(), "sabr-browser"))
-        app.tubehaus.engine.YouTube.prewarm(4_000)
-        app.tubehaus.engine.Sabr.only = System.getenv("TUBEHAUS_SABR_ONLY") != null
-    }
+    // what nothing else plays: SABR in a small JavaScript engine of the app's own (QuickJS, no browser), its formats
+    // kept in the cache while they play. TUBEHAUS_SABR=browser: the way before, a hidden Edge or Chrome page.
+    app.tubehaus.engine.Sabr.dir = File(platform.cacheDir.toString(), "sabr").apply { deleteRecursively() }
+    app.tubehaus.engine.Sabr.host = if (System.getenv("TUBEHAUS_SABR") == "browser" && BrowserSabr.browser() != null)
+        BrowserSabr(File(platform.cacheDir.toString(), "sabr-browser"))
+    else app.tubehaus.engine.JsSabr({ name -> DesktopPlatform::class.java.getResourceAsStream("/$name")?.use { it.readBytes().decodeToString() } },
+        File(platform.cacheDir.toString(), "sabr-js"))
+    app.tubehaus.engine.YouTube.prewarm(4_000)
+    app.tubehaus.engine.Sabr.only = System.getenv("TUBEHAUS_SABR_ONLY") != null
     val state = AppState(platform, Store(platform.dataDir))
     // macOS Control Center and the media keys: what plays and its buttons
     MacMediaControls(state, File(platform.cacheDir.toString(), "nowplaying")).start()

@@ -3,6 +3,9 @@
 // YouTube's web player does, and BotGuard runs in a real browser engine. Bundled into common/sabr/sabr-page.js
 // with googlevideo and bgutils-js (MIT); yt-dlp's EJS solver (common/ejs) is loaded into the same page first.
 //
+// The same code also runs without a browser (globalThis.__thQjs): in QuickJS inside the app, with jsdom as the
+// document (common/sabr/lite, built into common/sabr/sabr-lite.js). The differences are marked where they are.
+//
 // The app calls window.__thSabr.*; pieces go back through the host's bridge function `__thHost(json)`:
 //   {t:"piece", run, at, init, ms, data(base64)}   one SABR piece and its place in YouTube's file
 //   {t:"end", run, bad, error}                      a fetch is over (bad: YouTube turned its token down)
@@ -27,13 +30,14 @@ async function makeMinter() {
   if (!at) throw new Error("no BotGuard challenge on YouTube's home page");
   const ch = parseLooseJSON(at[1]).R.bgChallenge;
   // the interpreter as a <script> (as YouTube's page loads it: a fetch of it is refused, it has no CORS headers)
-  if (!window[ch.globalName]) await new Promise((ok, no) => {
+  if (globalThis.__thQjs) { if (!globalThis[ch.globalName]) (0, eval)(await (await fetch("https:" + ch.interpreterUrl.privateDoNotAccessOrElseTrustedResourceUrlWrappedValue)).text()); }
+  else if (!window[ch.globalName]) await new Promise((ok, no) => {
     const el = document.createElement("script");
     el.src = "https:" + ch.interpreterUrl.privateDoNotAccessOrElseTrustedResourceUrlWrappedValue;
     el.onload = ok; el.onerror = () => no(new Error("BotGuard script not loaded"));
     document.head.appendChild(el);
   });
-  const bg = await BotGuardClient.create({ program: ch.program, globalName: ch.globalName, globalObject: window });
+  const bg = await BotGuardClient.create({ program: ch.program, globalName: ch.globalName, globalObject: globalThis.__thQjs ? globalThis : window });
   const webPoSignalOutput = [];
   const resp = await bg.snapshot({ webPoSignalOutput });
   const [integrityToken, estimatedTtlSecs, mintRefreshThreshold, websafeFallbackToken] = await (await fetch(buildURL("GenerateIT", true),
@@ -44,7 +48,9 @@ async function makeMinter() {
 }
 async function getMinter() {
   if (minter && Date.now() - minter.at < minter.ttl * 0.8) return minter;
-  minting ??= makeMinter().then((m) => (minter = m)).finally(() => { minting = null; });
+  // without a browser BotGuard's answer is turned down about half the time: a new challenge, up to 5 times
+  const tries = async () => { for (let i = 0; ; i++) { try { return await makeMinter(); } catch (e) { if (!globalThis.__thQjs || i >= 4) throw e; } } };
+  minting ??= tries().then((m) => (minter = m)).finally(() => { minting = null; });
   return minting;
 }
 function turnedDown(m) { if (minter === m) minter = null; }
@@ -53,16 +59,26 @@ function turnedDown(m) { if (minter === m) minter = null; }
 // page itself would act on the page (it navigates away). The app hands its code in with setSolver().
 let solverSrc = null, worker = null, wid = 0;
 const pending = new Map();
+let solverFn = null;
 function jsc(input) {
+  // no browser (QuickJS): the solver in its own function scope, nothing of a page to navigate away
+  if (globalThis.__thQjs) {
+    if (!solverFn) { if (!solverSrc) throw new Error("no solver"); solverFn = new Function(solverSrc + "\n;return jsc;")(); }
+    return new Promise((ok) => setTimeout(() => ok(solverFn(input)), 0));
+  }
   if (!worker) {
     if (!solverSrc) throw new Error("no solver");
-    const src = solverSrc + "\n;onmessage=(e)=>{let r;try{r={id:e.data.id,r:jsc(e.data.input)}}catch(x){r={id:e.data.id,err:String(x)}}postMessage(r)};";
+    // the worker too keeps the last player compiled: an n is then a call, not the whole player compiled again
+    const src = solverSrc + "\n;var thLast=null,thN=null;function thSolve(i){if(i&&i.type==='preprocessed'&&i.requests.length===1&&i.requests[0].type==='n'){" +
+      "if(thLast!==i.preprocessed_player){var r={n:null,sig:null};Function('_result',i.preprocessed_player)(r);thLast=i.preprocessed_player;thN=r.n}" +
+      "if(thN){var d={};for(var c of i.requests[0].challenges)d[c]=thN(c);return{type:'result',responses:[{type:'result',data:d}]}}}return jsc(i)}" +
+      "\n;onmessage=(e)=>{let r;try{r={id:e.data.id,r:thSolve(e.data.input)}}catch(x){r={id:e.data.id,err:String(x)}}postMessage(r)};";
     worker = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
     worker.onmessage = (e) => { const p = pending.get(e.data.id); pending.delete(e.data.id); if (p) e.data.err ? p[1](new Error(e.data.err)) : p[0](e.data.r); };
   }
   return new Promise((ok, no) => { const id = ++wid; pending.set(id, [ok, no]); worker.postMessage({ id, input }); });
 }
-const players = new Map(), scripts = new Map();
+const players = new Map(), scripts = new Map(), nFns = new Map();
 function playerJs(jsUrl) {
   let p = scripts.get(jsUrl);
   if (!p) {
@@ -77,13 +93,31 @@ async function solveWith(url, jsUrl) {
   const u = new URL(url), n = u.searchParams.get("n");
   if (!n) return url;
   let pre = players.get(jsUrl);
+  // without a browser this takes seconds (QuickJS): the host may keep it on disk, per player version
+  const key = "player-" + ((jsUrl || "").match(/\/s\/player\/(\w+)\//)?.[1] || "") + "-" + (jsUrl || "").replace(/\W+/g, "_").slice(-40);
+  if (!pre && globalThis.__cacheGet) pre = __cacheGet(key) || null;
   if (!pre) {
     const js = await playerJs(jsUrl);
     pre = (await jsc({ type: "player", player: js, requests: [], output_preprocessed: true })).preprocessed_player;
+    if (pre && globalThis.__cacheSet) __cacheSet(key, pre);
+  }
+  if (!players.has(jsUrl)) {
     players.set(jsUrl, pre);
     if (players.size > 3) players.delete(players.keys().next().value);
   }
-  const ans = (await jsc({ type: "preprocessed", preprocessed_player: pre, requests: [{ type: "n", challenges: [n] }] })).responses?.[0]?.data?.[n];
+  // the solver compiles the whole preprocessed player for every n (over a second in QuickJS): compiled once per player
+  // version here, an n is then a call (milliseconds), as on YouTube's own page
+  let ans;
+  if (globalThis.__thQjs) {
+    let f = nFns.get(pre);
+    if (!f) {
+      const r = { n: null, sig: null };
+      Function("_result", pre)(r);
+      f = r.n; if (!f) throw new Error("no n function");
+      nFns.clear(); nFns.set(pre, f);
+    }
+    ans = f(n);
+  } else ans = (await jsc({ type: "preprocessed", preprocessed_player: pre, requests: [{ type: "n", challenges: [n] }] })).responses?.[0]?.data?.[n];
   if (!ans) throw new Error("n not solved");
   u.searchParams.set("n", ans);
   return u.toString();
@@ -125,6 +159,7 @@ function osOf(ua) {
   return { osName: "X11", osVersion: "" };
 }
 function sendPiece(o, u8) {
+  if (globalThis.__thPiece) { __thPiece(JSON.stringify(o), u8); return; }
   if (window.__thBin) {
     try {
       const head = new TextEncoder().encode(JSON.stringify(o));
@@ -177,11 +212,11 @@ window.__thSabr = {
       const m = await getMinter();
       const stream = new SabrStream({
         videoId: vid, formats, serverAbrStreamingUrl: s.sabrUrl, videoPlaybackUstreamerConfig: s.ustreamer,
-        clientInfo: { clientName: 1, clientVersion: s.ver, ...osOf(navigator.userAgent) },
+        clientInfo: { clientName: 1, clientVersion: s.ver, ...(globalThis.__thQjs ? { osName: "Windows", osVersion: "10.0" } : osOf(navigator.userAgent)) },
         poToken: await m.m.mintAsWebsafeString(vid),
         callbacks: { onMintPoToken: async () => (await getMinter()).m.mint(vid) },
         // as YouTube's own player sends it: a plain-text body (no CORS preflight), no headers a page may not set
-        fetchFunction: (u, o = {}) => fetch(u, { ...o, headers: { "content-type": "text/plain;charset=UTF-8", accept: "application/vnd.yt-ump" }, credentials: "omit" }),
+        fetchFunction: (u, o = {}) => fetch(u, globalThis.__thQjs ? o : { ...o, headers: { "content-type": "text/plain;charset=UTF-8", accept: "application/vnd.yt-ump" }, credentials: "omit" }),
       });
       r = { stream, allow: allows.get(run) ?? Infinity, gate: null, bad: false };
       allows.delete(run);
@@ -191,6 +226,8 @@ window.__thSabr = {
       stream.on("streamProtectionStatusUpdate", (p) => {
         send({ t: "log", run, msg: "protection " + p.status });
         if (first) { first = false; if (p.status === 1) m.good = true; }
+        // without a browser a minter YouTube does not take at once is no good: a new one for the next fetch
+        if (globalThis.__thQjs && p.status !== 1 && !m.good) { r.bad = true; turnedDown(m); stream.abort().catch(() => {}); return; }
         if (p.status === 1) m.good = true;
         refused = p.status === 3 ? refused + 1 : 0;
         if (refused >= 3) { r.bad = true; m.good = false; turnedDown(m); stream.abort().catch(() => {}); }
@@ -248,7 +285,7 @@ window.__thSabr = {
       let last = 0;
       const stream = new SabrStream({
         videoId: vid, formats, serverAbrStreamingUrl: s.sabrUrl, videoPlaybackUstreamerConfig: s.ustreamer,
-        clientInfo: { clientName: 1, clientVersion: s.ver, ...osOf(navigator.userAgent) },
+        clientInfo: { clientName: 1, clientVersion: s.ver, ...(globalThis.__thQjs ? { osName: "Windows", osVersion: "10.0" } : osOf(navigator.userAgent)) },
         poToken: await m.m.mintAsWebsafeString(vid),
         callbacks: { onMintPoToken: async () => (await getMinter()).m.mint(vid) },
         // at the live edge the library asks again at once: at most one request a second
@@ -314,6 +351,6 @@ window.__thSabr = {
   allow(run, n) { const r = runs.get(run); if (r) { r.allow = n; r.gate?.(); } else allows.set(run, n); return "ok"; },
   stop(run) { const r = runs.get(run); allows.delete(run); if (r) { runs.delete(run); r.gate?.(); r.stream.abort().catch(() => {}); } else { stopped.add(run); if (stopped.size > 200) stopped.delete(stopped.values().next().value); } return "ok"; },
   /** yt-dlp's solver (lib, then core) as one text, from the app's copy of common/ejs */
-  setSolver(src) { solverSrc = src; worker?.terminate(); worker = null; return "ok"; },
+  setSolver(src) { solverSrc = src; solverFn = null; worker?.terminate(); worker = null; return "ok"; },
   ready() { return solverSrc ? "ok" : "no solver"; },
 };

@@ -1,5 +1,7 @@
 package app.tubehaus.ui
 
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBarsPadding
 import app.tubehaus.engine.Dislikes
 import app.tubehaus.engine.Details
 import androidx.compose.ui.text.style.TextAlign
@@ -370,7 +372,7 @@ private fun Modifier.ambientGlow(frame: ImageBitmap?): Modifier {
 }
 
 @Composable
-private fun Info(app: AppState, v: Video, flush: Boolean = false) {
+private fun Info(app: AppState, v: Video, flush: Boolean = false, openDescription: (() -> Unit)? = null) {
     val pb = app.playback
     val d = pb.details
     val lib by app.store.lib.state.collectAsState()
@@ -397,7 +399,7 @@ private fun Info(app: AppState, v: Video, flush: Boolean = false) {
             }
         } else {
             // the title and one quiet line under it; either opens the description
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { sheet = true }) {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { if (openDescription != null) openDescription() else sheet = true }) {
                 if (has("title")) Text(titleOf(v, app), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -454,13 +456,40 @@ private fun Info(app: AppState, v: Video, flush: Boolean = false) {
 /** The description in a sheet from the bottom: the title, the channel, likes, views and date, then the full text. */
 @Composable
 private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose: () -> Unit) {
-    val d = app.playback.details
-    val calm = app.store.settings.value.calm
-    val desc = app.playback.stream?.description ?: ""
     // open all the way at once, as the player's settings sheet does
     ModalBottomSheet(onDismissRequest = onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
-        LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        DescriptionBody(app, v, viewsText, onClose)
+    }
+}
+
+/** The description over the space under the video on a phone, as the comments: the video keeps playing above. */
+@Composable
+private fun DescriptionPanel(app: AppState, v: Video, handle: Modifier, onClose: () -> Unit) {
+    val d = app.playback.details
+    val viewsText = d?.viewsText?.takeIf { it.isNotEmpty() } ?: v.views.takeIf { it > 0 }?.let { tr("{n} views").replace("{n}", compact(it)) } ?: ""
+    Column(Modifier.fillMaxSize()) {
+        // the same small grip as the comments' panel; the header drags it down
+        Box(Modifier.fillMaxWidth().then(handle).padding(top = 8.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(width = 36.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.outline))
+        }
+        Row(Modifier.fillMaxWidth().then(handle).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(tr("Description"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            IconButton(onClick = onClose) { Icon(Sym.Close.fill, tr("Close")) }
+        }
+        HorizontalDivider()
+        // the time links jump in the video and leave the panel open, the video being in sight
+        DescriptionBody(app, v, viewsText, onClose, Modifier.padding(top = 12.dp), closeOnTime = false)
+    }
+}
+
+@Composable
+private fun DescriptionBody(app: AppState, v: Video, viewsText: String, onClose: () -> Unit, modifier: Modifier = Modifier, closeOnTime: Boolean = true) {
+    val d = app.playback.details
+    val calm = app.store.settings.value.calm
+    val desc = app.playback.stream?.description ?: ""
+    run {
+        LazyColumn(Modifier.fillMaxWidth().then(modifier).padding(horizontal = 16.dp)) {
             item {
                 // the title can be copied too, as the description under it (#72)
                 SelectableInSheet(app) { Text(v.title, style = MaterialTheme.typography.titleLarge) }
@@ -495,11 +524,11 @@ private fun DescriptionSheet(app: AppState, v: Video, viewsText: String, onClose
                     LinkedText(desc, app,
                         Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 32.dp)
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(20.dp)).padding(16.dp),
-                        onTime = { s -> app.player.seekTo(s * 1000L); onClose() })
+                        onTime = { s -> app.player.seekTo(s * 1000L); if (closeOnTime) onClose() })
                 }
             }
             // the chapters as cards in a row, as under YouTube's description; a tap jumps there
-            if (app.playback.chapters.isNotEmpty()) item { ChapterCards(app, Modifier.padding(bottom = 32.dp), onClose) }
+            if (app.playback.chapters.isNotEmpty()) item { ChapterCards(app, Modifier.padding(bottom = 32.dp)) { if (closeOnTime) onClose() } }
         }
     }
 }
@@ -626,9 +655,9 @@ private fun Chip(icon: ImageVector, label: String, onClick: () -> Unit) {
 }
 
 /** What sits under the video, by Settings → Under the video: everything, only the title, or nothing. */
-private fun LazyListScope.under(app: AppState, v: Video, flush: Boolean = false) {
+private fun LazyListScope.under(app: AppState, v: Video, flush: Boolean = false, openDescription: (() -> Unit)? = null) {
     when (app.store.settings.value.underVideo) {
-        0 -> { item { Info(app, v, flush) }; item { SmartCard(app, v) } }
+        0 -> { item { Info(app, v, flush, openDescription) }; item { SmartCard(app, v) } }
         1 -> item {
             Text(titleOf(v, app), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
@@ -645,7 +674,8 @@ fun CommentsPanel(app: AppState, token: String, info: Details? = app.playback.de
             Box(Modifier.size(width = 36.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.outline))
         }
         Row(Modifier.fillMaxWidth().then(handle).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            val count = info?.takeIf { it.commentsToken == token }?.commentsCount ?: ""
+            // YouTube's count takes in the replies, which sit under their comments: said so, or the list looks short
+            val count = info?.takeIf { it.commentsToken == token }?.commentsCount?.takeIf { it.isNotEmpty() }?.let { "$it · " + tr("incl. replies") } ?: ""
             Text(tr("Comments"), style = MaterialTheme.typography.titleMedium)
             Text(count, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 8.dp).weight(1f))
@@ -1002,21 +1032,24 @@ private fun PhoneBody(app: AppState, v: Video, list: androidx.compose.foundation
     val token = pb.details?.commentsToken?.takeIf { !set.hideComments }
     var commentsOpen by remember(v.id) { mutableStateOf(false) }
     var transcriptOpen by remember(v.id) { mutableStateOf(false) }
+    // the description too slides up over the space under the video, which stays in sight and playing
+    var descOpen by remember(v.id) { mutableStateOf(false) }
     val hasCaptions = !pb.stream?.captions.isNullOrEmpty()
     LaunchedEffect(pb.transcriptAsked) {
         if (!pb.transcriptAsked) return@LaunchedEffect
         pb.transcriptAsked = false
-        commentsOpen = false; transcriptOpen = true
+        commentsOpen = false; descOpen = false; transcriptOpen = true
     }
     // Back closes an open panel before it folds the video away; only while the video page is in
     // front (folded into the mini player, its panels are put away and Back is the page's)
     val front = app.current is Screen.Watch
-    LaunchedEffect(front) { if (!front) { commentsOpen = false; transcriptOpen = false } }
-    BackHook(app, front && (commentsOpen || transcriptOpen)) { commentsOpen = false; transcriptOpen = false }
+    LaunchedEffect(front) { if (!front) { commentsOpen = false; transcriptOpen = false; descOpen = false } }
+    BackHook(app, front && (commentsOpen || transcriptOpen || descOpen)) { commentsOpen = false; transcriptOpen = false; descOpen = false }
     Box(Modifier.fillMaxSize().riseIn(v.id)) {
-        LazyColumn(Modifier.fillMaxSize(), state = list) {
+        // the last rows clear of the navigation bar, which the page runs under
+        LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues()) {
             item { PlayerNotes(app) }
-            under(app, v)
+            under(app, v, openDescription = { commentsOpen = false; transcriptOpen = false; descOpen = true })
             if (token != null) item { CommentsTeaser(token) { commentsOpen = true } }
             related(app, big = true)
         }
@@ -1027,33 +1060,7 @@ private fun PhoneBody(app: AppState, v: Video, list: androidx.compose.foundation
             exit = androidx.compose.animation.slideOutVertically(tween(Motion.SHORT + 50, easing = Motion.emphasizedOut)) { it } +
                 androidx.compose.animation.fadeOut(tween(Motion.SHORT + 50)),
         ) {
-            // pulled down by its top, it follows the finger and closes past a quarter (or flung)
-            val scope = rememberCoroutineScope()
-            val down = remember { Animatable(0f) }
-            var tall by remember { mutableStateOf(1f) }
-            val grip = Modifier.pointerInput(Unit) {
-                val track = androidx.compose.ui.input.pointer.util.VelocityTracker()
-                var acc = 0f
-                detectVerticalDragGestures(
-                    onDragStart = { acc = 0f; track.resetTracking() },
-                    onVerticalDrag = { ch, dy ->
-                        ch.consume(); acc += dy; track.addPosition(ch.uptimeMillis, Offset(0f, acc))
-                        scope.launch { down.snapTo((down.value + dy).coerceAtLeast(0f)) }
-                    },
-                    onDragCancel = { scope.launch { down.animateTo(0f) } },
-                    onDragEnd = {
-                        val vy = track.calculateVelocity().y
-                        scope.launch {
-                            if (down.value > tall * 0.25f || vy > 900.dp.toPx()) { commentsOpen = false; delay(400); down.snapTo(0f) }
-                            else down.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 500f), initialVelocity = vy)
-                        }
-                    },
-                )
-            }
-            Box(Modifier.fillMaxSize().onSizeChanged { tall = it.height.toFloat().coerceAtLeast(1f) }
-                .graphicsLayer { translationY = down.value }.background(MaterialTheme.colorScheme.background)) {
-                if (token != null) CommentsPanel(app, token, handle = grip) { commentsOpen = false }
-            }
+            PullDown({ commentsOpen = false }) { grip -> if (token != null) CommentsPanel(app, token, handle = grip) { commentsOpen = false } }
         }
         androidx.compose.animation.AnimatedVisibility(
             transcriptOpen && hasCaptions,
@@ -1062,9 +1069,49 @@ private fun PhoneBody(app: AppState, v: Video, list: androidx.compose.foundation
             exit = androidx.compose.animation.slideOutVertically(tween(Motion.SHORT + 50, easing = Motion.emphasizedOut)) { it } +
                 androidx.compose.animation.fadeOut(tween(Motion.SHORT + 50)),
         ) {
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).navigationBarsPadding()) {
                 TranscriptPanel(app) { transcriptOpen = false }
             }
         }
+        androidx.compose.animation.AnimatedVisibility(
+            descOpen,
+            enter = androidx.compose.animation.slideInVertically(tween(Motion.MEDIUM, easing = Motion.emphasizedIn)) { it } +
+                androidx.compose.animation.fadeIn(tween(Motion.SHORT)),
+            exit = androidx.compose.animation.slideOutVertically(tween(Motion.SHORT + 50, easing = Motion.emphasizedOut)) { it } +
+                androidx.compose.animation.fadeOut(tween(Motion.SHORT + 50)),
+        ) {
+            PullDown({ descOpen = false }) { grip -> DescriptionPanel(app, v, grip) { descOpen = false } }
+        }
+    }
+}
+
+/** A panel over the space under the video that its top pulls down: it follows the finger and closes past a quarter (or flung). */
+@Composable
+private fun PullDown(onClose: () -> Unit, content: @Composable (grip: Modifier) -> Unit) {
+    val scope = rememberCoroutineScope()
+    val down = remember { Animatable(0f) }
+    var tall by remember { mutableStateOf(1f) }
+    val grip = Modifier.pointerInput(Unit) {
+        val track = androidx.compose.ui.input.pointer.util.VelocityTracker()
+        var acc = 0f
+        detectVerticalDragGestures(
+            onDragStart = { acc = 0f; track.resetTracking() },
+            onVerticalDrag = { ch, dy ->
+                ch.consume(); acc += dy; track.addPosition(ch.uptimeMillis, Offset(0f, acc))
+                scope.launch { down.snapTo((down.value + dy).coerceAtLeast(0f)) }
+            },
+            onDragCancel = { scope.launch { down.animateTo(0f) } },
+            onDragEnd = {
+                val vy = track.calculateVelocity().y
+                scope.launch {
+                    if (down.value > tall * 0.25f || vy > 900.dp.toPx()) { onClose(); delay(400); down.snapTo(0f) }
+                    else down.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 500f), initialVelocity = vy)
+                }
+            },
+        )
+    }
+    Box(Modifier.fillMaxSize().onSizeChanged { tall = it.height.toFloat().coerceAtLeast(1f) }
+        .graphicsLayer { translationY = down.value }.background(MaterialTheme.colorScheme.background).navigationBarsPadding()) {
+        content(grip)
     }
 }

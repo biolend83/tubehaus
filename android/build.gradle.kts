@@ -30,6 +30,8 @@ android {
     sourceSets["main"].java.srcDirs("src/main/kotlin", "../common/src", "../common/jvm")
     // Pretendard, the type face of the web app 1.0 (one copy for every platform: common/fonts)
     sourceSets["main"].assets.srcDirs("../common/fonts", "../common/ejs", "../common/sabr")
+    // not common/sabr/lite: the sources sabr-lite.js is built from (and its node_modules)
+    androidResources.ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!lite"
 
     signingConfigs {
         // the release key lives outside the repository; without it the APK is signed with the debug key
@@ -103,6 +105,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // QuickJS, the JavaScript engine SABR can run in without a WebView (JsSabr)
+    implementation("io.github.dokar3:quickjs-kt:1.0.5")
     implementation("io.coil-kt.coil3:coil-compose:3.2.0")
     implementation("com.squareup.okio:okio:3.10.2")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.2.0")

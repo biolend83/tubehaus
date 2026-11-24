@@ -20,7 +20,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -68,7 +70,9 @@ class MainActivity : ComponentActivity() {
     private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        // the navigation bar clear, the app's own colour under it: no grey band behind the three buttons
+        enableEdgeToEdge(navigationBarStyle = androidx.activity.SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT))
+        if (Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
         super.onCreate(savedInstanceState)
         tube.platform.activity = this
         if (Build.VERSION.SDK_INT >= 31) lifecycleScope.launch {
@@ -79,7 +83,8 @@ class MainActivity : ComponentActivity() {
             ) { _, _ -> }.collect { if (Build.VERSION.SDK_INT >= 26) runCatching { setPictureInPictureParams(pipParams()) } }
         }
         setContent {
-            Box(Modifier.fillMaxSize().let { if (state.fullscreen || state.pip) it else it.safeDrawingPadding() }) { App(state) }
+            // not the bottom: the pages run under the clear navigation bar and keep their own last rows above it
+            Box(Modifier.fillMaxSize().let { if (state.fullscreen || state.pip) it else it.windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing.only(androidx.compose.foundation.layout.WindowInsetsSides.Top + androidx.compose.foundation.layout.WindowInsetsSides.Horizontal)) }) { App(state) }
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
