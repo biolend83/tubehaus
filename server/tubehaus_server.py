@@ -2613,6 +2613,7 @@ ENG_REGION = env("HT_REGION", "US")         # the default region of searches and
 ENG_POOL = ThreadPoolExecutor(16, thread_name_prefix="eng")
 ENG_VISITOR = f"{STATE}/visitor.json"
 VIS_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+IOS_PRODUCER_UA = "com.google.ios.youtubeproducer/0.147.945 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)"
 VR_UA = "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip"
 # (context.client, X-YouTube-Client-Name, User-Agent), in the order they are tried. When YouTube
 # stops answering one, its version here is the first thing to update (the app's clients.json has
@@ -2620,6 +2621,9 @@ VR_UA = "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12
 ENG_PLAYERS = [
     ({"clientName": "VISIONOS", "clientVersion": "1.02", "deviceMake": "Apple", "deviceModel": "RealityDevice17,1",
       "osName": "visionOS", "osVersion": "26.5.23O471"}, 101, VIS_UA),
+    # YouTube Studio's iPhone app: plain URLs to the end, H.264/AAC up to 1080p (added in yt-dlp 2026-11)
+    ({"clientName": "IOS_PRODUCER", "clientVersion": "0.147.945", "deviceMake": "Apple", "deviceModel": "iPhone16,2",
+      "osName": "iPhone", "osVersion": "18.3.2.22D82"}, 92, IOS_PRODUCER_UA),
     ({"clientName": "ANDROID_VR", "clientVersion": "1.65.10", "deviceMake": "Oculus", "deviceModel": "Quest 3",
       "androidSdkVersion": 32, "osName": "Android", "osVersion": "12L"}, 28, VR_UA),
 ]
