@@ -62,12 +62,13 @@ object YouTube {
     @Volatile var force: String = ""
 
     /** the ways this device can play a video, for the player's menu */
-    val methods: List<String> get() = listOfNotNull("VISIONOS", "ANDROID_VR", "KIDS",
+    val methods: List<String> get() = listOfNotNull("VISIONOS", "IOS_PRODUCER", "ANDROID_VR", "KIDS",
         if (Sabr.available) "SABR" else null, if (Cipher.available) "TV" else null)
 
     suspend fun stream(id: String): Stream {
         when (force) {
             "VISIONOS" -> return player(id, Clients.VISIONOS)
+            "IOS_PRODUCER" -> return player(id, Clients.IOS_PRODUCER)
             "ANDROID_VR" -> return player(id, Clients.ANDROID_VR)
             "KIDS" -> return player(id, Clients.KIDS)
             "SABR" -> if (Sabr.available) return sabr(id)
