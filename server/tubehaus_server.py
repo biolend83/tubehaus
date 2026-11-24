@@ -3211,12 +3211,22 @@ def _ejs_ready():
             return _ejs["sts"]
         d = os.path.join(STATE, "ejs")
         os.makedirs(d, exist_ok=True)
-        pre, stsf = os.path.join(d, pid + ".pre.js"), os.path.join(d, pid + ".sts")
+        # the TV player: since 2026-11 the main web player can't be solved outside a browser (yt-dlp too:
+        # "a.addOnDisposeCallback is not a function"); the main one only when the TV one can't be read
+        pre, stsf = os.path.join(d, pid + ".tv.pre.js"), os.path.join(d, pid + ".sts")
         try:
             if not (os.path.exists(pre) and os.path.exists(stsf)):
-                js = get("https://www.youtube.com/s/player/%s/player_ias.vflset/en_US/base.js" % pid, 30).decode()
-                sts = re.search(r"signatureTimestamp[=:](\d+)", js).group(1)
-                if _ejs_run("load", js, pre) != "ok":
+                js = sts = None
+                for variant in ("tv-player-ias.vflset/tv-player-ias.js", "player_ias.vflset/en_US/base.js"):
+                    try:
+                        js = get("https://www.youtube.com/s/player/%s/%s" % (pid, variant), 30).decode()
+                        sts = re.search(r"signatureTimestamp[=:](\d+)", js).group(1)
+                        if _ejs_run("load", js, pre) == "ok":
+                            break
+                    except Exception:
+                        pass
+                    js = None
+                if js is None:
                     raise RuntimeError("the solver couldn't read player " + pid)
                 with open(stsf, "w") as f:
                     f.write(sts)
