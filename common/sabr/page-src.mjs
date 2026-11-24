@@ -122,11 +122,15 @@ async function solveWith(url, jsUrl) {
   u.searchParams.set("n", ans);
   return u.toString();
 }
+// the TV player first: since 2026-11 YouTube's main web player can't be solved outside a browser
+// (yt-dlp too: "a.addOnDisposeCallback is not a function"), its TV player still can; then the page's own
 async function solveN(url, jsUrl) {
-  try { return await solveWith(url, jsUrl); } catch (e) {
-    const id = (jsUrl || "").match(/\/s\/player\/(\w+)\//)?.[1];
-    if (!id) throw e;
-    return await solveWith(url, `/s/player/${id}/player_ias.vflset/en_US/base.js`);
+  const id = (jsUrl || "").match(/\/s\/player\/(\w+)\//)?.[1];
+  if (!id) return await solveWith(url, jsUrl);
+  try { return await solveWith(url, `/s/player/${id}/tv-player-ias.vflset/tv-player-ias.js`); } catch (e) {
+    try { return await solveWith(url, jsUrl); } catch (e2) {
+      return await solveWith(url, `/s/player/${id}/player_ias.vflset/en_US/base.js`);
+    }
   }
 }
 

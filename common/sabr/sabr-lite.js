@@ -226955,12 +226955,16 @@ expected=${expectedLengthBytes}, received=${loadedLengthBytes}`);
     return u2.toString();
   }
   async function solveN(url, jsUrl) {
+    const id = (jsUrl || "").match(/\/s\/player\/(\w+)\//)?.[1];
+    if (!id) return await solveWith(url, jsUrl);
     try {
-      return await solveWith(url, jsUrl);
+      return await solveWith(url, `/s/player/${id}/tv-player-ias.vflset/tv-player-ias.js`);
     } catch (e2) {
-      const id = (jsUrl || "").match(/\/s\/player\/(\w+)\//)?.[1];
-      if (!id) throw e2;
-      return await solveWith(url, `/s/player/${id}/player_ias.vflset/en_US/base.js`);
+      try {
+        return await solveWith(url, jsUrl);
+      } catch (e22) {
+        return await solveWith(url, `/s/player/${id}/player_ias.vflset/en_US/base.js`);
+      }
     }
   }
   async function session(vid, hl, gl) {
