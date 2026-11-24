@@ -421,7 +421,7 @@ class MpvPlayer : VideoPlayer {
         audioRetried = false
         soundBad = 0
         if (s.live || s.video.isEmpty()) {
-            url = s.hls ?: return
+            url = s.hls?.let { if (it.startsWith("file:")) source(it) else it } ?: return
         } else if (opts.audioOnly && s.audio.isNotEmpty()) {
             // music: the sound alone (the app shows the cover)
             url = source((pickAudio(s) ?: return).url)
