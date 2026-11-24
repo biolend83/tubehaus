@@ -76,7 +76,8 @@ class JsSabr(private val load: (String) -> String?, private val cache: File?) : 
             "\n;" + (load("fastpre.js") ?: "") // the player's preprocess in a few seconds instead of most of a minute
         // one thread of its own with a large stack: jsdom goes deep, and a phone's pool threads have about 1 MB (QuickJS ran past it and the app
         // went down); QuickJS also wants the same thread every time, which a pool does not promise
-        val q = QuickJs.create(jsThread)
+        // QuickJS's native library may be missing for this machine (an unusual processor or system): then never again
+        val q = try { QuickJs.create(jsThread) } catch (e: Throwable) { log("no QuickJS here: $e"); broken = true; return@withLock false }
         q.memoryLimit = 1024L shl 20
         q.maxStackSize = 8L shl 20
         bind(q)
@@ -102,10 +103,21 @@ class JsSabr(private val load: (String) -> String?, private val cache: File?) : 
             }
         }
         engine = q
-        if (!started.await()) { engine = null; return@withLock false }
+        if (!started.await()) {
+            engine = null
+            // the page did not start twice in a row: something in this machine's engine, not a passing hitch
+            if (++failedStarts >= 2) broken = true
+            return@withLock false
+        }
+        failedStarts = 0
         idleWatch()
         true
     }
+
+    /** QuickJS cannot run here (no native library, or the page never starts): [Fallback] then uses another host */
+    @Volatile var broken = false
+        private set
+    private var failedStarts = 0
 
     private fun bind(q: QuickJs) {
         q.function("__log") { a -> log(a.joinToString(" ")) }
@@ -215,7 +227,9 @@ class JsSabr(private val load: (String) -> String?, private val cache: File?) : 
     }
 
     override suspend fun warm() { ready() }
-    override suspend fun prepare(id: String, hl: String, gl: String) = ask("prepare", id, hl, gl)
+    // the engine went down while it worked on it (memory, a crash in the page): once more in a fresh one
+    override suspend fun prepare(id: String, hl: String, gl: String) =
+        ask("prepare", id, hl, gl) ?: if (engine == null && !broken) { log("prepare again in a fresh engine"); ask("prepare", id, hl, gl) } else null
     override suspend fun caption(id: String, url: String) = ask("caption", id, url)
     override fun start(run: Int, id: String, index: Int, startMs: Long) { log("start $run $id #$index from $startMs ms"); fire("start", run, id, index, startMs) }
     override fun allow(run: Int, upTo: Long) = fire("allow", run, upTo)
@@ -230,4 +244,27 @@ class JsSabr(private val load: (String) -> String?, private val cache: File?) : 
         const val SOLVER_GLUE = "\n;var meriyah=lib.meriyah,astring={generate:function(a,o){var w={p:[],write:function(s){this.p.push(s)}};" +
             "lib.astring.generate(a,Object.assign({},o,{output:w}));return w.p.join(\"\")}};\n"
     }
+}
+
+/**
+ * [JsSabr] while it can run here, else [backup] (a browser page): a machine without QuickJS's native library, or one
+ * where the page never starts, still plays what needs SABR. The switch is for good, made when JsSabr gives up.
+ */
+class Fallback(private val js: JsSabr, private val backup: () -> SabrHost?) : SabrHost {
+    @Volatile private var other: SabrHost? = null
+    private fun now(): SabrHost = other ?: if (js.broken) (backup()?.also { other = it } ?: js) else js
+    private suspend fun <T> tried(f: suspend (SabrHost) -> T?): T? {
+        val h = now()
+        val r = f(h)
+        // it gave up just now: the same call on the backup
+        return if (r == null && h === js && js.broken) backup()?.also { other = it }?.let { f(it) } else r
+    }
+    override suspend fun prepare(id: String, hl: String, gl: String) = tried { it.prepare(id, hl, gl) }
+    override suspend fun caption(id: String, url: String) = tried { it.caption(id, url) }
+    override fun start(run: Int, id: String, index: Int, startMs: Long) = now().start(run, id, index, startMs)
+    override fun allow(run: Int, upTo: Long) = now().allow(run, upTo)
+    override fun stop(run: Int) = now().stop(run)
+    override val live get() = now().live
+    override fun startLive(runV: Int, runA: Int, id: String, index: Int) = now().startLive(runV, runA, id, index)
+    override suspend fun warm() = now().warm()
 }

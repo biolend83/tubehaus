@@ -208,8 +208,9 @@ private fun startApp() {
     app.tubehaus.engine.Sabr.dir = File(platform.cacheDir.toString(), "sabr").apply { deleteRecursively() }
     app.tubehaus.engine.Sabr.host = if (System.getenv("TUBEHAUS_SABR") == "browser" && BrowserSabr.browser() != null)
         BrowserSabr(File(platform.cacheDir.toString(), "sabr-browser"))
-    else app.tubehaus.engine.JsSabr({ name -> DesktopPlatform::class.java.getResourceAsStream("/$name")?.use { it.readBytes().decodeToString() } },
-        File(platform.cacheDir.toString(), "sabr-js"))
+    // QuickJS, and the browser page where QuickJS can't run on this machine
+    else app.tubehaus.engine.Fallback(app.tubehaus.engine.JsSabr({ name -> DesktopPlatform::class.java.getResourceAsStream("/$name")?.use { it.readBytes().decodeToString() } },
+        File(platform.cacheDir.toString(), "sabr-js"))) { if (BrowserSabr.browser() != null) BrowserSabr(File(platform.cacheDir.toString(), "sabr-browser")) else null }
     app.tubehaus.engine.YouTube.prewarm(4_000)
     app.tubehaus.engine.Sabr.only = System.getenv("TUBEHAUS_SABR_ONLY") != null
     val state = AppState(platform, Store(platform.dataDir))

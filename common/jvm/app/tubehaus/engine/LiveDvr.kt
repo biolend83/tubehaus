@@ -106,14 +106,20 @@ object LiveDvr {
         if (t == null || n == null || n < 0) return reply(404, "text/plain", ByteArray(0))
         m.used = System.currentTimeMillis()
         val url = t.replace(SQ, "/sq/$n/")
-        val r = runCatching { Net.client.newCall(okhttp3.Request.Builder().url(url).build()).execute() }.getOrNull()
-            ?: return reply(502, "text/plain", ByteArray(0))
-        r.use {
-            val body = it.body
-            if (!it.isSuccessful || body == null) return reply(if (it.code == 404) 404 else 502, "text/plain", ByteArray(0))
-            val bytes = body.bytes()
-            reply(200, it.header("Content-Type") ?: "video/mp2t", bytes)
+        // a passing network hitch must not stop the video: three tries, a moment apart; a 404 (not kept that far back) at once
+        var code = 502
+        for (attempt in 0 until 3) {
+            if (attempt > 0) Thread.sleep(400L * attempt)
+            val got = runCatching {
+                Net.client.newCall(okhttp3.Request.Builder().url(url).build()).execute().use {
+                    code = it.code
+                    if (it.isSuccessful) (it.header("Content-Type") ?: "video/mp2t") to it.body!!.bytes() else null
+                }
+            }.getOrNull()
+            if (got != null) return reply(200, got.first, got.second)
+            if (code == 404 || code == 403) break
         }
+        reply(if (code == 404) 404 else 502, "text/plain", ByteArray(0))
     }
 
 }
