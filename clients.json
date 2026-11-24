@@ -9,6 +9,13 @@
       "extra": { "deviceMake": "Apple", "deviceModel": "RealityDevice17,1", "osName": "visionOS", "osVersion": "26.5.23O471" }
     },
     {
+      "name": "IOS_PRODUCER",
+      "version": "0.147.945",
+      "id": 92,
+      "userAgent": "com.google.ios.youtubeproducer/0.147.945 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)",
+      "extra": { "deviceMake": "Apple", "deviceModel": "iPhone16,2", "osName": "iPhone", "osVersion": "18.3.2.22D82" }
+    },
+    {
       "name": "ANDROID_VR",
       "version": "1.65.10",
       "id": 28,

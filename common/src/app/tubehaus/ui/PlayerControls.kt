@@ -1520,6 +1520,7 @@ internal fun methodName(m: String): String = when (m) {
     "" -> tr("Auto")
     "VISIONOS" -> "visionOS"
     "ANDROID_VR" -> "Android VR"
+    "IOS_PRODUCER" -> "iOS Studio"
     "KIDS", "ANDROID_KIDS" -> "YouTube Kids"
     "SABR", "WEB_SABR" -> "SABR (web)"
     "TV", "TVHTML5" -> "TV"
