@@ -126,7 +126,9 @@ class JsSabr(
         q.asyncFunction("__next") { _ -> cmds.receiveCatching().getOrNull() }
         q.function("__reply") { a ->
             val d = replies.remove((a[0] as Number).toInt()) ?: return@function Unit
-            if (a.getOrNull(2) != null) { log("call failed: ${a[2]}"); d.complete(null) } else d.complete(a.getOrNull(1) as String?)
+            // a long answer with letters past ASCII comes as its UTF-8 bytes (a string that size is cut off on its way out of QuickJS)
+            if (a.getOrNull(2) != null) { log("call failed: ${a[2]}"); d.complete(null) }
+            else d.complete(a.getOrNull(1).let { if (it is ByteArray) it.decodeToString() else it as String? })
         }
         q.function("__thHost") { a ->
             val m = runCatching { Json.parseToJsonElement(a[0] as String).jsonObject }.getOrNull() ?: return@function Unit

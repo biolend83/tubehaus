@@ -95,7 +95,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "2.0.0"
+const val VERSION = "2.0.1"
 
 /** Settings' categories, as cards on its first page: key, icon, title, what is inside */
 private class Cat(val key: String, val icon: Symbol, val title: String, val sub: String)
