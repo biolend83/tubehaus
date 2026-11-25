@@ -1791,3 +1791,53 @@ html:not(.tv) .rgroup { background: none; padding: 0; display: flex; flex-direct
 html:not(.tv) .rgroup > .grow { background: var(--box); border-radius: 6px; padding: 14px 18px; }
 html:not(.tv) .rgroup > .grow:hover { background: color-mix(in srgb, var(--fg) 5%, var(--box)); }
 html:not(.tv) .grow .gic { background: none; width: 26px; height: 26px; color: var(--acc, var(--fg)); }
+
+/* ------------------------------------------------ TubeHaus 1.8 refresh (2026-11)
+   Softer and lighter: buttons as tonal pills that light up in the accent under the pointer, one accent
+   "do it" button (Subscribe), a search field that is one rounded piece with a glow when typing,
+   rounded chips, raised panels with a soft shadow instead of flat grey boxes. html[data-look="2"] only. */
+[data-look="2"] {
+  --shadow-1: 0 1px 2px rgba(20, 28, 60, .06), 0 2px 8px rgba(20, 28, 60, .05);
+  --shadow-2: 0 4px 14px rgba(20, 28, 60, .10), 0 1px 3px rgba(20, 28, 60, .06);
+}
+[data-look="2"][data-theme="dark"] {
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35), 0 2px 10px rgba(0, 0, 0, .25);
+  --shadow-2: 0 6px 18px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .3);
+}
+/* buttons */
+[data-look="2"] .pill { height: 40px; padding: 0 18px; border-radius: 999px; font-weight: 600; letter-spacing: -.1px;
+  background: var(--box2); box-shadow: var(--shadow-1); }
+[data-look="2"] .pill:hover { background: var(--acc-soft); color: var(--acc); box-shadow: var(--shadow-2); }
+[data-look="2"] .pill.round { width: 40px; padding: 0; }
+[data-look="2"] .pill .ic { width: 20px; height: 20px; }
+[data-look="2"] .seg-btn { border-radius: 999px; background: var(--box2); box-shadow: var(--shadow-1); overflow: hidden; }
+[data-look="2"] .seg-btn button { background: transparent; font-weight: 600; }
+[data-look="2"] .seg-btn button:hover { background: var(--acc-soft); color: var(--acc); }
+[data-look="2"] .subbtn { height: 40px; padding: 0 20px; border-radius: 999px; text-transform: none; font-weight: 700;
+  background: linear-gradient(135deg, var(--acc), color-mix(in srgb, var(--acc) 70%, #b06bff)); color: #fff;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--acc) 35%, transparent); }
+[data-look="2"] .subbtn:hover { filter: brightness(1.08); box-shadow: 0 6px 18px color-mix(in srgb, var(--acc) 45%, transparent); }
+[data-look="2"][data-theme="dark"] .subbtn { color: #0b0d16; }
+[data-look="2"] :is(.pill, .subbtn, .chip, .seg-btn button, .ib, .icon-btn):focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+/* chips */
+[data-look="2"] .chip { height: 34px; padding: 0 14px; border-radius: 999px; background: var(--box2); box-shadow: var(--shadow-1); font-weight: 600; }
+[data-look="2"] .chip:hover { background: var(--acc-soft); color: var(--acc); }
+[data-look="2"] .chip.on { background: var(--acc); color: #fff; box-shadow: 0 3px 10px color-mix(in srgb, var(--acc) 35%, transparent); }
+[data-look="2"][data-theme="dark"] .chip.on { color: #0b0d16; }
+/* the search field: one rounded piece; it glows in the accent while typing */
+[data-look="2"] #sform { border-radius: 999px; background: var(--box2); box-shadow: var(--shadow-1); transition: box-shadow .2s, background-color .2s; }
+[data-look="2"] #sform .sbox { background: transparent; border: 0; }
+[data-look="2"] #sform .sbtn { background: transparent; border: 0; border-radius: 0 999px 999px 0; }
+[data-look="2"] #sform .sbtn:hover { color: var(--acc); }
+[data-look="2"] #sform:focus-within { box-shadow: 0 0 0 3px var(--acc-soft), var(--shadow-2); }
+[data-look="2"] #voice { background: var(--box2); box-shadow: var(--shadow-1); }
+[data-look="2"] #voice:hover { background: var(--acc-soft); color: var(--acc); }
+/* the bar on top: frosted */
+[data-look="2"] #mast { -webkit-backdrop-filter: saturate(1.6) blur(18px); backdrop-filter: saturate(1.6) blur(18px); }
+/* panels: raised instead of flat grey */
+[data-look="2"] .w-desc { background: var(--box2); box-shadow: var(--shadow-1); border-radius: 20px; }
+[data-look="2"] .w-desc.collapsed:hover { box-shadow: var(--shadow-2); }
+[data-look="2"] :is(#popup, .dlg) { border-radius: 18px; box-shadow: var(--shadow-2); }
+/* cards: titles a touch bolder, the picture lifts under the pointer */
+[data-look="2"] .card .thumb, [data-look="2"] .card .th { transition: transform .25s var(--e-out), box-shadow .25s; }
+[data-look="2"] .card:hover .thumb, [data-look="2"] .card:hover .th { transform: translateY(-2px); box-shadow: var(--shadow-2); }
