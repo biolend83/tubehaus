@@ -142,8 +142,10 @@ class MpvPlayer : VideoPlayer {
             o("cache", "yes"); o("cache-secs", "300"); o("demuxer-readahead-secs", "300")
             o("demuxer-max-bytes", "150MiB"); o("demuxer-max-back-bytes", "50MiB")
             o("sub-auto", "no"); o("sub-font-size", "42")
-            // captions as on YouTube: white on a see-through black box behind each line (mpv 0.38+; before that, an outline)
-            box = o("sub-border-style", "opaque-box") >= 0
+            // captions as on YouTube: white on one see-through black box behind the lines (background-box; a box per
+            // line overlaps the next one where two lines meet), else a box per line (opaque-box), else an outline
+            boxStyle = if (o("sub-border-style", "background-box") >= 0) "background-box" else "opaque-box"
+            box = boxStyle == "background-box" || o("sub-border-style", "opaque-box") >= 0
             if (box) o("sub-shadow-offset", "0") else o("sub-border-size", "2.5")
             capOpts { k, v -> o(k, v) }
             o("audio-display", "no"); o("audio-client-name", "TubeHaus")
@@ -225,12 +227,20 @@ class MpvPlayer : VideoPlayer {
     @Volatile private var capStyle = Triple(100, 75, 0)
     /** this mpv draws a box behind captions (0.38+) */
     @Volatile private var box = true
+    @Volatile private var boxStyle = "opaque-box"
 
     private fun capOpts(o: (String, String) -> Unit) {
         val (size, bg, pos) = capStyle
         o("sub-scale", (size / 100.0).toString())
         if (box) {
-            if (bg > 0) { o("sub-border-style", "opaque-box"); o("sub-border-color", "#%02X080808".format(bg * 255 / 100)); o("sub-border-size", "6") }
+            if (bg > 0) {
+                val c = "#%02X080808".format(bg * 255 / 100)
+                o("sub-border-style", boxStyle); o("sub-back-color", c)
+                // background-box: the box is the back colour, the border an outline round the letters (none here)
+                o("sub-border-color", if (boxStyle == "background-box") "#00000000" else c)
+                // per line the padding stays under half the line gap, so neighbouring boxes don't overlap
+                o("sub-border-size", if (boxStyle == "background-box") "6" else "3")
+            }
             else { o("sub-border-style", "outline-and-shadow"); o("sub-border-color", "#FF000000"); o("sub-border-size", "2.5") }
         }
         o("sub-align-y", if (pos == 2) "top" else "bottom")
