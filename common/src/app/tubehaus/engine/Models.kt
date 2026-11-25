@@ -96,6 +96,9 @@ fun originalFirst(audio: List<Format>): List<Format> = when {
     else -> audio
 }
 
+/** YouTube's latencyClass ("MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_LOW") as "LOW"; null when there is none */
+fun latencyClass(s: String?): String? = s?.substringAfter("LATENCY_", "")?.takeIf { it.isNotEmpty() }
+
 data class Caption(val lang: String, val name: String, val url: String, val auto: Boolean)
 
 /** What the player needs. URLs expire after a few hours ([expiresAt], epoch seconds). */
@@ -117,6 +120,8 @@ data class Stream(
     val client: String,
     /** YouTube's storyboard spec: the small pictures shown over the seek bar while you drag it */
     val storyboard: String? = null,
+    /** a live stream's latency class from YouTube: "ULTRA_LOW" (1 s segments), "LOW" (2 s), "NORMAL" (5 s), or null */
+    val latency: String? = null,
 ) {
     fun asVideo() = Video(id, title, author, channelId, lengthSec, views = views, live = live)
 }
