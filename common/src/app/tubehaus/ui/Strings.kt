@@ -548,6 +548,8 @@ private val KO by lazy { mapOf(
     "Subscriptions, history and playlists from YouTube (Google Takeout), NewPipe, FreeTube, Invidious, TubeHaus or OPML" to
         "YouTube(Google 테이크아웃), NewPipe, FreeTube, Invidious, TubeHaus, OPML의 구독·기록·재생목록",
     "Theme" to "테마",
+    "Theater mode" to "극장 모드",
+    "The video across the window, everything else under it (T)" to "영상을 창 너비로 크게, 나머지는 그 아래에 (T)",
     "This channel won't be recommended" to "이 채널은 추천하지 않을게요",
     "This video can't be played" to "이 영상은 재생할 수 없어요",
     "Topics" to "주제",

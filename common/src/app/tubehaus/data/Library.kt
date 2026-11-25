@@ -167,6 +167,8 @@ data class Settings(
     val sideTab: String = "next",
     /** phones: the search box at the bottom, within reach of a thumb */
     val searchAtBottom: Boolean = false,
+    /** the desktop's theater mode: the video across the window, its details and the side panel under it (T) */
+    val theater: Boolean = false,
     /** under the video: 0 everything, 1 only the title, 2 nothing (just the player) */
     val underVideo: Int = 0,
     /** with "everything" under the video: the parts switched off one by one (see UNDER_PARTS) */

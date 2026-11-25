@@ -186,6 +186,8 @@ fun playerKey(app: AppState, key: Key, shift: Boolean = false): Boolean {
         Key.J -> seekBy(-10)
         Key.L -> seekBy(10)
         Key.F -> app.setFull(!app.fullscreen)
+        // theater mode, as on YouTube: the desktop only (a tablet's and a phone's page has no side panel to move)
+        Key.T -> if (!app.platform.touch && !app.platform.tv) app.store.settings.update { it.copy(theater = !it.theater) } else return false
         Key.M -> if (player.hasVolume) player.setMuted(!st.muted) else return false
         Key.DirectionUp -> if (player.hasVolume) volumeBy(0.05f) else return false
         Key.DirectionDown -> if (player.hasVolume) volumeBy(-0.05f) else return false

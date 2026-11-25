@@ -61,6 +61,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -129,8 +130,13 @@ fun WatchScreen(app: AppState) {
             if (wide) { side = "transcript"; transcriptOpen = true } else { commentsOpen = false; transcriptOpen = true }
         }
         if (wide) {
+            // theater mode (the desktop, T): the video across the window on black, all the rest under it (#119)
+            val theater = set.theater && !tablet
+            val tallest = maxHeight * 0.78f
+            Column(Modifier.fillMaxSize()) {
+            if (theater) Box(Modifier.fillMaxWidth().heightIn(max = tallest).background(Color.Black), contentAlignment = Alignment.Center) { PlayerBox(app) }
             // tablets and the desktop: the video and its details on the left; up next or the comments on the right
-            Row(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth().weight(1f)) {
                 if (tablet) {
                     // tablets: the video as large as the screen allows, with only its title under it;
                     // the description, buttons and channel move into the panel (Details)
@@ -141,7 +147,7 @@ fun WatchScreen(app: AppState) {
                     }
                 } else {
                     LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp)) {
-                        item { Box(Modifier.clip(RoundedCornerShape(20.dp))) { PlayerBox(app) } }
+                        if (!theater) item { Box(Modifier.clip(RoundedCornerShape(20.dp))) { PlayerBox(app) } }
                         under(app, v, flush = true)
                     }
                 }
@@ -169,6 +175,7 @@ fun WatchScreen(app: AppState) {
                         }
                     }
                 }
+            }
             }
         } else {
             // phones: pull the video down and the whole page follows the finger, shrinking toward the
