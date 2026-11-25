@@ -27,6 +27,8 @@ import app.tubehaus.ui.AppState
 import app.tubehaus.ui.Platform
 import app.tubehaus.ui.Screen
 import app.tubehaus.ui.playerKey
+import app.tubehaus.ui.playerSpeedChar
+import androidx.compose.ui.input.key.utf16CodePoint
 import java.awt.Desktop
 import java.awt.FileDialog
 import java.awt.Point
@@ -201,13 +203,16 @@ private fun startApp() {
     val bundled = System.getProperty("compose.application.resources.dir") ?: File("resources/windows").absolutePath
     System.setProperty("jna.library.path", if (isMac) "$bundled:/opt/homebrew/lib:/usr/local/lib:/opt/local/lib" else bundled)
     val platform = DesktopPlatform()
-    // what nothing else plays: SABR from a hidden Edge or Chrome page, its formats kept in the cache while they play
-    if (BrowserSabr.browser() != null) {
-        app.tubehaus.engine.Sabr.dir = File(platform.cacheDir.toString(), "sabr").apply { deleteRecursively() }
-        app.tubehaus.engine.Sabr.host = BrowserSabr(File(platform.cacheDir.toString(), "sabr-browser"))
-        app.tubehaus.engine.YouTube.prewarm(4_000)
-        app.tubehaus.engine.Sabr.only = System.getenv("TUBEHAUS_SABR_ONLY") != null
-    }
+    // what nothing else plays: SABR in a small JavaScript engine of the app's own (QuickJS, no browser), its formats
+    // kept in the cache while they play. TUBEHAUS_SABR=browser: the way before, a hidden Edge or Chrome page.
+    app.tubehaus.engine.Sabr.dir = File(platform.cacheDir.toString(), "sabr").apply { deleteRecursively() }
+    app.tubehaus.engine.Sabr.host = if (System.getenv("TUBEHAUS_SABR") == "browser" && BrowserSabr.browser() != null)
+        BrowserSabr(File(platform.cacheDir.toString(), "sabr-browser"))
+    // QuickJS, and the browser page where QuickJS can't run on this machine
+    else app.tubehaus.engine.Fallback(app.tubehaus.engine.JsSabr({ name -> DesktopPlatform::class.java.getResourceAsStream("/$name")?.use { it.readBytes().decodeToString() } },
+        File(platform.cacheDir.toString(), "sabr-js"))) { if (BrowserSabr.browser() != null) BrowserSabr(File(platform.cacheDir.toString(), "sabr-browser")) else null }
+    app.tubehaus.engine.YouTube.prewarm(4_000)
+    app.tubehaus.engine.Sabr.only = System.getenv("TUBEHAUS_SABR_ONLY") != null
     val state = AppState(platform, Store(platform.dataDir))
     // macOS Control Center and the media keys: what plays and its buttons
     MacMediaControls(state, File(platform.cacheDir.toString(), "nowplaying")).start()
@@ -258,7 +263,9 @@ private fun startApp() {
                         platform.tv -> false
                         state.current is Screen.Shorts -> state.shortsKeys?.invoke(e.key) ?: false
                         state.fullscreen || state.current is Screen.Watch ->
-                            !e.isCtrlPressed && !e.isMetaPressed && !e.isAltPressed && playerKey(state, e.key, e.isShiftPressed)
+                            // < and > by the character (an AZERTY or AltGr layout puts them elsewhere), then the keys by place
+                            playerSpeedChar(state, e.utf16CodePoint) ||
+                                !e.isCtrlPressed && !e.isMetaPressed && !e.isAltPressed && playerKey(state, e.key, e.isShiftPressed)
                         else -> false
                     }
                 }

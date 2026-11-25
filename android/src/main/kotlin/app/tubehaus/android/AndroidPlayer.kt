@@ -296,7 +296,8 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
                     .setArtworkUri(opts.artwork.takeIf { it.isNotEmpty() }?.let(Uri::parse)).build(),
             )
         if (s.live || s.video.isEmpty()) {
-            b.setUri(s.hls).setMimeType(MimeTypes.APPLICATION_M3U8)
+            // a downloaded video: one file, opened as it is
+            if (s.hls?.startsWith("file:") == true) b.setUri(s.hls) else b.setUri(s.hls).setMimeType(MimeTypes.APPLICATION_M3U8)
             // close to the edge: 8 s behind it (two segments), and a little faster or slower to stay there
             if (s.live) b.setLiveConfiguration(MediaItem.LiveConfiguration.Builder()
                 .setTargetOffsetMs(8_000).setMinOffsetMs(5_000).setMinPlaybackSpeed(0.97f).setMaxPlaybackSpeed(1.03f).build())

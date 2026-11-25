@@ -63,12 +63,15 @@ data class Format(
     val audioTrackName: String? = null,
     val audioDefault: Boolean = true,
     val drc: Boolean = false,
+    /** the format's xtags as text ("acont=original:lang=en-US"): kept for the formats served from this device (SABR), whose URLs don't carry them */
+    val xtags: String? = null,
 ) {
     val isVideo get() = mime.startsWith("video")
     /** the audio track's language ("ko", "en-US"), from its id ("ko.4"); null when the video has one track */
     val audioLang: String? get() = audioTrack?.substringBefore('.')?.takeIf { it.isNotEmpty() }
     /** what YouTube says the audio track is: "original", "dubbed-auto", "dubbed", "descriptive"... (xtags in the stream URL) */
-    val audioContent: String? get() = Regex("acont(?:=|%3D)([a-z-]+)", RegexOption.IGNORE_CASE).find(url)?.groupValues?.get(1)?.lowercase()
+    val audioContent: String? get() = Regex("acont(?:=|%3D)([a-z-]+)", RegexOption.IGNORE_CASE).let { r -> r.find(url) ?: xtags?.let { r.find(it) } }
+        ?.groupValues?.get(1)?.lowercase()
     val codecFamily: String
         get() = when {
             codecs.startsWith("av01") -> "av1"
@@ -85,9 +88,13 @@ data class Format(
  * the request's language (English) as its default, so a Korean video started in an auto-dubbed
  * English; the stream URLs say which track is the original.
  */
-fun originalFirst(audio: List<Format>): List<Format> =
-    if (audio.none { it.audioContent == "original" }) audio
-    else audio.map { it.copy(audioDefault = it.audioContent == "original") }
+fun originalFirst(audio: List<Format>): List<Format> = when {
+    audio.any { it.audioContent == "original" } -> audio.map { it.copy(audioDefault = it.audioContent == "original") }
+    // no tags at all: a track id ending in .4 is the original ("en-US.4"), the dubs end in .3
+    audio.any { it.audioTrack?.endsWith(".4") == true } && audio.any { it.audioTrack?.endsWith(".3") == true } ->
+        audio.map { it.copy(audioDefault = it.audioTrack?.endsWith(".4") == true) }
+    else -> audio
+}
 
 data class Caption(val lang: String, val name: String, val url: String, val auto: Boolean)
 
