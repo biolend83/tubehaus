@@ -46,6 +46,7 @@ final class PlayerModel {
     private let layers = NSHashTable<CaptionLayer>.weakObjects()
     @ObservationIgnored private var tick: Any?
     @ObservationIgnored private var status: NSKeyValueObservation?
+    @ObservationIgnored private var audioStatus: NSKeyValueObservation?
     @ObservationIgnored private var endObserver: NSObjectProtocol?
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var captionTask: Task<Void, Never>?
@@ -173,7 +174,10 @@ final class PlayerModel {
         MusicPlayer.shared.stop()
         let item = AVPlayerItem(asset: Server.shared.asset(url))
         item.externalMetadata = [meta(.commonIdentifierTitle, v.title), meta(.iTunesMetadataTrackSubTitle, v.author)]
+        let originalAudio = Settings.originalAudio
+        player.appliesMediaSelectionCriteriaAutomatically = !originalAudio
         player.replaceCurrentItem(with: item)
+        if originalAudio { pickOriginalAudio(item, language: s.originalAudioLanguage) }
         let at = Library.shared.resumeAt(v.id, length: v.lengthSec)
         if at > 0 { player.seek(to: CMTime(seconds: at, preferredTimescale: 600)) }
         last = at
@@ -189,6 +193,31 @@ final class PlayerModel {
         loadCaptions()
         loadGlance(s.captions, length: Double(v.lengthSec))
         menu()
+    }
+
+    /// Choose once when the list is ready, so the listener can still change tracks in the player.
+    private func pickOriginalAudio(_ item: AVPlayerItem, language: String?) {
+        audioStatus = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
+            guard item.status == .readyToPlay else { return }
+            Task { @MainActor in
+                guard let self, self.player.currentItem === item, self.audioStatus != nil else { return }
+                self.audioStatus = nil
+                guard let group = try? await item.asset.loadMediaSelectionGroup(for: .audible),
+                      self.player.currentItem === item else { return }
+                let original = group.options.first { $0.displayName.lowercased().hasSuffix(" - original") }
+                let tag = language?.lowercased()
+                let exact = tag.flatMap { tag in group.options.first { $0.extendedLanguageTag?.lowercased() == tag } }
+                let matches = tag.map { tag in
+                    group.options.filter {
+                        $0.extendedLanguageTag?.lowercased().split(separator: "-").first
+                            == tag.split(separator: "-").first
+                    }
+                } ?? []
+                if let option = original ?? exact ?? (matches.count == 1 ? matches.first : nil) ?? group.defaultOption {
+                    item.select(option, in: group)
+                }
+            }
+        }
     }
 
     /// the words and moments under the video, from a track in the TV's language (one made by people
@@ -250,6 +279,7 @@ final class PlayerModel {
     /// the video before (if any) is done with: remember it and learn from it
     private func leave() {
         sponsorBlock.close()
+        audioStatus = nil
         guard let v = video else { return }
         let t = player.currentTime().seconds
         if t.isFinite && t > 0 { last = t }

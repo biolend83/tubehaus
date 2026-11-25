@@ -344,6 +344,11 @@ enum Settings {
         set { UserDefaults.standard.set(newValue, forKey: "autoplayNext") }
     }
 
+    static var originalAudio: Bool {
+        get { UserDefaults.standard.object(forKey: "originalAudio") == nil || UserDefaults.standard.bool(forKey: "originalAudio") }
+        set { UserDefaults.standard.set(newValue, forKey: "originalAudio") }
+    }
+
     static var sponsorBlock: Bool {
         get { UserDefaults.standard.object(forKey: "sponsorBlock") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "sponsorBlock") }

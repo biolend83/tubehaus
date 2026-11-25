@@ -657,6 +657,7 @@ struct SettingsView: View {
     @State private var hideComments = Settings.hideComments
     @State private var hideRelated = Settings.hideRelated
     @State private var autoplay = Settings.autoplayNext
+    @State private var originalAudio = Settings.originalAudio
     @State private var sponsorBlock = Settings.sponsorBlock
     @State private var autoSkip = Settings.sponsorBlockCategories
     @State private var glance = Settings.glance
@@ -715,6 +716,7 @@ struct SettingsView: View {
 
                 group("Playback")
                 toggle("Autoplay", "Play the next video when one ends", $autoplay) { Settings.autoplayNext = $0 }
+                toggle("Original audio", "Start videos in their original language when available", $originalAudio) { Settings.originalAudio = $0 }
                 toggle("Video at a glance", "Key words and moments under a video, made on this TV from its captions", $glance) { Settings.glance = $0 }
                 item("Captions", captions.isEmpty ? "Off" : name(language: captions)) { dialog = .captions }
                 item("Caption size", ["Small", "Medium", "Large"][max(0, min(2, captionSize))]) { dialog = .captionSize }
