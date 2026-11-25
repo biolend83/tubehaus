@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "builds common/sabr/sabr-lite.js (see build.mjs); test.mjs plays one video's sound through it in QuickJS",
+  "dependencies": {
+    "bgutils-js": "4.0.3",
+    "googlevideo": "5.0.1",
+    "jsdom": "31.0.1",
+    "web-streams-polyfill": "4.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "quickjs-emscripten-core": "0.31.0",
+    "@jitl/quickjs-ng-wasmfile-release-sync": "0.31.0"
+  }
+}

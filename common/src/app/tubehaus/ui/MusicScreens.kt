@@ -773,7 +773,7 @@ private fun NowTabs(at: Int, pick: (Int) -> Unit) {
     val c = MaterialTheme.colorScheme
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.onBackground.copy(alpha = 0.07f)).padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        for ((i, n) in listOf(tr("Up next"), tr("Lyrics")).withIndex()) {
+        for ((i, n) in listOf(tr("Next songs"), tr("Lyrics")).withIndex()) {
             val on = i == at
             Box(Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(16.dp)).background(if (on) c.background else Color.Transparent)
                 .tvClickable(RoundedCornerShape(16.dp)) { pick(i) }, contentAlignment = Alignment.Center) {

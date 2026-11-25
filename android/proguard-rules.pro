@@ -11,3 +11,6 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# V8 (thv8.cc) calls these back by name: call, callAsync, settled
+-keep class app.tubehaus.android.V8Runtime { *; }

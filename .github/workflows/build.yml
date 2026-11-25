@@ -110,7 +110,8 @@ jobs:
             TubeHaus-*.zip
 
   linux:
-    # the system's libmpv (libmpv2 / mpv-libs) is used, nothing is bundled
+    # the packages use the system's libmpv; where there is none the app downloads libmpv-linux-<arch>.tar.gz
+    # (libmpv and what it needs, packaging/linux/bundle-mpv.sh) from the release once
     strategy:
       fail-fast: false
       matrix:
@@ -125,6 +126,12 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - name: libmpv for download
+        run: |
+          sudo apt-get update && sudo apt-get install -y libmpv2 patchelf
+          bash packaging/linux/bundle-mpv.sh "$RUNNER_TEMP/libmpv"
+          tar -C "$RUNNER_TEMP/libmpv" -czf "libmpv-linux-${{ matrix.tar }}.tar.gz" .
+          ls -la libmpv-linux-*.tar.gz
       - name: Build .deb, .rpm and .tar.gz
         run: |
           sudo apt-get install -y rpm
@@ -137,7 +144,7 @@ jobs:
           tar -C "$(dirname "$app")" -czf "TubeHaus-$ver-linux-${{ matrix.tar }}.tar.gz" "$(basename "$app")"
           ls -la TubeHaus-*
       - name: Build .AppImage
-        # one file to download, make executable and run; like the tar.gz it uses the system's libmpv
+        # one file to download, make executable and run; libmpv as for the other packages
         continue-on-error: true
         run: |
           ver=$(sed -n 's/^app.version=//p' gradle.properties)
@@ -162,6 +169,7 @@ jobs:
             TubeHaus-*.rpm
             TubeHaus-*.tar.gz
             TubeHaus-*.AppImage
+            libmpv-linux-*.tar.gz
 
   mac:
     # libmpv and the libraries it needs are copied into the app from Homebrew, rewired to load from there,

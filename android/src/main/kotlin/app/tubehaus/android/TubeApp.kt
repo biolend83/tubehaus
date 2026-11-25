@@ -1,5 +1,7 @@
 package app.tubehaus.android
 
+import app.tubehaus.engine.JsSabr
+import app.tubehaus.engine.Fallback
 import app.tubehaus.engine.YouTube
 import app.tubehaus.cast.Lan as NearLan
 import android.os.Build
@@ -61,9 +63,19 @@ class AndroidPlatform(private val app: Application) : Platform {
     // the TV client's locked links (videos made for kids...): opened by yt-dlp's solver in a hidden WebView
     init {
         Cipher.solver = WebSolver(app)
-        // what nothing else plays: SABR from a hidden page on www.youtube.com, its formats kept in the cache while they play
+        // what nothing else plays: SABR (BotGuard and the n solver in a hidden page), its formats kept in the cache while they play
         Sabr.dir = java.io.File(app.cacheDir, "sabr").apply { deleteRecursively() }
-        Sabr.host = WebSabr(app)
+        // V8 with its JIT where the app carries it (arm64): no WebView, and faster than one; else the hidden WebView
+        // (QuickJS only interprets, many times slower on a phone); QuickJS where neither is there
+        val load = { name: String -> runCatching { app.assets.open(name).use { it.readBytes().decodeToString() } }.getOrNull() }
+        val cache = java.io.File(app.cacheDir, "sabr-js")
+        val web = runCatching { android.webkit.WebView.getCurrentWebViewPackage() != null }.getOrDefault(false)
+        val lite = runCatching { app.assets.open("sabr-lite.js").close() }.isSuccess
+        Sabr.host = when {
+            lite && V8Runtime.available -> Fallback(JsSabr(load, cache) { V8Runtime(it, 512) }) { if (web) WebSabr(app) else JsSabr(load, cache) }
+            web || !lite -> WebSabr(app)
+            else -> JsSabr(load, cache)
+        }
         YouTube.prewarm(4_000)
         Sabr.only = runCatching {
             app.packageManager.getApplicationInfo(app.packageName, PackageManager.GET_META_DATA).metaData?.get("tubehaus.sabrOnly")?.toString() == "true"

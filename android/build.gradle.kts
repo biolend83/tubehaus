@@ -24,12 +24,27 @@ android {
         // the test build installs beside the real app: its own id and name
         manifestPlaceholders["appLabel"] = if (sabrOnly == "true") "TubeHaus-test" else "TubeHaus"
         if (sabrOnly == "true") applicationIdSuffix = ".test"
+        // -Parm64=true: an APK for 64-bit ARM phones only (most phones; much smaller)
+        if (findProperty("arm64") == "true") ndk.abiFilters += "arm64-v8a"
+    }
+    // the same build with its native libraries compressed in the APK (smaller to send; unpacked once at install)
+    if (findProperty("arm64") == "true") packaging.jniLibs.useLegacyPackaging = true
+    defaultConfig {
+    }
+
+    // V8 for the SABR engine (arm64): built only when android/v8 holds the v8-build branch's library
+    if (file("v8/lib/libv8_monolith.a").exists()) {
+        ndkVersion = "28.2.13676358"
+        defaultConfig.externalNativeBuild.cmake { arguments += "-DANDROID_STL=c++_static"; abiFilters += "arm64-v8a" }
+        externalNativeBuild.cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" }
     }
 
     // The shared code (engine, library, screens) is compiled into this module as plain sources.
     sourceSets["main"].java.srcDirs("src/main/kotlin", "../common/src", "../common/jvm")
     // Pretendard, the type face of the web app 1.0 (one copy for every platform: common/fonts)
     sourceSets["main"].assets.srcDirs("../common/fonts", "../common/ejs", "../common/sabr")
+    // not common/sabr/lite: the sources sabr-lite.js is built from (and its node_modules)
+    androidResources.ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!lite"
 
     signingConfigs {
         // the release key lives outside the repository; without it the APK is signed with the debug key
@@ -103,6 +118,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // QuickJS, the JavaScript engine SABR can run in without a WebView (JsSabr)
+    implementation("io.github.dokar3:quickjs-kt:1.0.5")
     implementation("io.coil-kt.coil3:coil-compose:3.2.0")
     implementation("com.squareup.okio:okio:3.10.2")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.2.0")

@@ -95,7 +95,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "1.8.0"
+const val VERSION = "2.0.0"
 
 /** Settings' categories, as cards on its first page: key, icon, title, what is inside */
 private class Cat(val key: String, val icon: Symbol, val title: String, val sub: String)
@@ -489,6 +489,8 @@ private fun SettingsRows(
         r.row("player", tr("Most replayed") + " heatmap") { Toggle(tr("Most replayed"), tr("A wave over the seek bar shows the parts people watch again"), s.heatmap) { b -> set { it.copy(heatmap = b) } } }
         if (android) r.row("player", tr("Ambient mode")) {
             Toggle(tr("Ambient mode"), tr("In the dark theme, the video's colours glow softly around it"), s.ambient) { b -> set { it.copy(ambient = b) } }
+            if (!app.platform.touch && !app.platform.tv)
+                Toggle(tr("Theater mode"), tr("The video across the window, everything else under it (T)"), s.theater) { b -> set { it.copy(theater = b) } }
         }
         if (android) r.row("player", tr("Background play")) {
             Toggle(tr("Background play"), tr("Keep playing with the screen off or in another app"), s.backgroundPlay) { b -> set { it.copy(backgroundPlay = b) } }

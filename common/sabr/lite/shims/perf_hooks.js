@@ -1,0 +1,1 @@
+export const performance = globalThis.performance; export class PerformanceObserver { observe(){} disconnect(){} } export class PerformanceEntry {} export class PerformanceObserverEntryList {} export default { performance };
