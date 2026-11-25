@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "2.0.0",
+          "buildVersion": "56",
+          "date": "2026-11-25T07:18:58+00:00",
+          "localizedDescription": "2.0.0: original audio for dubbed videos, theater mode, smoother playback.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v2.0.0/TubeHaus-2.0.0-ipad.ipa",
+          "size": 22484532,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "1.8.0",
           "buildVersion": "55",
           "date": "2026-11-23T07:11:19+00:00",
@@ -293,11 +302,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "1.8.0",
-      "versionDate": "2026-11-23T07:11:19+00:00",
-      "versionDescription": "1.8.0: faster start, better live, music synced with your server.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v1.8.0/TubeHaus-1.8.0-ipad.ipa",
-      "size": 22395510
+      "version": "2.0.0",
+      "versionDate": "2026-11-25T07:18:58+00:00",
+      "versionDescription": "2.0.0: original audio for dubbed videos, theater mode, smoother playback.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v2.0.0/TubeHaus-2.0.0-ipad.ipa",
+      "size": 22484532
     }
   ],
   "news": [],
