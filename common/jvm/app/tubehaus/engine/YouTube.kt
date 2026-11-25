@@ -270,8 +270,29 @@ object YouTube {
             audioTrackName = f.at("audioTrack.displayName").str,
             audioDefault = f.at("audioTrack.audioIsDefault").str?.let { it == "true" } ?: true,
             drc = f.at("isDrc").bool,
+            xtags = f.at("xtags").str?.let(::xtags),
         )
     }
+
+    /** the format's "xtags" (url-safe base64 of key/value pairs) as "acont=original:lang=en-US"; null when unreadable */
+    private fun xtags(b64: String): String? = runCatching {
+        val b = java.util.Base64.getUrlDecoder().decode(b64.trimEnd('='))
+        var i = 0
+        fun varint(): Int { var r = 0; var sh = 0; while (true) { val x = b[i++].toInt() and 0xff; r = r or ((x and 0x7f) shl sh); if (x < 0x80) return r; sh += 7 } }
+        fun str(end: Int): Map<Int, String> {
+            val m = HashMap<Int, String>()
+            while (i < end) { val tag = varint(); if (tag and 7 != 2) return m; val n = varint(); m[tag shr 3] = String(b, i, n, Charsets.UTF_8); i += n }
+            return m
+        }
+        val out = ArrayList<String>()
+        while (i < b.size) {
+            val tag = varint(); if (tag and 7 != 2) break
+            val n = varint(); val end = i + n
+            val kv = str(end); i = end
+            if (tag shr 3 == 1 && kv[1] != null) out += kv[1] + "=" + (kv[2] ?: "")
+        }
+        out.joinToString(":").ifEmpty { null }
+    }.getOrNull()
 
     // ------------------------------------------------------------------ watch page
     suspend fun details(id: String): Details {
