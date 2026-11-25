@@ -58,6 +58,8 @@ const MP = { queue: [], i: -1, orig: null, shuffle: false, repeat: local.get("mu
   radioFor: "", lyrics: null, lyricsFor: "", tab: local.get("music.tab", "queue"), open: false };
 const cur = () => MP.queue[MP.i];
 let seq = 0;
+// an iPad says it is a Mac; its touch screen gives it away
+const APPLE_TOUCH = IPHONE || /iPad/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
 async function engine() {
   if (MP.sp) return MP.sp;
@@ -149,7 +151,9 @@ async function start(i, { at = 0 } = {}) {
   setTimeout(() => songOf(MP.queue[MP.i + 1]), 3000);
   store.push("recent", slim(s), 80);
   if (MP.tab === "lyrics" && MP.open) loadLyrics();
-  const plain = IPHONE || !(window.MediaSource || window.ManagedMediaSource);
+  // iPhone and iPad: the plain file. Their MediaSource stops taking pieces when the screen is off or the app is
+  // in the background, and then the song never ends: no next song, and the time runs on past its length in silence
+  const plain = APPLE_TOUCH || !(window.MediaSource || window.ManagedMediaSource);
   if (plain) { MP.direct = ""; return direct(s, at); }
   try {
     const sp = await engine();
@@ -515,6 +519,9 @@ function paintQueue(force = false) {
 let lastPos = 0;
 audio.addEventListener("timeupdate", () => {
   const d = audio.duration || cur()?.len || 0, t = audio.currentTime;
+  // past the song's own length and still going (a stream that never says it ended): the next song, once
+  const len = cur()?.len || 0;
+  if (len > 0 && t > len + 8 && MP.overran !== cur()?.id + MP.i) { MP.overran = cur()?.id + MP.i; next(true); return; }
   const bar = $("#mbar");
   if (bar) {
     $(".mb-prog i", bar).style.width = d ? (t / d) * 100 + "%" : "0";
