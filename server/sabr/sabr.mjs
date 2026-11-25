@@ -90,13 +90,16 @@ async function solverReady() {
   vm.runInContext(lib + ";var meriyah=lib.meriyah,astring=lib.astring;" + core, solverCtx);
   return solverCtx;
 }
+// the TV player first: since 2026-11 the main web player (player_ias) can't be solved outside a browser
+// ("a.addOnDisposeCallback is not a function"), its TV and es6 builds still can; then the page's own
 async function solveN(url, jsUrl) {
-  try { return await solveWith(url, jsUrl); } catch (e) {
-    // the page may name a variant of the player script the solver does not read (e.g. _tcl): the main one of the same player
-    const id = (jsUrl || "").match(/\/s\/player\/(\w+)\//)?.[1];
-    if (!id) throw e;
-    return await solveWith(url, `/s/player/${id}/player_ias.vflset/en_US/base.js`);
+  const id = (jsUrl || "").match(/\/s\/player\/(\w+)\//)?.[1];
+  if (!id) return await solveWith(url, jsUrl);
+  let err;
+  for (const u of [`/s/player/${id}/tv-player-ias.vflset/tv-player-ias.js`, `/s/player/${id}/player_es6.vflset/en_US/base.js`, jsUrl]) {
+    try { return await solveWith(url, u); } catch (e) { err = e; players.delete(u); }
   }
+  throw err;
 }
 async function solveWith(url, jsUrl) {
   const u = new URL(url), n = u.searchParams.get("n");
