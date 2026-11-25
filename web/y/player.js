@@ -397,7 +397,7 @@ export class Player {
     let x = rel ? v.currentTime + t : t;
     x = Math.max(lo, Math.min(hi - (this.live ? 0 : 0.2), x));
     v.currentTime = x;
-    if (this.ended && x < hi - 1) { this.hideEnd(); }
+    if (this.ended && x < hi - 1) { this.hideEnd(); this.ended = false; this.root.classList.remove("ended"); this.setIcons(); }
     this.showCtl();
   }
   range() {
@@ -842,7 +842,7 @@ export class Player {
   // ------------------------------------------------------------ video events
   bindVideo() {
     const v = this.video, r = this.root;
-    v.addEventListener("play", () => { r.classList.remove("paused"); this.setIcons(); this.autoHide(); });
+    v.addEventListener("play", () => { r.classList.remove("paused"); if (this.ended) { this.ended = false; r.classList.remove("ended"); } this.setIcons(); this.autoHide(); });
     v.addEventListener("pause", () => { r.classList.add("paused"); this.setIcons(); this.showCtl(true); this.on.progress?.(true); });
     v.addEventListener("playing", () => {
       this.setBuffering(false); r.classList.remove("poster"); this.hideErr();
