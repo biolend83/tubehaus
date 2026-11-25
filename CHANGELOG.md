@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.0.0 — 2026-11-25
+
+### Added
+- **iOS Studio client** (`IOS_PRODUCER`) between VISIONOS and ANDROID_VR: whole videos in H.264/AAC up to 1080p when the first one refuses
+- **A lighter web look:** rounded, raised buttons, chips and search field, a frosted top bar, and frosted player menus with smoother motion and switches; the colours stay as they were
+- Older TV browsers (Chromium 85, 2022 Samsung TVs): the stylesheets are rewritten on the fly where they use `color-mix()`, `:is()`, `aspect-ratio` or `dvh`, so pages look right there too (#106)
+
+### Changed
+- The `n` and signature are solved with YouTube's TV player first: the main player's solver broke this week
+- The browser tab's title follows the page (search, channel, playlist), instead of keeping the last video's
+
+### Fixed
+- **Original audio:** a dub that YouTube marks as the default (the one in the request's language, Korean for a Korean interface) no longer counts as the original; SABR formats read the track from the format's own tags. Web playback and downloads start in the original language
+- SponsorBlock: jumping into a segment shows the Skip button instead of skipping it at once (#118)
+- Replay turns the play button back to pause; seeking back after the end and pressing play continues there instead of starting over
+- Music in the iPhone/iPad home-screen app: the next song plays with the screen off, and the time no longer runs past the song's length
+- Downloads take the original audio track; the version shows at the end of the menu
+
 ## v1.8.0 — 2026-11-23
 
 ### Added
