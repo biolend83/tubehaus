@@ -3559,7 +3559,7 @@ def eng_video(vid, hl="", gl="", fast=False):
         "authorVerified": "VERIFIED" in json.dumps(owner.get("badges") or []), "authorThumbnails": _athumbs(owner.get("thumbnail")),
         "subCountText": re.sub(r"(?i)\s*(subscribers?|구독자|명)\s*", "", subs_text).strip(),
         "lengthSeconds": int(vd.get("lengthSeconds") or 0), "allowRatings": bool(vd.get("allowRatings", True)), "rating": 0,
-        "isListed": not meta.get("isUnlisted"), "liveNow": bool(vd.get("isLive")), "isPostLiveDvr": bool(vd.get("isPostLiveDvr")),
+        "isListed": not meta.get("isUnlisted"), "liveNow": bool(vd.get("isLive")), "isPostLiveDvr": bool(vd.get("isPostLiveDvr")), "latencyClass": vd.get("latencyClass"),
         "isUpcoming": bool(vd.get("isUpcoming")),
         "dashUrl": "%s/api/manifest/dash/id/%s" % (PUBLIC, vid),
         "adaptiveFormats": adaptive, "formatStreams": muxed,
