@@ -860,6 +860,25 @@ private fun ServerDialog(app: AppState, close: () -> Unit) {
                 Text(tr("If the server asks for a login:"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
                 OutlinedTextField(user, { user = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(tr("User name")) })
                 PasswordField(app, pass, { pass = it }, Modifier.fillMaxWidth().padding(top = 4.dp))
+                val live = app.store.settings.state.collectAsState().value
+                Text(tr("Custom certificates (internal / local SSL):"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
+                Text(tr("{n} certificate(s) trusted for this server").replace("{n}", live.serverCerts.size.toString()),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp))
+                Row(Modifier.padding(top = 4.dp)) {
+                    TextButton(onClick = {
+                        app.platform.openTextFile { text ->
+                            if (text != null && text.isNotBlank()) {
+                                app.store.settings.update { it.copy(serverCerts = it.serverCerts + text) }
+                                app.toast(tr("Certificate added"))
+                            }
+                        }
+                    }) { Text(tr("Add certificate")) }
+                    if (live.serverCerts.isNotEmpty()) TextButton(onClick = {
+                        app.store.settings.update { it.copy(serverCerts = emptyList()) }
+                        app.toast(tr("Certificates cleared"))
+                    }) { Text(tr("Clear")) }
+                }
                 Text(tr("Or, for single sign-on (Authentik, ...) or to type nothing here:"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
                 val b = browser
                 if (b == null) {
