@@ -1,16 +1,33 @@
 package app.tubehaus.ios
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.ComposeUIViewController
 import app.tubehaus.data.Store
 import app.tubehaus.engine.Engine
@@ -21,6 +38,7 @@ import app.tubehaus.ui.Screen
 import kotlinx.coroutines.launch
 import app.tubehaus.ui.App
 import app.tubehaus.ui.AppState
+import app.tubehaus.ui.playerKey
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 import platform.Foundation.NSProcessInfo
@@ -71,10 +89,31 @@ fun MainViewController(hideBars: (Boolean) -> Unit): UIViewController {
         // the strip behind them takes the theme's background
         val dark = when (settings.dark) { 1 -> false; 2, 3 -> true; else -> isSystemInDarkTheme() }
         val edge = when { settings.dark == 3 -> Color.Black; dark -> Color(0xFF0F0F0F); else -> Color.White }
-        Box(Modifier.fillMaxSize().background(edge).let { if (state.fullscreen) it else it.windowInsetsPadding(WindowInsets.safeDrawing) }) {
+        // an iPad's keyboard reaches Compose only through what has the focus, and a touch focuses nothing:
+        // the app holds the focus itself whenever nothing else (a search field) does
+        val keys = remember { FocusRequester() }
+        var focused by remember { mutableStateOf(false) }
+        LaunchedEffect(focused) { if (!focused) runCatching { keys.requestFocus() } }
+        Box(
+            Modifier.fillMaxSize().background(edge).let { if (state.fullscreen) it else it.windowInsetsPadding(WindowInsets.safeDrawing) }
+                .focusRequester(keys).onFocusChanged { focused = it.hasFocus }.focusable().onKeyEvent { keyboard(state, it) }
+        ) {
             App(state)
         }
     }.also { platform.root = it }
+}
+
+/**
+ * An iPad's keyboard: the player's keys (space, arrows, J/K/L, F, M) where a video is on screen, as on the
+ * desktop. Only what a focused search field leaves over
+ */
+private fun keyboard(state: AppState, e: KeyEvent): Boolean {
+    if (e.type != KeyEventType.KeyDown || e.isCtrlPressed || e.isMetaPressed || e.isAltPressed) return false
+    return when {
+        state.current is Screen.Shorts -> state.shortsKeys?.invoke(e.key) ?: false
+        state.fullscreen || state.current is Screen.Watch -> playerKey(state, e.key, e.isShiftPressed)
+        else -> false
+    }
 }
 
 private var app: AppState? = null
