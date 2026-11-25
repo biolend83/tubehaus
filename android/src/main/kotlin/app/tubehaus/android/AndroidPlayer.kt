@@ -298,9 +298,13 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         if (s.live || s.video.isEmpty()) {
             // a downloaded video: one file, opened as it is
             if (s.hls?.startsWith("file:") == true) b.setUri(s.hls) else b.setUri(s.hls).setMimeType(MimeTypes.APPLICATION_M3U8)
-            // close to the edge: 8 s behind it (two segments), and a little faster or slower to stay there
-            if (s.live) b.setLiveConfiguration(MediaItem.LiveConfiguration.Builder()
-                .setTargetOffsetMs(8_000).setMinOffsetMs(5_000).setMinPlaybackSpeed(0.97f).setMaxPlaybackSpeed(1.03f).build())
+            // close to the edge, as far behind it as the stream's segments allow (1 s in an ultra-low-latency one, 2 s in a
+            // low one, 5 s otherwise), and a little faster or slower to stay there
+            if (s.live) {
+                val (target, min) = when (s.latency) { "ULTRA_LOW" -> 3_000L to 2_000L; "LOW" -> 5_000L to 3_000L; else -> 8_000L to 5_000L }
+                b.setLiveConfiguration(MediaItem.LiveConfiguration.Builder()
+                    .setTargetOffsetMs(target).setMinOffsetMs(min).setMinPlaybackSpeed(0.97f).setMaxPlaybackSpeed(1.03f).build())
+            }
         } else {
             // the codec chosen in Settings first, then the best this phone decodes
             val order = if (opts.codec.isNotEmpty()) listOf(opts.codec) + codecs else codecs
