@@ -56,14 +56,11 @@ interface LibMpv : Library {
         const val RENDER_UPDATE_FRAME = 1L
 
         /**
-         * libmpv-2.dll next to the app on Windows; on Linux the libmpv inside the package (resources: libmpv.so.2 and
-         * its libraries), else the system's; on macOS the one inside the app, else Homebrew's (libmpv.2.dylib)
+         * libmpv-2.dll next to the app on Windows; on Linux the system's libmpv (libmpv.so.2), else the one the app
+         * downloaded (MpvDownload); on macOS the one inside the app, else Homebrew's (libmpv.2.dylib)
          */
         fun load(): LibMpv? {
-            // the bundled one by its full path, so a system libmpv of another version can't come first
-            val inside = System.getProperty("compose.application.resources.dir")?.let { java.io.File(it, "libmpv.so.2") }
-                ?.takeIf { it.isFile }?.absolutePath
-            for (name in listOfNotNull(inside, "mpv-2", "mpv", "libmpv.so.2", "libmpv.so.1", "libmpv.2.dylib")) {
+            for (name in listOfNotNull("mpv-2", "mpv", "libmpv.so.2", "libmpv.so.1", "libmpv.2.dylib", MpvDownload.lib?.absolutePath)) {
                 try {
                     return Native.load(name, LibMpv::class.java, mapOf(Library.OPTION_STRING_ENCODING to "UTF-8"))
                 } catch (e: UnsatisfiedLinkError) {
@@ -105,6 +102,8 @@ interface LibMpv : Library {
                 os.startsWith("Mac") && System.getProperty("os.arch") != "aarch64" ->
                     "mpv is missing: install it with MacPorts (sudo port install mpv) or Homebrew (brew install mpv), then open TubeHaus again"
                 os.startsWith("Mac") -> "mpv is missing: install it with Homebrew (brew install mpv), then open TubeHaus again"
+                MpvDownload.running -> MpvDownload.status.value ?: "Downloading mpv…"
+                MpvDownload.status.value != null -> MpvDownload.status.value!!
                 else -> "mpv is missing: install libmpv (Debian/Ubuntu: sudo apt install libmpv2, Fedora: sudo dnf install mpv-libs, Arch: mpv)"
             }
         }

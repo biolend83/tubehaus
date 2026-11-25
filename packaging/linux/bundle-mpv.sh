@@ -1,11 +1,11 @@
 #!/bin/bash
-# libmpv and the libraries it needs, copied into desktop/resources/linux (inside every Linux package) and set to
-# find each other there ($ORIGIN), so nothing has to be installed. Left to the system, as AppImages do: the C
+# libmpv and the libraries it needs, copied into one folder and set to find each other there ($ORIGIN): the
+# libmpv-linux-<arch>.tar.gz the app downloads once when the system has no libmpv (MpvDownload.kt). Left to the system, as AppImages do: the C
 # library, graphics (GL, Vulkan, X11, Wayland, DRM, VA-API, VDPAU), sound servers (ALSA, PulseAudio, PipeWire,
 # JACK) and fonts; those belong to the machine and its drivers. Where the bundled copy won't load (a system much
-# older than the build's), the app falls back to the system's libmpv.
+# older than the build's), the app says to install libmpv.
 set -euo pipefail
-out=${1:-desktop/resources/linux}
+out=$1
 src=${MPV_LIB:-}; [ -n "$src" ] || src=$(ldconfig -p | awk '/libmpv\.so\.2 /{print $NF; exit}')
 [ -n "$src" ] || { echo "no libmpv.so.2 (apt install libmpv2)"; exit 1; }
 mkdir -p "$out"

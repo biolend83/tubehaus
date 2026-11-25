@@ -81,7 +81,7 @@ compose.desktop {
                 packageVersion = "1." + appVersion.substringAfter('.')
                 project.layout.projectDirectory.file("icon.icns").asFile.takeIf { it.exists() }?.let { iconFile.set(it) }
             }
-            // Linux: libmpv inside too (resources/linux, filled by CI with packaging/linux/bundle-mpv.sh), else the system's
+            // Linux uses the system's libmpv, else the app downloads it once from the release (MpvDownload.kt)
             linux {
                 packageName = "tubehaus"
                 debMaintainer = "biolend83 <258010694+biolend83@users.noreply.github.com>"

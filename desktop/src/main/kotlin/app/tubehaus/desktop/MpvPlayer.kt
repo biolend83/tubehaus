@@ -7,6 +7,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -62,7 +66,8 @@ class MpvPlayer : VideoPlayer {
     private val st = MutableStateFlow(PlayerState())
     override val state: StateFlow<PlayerState> = st
 
-    private val lib = LibMpv.load()
+    /** null until there is a libmpv: on Linux without one it is downloaded once (MpvDownload) and loaded then */
+    private var lib by mutableStateOf(LibMpv.load())
     private var h: Pointer? = null
     private val lock = Any()
 
@@ -418,6 +423,16 @@ class MpvPlayer : VideoPlayer {
     private fun open(startMs: Long) {
         val s = stream ?: return
         if (mpv() == null) {
+            if (lib == null && MpvDownload.possible) {
+                // no libmpv on this Linux: fetch it, then open this video again
+                st.update { it.copy(error = null, buffering = true) }
+                MpvDownload.start { ok ->
+                    if (ok) lib = LibMpv.load()
+                    if (lib != null && stream === s) open(startMs)
+                    else st.update { it.copy(error = LibMpv.MISSING, buffering = false) }
+                }
+                return
+            }
             st.update { it.copy(error = LibMpv.MISSING, buffering = false) }
             return
         }
@@ -550,8 +565,9 @@ class MpvPlayer : VideoPlayer {
     @Composable
     override fun View(modifier: Modifier) {
         if (!available) {
+            val downloading by MpvDownload.status.collectAsState()
             Box(modifier.background(Color.Black), contentAlignment = Alignment.Center) {
-                Text(LibMpv.MISSING, color = Color.White)
+                Text(downloading ?: LibMpv.MISSING, color = Color.White)
             }
             return
         }
