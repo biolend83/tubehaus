@@ -49,7 +49,9 @@ object Cipher {
         if (id == null) return@withLock if (player != null) sts else null
         checkedAt = now
         if (id == player) return@withLock sts
-        val js = runCatching { Net.get("https://www.youtube.com/s/player/$id/player_ias.vflset/en_US/base.js", mapOf("User-Agent" to UA)) }.getOrNull()
+        // the TV player: since 2026-11 the main web player can't be solved outside a browser (yt-dlp moved the same way)
+        val js = runCatching { Net.get("https://www.youtube.com/s/player/$id/tv-player-ias.vflset/tv-player-ias.js", mapOf("User-Agent" to UA)) }.getOrNull()
+            ?: runCatching { Net.get("https://www.youtube.com/s/player/$id/player_ias.vflset/en_US/base.js", mapOf("User-Agent" to UA)) }.getOrNull()
             ?: return@withLock if (player != null) sts else null
         val t = Regex("""signatureTimestamp[=:](\d+)""").find(js)?.groupValues?.get(1)?.toIntOrNull()
             ?: return@withLock if (player != null) sts else null

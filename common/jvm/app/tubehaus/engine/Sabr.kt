@@ -39,6 +39,9 @@ object Sabr {
     val available get() = host != null && dir != null
     /** when the page last gave a playable answer: while it is recent the host is up and every video goes this way first */
     @Volatile var okAt = 0L
+    /** SABR before the usual clients once its page is up; off: the usual clients are faster where they work,
+     *  and the page (a whole browser on a computer) starts only for a video that needs it */
+    @Volatile var first = false
     val warm get() = available && System.currentTimeMillis() - okAt < 30 * 60_000L
     /** the host closed its page (idle): fetches on their way there are over, and start again when wanted */
     fun hostGone() {
@@ -289,6 +292,7 @@ object Sabr {
                 path.startsWith("/sabr?") -> serveFormat(out, parts[0] == "HEAD", q, headers["range"])
                 path.startsWith("/api/timedtext?") -> serveCaption(out, q)
                 path.startsWith("/live/") -> SabrLive.serve(out, path, q) { code, type, body -> reply(out, code, type, body) }
+                path.startsWith("/dvr/") -> LiveDvr.serve(out, path, q) { code, type, body -> reply(out, code, type, body) }
                 else -> reply(out, 404, "text/plain", "not found".toByteArray())
             }
             out.flush()

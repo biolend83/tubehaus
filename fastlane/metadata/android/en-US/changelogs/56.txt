@@ -1,0 +1,6 @@
+- Android phones (64-bit): the SABR engine runs on V8, faster and lighter
+- Dubbed videos play and download in their original language
+- Downloads are saved as one file
+- iOS Studio playback method; signatures solved with YouTube's TV player
+- SponsorBlock: jumping into a segment shows the Skip button
+- Desktop: theater mode (T), captions in one box; Linux fetches mpv when missing

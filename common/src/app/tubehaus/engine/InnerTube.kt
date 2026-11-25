@@ -50,6 +50,15 @@ object Clients {
         "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
         mapOf("deviceMake" to "Oculus", "deviceModel" to "Quest 3", "androidSdkVersion" to 32, "osName" to "Android", "osVersion" to "12L"),
     )
+    /**
+     * YouTube Studio's iPhone app: plain links like [VISIONOS], H.264 and AAC only (up to 1080p), whole videos.
+     * After VISIONOS when it can't play a video, before ANDROID_VR (cut off a minute in). Added in yt-dlp 2026-11
+     */
+    val IOS_PRODUCER = Client(
+        "IOS_PRODUCER", "0.147.945", 92,
+        "com.google.ios.youtubeproducer/0.147.945 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)",
+        mapOf("deviceMake" to "Apple", "deviceModel" to "iPhone16,2", "osName" to "iPhone", "osVersion" to "18.3.2.22D82"),
+    )
     /** YouTube Music's web site: albums and artists (its songs and charts are Premium-only in some countries) */
     val MUSIC = Client(
         "WEB_REMIX", "1.20261104.00.00", 67,
@@ -89,7 +98,7 @@ object Clients {
     /** YouTube's web player through [Sabr]: never called on InnerTube from here, the name marks streams it played */
     val WEB_SABR = Client("WEB_SABR", "2.20261119.01.00", 1, "")
     /** in the order the player tries them; replaced by the list on GitHub when there is a newer one (Remote) */
-    @Volatile var PLAYERS = listOf(VISIONOS, ANDROID_VR)
+    @Volatile var PLAYERS = listOf(VISIONOS, IOS_PRODUCER, ANDROID_VR)
 }
 
 object InnerTube {

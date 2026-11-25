@@ -62,12 +62,13 @@ object YouTube {
     @Volatile var force: String = ""
 
     /** the ways this device can play a video, for the player's menu */
-    val methods: List<String> get() = listOfNotNull("VISIONOS", "ANDROID_VR", "KIDS",
+    val methods: List<String> get() = listOfNotNull("VISIONOS", "IOS_PRODUCER", "ANDROID_VR", "KIDS",
         if (Sabr.available) "SABR" else null, if (Cipher.available) "TV" else null)
 
     suspend fun stream(id: String): Stream {
         when (force) {
             "VISIONOS" -> return player(id, Clients.VISIONOS)
+            "IOS_PRODUCER" -> return player(id, Clients.IOS_PRODUCER)
             "ANDROID_VR" -> return player(id, Clients.ANDROID_VR)
             "KIDS" -> return player(id, Clients.KIDS)
             "SABR" -> if (Sabr.available) return sabr(id)
@@ -92,7 +93,7 @@ object YouTube {
 
     /** opens the front door in the background (at start, a few seconds in, so the first video is fast too) */
     fun prewarm(delayMs: Long = 0) {
-        if (Sabr.warm || warming) return
+        if (!Sabr.first || Sabr.warm || warming) return
         val h = Sabr.host ?: return
         warming = true
         warmScope.launch { try { if (delayMs > 0) kotlinx.coroutines.delay(delayMs); if (Sabr.available) { h.warm(); runCatching { Sabr.prepare(WARM_ID) } } } finally { warming = false } }
@@ -102,7 +103,7 @@ object YouTube {
     private suspend fun device(id: String): Stream {
         // the front door first: the web player's own way (SABR, a real browser's token) once its page is up; it
         // starts in the background after the first video, so that one never waits for it
-        if (Sabr.warm) {
+        if (Sabr.first && Sabr.warm) {
             // not a live stream: the usual clients' live playlists go back hours, live SABR keeps only the last minute
             try { sabr(id).let { if (!it.live) return it } } catch (e: YtError) { if (e.kind == YtError.Kind.NETWORK) throw e; if (e.kind == YtError.Kind.OTHER || e.kind == YtError.Kind.LOGIN) Sabr.cool() }  // a video that isn't there (ended live, removed, private) says nothing about the page
             catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; Sabr.cool() }
@@ -174,6 +175,8 @@ object YouTube {
 
     /** a live stream that came without a playlist: the web player's way, its own live playlist on this device */
     private suspend fun liveOr(id: String, s: Stream): Stream {
+        // a live playlist: served on this device with hours more of the stream in front, to go back as on YouTube
+        if (s.live && s.hls != null) return LiveDvr.master(s.hls)?.let { s.copy(hls = it) } ?: s
         if (!s.live || s.hls != null || !Sabr.available || Sabr.host?.live != true) return s
         return try { sabr(id) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; s }
     }
@@ -267,8 +270,29 @@ object YouTube {
             audioTrackName = f.at("audioTrack.displayName").str,
             audioDefault = f.at("audioTrack.audioIsDefault").str?.let { it == "true" } ?: true,
             drc = f.at("isDrc").bool,
+            xtags = f.at("xtags").str?.let(::xtags),
         )
     }
+
+    /** the format's "xtags" (url-safe base64 of key/value pairs) as "acont=original:lang=en-US"; null when unreadable */
+    private fun xtags(b64: String): String? = runCatching {
+        val b = java.util.Base64.getUrlDecoder().decode(b64.trimEnd('='))
+        var i = 0
+        fun varint(): Int { var r = 0; var sh = 0; while (true) { val x = b[i++].toInt() and 0xff; r = r or ((x and 0x7f) shl sh); if (x < 0x80) return r; sh += 7 } }
+        fun str(end: Int): Map<Int, String> {
+            val m = HashMap<Int, String>()
+            while (i < end) { val tag = varint(); if (tag and 7 != 2) return m; val n = varint(); m[tag shr 3] = String(b, i, n, Charsets.UTF_8); i += n }
+            return m
+        }
+        val out = ArrayList<String>()
+        while (i < b.size) {
+            val tag = varint(); if (tag and 7 != 2) break
+            val n = varint(); val end = i + n
+            val kv = str(end); i = end
+            if (tag shr 3 == 1 && kv[1] != null) out += kv[1] + "=" + (kv[2] ?: "")
+        }
+        out.joinToString(":").ifEmpty { null }
+    }.getOrNull()
 
     // ------------------------------------------------------------------ watch page
     suspend fun details(id: String): Details {

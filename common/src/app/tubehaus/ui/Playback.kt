@@ -121,6 +121,8 @@ class Playback(private val app: AppState) {
     var justSkipped by mutableStateOf<SponsorBlock.Segment?>(null)
         private set
     private val skipped = HashSet<String>()
+    /** where the last check found the player: was the part played into, or jumped into */
+    private var lastSponsorPos = -1L
     private var noticeJob: Job? = null
 
     /** the button: past the part, or to the highlight */
@@ -145,8 +147,17 @@ class Playback(private val app: AppState) {
         // where parts overlap, one skipped by itself wins
         val hits = segments.filter { it.category != SponsorBlock.HIGHLIGHT && pos >= it.startMs && pos < it.endMs - 300 }
         val seg = hits.firstOrNull { it.category in set.sponsorCats && it.uuid !in skipped } ?: hits.firstOrNull()
+        val before = lastSponsorPos
+        lastSponsorPos = pos
         if (seg != null && seg.category in set.sponsorCats && seg.uuid !in skipped) {
             if (!st.playing) return
+            // skipped by itself only when playing ran into it: a jump into the part (the seek bar, a time in the
+            // description) means it is wanted, and the button offers the skip instead (#118)
+            if (before !in (seg.startMs - 3000)..pos) {
+                skipped += seg.uuid
+                skippable = seg
+                return
+            }
             skipped += seg.uuid
             skippable = null
             player.seekTo(seg.endMs)
@@ -157,7 +168,8 @@ class Playback(private val app: AppState) {
         }
         // the highlight: offered in the first 20 seconds, while it is still ahead
         val hl = segments.firstOrNull { it.category == SponsorBlock.HIGHLIGHT && it.uuid !in skipped && pos < it.startMs - 2000 && pos < 20_000 }
-        skippable = seg?.takeIf { it.category !in set.sponsorCats } ?: hl
+        // a part jumped into (or played again after Undo) keeps its button
+        skippable = seg?.takeIf { it.category !in set.sponsorCats || it.uuid in skipped } ?: hl
     }
 
     fun loopVideo(on: Boolean) { loop = on; player.setLoop(on) }
@@ -256,7 +268,7 @@ class Playback(private val app: AppState) {
         learned = false
         endHandled = false
         loop = false
-        segments = emptyList(); skippable = null; justSkipped = null; skipped.clear()
+        segments = emptyList(); skippable = null; justSkipped = null; skipped.clear(); lastSponsorPos = -1L
         job?.cancel()
         job = app.scope.launch {
             if (store.settings.value.sponsor) launch {

@@ -105,6 +105,14 @@ class Offline(private val app: AppState) {
         val vf = File(dir, s.video.file)
         val af = File(dir, s.audio.file)
         if (!vf.isFile || !af.isFile) return null
+        val caps = s.caption?.let { c -> File(dir, c.file).takeIf { it.isFile }?.let { listOf(Caption(c.lang, c.name, it.toURI().toString(), false)) } }
+            ?: emptyList()
+        // one file with the picture and the sound (every download since 1.8.1): the players open it as it is
+        if (s.video.file == s.audio.file) return Stream(
+            id = s.id, title = s.title, author = s.author, channelId = s.channelId, lengthSec = s.lengthSec, views = 0,
+            description = "", keywords = emptyList(), live = false, hls = vf.toURI().toString(),
+            video = emptyList(), audio = emptyList(), captions = caps, expiresAt = Long.MAX_VALUE, client = "offline",
+        )
         return Stream(
             id = s.id, title = s.title, author = s.author, channelId = s.channelId, lengthSec = s.lengthSec, views = 0,
             description = "", keywords = emptyList(), live = false, hls = null,
@@ -148,7 +156,8 @@ class Offline(private val app: AppState) {
             done(runCatching {
                 val name = s.title.replace(Regex("[\\/:*?\"<>|\\p{Cntrl}]"), "_").trim().take(120).ifEmpty { id }
                 val out = File(dir, name + "." + s.video.file.substringAfterLast('.'))
-                Mux.join(File(dir, s.video.file), File(dir, s.audio.file), out)
+                if (s.video.file == s.audio.file) File(dir, s.video.file).copyTo(out, overwrite = true)
+                else Mux.join(File(dir, s.video.file), File(dir, s.audio.file), out)
                 out.absolutePath
             }.getOrNull())
         }
@@ -186,10 +195,15 @@ class Offline(private val app: AppState) {
         before = vSize
         val aSize = fetch(v.id, audio, File(dir, aName)) { got -> report(v.id, (before + got).toFloat() / total) }
         if (!folder.isDirectory) error("folder gone")
+        // always one file: the picture and the sound put together, the two parts removed
+        val oneName = "${v.id}/${v.id}.${ext(video)}"
+        Mux.join(File(dir, vName), File(dir, aName), File(dir, oneName))
+        File(dir, vName).delete(); File(dir, aName).delete()
+        val size = File(dir, oneName).length()
         return SavedVideo(
             id = v.id, title = s.title.ifEmpty { v.title }, author = s.author.ifEmpty { v.author },
             channelId = s.channelId.ifEmpty { v.channelId }, lengthSec = s.lengthSec.takeIf { it > 0 } ?: v.lengthSec,
-            video = saved(video, vSize, vName), audio = saved(audio, aSize, aName), at = System.currentTimeMillis() / 1000,
+            video = saved(video, size, oneName).copy(init = null, index = null), audio = saved(audio, size, oneName).copy(init = null, index = null), at = System.currentTimeMillis() / 1000,
             audioName = if (track != null && audio.audioTrack == track) audio.audioTrackName ?: audio.audioLang ?: "" else "",
             caption = cap,
         )

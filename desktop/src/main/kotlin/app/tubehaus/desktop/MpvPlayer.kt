@@ -7,6 +7,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -62,7 +66,8 @@ class MpvPlayer : VideoPlayer {
     private val st = MutableStateFlow(PlayerState())
     override val state: StateFlow<PlayerState> = st
 
-    private val lib = LibMpv.load()
+    /** null until there is a libmpv: on Linux without one it is downloaded once (MpvDownload) and loaded then */
+    private var lib by mutableStateOf(LibMpv.load())
     private var h: Pointer? = null
     private val lock = Any()
 
@@ -142,8 +147,10 @@ class MpvPlayer : VideoPlayer {
             o("cache", "yes"); o("cache-secs", "300"); o("demuxer-readahead-secs", "300")
             o("demuxer-max-bytes", "150MiB"); o("demuxer-max-back-bytes", "50MiB")
             o("sub-auto", "no"); o("sub-font-size", "42")
-            // captions as on YouTube: white on a see-through black box behind each line (mpv 0.38+; before that, an outline)
-            box = o("sub-border-style", "opaque-box") >= 0
+            // captions as on YouTube: white on one see-through black box behind the lines (background-box; a box per
+            // line overlaps the next one where two lines meet), else a box per line (opaque-box), else an outline
+            boxStyle = if (o("sub-border-style", "background-box") >= 0) "background-box" else "opaque-box"
+            box = boxStyle == "background-box" || o("sub-border-style", "opaque-box") >= 0
             if (box) o("sub-shadow-offset", "0") else o("sub-border-size", "2.5")
             capOpts { k, v -> o(k, v) }
             o("audio-display", "no"); o("audio-client-name", "TubeHaus")
@@ -225,12 +232,20 @@ class MpvPlayer : VideoPlayer {
     @Volatile private var capStyle = Triple(100, 75, 0)
     /** this mpv draws a box behind captions (0.38+) */
     @Volatile private var box = true
+    @Volatile private var boxStyle = "opaque-box"
 
     private fun capOpts(o: (String, String) -> Unit) {
         val (size, bg, pos) = capStyle
         o("sub-scale", (size / 100.0).toString())
         if (box) {
-            if (bg > 0) { o("sub-border-style", "opaque-box"); o("sub-border-color", "#%02X080808".format(bg * 255 / 100)); o("sub-border-size", "6") }
+            if (bg > 0) {
+                val c = "#%02X080808".format(bg * 255 / 100)
+                o("sub-border-style", boxStyle); o("sub-back-color", c)
+                // background-box: the box is the back colour, the border an outline round the letters (none here)
+                o("sub-border-color", if (boxStyle == "background-box") "#00000000" else c)
+                // per line the padding stays under half the line gap, so neighbouring boxes don't overlap
+                o("sub-border-size", if (boxStyle == "background-box") "6" else "3")
+            }
             else { o("sub-border-style", "outline-and-shadow"); o("sub-border-color", "#FF000000"); o("sub-border-size", "2.5") }
         }
         o("sub-align-y", if (pos == 2) "top" else "bottom")
@@ -408,6 +423,16 @@ class MpvPlayer : VideoPlayer {
     private fun open(startMs: Long) {
         val s = stream ?: return
         if (mpv() == null) {
+            if (lib == null && MpvDownload.possible) {
+                // no libmpv on this Linux: fetch it, then open this video again
+                st.update { it.copy(error = null, buffering = true) }
+                MpvDownload.start { ok ->
+                    if (ok) lib = LibMpv.load()
+                    if (lib != null && stream === s) open(startMs)
+                    else st.update { it.copy(error = LibMpv.MISSING, buffering = false) }
+                }
+                return
+            }
             st.update { it.copy(error = LibMpv.MISSING, buffering = false) }
             return
         }
@@ -421,7 +446,7 @@ class MpvPlayer : VideoPlayer {
         audioRetried = false
         soundBad = 0
         if (s.live || s.video.isEmpty()) {
-            url = s.hls ?: return
+            url = s.hls?.let { if (it.startsWith("file:")) source(it) else it } ?: return
         } else if (opts.audioOnly && s.audio.isNotEmpty()) {
             // music: the sound alone (the app shows the cover)
             url = source((pickAudio(s) ?: return).url)
@@ -540,8 +565,9 @@ class MpvPlayer : VideoPlayer {
     @Composable
     override fun View(modifier: Modifier) {
         if (!available) {
+            val downloading by MpvDownload.status.collectAsState()
             Box(modifier.background(Color.Black), contentAlignment = Alignment.Center) {
-                Text(LibMpv.MISSING, color = Color.White)
+                Text(downloading ?: LibMpv.MISSING, color = Color.White)
             }
             return
         }

@@ -203,7 +203,7 @@ private suspend fun upstreamClients(): List<Client> {
 /** InnerTube's number for each client name (the X-YouTube-Client-Name header) */
 private val CLIENT_IDS = mapOf(
     "ANDROID" to 3, "IOS" to 5, "TVHTML5" to 7, "ANDROID_CREATOR" to 14, "ANDROID_KIDS" to 18, "ANDROID_MUSIC" to 21,
-    "IOS_MUSIC" to 26, "ANDROID_VR" to 28, "ANDROID_UNPLUGGED" to 29, "TVHTML5_SIMPLY" to 75,
+    "IOS_MUSIC" to 26, "IOS_PRODUCER" to 92, "ANDROID_VR" to 28, "ANDROID_UNPLUGGED" to 29, "TVHTML5_SIMPLY" to 75,
     "TVHTML5_SIMPLY_EMBEDDED_PLAYER" to 85, "VISIONOS" to 101,
 )
 
