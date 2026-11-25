@@ -96,7 +96,7 @@ def _name(raw):
 
 # The instance's own name in the page title and menu (empty = TubeHaus, in the visitor's language)
 NAME = _name(env("HT_NAME", ""))
-VERSION = "2.0.0"   # this server's release: health() tells it, the web app shows it at the end of its menu
+VERSION = "2.0.1"   # this server's release: health() tells it, the web app shows it at the end of its menu
 
 
 def _links(raw):

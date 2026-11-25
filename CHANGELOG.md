@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.0.1 — 2026-11-25
+
+### Fixed
+- **SABR on the server stopped working on 2026-11-25:** YouTube's main web player (`player_ias`) can no longer be run outside a browser to solve `n` ("a.addOnDisposeCallback is not a function"). The SABR helper now solves it with the TV player first, then the es6 build, then the page's own
+
+### Added
+- The video answer carries YouTube's `latencyClass` for live streams, so the apps can play low-latency streams closer to live
+
 ## v2.0.0 — 2026-11-25
 
 ### Added
