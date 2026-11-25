@@ -1,10 +1,11 @@
 package app.tubehaus.engine
 
 /**
- * What runs SABR for [Sabr]: a browser page nobody sees whose address is on www.youtube.com (a WebView on
- * Android and the iPad, Edge or Chrome on a computer). There YouTube's own web player code paths work as they do on
- * YouTube: BotGuard makes the proof-of-origin token, and the page's fetch speaks SABR to the video servers.
- * The page is common/sabr/sabr-page.js; its pieces come back through [Sabr.piece] and [Sabr.end].
+ * What runs SABR for [Sabr]: the page code common/sabr/page-src.mjs, where BotGuard makes the proof-of-origin
+ * token and the page's fetch speaks SABR to the video servers as YouTube's web player does. Either in QuickJS
+ * inside the app with jsdom as its document ([JsSabr], common/sabr/sabr-lite.js: no browser needed), or in a
+ * browser page nobody sees whose address is on www.youtube.com (a WebView on Android and the iPad, Edge or
+ * Chrome on a computer: common/sabr/sabr-page.js). Its pieces come back through [Sabr.piece] and [Sabr.end].
  */
 interface SabrHost {
     /** the watch page's player answer as JSON text, or null when the page could not get one */

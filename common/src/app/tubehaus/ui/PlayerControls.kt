@@ -135,6 +135,17 @@ fun VideoArea(app: AppState, modifier: Modifier = Modifier, fullscreen: Boolean 
     }
 }
 
+/** < and > by the character typed, whatever the keyboard layout (and AltGr) puts it on. True when it was one. */
+fun playerSpeedChar(app: AppState, ch: Int): Boolean {
+    val d = when (ch) { '<'.code -> -1; '>'.code -> 1; else -> return false }
+    val st = app.player.state.value
+    if (st.videoId == null) return false
+    val i = SPEEDS.indexOfFirst { it >= st.speed - 0.01f }.let { if (it < 0) SPEEDS.size - 1 else it }
+    val x = SPEEDS[(i + d).coerceIn(0, SPEEDS.size - 1)]
+    app.playback.setSpeed(x); app.toast(if (x == 1f) tr("Normal") else "${x}x")
+    return true
+}
+
 /** Keyboard shortcuts while a video is on screen (YouTube's). True when the key was used. */
 fun playerKey(app: AppState, key: Key, shift: Boolean = false): Boolean {
     val player = app.player
@@ -175,6 +186,8 @@ fun playerKey(app: AppState, key: Key, shift: Boolean = false): Boolean {
         Key.J -> seekBy(-10)
         Key.L -> seekBy(10)
         Key.F -> app.setFull(!app.fullscreen)
+        // theater mode, as on YouTube: the desktop only (a tablet's and a phone's page has no side panel to move)
+        Key.T -> if (!app.platform.touch && !app.platform.tv) app.store.settings.update { it.copy(theater = !it.theater) } else return false
         Key.M -> if (player.hasVolume) player.setMuted(!st.muted) else return false
         Key.DirectionUp -> if (player.hasVolume) volumeBy(0.05f) else return false
         Key.DirectionDown -> if (player.hasVolume) volumeBy(-0.05f) else return false
@@ -576,7 +589,9 @@ private fun Controls(app: AppState, fullscreen: Boolean, sideGestures: Boolean) 
         // a thin progress line while the controls are hidden (not in full screen)
         if (!shown && !fullscreen && st.durationMs > 0 && st.playing) {
             Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(2.dp).background(Color(0x55FFFFFF))) {
-                Box(Modifier.fillMaxWidth((st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f)).height(2.dp).background(Red))
+                // live at the edge: full, as the seek bar shows it
+                val atEdge = app.playback.video?.live == true && st.durationMs - st.positionMs < 30_000
+                Box(Modifier.fillMaxWidth(if (atEdge) 1f else (st.positionMs.toFloat() / st.durationMs).coerceIn(0f, 1f)).height(2.dp).background(Red))
             }
         }
     }
@@ -1507,6 +1522,7 @@ internal fun methodName(m: String): String = when (m) {
     "" -> tr("Auto")
     "VISIONOS" -> "visionOS"
     "ANDROID_VR" -> "Android VR"
+    "IOS_PRODUCER" -> "iOS Studio"
     "KIDS", "ANDROID_KIDS" -> "YouTube Kids"
     "SABR", "WEB_SABR" -> "SABR (web)"
     "TV", "TVHTML5" -> "TV"

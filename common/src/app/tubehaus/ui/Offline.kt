@@ -91,7 +91,7 @@ data class SavedVideo(
     val audioName: String = "",
     val caption: SavedCaption? = null,
 ) {
-    val size: Long get() = video.size + audio.size
+    val size: Long get() = if (video.file == audio.file) video.size else video.size + audio.size
     fun asVideo() = Video(id, title, author, channelId, lengthSec)
 }
 
