@@ -347,13 +347,51 @@ def _atrack(f):
     """an audio format's track: {"id", "lang", "kind" (original, dubbed, dubbed-auto, descriptive), "orig", "drc", "name"}.
     From audioTrack when YouTube gives it, else from the stream's xtags (acont=dubbed:lang=ko, drc=1 = stable volume)."""
     q = urllib.parse.parse_qs(urllib.parse.urlsplit(f.get("url") or "").query)
-    x = dict(p.split("=", 1) for p in (q.get("xtags") or [""])[0].split(":") if "=" in p)
+    x = dict(p.split("=", 1) for p in (q.get("xtags") or [""])[0].split(":") if "=" in p) or _xtags(f.get("xtags"))
     t = f.get("audioTrack") or {}
-    lang = x.get("lang") or (t.get("id") or "").split(".")[0]
-    kind = x.get("acont") or ("original" if t.get("isDefault") else "dubbed" if t else "")
-    return {"id": t.get("id") or ("%s.%s" % (lang, kind) if lang else ""), "lang": lang, "kind": kind,
-            "orig": kind == "original" or bool(t.get("isDefault")) or not lang, "drc": x.get("drc") == "1",
+    tid = t.get("id") or ""
+    lang = x.get("lang") or tid.split(".")[0]
+    # YouTube marks the track in the request's language as the default (a Korean dub when asked in Korean):
+    # the tags say which one is the original, else the id (".4" the original, ".3" a dub), the default flag last
+    dflt = t.get("isDefault", t.get("audioIsDefault"))
+    dflt = dflt is True or dflt == "true"
+    kind = x.get("acont") or ("original" if tid.endswith(".4") else "dubbed" if tid.endswith(".3") else
+                              "original" if dflt else "dubbed" if t else "")
+    return {"id": tid or ("%s.%s" % (lang, kind) if lang else ""), "lang": lang, "kind": kind,
+            "orig": kind == "original" or not lang, "drc": x.get("drc") == "1",
             "name": t.get("displayName") or ""}
+
+
+def _xtags(b64):
+    """a format's "xtags" field (url-safe base64 of key/value pairs, as on SABR formats whose URL has none) as a dict"""
+    out = {}
+    try:
+        b = base64.urlsafe_b64decode(b64 + "=" * (-len(b64) % 4))
+
+        def varint(i):
+            r = sh = 0
+            while True:
+                c = b[i]; i += 1; r |= (c & 0x7f) << sh
+                if c < 0x80:
+                    return r, i
+                sh += 7
+        i = 0
+        while i < len(b):
+            tag, i = varint(i)
+            n, i = varint(i)
+            end, j, kv = i + n, i, {}
+            if tag & 7 != 2:
+                break
+            while j < end:
+                t2, j = varint(j)
+                m, j = varint(j)
+                kv[t2 >> 3] = b[j:j + m].decode("utf-8", "replace"); j += m
+            i = end
+            if 1 in kv:
+                out[kv[1]] = kv.get(2, "")
+    except Exception:
+        pass
+    return out
 
 
 def _mp4_ranges(head):
