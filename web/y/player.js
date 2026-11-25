@@ -262,7 +262,7 @@ export class Player {
     this.live = !!(info.liveNow && info.hlsUrl);
     this.lockH = null;
     this.retried = 0;
-    this.skipped = new Set();
+    this.skipped = new Set(); this.sbLast = -1;
     this.segments = [];
     this.heat = null;
     this.cues = null;
@@ -1367,6 +1367,9 @@ export class Player {
   sponsorCheck() {
     const v = this.video, t = v.currentTime;
     const btn = this.q(".ytp-skipbtn");
+    // where the last check found the video: was a part played into, or jumped into
+    const before = this.sbLast ?? -1;
+    this.sbLast = t;
     // where segments overlap, the auto-skip categories win
     const hits = this.segments.filter((x) => x.cat !== HIGHLIGHT && t >= x.start && t < x.end - 0.3);
     const s = hits.find((x) => settings.sponsorCats.includes(x.cat) && !this.skipped.has(x)) || hits[0];
@@ -1380,6 +1383,8 @@ export class Player {
       return;
     }
     const auto = settings.sponsorCats.includes(s.cat);
+    // skipped by itself only when playing ran into it: a jump into the part means it is wanted (#118)
+    if (auto && !this.skipped.has(s) && !v.paused && !(before >= s.start - 3 && before <= t)) this.skipped.add(s);
     if (auto && !this.skipped.has(s) && !v.paused) {
       this.skipped.add(s);
       v.currentTime = s.end;
@@ -1387,7 +1392,7 @@ export class Player {
       btn.classList.remove("show");
       return;
     }
-    if (!auto) {
+    if (!auto || this.skipped.has(s)) {
       btn.innerHTML = `${$t("{0} 건너뛰기 {1}", esc(SB_CATS[s.cat]?.[0] || $t("구간")), icon("skip"))}`;
       btn.classList.add("show");
     }
