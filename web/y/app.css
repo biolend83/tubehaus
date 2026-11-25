@@ -1841,3 +1841,21 @@ html:not(.tv) .grow .gic { background: none; width: 26px; height: 26px; color: v
 /* cards: titles a touch bolder, the picture lifts under the pointer */
 [data-look="2"] .card .thumb, [data-look="2"] .card .th { transition: transform .25s var(--e-out), box-shadow .25s; }
 [data-look="2"] .card:hover .thumb, [data-look="2"] .card:hover .th { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+
+/* the player's menus: frosted glass, rounded rows, accent switches; they grow from the gear and each page slides in */
+[data-look="2"] :is(.ytp-menu, .ytp-ctx) { background: rgba(18, 20, 30, .72); -webkit-backdrop-filter: blur(22px) saturate(1.5); backdrop-filter: blur(22px) saturate(1.5);
+  border-radius: 18px; padding: 6px; box-shadow: 0 12px 40px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(255, 255, 255, .08); text-shadow: none; }
+[data-look="2"] .ytp-menu { transform-origin: bottom right; }
+[data-look="2"] :is(.ytp-menu, .ytp-ctx).show { animation: thMenuIn .22s cubic-bezier(.2, .9, .25, 1.15); }
+[data-look="2"] .ytp-menu.show > * { animation: thMenuPage .2s cubic-bezier(.2, .8, .2, 1); }
+@keyframes thMenuIn { from { opacity: 0; transform: translateY(8px) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes thMenuPage { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+[data-look="2"] :is(.ytp-menu, .ytp-ctx) :is(.mi, .mo) { border-radius: 12px; transition: background-color .12s; }
+[data-look="2"] :is(.ytp-menu, .ytp-ctx) :is(.mi, .mo):hover { background: rgba(255, 255, 255, .12); }
+[data-look="2"] .ytp-menu .mh { border-bottom-color: rgba(255, 255, 255, .1); margin: -6px -6px 6px; padding: 0 12px; border-radius: 18px 18px 0 0; }
+[data-look="2"] .ytp-menu .vl { color: rgba(255, 255, 255, .7); }
+[data-look="2"] .ytp-menu .tg { width: 40px; height: 24px; border-radius: 12px; background: rgba(255, 255, 255, .22); transition: background-color .2s; }
+[data-look="2"] .ytp-menu .tg i { left: 2px; top: 2px; width: 20px; height: 20px; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: left .22s cubic-bezier(.3, 1.4, .5, 1); }
+[data-look="2"] .ytp-menu .tg.on { background: var(--acc); }
+[data-look="2"] .ytp-menu .tg.on i { left: 18px; }
+[data-look="2"] .ytp-menu .spd input { accent-color: var(--acc); }
