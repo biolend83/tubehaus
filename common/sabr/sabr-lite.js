@@ -218713,7 +218713,7 @@ ${lines.length ? `${lines.join("\n")}
       (async () => {
         try {
           const v2 = await window.__thSabr[m2.f](...m2.a);
-          if (m2.id) __reply(m2.id, v2 == null ? null : String(v2), null);
+          if (m2.id) __reply(m2.id, v2 == null ? null : /[^\x00-\x7f]/.test(String(v2)) ? new TextEncoder().encode(String(v2)) : String(v2), null);
         } catch (e2) {
           if (m2.id) __reply(m2.id, null, String(e2 && e2.message || e2));
         }
