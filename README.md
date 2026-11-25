@@ -78,7 +78,7 @@ ExoPlayer (Media3) on Android, libmpv on Windows, macOS and Linux.
 
 ## Install
 
-TubeHaus uses your system's mpv library for playback, so install that first. Builds for x86-64 and ARM64; on ARM64 the files end in `-linux-arm64.deb`, `-linux-aarch64.rpm` and `-linux-arm64.tar.gz`.
+TubeHaus plays with your system's mpv library when it has one; if not, it downloads mpv by itself the first time a video opens (2.0.0 and later). Installing it as below is still fine, and lets your distribution keep it updated. Builds for x86-64 and ARM64; on ARM64 the files end in `-linux-arm64.deb`, `-linux-aarch64.rpm` and `-linux-arm64.tar.gz`.
 
 **Debian, Ubuntu, Mint, Pop!_OS**
 ```sh
