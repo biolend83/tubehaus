@@ -110,7 +110,7 @@ jobs:
             TubeHaus-*.zip
 
   linux:
-    # the system's libmpv (libmpv2 / mpv-libs) is used, nothing is bundled
+    # libmpv and what it needs go inside every package (packaging/linux/bundle-mpv.sh): nothing to install
     strategy:
       fail-fast: false
       matrix:
@@ -125,6 +125,10 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - name: Put libmpv inside
+        run: |
+          sudo apt-get update && sudo apt-get install -y libmpv2 patchelf
+          bash packaging/linux/bundle-mpv.sh desktop/resources/linux
       - name: Build .deb, .rpm and .tar.gz
         run: |
           sudo apt-get install -y rpm
@@ -137,7 +141,7 @@ jobs:
           tar -C "$(dirname "$app")" -czf "TubeHaus-$ver-linux-${{ matrix.tar }}.tar.gz" "$(basename "$app")"
           ls -la TubeHaus-*
       - name: Build .AppImage
-        # one file to download, make executable and run; like the tar.gz it uses the system's libmpv
+        # one file to download, make executable and run; libmpv inside, like the other packages
         continue-on-error: true
         run: |
           ver=$(sed -n 's/^app.version=//p' gradle.properties)

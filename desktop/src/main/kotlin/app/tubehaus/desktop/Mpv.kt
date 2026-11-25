@@ -55,9 +55,15 @@ interface LibMpv : Library {
         const val RENDER_PARAM_SW_POINTER = 20
         const val RENDER_UPDATE_FRAME = 1L
 
-        /** libmpv-2.dll next to the app on Windows; the system's libmpv on Linux (libmpv.so.2) and macOS (Homebrew, libmpv.2.dylib) */
+        /**
+         * libmpv-2.dll next to the app on Windows; on Linux the libmpv inside the package (resources: libmpv.so.2 and
+         * its libraries), else the system's; on macOS the one inside the app, else Homebrew's (libmpv.2.dylib)
+         */
         fun load(): LibMpv? {
-            for (name in listOf("mpv-2", "mpv", "libmpv.so.2", "libmpv.so.1", "libmpv.2.dylib")) {
+            // the bundled one by its full path, so a system libmpv of another version can't come first
+            val inside = System.getProperty("compose.application.resources.dir")?.let { java.io.File(it, "libmpv.so.2") }
+                ?.takeIf { it.isFile }?.absolutePath
+            for (name in listOfNotNull(inside, "mpv-2", "mpv", "libmpv.so.2", "libmpv.so.1", "libmpv.2.dylib")) {
                 try {
                     return Native.load(name, LibMpv::class.java, mapOf(Library.OPTION_STRING_ENCODING to "UTF-8"))
                 } catch (e: UnsatisfiedLinkError) {
