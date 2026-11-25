@@ -1806,36 +1806,22 @@ html:not(.tv) .grow .gic { background: none; width: 26px; height: 26px; color: v
 }
 /* buttons */
 [data-look="2"] .pill { height: 40px; padding: 0 18px; border-radius: 999px; font-weight: 600; letter-spacing: -.1px;
-  background: var(--box2); box-shadow: var(--shadow-1); }
-[data-look="2"] .pill:hover { background: var(--acc-soft); color: var(--acc); box-shadow: var(--shadow-2); }
+  box-shadow: var(--shadow-1); }
+[data-look="2"] .pill:hover { box-shadow: var(--shadow-2); }
 [data-look="2"] .pill.round { width: 40px; padding: 0; }
 [data-look="2"] .pill .ic { width: 20px; height: 20px; }
-[data-look="2"] .seg-btn { border-radius: 999px; background: var(--box2); box-shadow: var(--shadow-1); overflow: hidden; }
-[data-look="2"] .seg-btn button { background: transparent; font-weight: 600; }
-[data-look="2"] .seg-btn button:hover { background: var(--acc-soft); color: var(--acc); }
-[data-look="2"] .subbtn { height: 40px; padding: 0 20px; border-radius: 999px; text-transform: none; font-weight: 700;
-  background: linear-gradient(135deg, var(--acc), color-mix(in srgb, var(--acc) 70%, #b06bff)); color: #fff;
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--acc) 35%, transparent); }
-[data-look="2"] .subbtn:hover { filter: brightness(1.08); box-shadow: 0 6px 18px color-mix(in srgb, var(--acc) 45%, transparent); }
-[data-look="2"][data-theme="dark"] .subbtn { color: #0b0d16; }
+[data-look="2"] .seg-btn { border-radius: 999px; box-shadow: var(--shadow-1); overflow: hidden; }
+[data-look="2"] .subbtn { height: 40px; padding: 0 20px; border-radius: 999px; text-transform: none; font-weight: 700; box-shadow: var(--shadow-1); }
+[data-look="2"] .subbtn:hover { box-shadow: var(--shadow-2); }
 [data-look="2"] :is(.pill, .subbtn, .chip, .seg-btn button, .ib, .icon-btn):focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 /* chips */
-[data-look="2"] .chip { height: 34px; padding: 0 14px; border-radius: 999px; background: var(--box2); box-shadow: var(--shadow-1); font-weight: 600; }
-[data-look="2"] .chip:hover { background: var(--acc-soft); color: var(--acc); }
-[data-look="2"] .chip.on { background: var(--acc); color: #fff; box-shadow: 0 3px 10px color-mix(in srgb, var(--acc) 35%, transparent); }
-[data-look="2"][data-theme="dark"] .chip.on { color: #0b0d16; }
+[data-look="2"] .chip { height: 34px; padding: 0 14px; border-radius: 999px; box-shadow: var(--shadow-1); font-weight: 600; }
 /* the search field: one rounded piece; it glows in the accent while typing */
-[data-look="2"] #sform { border-radius: 999px; background: var(--box2); box-shadow: var(--shadow-1); transition: box-shadow .2s, background-color .2s; }
-[data-look="2"] #sform .sbox { background: transparent; border: 0; }
-[data-look="2"] #sform .sbtn { background: transparent; border: 0; border-radius: 0 999px 999px 0; }
-[data-look="2"] #sform .sbtn:hover { color: var(--acc); }
-[data-look="2"] #sform:focus-within { box-shadow: 0 0 0 3px var(--acc-soft), var(--shadow-2); }
-[data-look="2"] #voice { background: var(--box2); box-shadow: var(--shadow-1); }
-[data-look="2"] #voice:hover { background: var(--acc-soft); color: var(--acc); }
+[data-look="2"] #voice { box-shadow: var(--shadow-1); }
 /* the bar on top: frosted */
 [data-look="2"] #mast { -webkit-backdrop-filter: saturate(1.6) blur(18px); backdrop-filter: saturate(1.6) blur(18px); }
 /* panels: raised instead of flat grey */
-[data-look="2"] .w-desc { background: var(--box2); box-shadow: var(--shadow-1); border-radius: 20px; }
+[data-look="2"] .w-desc { box-shadow: var(--shadow-1); border-radius: 20px; }
 [data-look="2"] .w-desc.collapsed:hover { box-shadow: var(--shadow-2); }
 [data-look="2"] :is(#popup, .dlg) { border-radius: 18px; box-shadow: var(--shadow-2); }
 /* cards: titles a touch bolder, the picture lifts under the pointer */
@@ -1856,6 +1842,4 @@ html:not(.tv) .grow .gic { background: none; width: 26px; height: 26px; color: v
 [data-look="2"] .ytp-menu .vl { color: rgba(255, 255, 255, .7); }
 [data-look="2"] .ytp-menu .tg { width: 40px; height: 24px; border-radius: 12px; background: rgba(255, 255, 255, .22); transition: background-color .2s; }
 [data-look="2"] .ytp-menu .tg i { left: 2px; top: 2px; width: 20px; height: 20px; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: left .22s cubic-bezier(.3, 1.4, .5, 1); }
-[data-look="2"] .ytp-menu .tg.on { background: var(--acc); }
 [data-look="2"] .ytp-menu .tg.on i { left: 18px; }
-[data-look="2"] .ytp-menu .spd input { accent-color: var(--acc); }
