@@ -1,0 +1,4 @@
+- Korean (and other non-English) videos no longer fail with a JSON error when they play the SABR way
+- A YouTube answer that arrives cut off is asked again, then the next way is tried
+- Live streams with low latency play closer to live
+- A new message replaces the last one instead of waiting behind it

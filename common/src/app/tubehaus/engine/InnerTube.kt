@@ -195,15 +195,24 @@ object InnerTube {
             }
         }
         val headers = headers(client, visitor)
-        val text = try {
-            Backoff.retry { Net.post("https://${client.host}/youtubei/v1/$endpoint?prettyPrint=false", payload.toString(), headers) }
-        } catch (e: HttpError) {
-            throw YtError("YouTube answered ${e.code}", YtError.Kind.NETWORK)
-        } catch (e: okio.IOException) {
-            throw YtError("No connection to YouTube", YtError.Kind.NETWORK)
+        // an answer now and then arrives cut off (unreadable JSON): asked once more, then an error the callers
+        // handle (the player tries its next client) instead of the parser's message on the screen
+        for (attempt in 0..1) {
+            val text = try {
+                Backoff.retry { Net.post("https://${client.host}/youtubei/v1/$endpoint?prettyPrint=false", payload.toString(), headers) }
+            } catch (e: HttpError) {
+                throw YtError("YouTube answered ${e.code}", YtError.Kind.NETWORK)
+            } catch (e: okio.IOException) {
+                throw YtError("No connection to YouTube", YtError.Kind.NETWORK)
+            }
+            // YouTube's answers run to hundreds of kilobytes: read them off the main thread, or a slow TV box
+            // freezes on every page (and Android closes the app as not responding)
+            try {
+                return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { parse(text) }
+            } catch (e: kotlinx.serialization.SerializationException) {
+                if (attempt == 1) throw YtError("YouTube's answer arrived cut off", YtError.Kind.OTHER)
+            }
         }
-        // YouTube's answers run to hundreds of kilobytes: read them off the main thread, or a slow TV box
-        // freezes on every page (and Android closes the app as not responding)
-        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { parse(text) }
+        throw YtError("YouTube's answer arrived cut off", YtError.Kind.OTHER)
     }
 }

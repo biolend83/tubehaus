@@ -52,7 +52,9 @@ g.__thLoop = async () => {
     if (c == null) return "closed";
     const m = JSON.parse(c);
     (async () => {
-      try { const v = await window.__thSabr[m.f](...m.a); if (m.id) __reply(m.id, v == null ? null : String(v), null); }
+      // a long string with letters past ASCII (a Korean video's player answer) is cut off at 64 KB on its way out of
+      // QuickJS: such answers go as their UTF-8 bytes
+      try { const v = await window.__thSabr[m.f](...m.a); if (m.id) __reply(m.id, v == null ? null : /[^\x00-\x7f]/.test(String(v)) ? new TextEncoder().encode(String(v)) : String(v), null); }
       catch (e) { if (m.id) __reply(m.id, null, String((e && e.message) || e)); }
     })();
   }

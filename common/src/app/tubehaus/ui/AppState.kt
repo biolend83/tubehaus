@@ -311,8 +311,12 @@ class AppState(val platform: Platform, val store: Store) {
         if (!platform.share(title, url)) toast(tr("Link copied"))
     }
 
+    /** a short message at the bottom; a newer one replaces the one showing (quick key presses don't queue up, #107) */
+    private var toastJob: kotlinx.coroutines.Job? = null
     fun toast(msg: String) {
-        scope.launch { snackbar.showSnackbar(msg) }
+        // cancelling the last one takes it off the screen, or out of the queue if it hasn't shown yet
+        toastJob?.cancel()
+        toastJob = scope.launch { snackbar.showSnackbar(msg) }
     }
 
     /**
