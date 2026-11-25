@@ -1,5 +1,5 @@
 // App skeleton: router, shared state (my library), cards, popup menus, dialogs
-import { $, $$, el, esc, icon, api, lib, settings, local, toast, copy, fmtTime, fmtViews, ago, exactTime, thumb, normVideo, metaOf, pickThumb, dropCache, PUBLIC } from "./util.js";
+import { $, $$, el, esc, icon, api, lib, settings, local, toast, copy, fmtTime, fmtViews, ago, exactTime, thumb, normVideo, metaOf, pickThumb, dropCache, PUBLIC, siteName } from "./util.js";
 import { Player, audioName } from "./player.js";
 import { knownAvatar } from "./avatars.js";
 import { $t, $tMsg, fmtShort, LANG, LOCALE } from "./i18n.js";
@@ -489,6 +489,7 @@ export async function render() {
     document.body.dataset.route = state.route;
     $$("#guide .gi, #mguide a, #bnav a").forEach((a) => a.classList.toggle("act", a.dataset.r === state.route));
     page.innerHTML = "";
+    document.title = siteName();            // a page with a name of its own (a video, music) sets it again
     page.classList.remove("enter");         // restart the "rise in" of the new page (app.css: Motion)
     void page.offsetWidth;
     page.classList.add("enter");
@@ -504,6 +505,7 @@ export async function render() {
     if (seq === renderSeq) dispatchEvent(new CustomEvent("routed"));
     return;
   }
+  document.title = siteName();
   page.innerHTML = `<div class="empty">${icon("info")}<p>${$t("페이지를 찾을 수 없어요")}</p><a class="pill" href="/" data-nav>${$t("홈으로")}</a></div>`;
 }
 // restore the old scroll position only when going back

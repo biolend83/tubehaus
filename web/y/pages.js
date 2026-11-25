@@ -212,6 +212,7 @@ export async function search(page, m, alive) {
   const sp = new URLSearchParams(location.search);
   const q = sp.get("search_query") || sp.get("q") || "";
   $("#q").value = q;
+  if (q) document.title = q + " - " + siteName();
   if (!q) { page.innerHTML = empty("search", $t("검색어를 입력하세요")); return; }
   const f = { date: sp.get("date") || "", type: sp.get("type") || "all", duration: sp.get("duration") || "", features: (sp.get("features") || "").split(",").filter(Boolean), sort: sp.get("sort") || "relevance", min_views: viewLimit(sp.get("min_views")), max_views: viewLimit(sp.get("max_views")) };
   if (!FILTERS.sort[1].some(([v]) => v === f.sort)) f.sort = "relevance";
@@ -339,6 +340,7 @@ export async function channel(page, m, alive) {
   const tab = tabM ? tabM[1] : "";
   const c = await api(`/api/v1/channels/${ucid}`, { ttl: 600000 });
   if (!alive()) return;
+  document.title = (c.author || "") + " - " + siteName();
   const av = pickThumb(c.authorThumbnails, 176);
   const banner = c.authorBanners?.length ? localUrl([...c.authorBanners].sort((a, b) => b.width - a.width)[0].url) : "";
   const base = `/channel/${ucid}`;
@@ -470,6 +472,7 @@ export async function playlist(page, m, alive) {
   page.innerHTML = spinner;
   const p = await loadPlaylist(id);
   if (!alive()) return;
+  document.title = (p.title || "") + " - " + siteName();
   const first = p.videos[0];
   const ctxParam = (v, i) => `&list=${encodeURIComponent(id)}&index=${i + 1}`;
   page.innerHTML = `<div class="plpage" ${p.mine ? `data-pl="${esc(id === "WL" ? "wl" : id === "LL" ? "likes" : id)}" data-ctx="pl"` : ""}>
