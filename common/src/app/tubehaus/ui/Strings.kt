@@ -307,6 +307,8 @@ private val KO by lazy { mapOf(
     "Next / previous video" to "다음 / 이전 영상",
     "Jump to 0–90%" to "0–90% 위치로",
     "Refresh the page" to "페이지 새로고침",
+    "Middle click" to "가운데 클릭",
+    "Open a video in a new window" to "영상을 새 창에서 열기",
     "Full screen window" to "창 전체 화면",
     "Back / forward" to "뒤로 / 앞으로",
     "Leaving the video page" to "영상 페이지를 나갈 때",

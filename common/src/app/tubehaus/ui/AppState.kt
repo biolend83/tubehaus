@@ -55,7 +55,10 @@ sealed interface Screen {
 /** the screens a tab opens: going to one starts over from it (Music and Live are tabs at the top on phones) */
 val TABS = listOf(Screen.Home, Screen.Shorts, Screen.Subs, Screen.Library, Screen.Music) + TOP_TOPICS.map { Screen.Topic(it) }
 
-class AppState(val platform: Platform, val store: Store) {
+/** [parent]: the app's first window, when this is another one (a video opened with a middle click) */
+class AppState(val platform: Platform, val store: Store, private val parent: AppState? = null) {
+    /** another window of the app: the library is the first one's, the start-up things (updates, sync, who is watching) are left to it */
+    val extra get() = parent != null
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     /** F5: bumped to build the page again, which loads it afresh */
     val reload = androidx.compose.runtime.mutableIntStateOf(0)
@@ -104,7 +107,7 @@ class AppState(val platform: Platform, val store: Store) {
     var discover by mutableStateOf(false)
 
     /** the library shared with a TubeHaus server, when one is connected in Settings */
-    val sync by lazy { app.tubehaus.data.ServerSync(store, scope) }
+    val sync: app.tubehaus.data.ServerSync by lazy { parent?.sync ?: app.tubehaus.data.ServerSync(store, scope) }
 
     /** a newer version to offer, found by [checkForUpdates] */
     var update by mutableStateOf<Remote.Release?>(null)
@@ -255,7 +258,7 @@ class AppState(val platform: Platform, val store: Store) {
     }
 
     /** the TV has asked "Who's watching?" since it opened (or there is only one person) */
-    var whoAsked by mutableStateOf(false)
+    var whoAsked by mutableStateOf(parent != null)
 
     /** someone else uses the app now: their library, recommendations, settings and server login */
     fun switchPerson(id: String) {
@@ -271,6 +274,8 @@ class AppState(val platform: Platform, val store: Store) {
     var shortFirst: Video? = null
 
     fun watch(v: Video, queue: List<Video> = emptyList()) {
+        // a middle click: in a window of its own
+        if (NewWindow.next && !v.short) { NewWindow.next = false; if (platform.newWindow(v, queue)) return }
         // a Short plays upright in the Shorts player, as on YouTube, not in the wide video page
         if (v.short && !noShorts) {
             playback.close()
