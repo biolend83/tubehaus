@@ -649,6 +649,7 @@ private fun SettingsRows(
                         "↑ / ↓" to tr("Volume"), "M" to tr("Mute"), "F" to tr("Full screen"), "C" to tr("Captions"),
                         ", / ." to tr("Slower / faster"), "N / P" to tr("Next / previous video"), "0–9" to tr("Jump to 0–90%"),
                         "F5" to tr("Refresh the page"), "F11" to tr("Full screen window"), "Esc" to tr("Back"), "Alt+← / Alt+→" to tr("Back / forward"), tr("Middle click") to tr("Open a video in a new window"),
+                        "Home" to tr("Back to the top of the page"),
                     )) Row(Modifier.padding(vertical = 3.dp)) {
                         Text(k, Modifier.width(150.dp), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                         Text(d, style = MaterialTheme.typography.bodyMedium)
