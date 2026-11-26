@@ -30,7 +30,9 @@ object Vtt {
             val (a, b) = rows[i].trim().split("-->").let { it[0].trim() to it[1].trim().substringBefore(' ') }
             i++
             val text = mutableListOf<String>()
-            while (i < rows.size && rows[i].isNotBlank()) { text += rows[i]; i++ }
+            // only an empty line ends a cue: automatic captions start a line after a pause with " " (the empty top line
+            // of two), and ending the cue there lost the words below it
+            while (i < rows.size && rows[i].isNotEmpty()) { text += rows[i]; i++ }
             val lines = text.map { tags.replace(it, "").replace("&nbsp;", " ").trim() }.filter { it.isNotEmpty() }
             cues += Cue(ms(a), ms(b), lines)
         }
