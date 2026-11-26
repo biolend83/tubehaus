@@ -74,6 +74,9 @@ class DesktopPlatform : Platform {
     override val nearby: app.tubehaus.ui.Nearby by lazy { app.tubehaus.cast.Lan() }
     var window: WindowState? = null
     var frame: Frame? = null
+    /** opens another window of the app with a video (set by [startApp]) */
+    var onNewWindow: ((app.tubehaus.engine.Video, List<app.tubehaus.engine.Video>) -> Boolean)? = null
+    override fun newWindow(v: app.tubehaus.engine.Video, queue: List<app.tubehaus.engine.Video>) = onNewWindow?.invoke(v, queue) ?: false
 
     override fun share(title: String, url: String): Boolean {
         Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(url), null)
@@ -216,6 +219,15 @@ private fun startApp() {
     val state = AppState(platform, Store(platform.dataDir))
     // macOS Control Center and the media keys: what plays and its buttons
     MacMediaControls(state, File(platform.cacheDir.toString(), "nowplaying")).start()
+    // more windows: a video opened with a middle click, each with its own player, the library shared
+    val extras = androidx.compose.runtime.mutableStateListOf<Extra>()
+    var open: ((app.tubehaus.engine.Video, List<app.tubehaus.engine.Video>) -> Boolean)? = null
+    open = { v, q ->
+        val p = DesktopPlatform().also { it.onNewWindow = open }
+        extras.add(Extra(p, AppState(p, state.store, state), v, q))
+        true
+    }
+    platform.onNewWindow = open
     application {
         val s0 = state.store.settings.value
         val ws = rememberWindowState(
@@ -223,18 +235,39 @@ private fun startApp() {
             placement = if (s0.winMax) WindowPlacement.Maximized else WindowPlacement.Floating,
         )
         platform.window = ws
+        AppWindow(state, platform, ws, "TubeHaus") {
+            val max = ws.placement == WindowPlacement.Maximized
+            val sz = ws.size
+            state.store.settings.update { it.copy(winMax = max, winW = if (max || ws.placement == WindowPlacement.Fullscreen) it.winW else sz.width.value.toInt(), winH = if (max || ws.placement == WindowPlacement.Fullscreen) it.winH else sz.height.value.toInt()) }
+            for (x in extras) { x.state.playback.close(); x.platform.mpv.shutdown() }
+            state.playback.close()
+            state.store.flush()
+            platform.mpv.shutdown()
+            exitApplication()
+        }
+        for (x in extras) androidx.compose.runtime.key(x) {
+            val xs = rememberWindowState(size = DpSize(1100.dp, 720.dp))
+            x.platform.window = xs
+            AppWindow(x.state, x.platform, xs, x.video.title.ifEmpty { "TubeHaus" }) {
+                x.state.playback.close()
+                x.platform.mpv.shutdown()
+                extras.remove(x)
+            }
+            androidx.compose.runtime.LaunchedEffect(x) { x.state.watch(x.video, x.queue) }
+        }
+    }
+}
+
+/** another window: its own player and page, the first window's library */
+private class Extra(val platform: DesktopPlatform, val state: AppState, val video: app.tubehaus.engine.Video, val queue: List<app.tubehaus.engine.Video>)
+
+/** one window of the app: [state]'s pages, the keys and the mouse's side buttons */
+@androidx.compose.runtime.Composable
+private fun AppWindow(state: AppState, platform: DesktopPlatform, ws: WindowState, title: String, onClose: () -> Unit) {
         Window(
-            onCloseRequest = {
-                val max = ws.placement == WindowPlacement.Maximized
-                val sz = ws.size
-                state.store.settings.update { it.copy(winMax = max, winW = if (max || ws.placement == WindowPlacement.Fullscreen) it.winW else sz.width.value.toInt(), winH = if (max || ws.placement == WindowPlacement.Fullscreen) it.winH else sz.height.value.toInt()) }
-                state.playback.close()
-                state.store.flush()
-                platform.mpv.shutdown()
-                exitApplication()
-            },
+            onCloseRequest = onClose,
             state = ws,
-            title = "TubeHaus",
+            title = title,
             icon = androidx.compose.ui.res.painterResource("icon.png"),
             onPreviewKeyEvent = { e ->
                 if (e.type != KeyEventType.KeyDown) false
@@ -287,5 +320,4 @@ private fun startApp() {
                 },
             ) { App(state) }
         }
-    }
 }
