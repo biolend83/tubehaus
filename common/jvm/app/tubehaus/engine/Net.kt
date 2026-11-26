@@ -30,6 +30,9 @@ object Net {
     private class Custom(val tm: X509TrustManager, val host: String)
     @Volatile private var custom: Custom? = null
 
+    /** whether this platform keeps its own certificates for the server (iOS uses the system's instead) */
+    const val customCerts = true
+
     /** the certificates trusted, besides the system's, for the server at [server] (its address as in the settings) */
     fun setCustomCerts(pems: List<String>, server: String) {
         val host = runCatching { java.net.URI(server.trim()).host?.trim('[', ']')?.lowercase() }.getOrNull()
