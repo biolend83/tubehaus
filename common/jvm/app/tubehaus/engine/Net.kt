@@ -25,43 +25,67 @@ object Net {
         tmf.trustManagers.filterIsInstance<X509TrustManager>().first()
     }
 
-    /** extra certificates (PEM) the user added for a self-hosted TubeHaus server with its own CA */
-    private val customCerts = mutableListOf<X509Certificate>()
-    private var customTrustManager: X509TrustManager? = null
+    /** extra certificates (PEM) the user added for a self-hosted TubeHaus server with its own CA, and that server's host:
+     *  they vouch for that host only, never for YouTube or any other site */
+    private class Custom(val tm: X509TrustManager, val host: String)
+    @Volatile private var custom: Custom? = null
 
-    /** replace the set of custom certificates trusted in addition to the system ones */
-    fun setCustomCerts(pems: List<String>) {
-        customCerts.clear()
+    /** the certificates trusted, besides the system's, for the server at [server] (its address as in the settings) */
+    fun setCustomCerts(pems: List<String>, server: String) {
+        val host = runCatching { java.net.URI(server.trim()).host?.trim('[', ']')?.lowercase() }.getOrNull()
         val cf = CertificateFactory.getInstance("X.509")
-        for (pem in pems) {
-            runCatching {
-                cf.generateCertificates(ByteArrayInputStream(pem.toByteArray(Charsets.UTF_8))).filterIsInstance<X509Certificate>()
-            }.getOrNull()?.let { customCerts.addAll(it) }
+        val certs = pems.flatMap { pem ->
+            runCatching { cf.generateCertificates(ByteArrayInputStream(pem.toByteArray(Charsets.UTF_8))).filterIsInstance<X509Certificate>() }.getOrDefault(emptyList())
         }
-        customTrustManager = if (customCerts.isEmpty()) null else run {
+        custom = if (certs.isEmpty() || host.isNullOrEmpty()) null else runCatching {
             val ks = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null, null) }
-            customCerts.forEachIndexed { i, c -> ks.setCertificateEntry("custom$i", c) }
+            certs.forEachIndexed { i, c -> ks.setCertificateEntry("custom$i", c) }
             val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
             tmf.init(ks)
-            tmf.trustManagers.filterIsInstance<X509TrustManager>().firstOrNull()
+            tmf.trustManagers.filterIsInstance<X509TrustManager>().firstOrNull()?.let { Custom(it, host) }
+        }.getOrNull()
+    }
+
+    /** whether [leaf] is a certificate for [c]'s host (its names), and the connection ([peer]) goes there when known */
+    private fun forServer(c: Custom, leaf: X509Certificate?, peer: String?): Boolean {
+        if (leaf == null) return false
+        if (peer != null && !peer.equals(c.host, true)) return false
+        val names = runCatching { leaf.subjectAlternativeNames?.mapNotNull { (it.getOrNull(1) as? String)?.lowercase() } }.getOrNull().orEmpty()
+        return names.any { n -> n == c.host || (n.startsWith("*.") && c.host.endsWith(n.substring(1)) && c.host.count { it == '.' } == n.count { it == '.' }) }
+    }
+
+    /** the system's answer first; when it refuses, the user's certificates, for the server's own host only */
+    private inline fun server(chain: Array<out X509Certificate>, authType: String, peer: String?, system: () -> Unit) {
+        try { system() } catch (e: java.security.cert.CertificateException) {
+            val c = custom
+            if (c == null || !forServer(c, chain.firstOrNull(), peer)) throw e
+            c.tm.checkServerTrusted(chain, authType)
         }
     }
 
-    /** trusts the system CAs plus any custom certificates the user added */
-    private val trustManager = object : X509TrustManager {
-        override fun checkClientTrusted(chain: Array<out X509Certificate>, authType: String) =
-            defaultTrustManager.checkClientTrusted(chain, authType)
-
-        override fun checkServerTrusted(chain: Array<out X509Certificate>, authType: String) {
-            try {
-                defaultTrustManager.checkServerTrusted(chain, authType)
-            } catch (e: Exception) {
-                customTrustManager?.checkServerTrusted(chain, authType) ?: throw e
+    /**
+     * The system's trust plus the user's certificates. An extended trust manager that hands the system's the
+     * connection too: Android's, with a network security config that names a domain (ours: 127.0.0.1), refuses
+     * every check that comes without the host name.
+     */
+    private val trustManager = object : javax.net.ssl.X509ExtendedTrustManager() {
+        private val ext = defaultTrustManager as? javax.net.ssl.X509ExtendedTrustManager
+        override fun checkClientTrusted(chain: Array<out X509Certificate>, authType: String) = defaultTrustManager.checkClientTrusted(chain, authType)
+        override fun checkClientTrusted(chain: Array<out X509Certificate>, authType: String, socket: java.net.Socket?) =
+            ext?.checkClientTrusted(chain, authType, socket) ?: defaultTrustManager.checkClientTrusted(chain, authType)
+        override fun checkClientTrusted(chain: Array<out X509Certificate>, authType: String, engine: javax.net.ssl.SSLEngine?) =
+            ext?.checkClientTrusted(chain, authType, engine) ?: defaultTrustManager.checkClientTrusted(chain, authType)
+        override fun checkServerTrusted(chain: Array<out X509Certificate>, authType: String) =
+            server(chain, authType, null) { defaultTrustManager.checkServerTrusted(chain, authType) }
+        override fun checkServerTrusted(chain: Array<out X509Certificate>, authType: String, socket: java.net.Socket?) =
+            server(chain, authType, (socket as? javax.net.ssl.SSLSocket)?.handshakeSession?.peerHost) {
+                ext?.checkServerTrusted(chain, authType, socket) ?: defaultTrustManager.checkServerTrusted(chain, authType)
             }
-        }
-
-        override fun getAcceptedIssuers(): Array<X509Certificate> =
-            defaultTrustManager.acceptedIssuers + (customTrustManager?.acceptedIssuers ?: emptyArray())
+        override fun checkServerTrusted(chain: Array<out X509Certificate>, authType: String, engine: javax.net.ssl.SSLEngine?) =
+            server(chain, authType, engine?.peerHost) {
+                ext?.checkServerTrusted(chain, authType, engine) ?: defaultTrustManager.checkServerTrusted(chain, authType)
+            }
+        override fun getAcceptedIssuers(): Array<X509Certificate> = defaultTrustManager.acceptedIssuers + (custom?.tm?.acceptedIssuers ?: emptyArray())
     }
 
     private val sslSocketFactory = SSLContext.getInstance("TLS").apply {

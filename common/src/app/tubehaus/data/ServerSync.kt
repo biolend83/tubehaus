@@ -47,11 +47,11 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
         // with a server connected, videos play through it (ServerVideo)
         store.settings.value.let {
             ServerVideo.set(it.server, it.serverUser, it.serverPass, it.serverToken)
-            Net.setCustomCerts(it.serverCerts)
+            Net.setCustomCerts(it.serverCerts, it.server)
         }
         scope.launch { store.settings.state.collect {
             ServerVideo.set(it.server, it.serverUser, it.serverPass, it.serverToken)
-            Net.setCustomCerts(it.serverCerts)
+            Net.setCustomCerts(it.serverCerts, it.server)
         } }
         scope.launch {
             while (true) {

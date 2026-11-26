@@ -44,6 +44,11 @@ fun tr(s: String): String {
 fun textOverride(key: String, lang: String): String = ""
 
 private val KO by lazy { mapOf(
+    "Custom certificates (internal / local SSL):" to "사설 인증서 (내부 / 로컬 SSL):",
+    "{n} certificate(s) trusted for this server" to "이 서버에 믿는 인증서 {n}개",
+    "Certificate added" to "인증서를 추가했어요",
+    "Add certificate" to "인증서 추가",
+    "Certificates cleared" to "인증서를 지웠어요",
     "Ask who's watching when the app opens" to "앱을 열 때 누가 볼지 묻기",
     "PIN for {n}" to "{n}의 PIN",
     "Asked before switching to you, so others can't open your library" to "나로 바꿀 때 물어봐요. 다른 사람이 내 서재를 열 수 없어요",
@@ -806,6 +811,11 @@ private val KO by lazy { mapOf(
 
 // Español. Machine-made, not yet read by a native speaker: corrections welcome
 private val ES by lazy { mapOf(
+    "Custom certificates (internal / local SSL):" to "Certificados propios (SSL interno / local):",
+    "{n} certificate(s) trusted for this server" to "{n} certificado(s) de confianza para este servidor",
+    "Certificate added" to "Certificado añadido",
+    "Add certificate" to "Añadir certificado",
+    "Certificates cleared" to "Certificados borrados",
     "Ask who's watching when the app opens" to "Preguntar quién está viendo al abrir la app",
     "PIN for {n}" to "PIN de {n}",
     "Asked before switching to you, so others can't open your library" to "Se pide antes de cambiar a ti, para que nadie más abra tu biblioteca",
@@ -1476,6 +1486,11 @@ private val ES by lazy { mapOf(
 
 // 日本語. Machine-made, not yet read by a native speaker: corrections welcome
 private val JA by lazy { mapOf(
+    "Custom certificates (internal / local SSL):" to "独自の証明書(内部 / ローカル SSL):",
+    "{n} certificate(s) trusted for this server" to "このサーバーで信頼する証明書 {n} 件",
+    "Certificate added" to "証明書を追加しました",
+    "Add certificate" to "証明書を追加",
+    "Certificates cleared" to "証明書を消去しました",
     "Ask who's watching when the app opens" to "アプリを開くときに誰が見るか聞く",
     "PIN for {n}" to "{n} の PIN",
     "Asked before switching to you, so others can't open your library" to "あなたに切り替えるときに確認します。他の人はあなたのライブラリを開けません",
@@ -2146,6 +2161,11 @@ private val JA by lazy { mapOf(
 
 // Deutsch. Machine-made, not yet read by a native speaker: corrections welcome
 private val DE by lazy { mapOf(
+    "Custom certificates (internal / local SSL):" to "Eigene Zertifikate (internes / lokales SSL):",
+    "{n} certificate(s) trusted for this server" to "{n} Zertifikat(e) für diesen Server vertraut",
+    "Certificate added" to "Zertifikat hinzugefügt",
+    "Add certificate" to "Zertifikat hinzufügen",
+    "Certificates cleared" to "Zertifikate entfernt",
     "Ask who's watching when the app opens" to "Beim Öffnen fragen, wer schaut",
     "PIN for {n}" to "PIN für {n}",
     "Asked before switching to you, so others can't open your library" to "Wird vor dem Wechsel zu dir abgefragt, damit andere deine Mediathek nicht öffnen",
@@ -2816,6 +2836,11 @@ private val DE by lazy { mapOf(
 
 // 简体中文 (Simplified Chinese). Machine-made, not yet read by a native speaker: corrections welcome
 private val ZH by lazy { mapOf(
+    "Custom certificates (internal / local SSL):" to "自定义证书(内部 / 本地 SSL):",
+    "{n} certificate(s) trusted for this server" to "此服务器信任 {n} 个证书",
+    "Certificate added" to "已添加证书",
+    "Add certificate" to "添加证书",
+    "Certificates cleared" to "已清除证书",
     "Ask who's watching when the app opens" to "打开应用时询问谁在观看",
     "PIN for {n}" to "{n} 的 PIN",
     "Asked before switching to you, so others can't open your library" to "切换到你时需要输入，其他人无法打开你的媒体库",
@@ -3486,6 +3511,11 @@ private val ZH by lazy { mapOf(
 
 // Português (Portuguese). Machine-made, not yet read by a native speaker: corrections welcome
 private val PT by lazy { mapOf(
+    "Custom certificates (internal / local SSL):" to "Certificados próprios (SSL interno / local):",
+    "{n} certificate(s) trusted for this server" to "{n} certificado(s) confiável(is) para este servidor",
+    "Certificate added" to "Certificado adicionado",
+    "Add certificate" to "Adicionar certificado",
+    "Certificates cleared" to "Certificados apagados",
     "Ask who's watching when the app opens" to "Perguntar quem está assistindo ao abrir o app",
     "PIN for {n}" to "PIN de {n}",
     "Asked before switching to you, so others can't open your library" to "Pedido antes de mudar para você, para ninguém abrir sua biblioteca",
@@ -4156,6 +4186,11 @@ private val PT by lazy { mapOf(
 
 // Français (French). Machine-made, not yet read by a native speaker: corrections welcome
 private val FR by lazy { mapOf(
+    "Custom certificates (internal / local SSL):" to "Certificats personnalisés (SSL interne / local) :",
+    "{n} certificate(s) trusted for this server" to "{n} certificat(s) approuvé(s) pour ce serveur",
+    "Certificate added" to "Certificat ajouté",
+    "Add certificate" to "Ajouter un certificat",
+    "Certificates cleared" to "Certificats effacés",
     "Ask who's watching when the app opens" to "Demander qui regarde à l'ouverture",
     "PIN for {n}" to "PIN de {n}",
     "Asked before switching to you, so others can't open your library" to "Demandé avant de passer à vous, pour que personne d'autre n'ouvre votre bibliothèque",
@@ -4826,6 +4861,11 @@ private val FR by lazy { mapOf(
 
 // Русский (Russian). Machine-made, not yet read by a native speaker: corrections welcome
 private val RU by lazy { mapOf(
+    "Custom certificates (internal / local SSL):" to "Свои сертификаты (внутренний / локальный SSL):",
+    "{n} certificate(s) trusted for this server" to "Доверенных сертификатов для этого сервера: {n}",
+    "Certificate added" to "Сертификат добавлен",
+    "Add certificate" to "Добавить сертификат",
+    "Certificates cleared" to "Сертификаты удалены",
     "Ask who's watching when the app opens" to "Спрашивать, кто смотрит, при открытии",
     "PIN for {n}" to "PIN для {n}",
     "Asked before switching to you, so others can't open your library" to "Запрашивается при переключении на вас, чтобы другие не открыли вашу библиотеку",
@@ -5496,6 +5536,11 @@ private val RU by lazy { mapOf(
 
 // हिन्दी (Hindi). Machine-made, not yet read by a native speaker: corrections welcome
 private val HI by lazy { mapOf(
+    "Custom certificates (internal / local SSL):" to "अपने प्रमाणपत्र (आंतरिक / लोकल SSL):",
+    "{n} certificate(s) trusted for this server" to "इस सर्वर के लिए {n} भरोसेमंद प्रमाणपत्र",
+    "Certificate added" to "प्रमाणपत्र जोड़ा गया",
+    "Add certificate" to "प्रमाणपत्र जोड़ें",
+    "Certificates cleared" to "प्रमाणपत्र हटाए गए",
     "Ask who's watching when the app opens" to "ऐप खोलते समय पूछें कि कौन देख रहा है",
     "PIN for {n}" to "{n} का PIN",
     "Asked before switching to you, so others can't open your library" to "आप पर जाने से पहले पूछा जाता है, ताकि कोई और आपकी लाइब्रेरी न खोले",
@@ -6166,6 +6211,11 @@ private val HI by lazy { mapOf(
 
 // Bahasa Indonesia (Indonesian). Machine-made, not yet read by a native speaker: corrections welcome
 private val ID by lazy { mapOf(
+    "Custom certificates (internal / local SSL):" to "Sertifikat sendiri (SSL internal / lokal):",
+    "{n} certificate(s) trusted for this server" to "{n} sertifikat dipercaya untuk server ini",
+    "Certificate added" to "Sertifikat ditambahkan",
+    "Add certificate" to "Tambah sertifikat",
+    "Certificates cleared" to "Sertifikat dihapus",
     "Ask who's watching when the app opens" to "Tanyakan siapa yang menonton saat aplikasi dibuka",
     "PIN for {n}" to "PIN untuk {n}",
     "Asked before switching to you, so others can't open your library" to "Ditanyakan sebelum beralih ke Anda, agar orang lain tak bisa membuka pustaka Anda",
@@ -6836,6 +6886,11 @@ private val ID by lazy { mapOf(
 
 // Türkçe (Turkish). Machine-made, not yet read by a native speaker: corrections welcome
 private val TR by lazy { mapOf(
+    "Custom certificates (internal / local SSL):" to "Özel sertifikalar (dahili / yerel SSL):",
+    "{n} certificate(s) trusted for this server" to "Bu sunucu için güvenilen {n} sertifika",
+    "Certificate added" to "Sertifika eklendi",
+    "Add certificate" to "Sertifika ekle",
+    "Certificates cleared" to "Sertifikalar temizlendi",
     "Ask who's watching when the app opens" to "Uygulama açılınca kimin izlediğini sor",
     "PIN for {n}" to "{n} için PIN",
     "Asked before switching to you, so others can't open your library" to "Sana geçmeden önce sorulur, böylece başkaları kitaplığını açamaz",
@@ -7506,6 +7561,11 @@ private val TR by lazy { mapOf(
 
 // বাংলা (Bengali). Machine-made, not yet read by a native speaker: corrections welcome
 private val BN by lazy { mapOf(
+    "Custom certificates (internal / local SSL):" to "নিজস্ব সার্টিফিকেট (অভ্যন্তরীণ / লোকাল SSL):",
+    "{n} certificate(s) trusted for this server" to "এই সার্ভারের জন্য বিশ্বস্ত {n}টি সার্টিফিকেট",
+    "Certificate added" to "সার্টিফিকেট যোগ হয়েছে",
+    "Add certificate" to "সার্টিফিকেট যোগ করুন",
+    "Certificates cleared" to "সার্টিফিকেট মুছে ফেলা হয়েছে",
     "Ask who's watching when the app opens" to "অ্যাপ খুললে কে দেখছেন জিজ্ঞেস করুন",
     "PIN for {n}" to "{n}-এর PIN",
     "Asked before switching to you, so others can't open your library" to "আপনাতে বদলানোর আগে জিজ্ঞেস করা হয়, যাতে অন্যরা আপনার লাইব্রেরি খুলতে না পারে",
