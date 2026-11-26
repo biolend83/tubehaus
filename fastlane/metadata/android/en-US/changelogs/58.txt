@@ -1,0 +1,4 @@
+- Your own server with a private certificate (internal CA): add its certificate in the server settings (#123, thanks @Kigurame)
+- Desktop: a middle click opens a video in a new window
+- Captions: words after a pause no longer go missing
+- Apple TV: videos start in their original audio (#124, thanks @Drizztfire)
