@@ -169,10 +169,12 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
 
     /**
      * Checks the server, merges this device's library into it, then takes the merged library.
-     * Returns null when it worked, or a short reason: "address", "login", "public", "notTubeHaus", "network".
+     * Returns null when it worked, or a short reason: "address", "login", "public", "notTubeHaus", "cert", "network: <why>".
      */
     suspend fun connect(address: String, user: String, pass: String): String? {
         val base = normalize(address) ?: return "address"
+        // the certificates the user added vouch for this address from the first request on (not only once it is saved)
+        Net.setCustomCerts(store.settings.value.serverCerts, base)
         return connectAs(base, store.settings.value.copy(server = base, serverUser = user.trim(), serverPass = pass, serverToken = ""))
     }
 
@@ -183,6 +185,7 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
      */
     suspend fun connectInBrowser(address: String, name: String, show: (url: String, code: String) -> Unit): String? {
         val base = normalize(address) ?: return "address"
+        Net.setCustomCerts(store.settings.value.serverCerts, base)
         val h = try {
             storeJson.parseToJsonElement(Net.get("$base/api/p/health", mapOf("Accept" to "application/json"))) as JsonObject
         } catch (e: Exception) {
@@ -260,8 +263,14 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
         e is HttpError && (e.code == 401 || e.code == 403) -> "login"
         e is HttpError && e.code == 404 -> "notTubeHaus"
         e is kotlinx.serialization.SerializationException -> "notTubeHaus"
-        else -> "network"
+        // the server's certificate isn't one the device (or the certificates added for it) trusts
+        causes(e).any { c -> c::class.simpleName.orEmpty().let { "SSLHandshake" in it || "CertPath" in it || "CertificateException" in it } ||
+            c.message.orEmpty().let { "Trust anchor" in it || "certification path" in it || "not trusted" in it } } -> "cert"
+        // what went wrong, shown under the message (a name that doesn't resolve, a refused connection, a timeout)
+        else -> "network: " + causes(e).last().let { (it::class.simpleName ?: "") + (it.message?.let { m -> ": " + m.take(140) } ?: "") }
     }
+
+    private fun causes(e: Throwable): List<Throwable> = generateSequence(e) { it.cause.takeIf { c -> c !== it } }.take(8).toList()
 
     companion object {
         /** "tube.example.com" or "https://tube.example.com/" → "https://tube.example.com"; null when it isn't an address */
