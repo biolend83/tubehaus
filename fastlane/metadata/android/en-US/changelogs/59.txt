@@ -1,0 +1,3 @@
+- Your own server with a private certificate: the certificate you add is used from the first connection (#122)
+- A certificate problem says so, and other connection errors show their reason
+- The chapter list no longer closes by itself while the video plays (#127)
