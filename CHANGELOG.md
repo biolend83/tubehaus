@@ -1,9 +1,12 @@
 # Changelog
 
-## Unreleased
+## v2.0.2 — 2026-11-26
 
 ### Fixed
 - **Audio track menu on iPhone and iPad (web app):** with the device's own player the menu now lists the video's tracks (original first) and switches between them; a language picked before is chosen again (#125)
+
+### Added
+- Docker images carry an SBOM attestation (list of what is inside), thanks to @sweepies
 
 ## v2.0.1 — 2026-11-25
 

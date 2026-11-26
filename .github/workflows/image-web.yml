@@ -55,6 +55,7 @@ jobs:
             ${{ env.IMAGE }}:latest
             ${{ github.event_name == 'release' && format('{0}:{1}', env.IMAGE, steps.v.outputs.v) || '' }}
           push: true
+          sbom: true
 
       - name: Copy both images to Docker Hub
         env:
