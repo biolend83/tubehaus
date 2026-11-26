@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.0.2</string>
+	<string>2.0.3</string>
 	<key>CFBundleVersion</key>
-	<string>58</string>
+	<string>59</string>
 	<!-- tubehaus://open?url=<a YouTube link>: what the share extension hands over -->
 	<key>CFBundleURLTypes</key>
 	<array>
