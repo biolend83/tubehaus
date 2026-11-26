@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "2.0.2",
+          "buildVersion": "58",
+          "date": "2026-11-26T08:29:18+00:00",
+          "localizedDescription": "2.0.2: certificates for your own server, captions after a pause fixed.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v2.0.2/TubeHaus-2.0.2-ipad.ipa",
+          "size": 22502781,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "2.0.1",
           "buildVersion": "57",
           "date": "2026-11-26T05:39:27+00:00",
@@ -311,11 +320,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "2.0.1",
-      "versionDate": "2026-11-26T05:39:27+00:00",
-      "versionDescription": "2.0.1: fixes Korean videos failing on the SABR way, smoother live.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v2.0.1/TubeHaus-2.0.1-ipad.ipa",
-      "size": 22487743
+      "version": "2.0.2",
+      "versionDate": "2026-11-26T08:29:18+00:00",
+      "versionDescription": "2.0.2: certificates for your own server, captions after a pause fixed.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v2.0.2/TubeHaus-2.0.2-ipad.ipa",
+      "size": 22502781
     }
   ],
   "news": [],
