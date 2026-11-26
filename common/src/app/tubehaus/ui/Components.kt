@@ -626,6 +626,9 @@ fun Refreshable(app: AppState, refresh: (suspend () -> Unit)?, atTop: () -> Bool
     val tick = app.reselect
     val start = remember { tick }
     LaunchedEffect(tick) { if (tick != start) { if (atTop()) again() else toTop() } }
+    val home = app.homeKey
+    val homeStart = remember { home }
+    LaunchedEffect(home) { if (home != homeStart && !atTop()) toTop() }
     if (refresh != null && app.platform.touch && !app.platform.tv) {
         androidx.compose.material3.pulltorefresh.PullToRefreshBox(busy, again, Modifier.fillMaxSize()) { content() }
     } else content()
