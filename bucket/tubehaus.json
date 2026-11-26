@@ -1,16 +1,16 @@
 {
-    "version": "2.0.0",
+    "version": "2.0.1",
     "description": "Private YouTube client with no Google account, no ads and no tracking",
     "homepage": "https://github.com/biolend83/tubehaus",
     "license": "GPL-3.0-only",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/biolend83/tubehaus/releases/download/app-v2.0.0/TubeHaus-2.0.0-win-x64-portable.zip",
-            "hash": "b8d312fe2a27a88aae807c7d4972c1bee83957347b8c2df36cad207fc06b2767"
+            "url": "https://github.com/biolend83/tubehaus/releases/download/app-v2.0.1/TubeHaus-2.0.1-win-x64-portable.zip",
+            "hash": "8ae0fabca190a82b4c380c9345a6830a6e2687bb9d4e01c810a48499ff3398c3"
         },
         "arm64": {
-            "url": "https://github.com/biolend83/tubehaus/releases/download/app-v2.0.0/TubeHaus-2.0.0-win-arm64-portable.zip",
-            "hash": "2a63744766e0b76d8e31cd811d2877fe66522acab8cabf93513ab213438dcfd9"
+            "url": "https://github.com/biolend83/tubehaus/releases/download/app-v2.0.1/TubeHaus-2.0.1-win-arm64-portable.zip",
+            "hash": "09fa0e22604fb3edfa27f33f53c61880afa8ad90d0148c43f6f3ef6c3e5ecc0a"
         }
     },
     "extract_dir": "TubeHaus",
