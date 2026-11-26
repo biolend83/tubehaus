@@ -231,6 +231,9 @@ data class Settings(
     val nearAllowed: List<String> = emptyList(),
     /** channels whose new videos are saved by themselves (ui/AutoSave.kt): channel id → from when (epoch s) */
     val autoSave: Map<String, Long> = emptyMap(),
+    /** extra CA / server certificates (PEM) trusted when connecting to a TubeHaus server over HTTPS,
+     *  for self-hosted instances with their own certificate authority (internal / local SSL) */
+    val serverCerts: List<String> = emptyList(),
 )
 
 /** One day of watching, kept on this device only: seconds of video and music, per channel and artist. */
