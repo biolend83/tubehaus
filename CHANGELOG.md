@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **Audio track menu on iPhone and iPad (web app):** with the device's own player the menu now lists the video's tracks (original first) and switches between them; a language picked before is chosen again (#125)
+
 ## v2.0.1 — 2026-11-25
 
 ### Fixed

@@ -315,8 +315,8 @@ export class Player {
       }
     }
     this.video.playbackRate = settings.rememberSpeed ? (+settings.speed || 1) : (+sessionStorage.getItem("yt.speed") || 1);
+    this.startAudio();
     if (!native) {
-      this.startAudio();
       await this.rateTracks();
       this.applyDefaultQuality();
     }
@@ -1200,6 +1200,19 @@ export class Player {
   }
   /** the audio tracks: one per language and role, the original first, then by name */
   audioOpts() {
+    // iPhone and iPad, the device's own player: the tracks of the server's HLS (the original first, as its default)
+    if (this.native) {
+      const L = this.video.audioTracks;
+      if (!L || L.length < 2) return [];
+      const out = [];
+      for (let i = 0; i < L.length; i++) {
+        const t = L[i];
+        const desc = /desc/i.test(t.kind || "") || /description/i.test(t.label || "");
+        const o = { key: "n|" + i, idx: i, lang: t.language || "", orig: i === 0 && !desc, desc };
+        out.push({ ...o, label: o.lang ? audioName(o) : t.label || "Audio " + (i + 1) });
+      }
+      return out;
+    }
     if (!this.sp) return [];
     const m = new Map();
     for (const t of this.sp.getVariantTracks()) {
@@ -1213,11 +1226,17 @@ export class Player {
     return opts.sort((a, b) => b.orig - a.orig || a.desc - b.desc || a.label.localeCompare(b.label, LOCALE));
   }
   curAudio() {
+    if (this.native) { const L = this.video.audioTracks; return this.audioOpts().find((o) => L[o.idx]?.enabled) || null; }
     const t = this.curTrack();
     return t ? this.audioOpts().find((o) => o.key === audioKey(t)) : null;
   }
   /** switch the audio, keeping the picture at the same height */
   pickAudio(key) {
+    if (this.native) {
+      const L = this.video.audioTracks, i = +key.split("|")[1];
+      if (L && L[i]) for (let j = 0; j < L.length; j++) L[j].enabled = j === i;
+      return;
+    }
     const cur = this.curTrack();
     const h = this.lockH || cur?.height || 0;
     const fps = (t) => Math.round(t.frameRate || 0);
