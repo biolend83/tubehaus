@@ -45,8 +45,14 @@ class ServerSync(private val store: Store, private val scope: CoroutineScope) {
     init {
         store.onQueued = { kick.trySend(Unit) }
         // with a server connected, videos play through it (ServerVideo)
-        store.settings.value.let { ServerVideo.set(it.server, it.serverUser, it.serverPass, it.serverToken) }
-        scope.launch { store.settings.state.collect { ServerVideo.set(it.server, it.serverUser, it.serverPass, it.serverToken) } }
+        store.settings.value.let {
+            ServerVideo.set(it.server, it.serverUser, it.serverPass, it.serverToken)
+            Net.setCustomCerts(it.serverCerts)
+        }
+        scope.launch { store.settings.state.collect {
+            ServerVideo.set(it.server, it.serverUser, it.serverPass, it.serverToken)
+            Net.setCustomCerts(it.serverCerts)
+        } }
         scope.launch {
             while (true) {
                 // a change: send it a little later, so a burst (a playing video saves its position
