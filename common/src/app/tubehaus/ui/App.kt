@@ -213,6 +213,7 @@ fun App(app: AppState) {
                     }
                     LaunchedEffect(settings.audioDevice) { app.player.setAudioDevice(settings.audioDevice) }
                     app.update?.let { UpdateDialog(app, it) }
+                    if (app.chaptersOpen) ChaptersSheet(app) { app.chaptersOpen = false }
                     if (app.casting.picking) CastDialog(app)
                     app.whatsNew?.let { WhatsNewDialog(app, it) }
                     app.reminder?.let { ReminderDialog(app, it) }

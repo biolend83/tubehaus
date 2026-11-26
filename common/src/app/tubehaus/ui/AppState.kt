@@ -260,6 +260,9 @@ class AppState(val platform: Platform, val store: Store, private val parent: App
     /** the TV has asked "Who's watching?" since it opened (or there is only one person) */
     var whoAsked by mutableStateOf(parent != null)
 
+    /** the list of chapters is open (kept here, not in the player's controls: they hide while the video plays) */
+    var chaptersOpen by mutableStateOf(false)
+
     /** someone else uses the app now: their library, recommendations, settings and server login */
     fun switchPerson(id: String) {
         if (id == store.people.value.current) return
