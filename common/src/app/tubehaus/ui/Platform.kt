@@ -39,6 +39,8 @@ interface Platform {
     /** a share sheet where there is one; false when the link was copied to the clipboard instead */
     fun share(title: String, url: String): Boolean
     fun openExternal(url: String)
+    /** a computer: [v] in a window of its own (a middle click on it), this one left as it is; false where there is none */
+    fun newWindow(v: app.tubehaus.engine.Video, queue: List<app.tubehaus.engine.Video>): Boolean = false
     /** asks where to save [bytes]; calls [done] with true when written */
     fun saveFile(name: String, mime: String, bytes: ByteArray, done: (Boolean) -> Unit)
     /** lets the user pick a file; calls [done] with its text (null when cancelled) */
