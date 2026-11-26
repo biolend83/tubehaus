@@ -96,7 +96,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "2.0.2"
+const val VERSION = "2.0.3"
 
 /** Settings' categories, as cards on its first page: key, icon, title, what is inside */
 private class Cat(val key: String, val icon: Symbol, val title: String, val sub: String)
@@ -836,7 +836,8 @@ private fun serverProblem(code: String) = when (code) {
     "notTubeHaus" -> tr("No TubeHaus server answered there")
     "noBrowserSignIn" -> tr("This server has no accounts, or is older than 1.6.5: use the user name and password")
     "expired" -> tr("Nobody pressed Allow in time. Try again")
-    else -> tr("Couldn't reach the server")
+    "cert" -> tr("The server's certificate isn't trusted. Add its CA certificate with Add certificate")
+    else -> tr("Couldn't reach the server") + (code.substringAfter("network: ", "").takeIf { it.isNotEmpty() }?.let { "\n($it)" } ?: "")
 }
 
 @Composable
