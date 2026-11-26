@@ -836,7 +836,8 @@ private fun serverProblem(code: String) = when (code) {
     "notTubeHaus" -> tr("No TubeHaus server answered there")
     "noBrowserSignIn" -> tr("This server has no accounts, or is older than 1.6.5: use the user name and password")
     "expired" -> tr("Nobody pressed Allow in time. Try again")
-    else -> tr("Couldn't reach the server")
+    "cert" -> tr("The server's certificate isn't trusted. Add its CA certificate with Add certificate")
+    else -> tr("Couldn't reach the server") + (code.substringAfter("network: ", "").takeIf { it.isNotEmpty() }?.let { "\n($it)" } ?: "")
 }
 
 @Composable

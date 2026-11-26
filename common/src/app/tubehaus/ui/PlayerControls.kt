@@ -775,7 +775,6 @@ private fun PlayButton(st: PlayerState, onClick: () -> Unit) {
 @Composable
 private fun TimePills(app: AppState, st: PlayerState, dragging: Float?, remaining: Boolean, onTime: () -> Unit) {
     val pos = dragging?.let { (it * st.durationMs).toLong() } ?: st.positionMs
-    var list by remember { mutableStateOf(false) }
     val chapter = app.playback.chapters.lastOrNull { it.startMs <= pos }
     val live = app.playback.video?.live == true
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -790,14 +789,13 @@ private fun TimePills(app: AppState, st: PlayerState, dragging: Float?, remainin
             }
         }
         if (chapter != null && chapter.title.isNotEmpty()) Row(
-            Modifier.height(28.dp).clip(CircleShape).background(PILL).clickable { list = true }.padding(start = 12.dp, end = 8.dp),
+            Modifier.height(28.dp).clip(CircleShape).background(PILL).clickable { app.chaptersOpen = true }.padding(start = 12.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(chapter.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
             Icon(Sym.ChevronRight.outline, null, tint = Color(0xB3FFFFFF), modifier = Modifier.size(16.dp))
         }
     }
-    if (list) ChaptersSheet(app) { list = false }
 }
 
 @Composable
@@ -903,7 +901,6 @@ private fun Volume(app: AppState, st: PlayerState) {
 @Composable
 private fun TimeText(app: AppState, st: PlayerState, dragging: Float?, toLive: () -> Unit = {}) {
     val pos = dragging?.let { (it * st.durationMs).toLong() } ?: st.positionMs
-    var list by remember { mutableStateOf(false) }
     val chapter = app.playback.chapters.lastOrNull { it.startMs <= pos }
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (app.playback.video?.live == true) {
@@ -920,10 +917,9 @@ private fun TimeText(app: AppState, st: PlayerState, dragging: Float?, toLive: (
         )
         if (chapter != null && chapter.title.isNotEmpty()) Text(
             " • " + chapter.title + " ›", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1,
-            overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp).clip(RoundedCornerShape(4.dp)).clickable { list = true },
+            overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp).clip(RoundedCornerShape(4.dp)).clickable { app.chaptersOpen = true },
         )
     }
-    if (list) ChaptersSheet(app) { list = false }
 }
 
 /** every chapter with its picture and time; the one playing is marked, a press jumps there */

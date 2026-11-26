@@ -44,6 +44,7 @@ fun tr(s: String): String {
 fun textOverride(key: String, lang: String): String = ""
 
 private val KO by lazy { mapOf(
+    "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "서버 인증서를 믿을 수 없어요. 인증서 추가로 그 서버의 CA 인증서를 넣으세요",
     "Custom certificates (internal / local SSL):" to "사설 인증서 (내부 / 로컬 SSL):",
     "{n} certificate(s) trusted for this server" to "이 서버에 믿는 인증서 {n}개",
     "Certificate added" to "인증서를 추가했어요",
@@ -813,6 +814,7 @@ private val KO by lazy { mapOf(
 
 // Español. Machine-made, not yet read by a native speaker: corrections welcome
 private val ES by lazy { mapOf(
+    "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "No se confía en el certificado del servidor. Añade el certificado de su CA con Añadir certificado",
     "Custom certificates (internal / local SSL):" to "Certificados propios (SSL interno / local):",
     "{n} certificate(s) trusted for this server" to "{n} certificado(s) de confianza para este servidor",
     "Certificate added" to "Certificado añadido",
@@ -1488,6 +1490,7 @@ private val ES by lazy { mapOf(
 
 // 日本語. Machine-made, not yet read by a native speaker: corrections welcome
 private val JA by lazy { mapOf(
+    "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "サーバーの証明書を信頼できません。「証明書を追加」でそのサーバーの CA 証明書を追加してください",
     "Custom certificates (internal / local SSL):" to "独自の証明書(内部 / ローカル SSL):",
     "{n} certificate(s) trusted for this server" to "このサーバーで信頼する証明書 {n} 件",
     "Certificate added" to "証明書を追加しました",
@@ -2163,6 +2166,7 @@ private val JA by lazy { mapOf(
 
 // Deutsch. Machine-made, not yet read by a native speaker: corrections welcome
 private val DE by lazy { mapOf(
+    "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "Dem Zertifikat des Servers wird nicht vertraut. Füge mit „Zertifikat hinzufügen“ das Zertifikat seiner CA hinzu",
     "Custom certificates (internal / local SSL):" to "Eigene Zertifikate (internes / lokales SSL):",
     "{n} certificate(s) trusted for this server" to "{n} Zertifikat(e) für diesen Server vertraut",
     "Certificate added" to "Zertifikat hinzugefügt",
@@ -2838,6 +2842,7 @@ private val DE by lazy { mapOf(
 
 // 简体中文 (Simplified Chinese). Machine-made, not yet read by a native speaker: corrections welcome
 private val ZH by lazy { mapOf(
+    "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "服务器的证书不受信任。请用“添加证书”添加其 CA 证书",
     "Custom certificates (internal / local SSL):" to "自定义证书(内部 / 本地 SSL):",
     "{n} certificate(s) trusted for this server" to "此服务器信任 {n} 个证书",
     "Certificate added" to "已添加证书",
@@ -3513,6 +3518,7 @@ private val ZH by lazy { mapOf(
 
 // Português (Portuguese). Machine-made, not yet read by a native speaker: corrections welcome
 private val PT by lazy { mapOf(
+    "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "O certificado do servidor não é confiável. Adicione o certificado da CA dele em Adicionar certificado",
     "Custom certificates (internal / local SSL):" to "Certificados próprios (SSL interno / local):",
     "{n} certificate(s) trusted for this server" to "{n} certificado(s) confiável(is) para este servidor",
     "Certificate added" to "Certificado adicionado",
@@ -4188,6 +4194,7 @@ private val PT by lazy { mapOf(
 
 // Français (French). Machine-made, not yet read by a native speaker: corrections welcome
 private val FR by lazy { mapOf(
+    "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "Le certificat du serveur n'est pas approuvé. Ajoutez le certificat de son autorité (CA) avec Ajouter un certificat",
     "Custom certificates (internal / local SSL):" to "Certificats personnalisés (SSL interne / local) :",
     "{n} certificate(s) trusted for this server" to "{n} certificat(s) approuvé(s) pour ce serveur",
     "Certificate added" to "Certificat ajouté",
@@ -4863,6 +4870,7 @@ private val FR by lazy { mapOf(
 
 // Русский (Russian). Machine-made, not yet read by a native speaker: corrections welcome
 private val RU by lazy { mapOf(
+    "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "Сертификату сервера нет доверия. Добавьте сертификат его центра (CA) кнопкой «Добавить сертификат»",
     "Custom certificates (internal / local SSL):" to "Свои сертификаты (внутренний / локальный SSL):",
     "{n} certificate(s) trusted for this server" to "Доверенных сертификатов для этого сервера: {n}",
     "Certificate added" to "Сертификат добавлен",
@@ -5538,6 +5546,7 @@ private val RU by lazy { mapOf(
 
 // हिन्दी (Hindi). Machine-made, not yet read by a native speaker: corrections welcome
 private val HI by lazy { mapOf(
+    "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "सर्वर के प्रमाणपत्र पर भरोसा नहीं है। \"प्रमाणपत्र जोड़ें\" से उसका CA प्रमाणपत्र जोड़ें",
     "Custom certificates (internal / local SSL):" to "अपने प्रमाणपत्र (आंतरिक / लोकल SSL):",
     "{n} certificate(s) trusted for this server" to "इस सर्वर के लिए {n} भरोसेमंद प्रमाणपत्र",
     "Certificate added" to "प्रमाणपत्र जोड़ा गया",
@@ -6213,6 +6222,7 @@ private val HI by lazy { mapOf(
 
 // Bahasa Indonesia (Indonesian). Machine-made, not yet read by a native speaker: corrections welcome
 private val ID by lazy { mapOf(
+    "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "Sertifikat server tidak dipercaya. Tambahkan sertifikat CA-nya lewat Tambah sertifikat",
     "Custom certificates (internal / local SSL):" to "Sertifikat sendiri (SSL internal / lokal):",
     "{n} certificate(s) trusted for this server" to "{n} sertifikat dipercaya untuk server ini",
     "Certificate added" to "Sertifikat ditambahkan",
@@ -6888,6 +6898,7 @@ private val ID by lazy { mapOf(
 
 // Türkçe (Turkish). Machine-made, not yet read by a native speaker: corrections welcome
 private val TR by lazy { mapOf(
+    "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "Sunucunun sertifikasına güvenilmiyor. CA sertifikasını Sertifika ekle ile ekleyin",
     "Custom certificates (internal / local SSL):" to "Özel sertifikalar (dahili / yerel SSL):",
     "{n} certificate(s) trusted for this server" to "Bu sunucu için güvenilen {n} sertifika",
     "Certificate added" to "Sertifika eklendi",
@@ -7563,6 +7574,7 @@ private val TR by lazy { mapOf(
 
 // বাংলা (Bengali). Machine-made, not yet read by a native speaker: corrections welcome
 private val BN by lazy { mapOf(
+    "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "সার্ভারের সার্টিফিকেট বিশ্বস্ত নয়। \"সার্টিফিকেট যোগ করুন\" দিয়ে তার CA সার্টিফিকেট যোগ করুন",
     "Custom certificates (internal / local SSL):" to "নিজস্ব সার্টিফিকেট (অভ্যন্তরীণ / লোকাল SSL):",
     "{n} certificate(s) trusted for this server" to "এই সার্ভারের জন্য বিশ্বস্ত {n}টি সার্টিফিকেট",
     "Certificate added" to "সার্টিফিকেট যোগ হয়েছে",
