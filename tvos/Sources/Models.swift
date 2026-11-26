@@ -175,6 +175,7 @@ struct StreamInfo {
     var live: Bool
     var hls: URL?
     var captions: [Caption]
+    var originalAudioLanguage: String? = nil
 }
 
 struct Details {
@@ -252,6 +253,12 @@ enum YT {
 
     static func stream(_ id: String) async throws -> StreamInfo {
         let o = try await Engine.shared.call("stream", [id]) as? [String: Any] ?? [:]
+        let audio = (o["audio"] as? [[String: Any]] ?? []).filter { $0["audioTrack"] is String }
+        let original = audio.first {
+            let url = ($0["url"] as? String)?.removingPercentEncoding ?? ""
+            return url.range(of: #"acont=original(?=[:&]|$)"#, options: .regularExpression) != nil
+        } ?? audio.first { $0["audioDefault"] as? Bool == true }
+        let originalLanguage = (original?["audioTrack"] as? String)?.split(separator: ".").first.map(String.init)
         let caps = (o["captions"] as? [[String: Any]] ?? []).compactMap { c -> Caption? in
             guard let url = c["url"] as? String, !url.isEmpty else { return nil }
             return Caption(lang: c["lang"] as? String ?? "", name: c["name"] as? String ?? "", url: url, auto: c["auto"] as? Bool ?? false)
@@ -261,7 +268,8 @@ enum YT {
                           views: (o["views"] as? NSNumber)?.intValue ?? 0,
                           description: o["description"] as? String ?? "", keywords: o["keywords"] as? [String] ?? [],
                           live: o["live"] as? Bool ?? false,
-                          hls: (o["hls"] as? String).flatMap(URL.init(string:)), captions: caps)
+                          hls: (o["hls"] as? String).flatMap(URL.init(string:)), captions: caps,
+                          originalAudioLanguage: originalLanguage)
     }
 
     static func details(_ id: String) async throws -> Details {
