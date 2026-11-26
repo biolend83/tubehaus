@@ -134,7 +134,12 @@ fun WatchScreen(app: AppState) {
             val theater = set.theater && !tablet
             val tallest = maxHeight * 0.78f
             Column(Modifier.fillMaxSize()) {
-            if (theater) Box(Modifier.fillMaxWidth().heightIn(max = tallest).background(Color.Black), contentAlignment = Alignment.Center) { PlayerBox(app) }
+            // the video fits the height first, narrower with black at the sides in a wide window: at the full
+            // width it stood out of this box above and below, and the row under it took the clicks meant
+            // for the lower half of the player's buttons
+            if (theater) Box(Modifier.fillMaxWidth().heightIn(max = tallest).background(Color.Black), contentAlignment = Alignment.Center) {
+                PlayerBox(app, size = Modifier.aspectRatio(16f / 9f, matchHeightConstraintsFirst = true))
+            }
             // tablets and the desktop: the video and its details on the left; up next or the comments on the right
             Row(Modifier.fillMaxWidth().weight(1f)) {
                 if (tablet) {
@@ -254,6 +259,8 @@ private fun PlayerBox(
     app: AppState, sideGestures: Boolean = false, onPull: ((Float) -> Unit)? = null, onPullEnd: ((Float) -> Unit)? = null,
     // in the phone's watch sheet: the sheet sizes the box (it shrinks into the mini player) and moves it
     sheet: Modifier? = null, controls: Boolean = true,
+    // the box's size in place of the full width at 16:9 (theater mode fits it to a height)
+    size: Modifier? = null,
 ) {
     val pb = app.playback
     val st by app.player.state.collectAsState()
@@ -272,7 +279,7 @@ private fun PlayerBox(
         }
     }
     Box(
-        (sheet ?: Modifier.fillMaxWidth().aspectRatio(16f / 9f)).ambientGlow(glow).background(Color.Black)
+        (sheet ?: size ?: Modifier.fillMaxWidth().aspectRatio(16f / 9f)).ambientGlow(glow).background(Color.Black)
             // touch screens: swipe the video down to keep it playing in the mini player and go back,
             // up to watch it full screen (#64)
             .pointerInput(touch, sheet != null) {
