@@ -198,7 +198,7 @@ fun App(app: AppState) {
                             }
                         }
                     }
-                    LaunchedEffect(Unit) {
+                    if (!app.extra) LaunchedEffect(Unit) {
                         app.fillSubInfo()
                         app.sync.refreshSoon()
                         app.whatsNewAfterUpdate()

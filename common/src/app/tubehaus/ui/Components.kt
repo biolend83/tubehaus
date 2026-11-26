@@ -3,6 +3,8 @@ package app.tubehaus.ui
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.input.pointer.isTertiaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 
 import androidx.compose.ui.draw.blur
@@ -123,6 +125,9 @@ fun Modifier.tvFocus(shape: Shape = RoundedCornerShape(12.dp)): Modifier {
         .let { if (on) it.border(3.dp, Teal, shape) else it }
 }
 
+/** a middle click on a card (a computer): the video it opens goes to a window of its own ([AppState.watch]) */
+object NewWindow { var next = false }
+
 /**
  * clickable, and on a TV with [tvFocus]'s frame instead of a tint over the whole card;
  * [onLongClick] is holding OK on the remote (the card's ⋮ menu). On a touch screen or with a mouse
@@ -139,7 +144,21 @@ fun Modifier.tvClickable(shape: Shape = RoundedCornerShape(12.dp), onLongClick: 
             if (pressed) tween(Motion.SHORT, easing = Motion.standard) else if (sink < 0.96f) spring(0.5f, Spring.StiffnessMedium) else tween(Motion.MEDIUM, easing = Motion.standard))
         val shade by animateFloatAsState(if (pressed) 0.1f else 0f, tween(if (pressed) 90 else Motion.LONG, easing = Motion.standard))
         val ink = MaterialTheme.colorScheme.onSurface
+        val click = androidx.compose.runtime.rememberUpdatedState(onClick)
         return graphicsLayer { scaleX = sink; scaleY = sink }
+            // the mouse's middle button: as a click, with a video going to a new window
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val e = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                        if (e.type == androidx.compose.ui.input.pointer.PointerEventType.Press && e.buttons.let { b -> b.isTertiaryPressed && !b.isPrimaryPressed }) {
+                            e.changes.forEach { it.consume() }
+                            NewWindow.next = true
+                            try { click.value() } finally { NewWindow.next = false }
+                        }
+                    }
+                }
+            }
             .drawBehind { if (shade > 0f) drawOutline(shape.createOutline(size, layoutDirection, this), ink.copy(alpha = shade)) }
             .combinedClickable(touch, indication = null, role = Role.Button, onLongClick = onLongClick, onClick = onClick)
     }

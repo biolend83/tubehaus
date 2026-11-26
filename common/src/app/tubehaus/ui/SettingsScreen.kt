@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.Net
 import app.tubehaus.data.Store
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
@@ -95,7 +96,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "2.0.1"
+const val VERSION = "2.0.2"
 
 /** Settings' categories, as cards on its first page: key, icon, title, what is inside */
 private class Cat(val key: String, val icon: Symbol, val title: String, val sub: String)
@@ -647,7 +648,7 @@ private fun SettingsRows(
                         "Space / K" to tr("Play / pause"), "J / L" to tr("Back / forward 10 s"), "← / →" to tr("Back / forward 5 s"),
                         "↑ / ↓" to tr("Volume"), "M" to tr("Mute"), "F" to tr("Full screen"), "C" to tr("Captions"),
                         ", / ." to tr("Slower / faster"), "N / P" to tr("Next / previous video"), "0–9" to tr("Jump to 0–90%"),
-                        "F5" to tr("Refresh the page"), "F11" to tr("Full screen window"), "Esc" to tr("Back"), "Alt+← / Alt+→" to tr("Back / forward"),
+                        "F5" to tr("Refresh the page"), "F11" to tr("Full screen window"), "Esc" to tr("Back"), "Alt+← / Alt+→" to tr("Back / forward"), tr("Middle click") to tr("Open a video in a new window"),
                     )) Row(Modifier.padding(vertical = 3.dp)) {
                         Text(k, Modifier.width(150.dp), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                         Text(d, style = MaterialTheme.typography.bodyMedium)
@@ -860,6 +861,27 @@ private fun ServerDialog(app: AppState, close: () -> Unit) {
                 Text(tr("If the server asks for a login:"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
                 OutlinedTextField(user, { user = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(tr("User name")) })
                 PasswordField(app, pass, { pass = it }, Modifier.fillMaxWidth().padding(top = 4.dp))
+                if (Net.customCerts) {
+                val live = app.store.settings.state.collectAsState().value
+                Text(tr("Custom certificates (internal / local SSL):"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
+                Text(tr("{n} certificate(s) trusted for this server").replace("{n}", live.serverCerts.size.toString()),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp))
+                Row(Modifier.padding(top = 4.dp)) {
+                    TextButton(onClick = {
+                        app.platform.openTextFile { text ->
+                            if (text != null && text.isNotBlank()) {
+                                app.store.settings.update { it.copy(serverCerts = it.serverCerts + text) }
+                                app.toast(tr("Certificate added"))
+                            }
+                        }
+                    }) { Text(tr("Add certificate")) }
+                    if (live.serverCerts.isNotEmpty()) TextButton(onClick = {
+                        app.store.settings.update { it.copy(serverCerts = emptyList()) }
+                        app.toast(tr("Certificates cleared"))
+                    }) { Text(tr("Clear")) }
+                }
+                }
                 Text(tr("Or, for single sign-on (Authentik, ...) or to type nothing here:"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
                 val b = browser
                 if (b == null) {
