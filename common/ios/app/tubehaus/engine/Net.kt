@@ -19,6 +19,10 @@ import kotlinx.coroutines.CancellationException
  * the OkHttp one in common/jvm: to YouTube from this device, or to the connected TubeHaus server.
  */
 object Net {
+    /** on iOS a private CA is trusted through the system (a profile with the CA, then Certificate Trust Settings): nothing to keep here */
+    const val customCerts = false
+    fun setCustomCerts(pems: List<String>, server: String) {}
+
     val client = HttpClient(Darwin) {
         expectSuccess = false
         install(HttpTimeout) {

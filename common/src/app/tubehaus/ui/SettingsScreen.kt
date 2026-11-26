@@ -1,5 +1,6 @@
 package app.tubehaus.ui
 
+import app.tubehaus.engine.Net
 import app.tubehaus.data.Store
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
@@ -860,6 +861,7 @@ private fun ServerDialog(app: AppState, close: () -> Unit) {
                 Text(tr("If the server asks for a login:"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
                 OutlinedTextField(user, { user = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(tr("User name")) })
                 PasswordField(app, pass, { pass = it }, Modifier.fillMaxWidth().padding(top = 4.dp))
+                if (Net.customCerts) {
                 val live = app.store.settings.state.collectAsState().value
                 Text(tr("Custom certificates (internal / local SSL):"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
                 Text(tr("{n} certificate(s) trusted for this server").replace("{n}", live.serverCerts.size.toString()),
@@ -878,6 +880,7 @@ private fun ServerDialog(app: AppState, close: () -> Unit) {
                         app.store.settings.update { it.copy(serverCerts = emptyList()) }
                         app.toast(tr("Certificates cleared"))
                     }) { Text(tr("Clear")) }
+                }
                 }
                 Text(tr("Or, for single sign-on (Authentik, ...) or to type nothing here:"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
                 val b = browser
