@@ -37,6 +37,7 @@ import app.tubehaus.engine.Caption
 import app.tubehaus.engine.Format
 import app.tubehaus.engine.Sys
 import app.tubehaus.engine.Net
+import app.tubehaus.engine.ServerVideo
 import app.tubehaus.engine.Stream
 import app.tubehaus.engine.Video
 import app.tubehaus.engine.YouTube
@@ -142,6 +143,8 @@ fun OfflineDialog(app: AppState, v: Video) {
     }
     var track by remember { mutableStateOf(0) }
     var cap by remember { mutableStateOf<Caption?>(null) }
+    // with a server connected: kept on the server instead, and played from there on every device (#126)
+    var onServer by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = { app.offline.asking = null },
         title = { Text(tr("Download")) },
@@ -156,8 +159,19 @@ fun OfflineDialog(app: AppState, v: Video) {
                     RadioButton(pick == h, onClick = { pick = h })
                     Text(if (h == 360) "${h}p · " + tr("smallest") else "${h}p")
                 }
-                if (tracks.isNotEmpty()) Choice(tr("Audio track"), tracks.getOrNull(track)?.second ?: "", tracks.map { it.second }) { track = it }
-                if (caps.isNotEmpty()) Choice(tr("Captions"), cap?.name ?: tr("Off"), listOf(tr("Off")) + caps.map { it.name }) { cap = caps.getOrNull(it - 1) }
+                if (ServerVideo.on) Row(
+                    Modifier.fillMaxWidth().clickable { onServer = !onServer }.padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    androidx.compose.material3.Checkbox(onServer, onCheckedChange = { onServer = it })
+                    Column {
+                        Text(tr("Keep on the server instead"))
+                        Text(tr("Every device then plays it from the server"), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (!onServer && tracks.isNotEmpty()) Choice(tr("Audio track"), tracks.getOrNull(track)?.second ?: "", tracks.map { it.second }) { track = it }
+                if (!onServer && caps.isNotEmpty()) Choice(tr("Captions"), cap?.name ?: tr("Off"), listOf(tr("Off")) + caps.map { it.name }) { cap = caps.getOrNull(it - 1) }
                 Text(tr("If the video isn't that sharp, the best it has is saved."), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
                 Text(tr("For your own viewing only. Sharing or re-uploading it is your own responsibility."), style = MaterialTheme.typography.bodySmall,
@@ -168,7 +182,17 @@ fun OfflineDialog(app: AppState, v: Video) {
             TextButton(onClick = {
                 app.store.settings.update { it.copy(offlineHeight = pick) }
                 app.offline.asking = null
-                app.offline.start(v, pick, tracks.getOrNull(track)?.takeIf { track > 0 }?.first, cap)
+                if (onServer) app.scope.launch {
+                    app.toast(tr("Keeping it on the server..."))
+                    try {
+                        ServerVideo.keep(v, pick)
+                        app.toast(tr("Kept on the server"))
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        app.toast(tr(e.message ?: "The server couldn't save it"))
+                    }
+                } else app.offline.start(v, pick, tracks.getOrNull(track)?.takeIf { track > 0 }?.first, cap)
             }) { Text(tr("Download")) }
         },
         dismissButton = { TextButton(onClick = { app.offline.asking = null }) { Text(tr("Cancel")) } },
