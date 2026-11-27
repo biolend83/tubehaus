@@ -67,7 +67,7 @@ final class WalkThrough: XCTestCase {
 
         // search: the keyboard and suggestions, results as you type
         launch(["-tab", "search"])
-        pause(8); shot("search")
+        pause(14); shot("search")
         press(.down, 2); press(.select, wait: 0.4); press(.right, wait: 0.3); press(.select, wait: 0.4); press(.down, wait: 0.3); press(.select)
         pause(5); shot("search-typed")
         launch(["-tab", "search", "-q", "lofi hip hop"])

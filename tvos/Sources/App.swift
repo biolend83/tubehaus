@@ -120,6 +120,9 @@ struct RootView: View {
     /// "Who's watching?" is asked once each time the app opens (not when a launch argument opens a page: the CI check)
     @State private var asked = Self.skipWho
     @FocusState private var guide: GuideItem?
+    /// the page, not the guide, gets the focus when the app starts and when the remote leaves the guide
+    @Namespace private var root
+    @Environment(\.resetFocus) private var resetFocus
 
     private static var skipWho: Bool {
         let d = UserDefaults.standard
@@ -148,6 +151,8 @@ struct RootView: View {
                     .navigationDestination(for: Route.self) { destination($0) }
             }
             .id(nav.tab)
+            .focusSection()
+            .prefersDefaultFocus(in: root)
             .padding(.leading, showsGuide ? Metrics.guide : 0)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -160,11 +165,14 @@ struct RootView: View {
                     .allowsHitTesting(false)
                 Guide(focus: $guide, open: guideOpen, music: server.connected) { asked = false }
                     .focusSection()
+                    // the open guide covers the page's left edge, so right goes back to the page itself
+                    .onMoveCommand { if $0 == .right { resetFocus(in: root) } }
             }
         }
         .background(Theme.bg)
         .foregroundStyle(Theme.text)
         .ignoresSafeArea()
+        .focusScope(root)
         .animation(.easeOut(duration: 0.2), value: guideOpen)
         // Back on a place's first page goes to the guide, then Home; on Home's guide it leaves the app
         .onExitCommand(perform: exitAction)

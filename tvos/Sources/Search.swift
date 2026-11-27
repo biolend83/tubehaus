@@ -29,10 +29,12 @@ struct SearchView: View {
                 queryBox
                 Keyboard(mode: $mode, focus: $focus) { k in typeKey(k) }
                     .focusSection()
-                suggestionList
-                Spacer(minLength: 0)
+                // the suggestions take what's left of the screen's height, so the box stays on screen
+                ScrollView { suggestionList }
+                    .frame(maxHeight: .infinity)
             }
             .frame(width: 660)
+            .frame(maxHeight: .infinity, alignment: .top)
             .padding(.leading, Metrics.side).padding(.top, 48)
 
             VStack(alignment: .leading, spacing: 0) {
