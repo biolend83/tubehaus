@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Set up and change the server in the browser, not in `.env`:** a new server asks how it will be used (just me, family, anyone, no sign-in) and makes your account, after a setup code from its log. Afterwards **Settings → Server settings** changes accounts, guests, the name, menu links, quality and load limits and single sign-on, at once. `.env` needs only `TUBEHAUS_SITE`; a value written there still works and wins over the page. Existing servers aren't asked anything
+- **Keep a video on the server** (#126): "Keep on the server" when saving a video offline (web) or "Keep on the server instead" (app, with a server connected). Every device then plays that file; the videos are listed under You → Kept on the server, where they can be deleted. Room for them: `TUBEHAUS_SAVED_MAX_GB` / the settings page (50 GB)
+- **Watching without an account** on a server with accounts (#132): "Let people look around without an account"; their subscriptions and history stay in their browser, and signing in gives them their library on the server
+- **Home key** goes back to the top of the page in the desktop app (#128)
+- **Video lengths** on subscription-feed thumbnails in the app (#131)
+
+### Fixed
+- **App sign-in after single sign-on** (Authelia, Authentik, ...): the page that lets the app in no longer refuses the browser coming back from the provider (#122)
+- **Android Auto:** the picture plays again while the app is open on the phone with a car connected, and no longer stays off after the car is gone (#129)
+- **Theater mode (app):** the player's buttons answer over their whole area, thanks to @onedge (#130)
+
 ## v2.0.2 — 2026-11-26
 
 ### Fixed
