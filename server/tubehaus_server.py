@@ -5567,6 +5567,8 @@ def saved_size():
 def saved_add(vid, path, ext, meta):
     """a finished download (path) kept as <id>.<ext> (a hard link where it can, else a copy)"""
     import shutil
+    if not re.fullmatch(r"[\w-]{11}", vid) or ext not in ("mp4", "webm", "m4a"):
+        raise ValueError("bad id or type")
     d = _saved_dir()
     os.makedirs(d, exist_ok=True)
     dst = os.path.join(d, f"{vid}.{ext}")
@@ -6914,13 +6916,34 @@ def feed_for(chs):
 # TubeHaus' own address: another web site open in the same browser can neither read nor change
 # them. The playback parts below stay open to every origin, like Invidious' API, because players
 # on other origins (Invidious' own page for live streams) load them.
-OPEN_PARTS = ("/api/p/health", "/api/p/live/", "/api/p/hls/", "/api/p/dash/", "/api/p/sub/", "/api/p/plog",
-              "/api/p/yt/dathumb", "/api/p/yt/music/img", "/api/p/auth/check")
+# Requests are routed by how their path ends or what it contains, so a path is open only when it is
+# nothing but one open part: no second part (/api/p/sub/x/api/p/yt/hist, /api/p/auth/x/yt/lib)
+# hides a personal one behind it, and a personal part without /api/p/ in front is still personal.
+_MARKS = ("/api/p/", "/yt/", "/cast/", "/server/", "/admin/", "/auth/", "/stat/")
+_OPEN = re.compile(r"/api/p/(health|plog|yt/dathumb|yt/music/img|auth/check|live|hls|dash|sub)(?=/|$)")
+_OPEN_EXACT = ("health", "plog", "yt/dathumb", "yt/music/img", "auth/check")
+
+
+def _only(p, part):
+    """p is /api/p/<part>... and nothing else that is routed (in front of it or after it)"""
+    i = p.find("/api/p/")
+    if i < 0 or not p.startswith(part, i) or any(m in p[:i] for m in _MARKS):
+        return False
+    return not any(m in p[i + len(part) - 1:] for m in _MARKS)     # (part ends in "/": kept, so /yt/ right after it counts)
 
 
 def personal(path):
     p = path.split("?")[0]
-    return "/api/p/" in p and not any(o in p for o in OPEN_PARTS)
+    i = p.find("/api/p/")
+    if i < 0:
+        return any(m in p for m in _MARKS)
+    m = _OPEN.match(p, i)
+    if not m or any(x in p[:i] for x in _MARKS):
+        return True
+    rest = p[m.end():]
+    if m.group(1) in _OPEN_EXACT:
+        return rest != ""
+    return any(x in rest for x in _MARKS)
 
 
 def _private_peer(ip):
@@ -7090,10 +7113,10 @@ class H(BaseHTTPRequestHandler):
 
     def needs_sign_in(self, p):
         """True, with a 401 sent, for a household library call from someone not signed in."""
-        if not (ACCOUNTS and not PUBLIC_MODE) or _req.user or not personal(p) or "/api/p/auth/" in p or "/api/p/admin/" in p:
+        if not (ACCOUNTS and not PUBLIC_MODE) or _req.user or not personal(p) or _only(p, "/api/p/auth/") or _only(p, "/api/p/admin/"):
             return False
         # guests use what a public instance's visitors use (the library itself is in their browser)
-        if GUESTS and "/api/p/yt/" in p and not public_blocked(self.command, p):
+        if GUESTS and _only(p, "/api/p/yt/") and not public_blocked(self.command, p):
             return False
         self.send(401, {"error": "Please sign in"})
         return True
@@ -7340,7 +7363,7 @@ class H(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if "/yt/music/" in p and "/api/p/" in self.path:
+        if "/yt/music/" in p and "/api/p/" in p:
             if p.endswith("/yt/music/img"):
                 code, ctype, body = music_img(self.qs())
                 self.send_response(code)
@@ -7354,7 +7377,7 @@ class H(BaseHTTPRequestHandler):
         if p.endswith("/yt/topic"):
             d = topic_page(self.qs())
             return self.send(404 if d.get("error") == "unknown topic" else 502 if d.get("error") else 200, d)
-        if "/yt/" in p and "/api/p/" in self.path:
+        if "/yt/" in p and "/api/p/" in p:
             if p.endswith("/yt/lib"):
                 return self.send(200, ytlib_get())
             d = ytlib_query(p, self.qs())
@@ -7543,7 +7566,7 @@ class H(BaseHTTPRequestHandler):
             return self.send(*shorts_reset())
         if p.endswith("/yt/tr"):                     # titles in the viewer's language (Settings -> Translate titles)
             return self.send(*titles_tr(body))
-        if "/yt/" in p and "/api/p/" in self.path:
+        if "/yt/" in p and "/api/p/" in p:
             return self.send(*ytlib_post(p, body))
         self.send(404, {"error": "not found"})
 
