@@ -114,10 +114,14 @@ class AndroidPlatform(private val app: Application) : Platform {
         }
     // a TV has a remote, not a touch screen: it gets the wide layout and the keyboard player
     override val touch: Boolean get() = !tv
-    val androidPlayer by lazy {
+    private val playerLazy = lazy {
         AndroidPlayer.longBuffer = runCatching { (app as TubeApp).state.store.settings.value.longBuffer }.getOrDefault(false)
-        AndroidPlayer(app)
+        AndroidPlayer(app).also { it.onScreen(appOnScreen) }
     }
+    val androidPlayer by playerLazy
+    /** the app is on the phone's screen (#129: the picture with Android Auto connected); never makes the player itself */
+    var appOnScreen = true
+        set(v) { field = v; if (playerLazy.isInitialized()) androidPlayer.onScreen(v) }
     override val player: VideoPlayer get() = androidPlayer
 
     /** lets multicast packets in while looking for Cast devices (Android drops them otherwise) */

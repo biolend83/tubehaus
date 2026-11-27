@@ -21,6 +21,9 @@ import app.tubehaus.engine.Song
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -102,6 +105,9 @@ class Playback(private val app: AppState) {
     var transcriptSearch by mutableStateOf("")
     /** chapters made from the captions (ui/Smart.kt) for a video without its own, by video id */
     var autoChapters by mutableStateOf<Pair<String, List<Chapter>>>("" to emptyList())
+
+    /** the sound panel (ui/Sound.kt) is open */
+    var soundOpen by mutableStateOf(false)
 
     /** "Loop video": this one plays again from the start; off again for the next video */
     var loop by mutableStateOf(false)
@@ -210,6 +216,10 @@ class Playback(private val app: AppState) {
     private val store get() = app.store
 
     init {
+        app.scope.launch {
+            store.settings.state.map { listOf(it.soundNorm, it.soundVideo, it.eqOn, it.eqGains, it.soundWidth, it.soundBalance, it.nightSound) }
+                .distinctUntilChanged().drop(1).collect { soundChanged() }
+        }
         // follow the player: save the resume point every few seconds, react to the end
         app.scope.launch {
             var lastSave = 0L
@@ -370,7 +380,11 @@ class Playback(private val app: AppState) {
                 artwork = video?.thumbHigh ?: "",
             ),
         )
+        player.setSound(soundFor(set, s, music))
     }
+
+    /** the sound settings changed: the video playing now hears them at once */
+    fun soundChanged() = player.setSound(soundFor(store.settings.value, stream, music))
 
     private fun lang() = store.settings.value.lang.ifEmpty { "en" }
 

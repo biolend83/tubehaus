@@ -199,6 +199,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // with Android Auto connected the picture plays again while the app is on screen (#129)
+        tube.platform.appOnScreen = true
         // opening the app again (it often stays alive in the background): look for a new version
         state.checkForUpdates()
         // and what the other devices changed, when a server is connected
@@ -270,6 +272,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        tube.platform.appOnScreen = false
         state.store.flush()
         // background play is off: pause when the app goes away (but not into picture-in-picture)
         // (music always keeps playing, as a music app does)

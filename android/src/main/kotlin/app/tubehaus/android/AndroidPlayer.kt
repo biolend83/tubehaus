@@ -110,7 +110,21 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             (ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice
     }
 
-    val exo: ExoPlayer = ExoPlayer.Builder(ctx)
+    /** loudness matching, the equalizer and effects (SoundProcessor), between the decoder and the speaker */
+    // one per audio sink: a processor belongs to one chain only
+    private val sounds = java.util.concurrent.CopyOnWriteArrayList<SoundProcessor>()
+    @Volatile private var soundFx = app.tubehaus.ui.SoundFx()
+    override val canSound get() = true
+    override fun setSound(fx: app.tubehaus.ui.SoundFx) { soundFx = fx; for (p in sounds) p.fx = fx }
+
+    val exo: ExoPlayer = ExoPlayer.Builder(ctx, object : androidx.media3.exoplayer.DefaultRenderersFactory(ctx) {
+        override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): androidx.media3.exoplayer.audio.AudioSink =
+            androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
+                .setEnableFloatOutput(enableFloatOutput)
+                .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                .setAudioProcessors(arrayOf(SoundProcessor().also { it.fx = soundFx; sounds += it }))
+                .build()
+    })
         .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
         .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
         .setHandleAudioBecomingNoisy(true)
@@ -138,8 +152,11 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
     /** the subtitle track inside the media item (shown or not): toggling it never reloads the video */
     private var loadedCaption: Caption? = null
     private var loadedTranslate: String? = null
-    /** a car is connected (Android Auto): no picture is loaded */
+    /** a car is connected (Android Auto): no picture is loaded while the app isn't on the phone's screen */
     private var car = false
+    /** the app is on the phone's screen (or in picture-in-picture): the picture is wanted, car or not (#129) */
+    private var onScreen = true
+    private val noPicture get() = car && !onScreen
     /** the view on screen, for [frame] */
     private var view: PlayerView? = null
     private var zoomed = false
@@ -280,7 +297,7 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             .setPreferredAudioLanguage(audioLang)      // null: the original track (the manifest's "main" one)
             .setPreferredTextLanguage(caption?.lang)
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, caption == null)
-            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, car || o.audioOnly)
+            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, noPicture || o.audioOnly)
             .build()
         exo.setMediaItem(item(s), o.startMs)
         exo.repeatMode = if (o.loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
@@ -297,7 +314,9 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             )
         if (s.live || s.video.isEmpty()) {
             // a downloaded video: one file, opened as it is
-            if (s.hls?.startsWith("file:") == true) b.setUri(s.hls) else b.setUri(s.hls).setMimeType(MimeTypes.APPLICATION_M3U8)
+            // (or one the connected server keeps, #126)
+            if (s.hls?.startsWith("file:") == true || app.tubehaus.engine.ServerVideo.isKept(s.hls)) b.setUri(s.hls)
+            else b.setUri(s.hls).setMimeType(MimeTypes.APPLICATION_M3U8)
             // close to the edge, as far behind it as the stream's segments allow (1 s in an ultra-low-latency one, 2 s in a
             // low one, 5 s otherwise), and a little faster or slower to stay there
             if (s.live) {
@@ -363,10 +382,26 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         sync()
     }
 
-    /** Android Auto: only the sound is loaded while a car is connected, as nothing shows the picture there */
+    /**
+     * Android Auto: only the sound is loaded while a car is connected, as nothing shows the picture there; but while
+     * the app is open on the phone (a passenger, or parked) the video plays as usual (#129)
+     */
     fun audioOnly(on: Boolean) {
         car = on
-        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, on || opts.audioOnly).build()
+        pictureTracks()
+    }
+
+    /** the app came onto the phone's screen or left it */
+    fun onScreen(shown: Boolean) {
+        if (onScreen == shown) return
+        onScreen = shown
+        if (car) pictureTracks()
+    }
+
+    private fun pictureTracks() {
+        val off = noPicture || opts.audioOnly
+        if (exo.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO) == off) return
+        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, off).build()
     }
 
     override fun setAudioTrack(lang: String) {

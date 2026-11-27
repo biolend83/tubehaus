@@ -1224,6 +1224,14 @@ internal fun ColumnScope.SettingsPages(app: AppState, pageState: androidx.compos
                 pb.sleepAt > 0 -> tr("{n} min left").replace("{n}", "${((pb.sleepAt - Sys.nowMs()) / 60_000 + 1)}")
                 else -> tr("Off")
             }) { page = "t" }
+            if (player.canSound) {
+                val ss = app.store.settings.state.collectAsState().value
+                SheetRow(Sym.Tune.outline, tr("Sound & equalizer"), when {
+                    ss.eqOn && (pb.music || ss.soundVideo) -> tr(presetName(presetOf(eqGains(ss))))
+                    ss.soundNorm -> tr("Loudness matching")
+                    else -> tr("Off")
+                }) { pb.soundOpen = true; dismiss() }
+            }
             }
             SheetHeader(tr("More"))
             SheetGroup(app) {

@@ -543,6 +543,37 @@ class MpvPlayer : VideoPlayer {
 
     override fun setLoop(on: Boolean) { opts = opts.copy(loop = on); set("loop-file", if (on) "inf" else "no") }
 
+    /** loudness matching, the equalizer and effects: mpv's audio filters (FFmpeg's) */
+    override val canSound get() = true
+    private var afNow = ""
+    override fun setSound(fx: app.tubehaus.ui.SoundFx) {
+        val f = mutableListOf<String>()
+        val eqOn = fx.eq.size == app.tubehaus.ui.SOUND_BANDS.size && fx.eq.any { it != 0f }
+        val gain = fx.gainDb + if (eqOn) fx.headroomDb else 0f
+        if (gain != 0f) f += "volume=%.2fdB".format(java.util.Locale.ROOT, gain)
+        if (eqOn) app.tubehaus.ui.SOUND_BANDS.forEachIndexed { i, hz ->
+            val g = fx.eq[i]
+            if (g != 0f) f += when (i) {
+                0 -> "lowshelf=f=$hz:g=%.1f".format(java.util.Locale.ROOT, g)
+                app.tubehaus.ui.SOUND_BANDS.size - 1 -> "highshelf=f=$hz:g=%.1f".format(java.util.Locale.ROOT, g)
+                else -> "equalizer=f=$hz:t=q:w=1.1:g=%.1f".format(java.util.Locale.ROOT, g)
+            }
+        }
+        if (fx.width != 100 || fx.balance != 0) {
+            val w = fx.width / 100.0
+            val a = (1 + w) / 2; val b = (1 - w) / 2
+            val bal = fx.balance / 100.0
+            val gl = if (bal > 0) 1 - bal else 1.0
+            val gr = if (bal < 0) 1 + bal else 1.0
+            f += "pan=stereo|c0=%.3f*c0+%.3f*c1|c1=%.3f*c0+%.3f*c1".format(java.util.Locale.ROOT, a * gl, b * gl, b * gr, a * gr)
+        }
+        if (fx.night) f += "acompressor=threshold=-28dB:ratio=4:attack=5:release=250:makeup=7dB"
+        val af = if (f.isEmpty()) "" else "lavfi=[" + f.joinToString(",") + "]"
+        if (af == afNow) return
+        afNow = af
+        set("af", af)
+    }
+
     override val hasVolume get() = true
     override fun setVolume(v: Float) {
         val x = v.coerceIn(0f, 1f)

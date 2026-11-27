@@ -203,6 +203,8 @@ class AppState(val platform: Platform, val store: Store, private val parent: App
     /** counts taps on the tab that is already open: its list goes back to the top (Refreshable) */
     var reselect by androidx.compose.runtime.mutableIntStateOf(0)
         private set
+    /** counts presses of the Home key (desktop): the page's list goes back to the top, without reloading */
+    var homeKey by androidx.compose.runtime.mutableIntStateOf(0)
 
     /** the pages Back left, newest last: Forward opens them again; going anywhere else forgets them */
     val ahead = mutableStateListOf<Screen>()
