@@ -110,7 +110,21 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             (ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice
     }
 
-    val exo: ExoPlayer = ExoPlayer.Builder(ctx)
+    /** loudness matching, the equalizer and effects (SoundProcessor), between the decoder and the speaker */
+    // one per audio sink: a processor belongs to one chain only
+    private val sounds = java.util.concurrent.CopyOnWriteArrayList<SoundProcessor>()
+    @Volatile private var soundFx = app.tubehaus.ui.SoundFx()
+    override val canSound get() = true
+    override fun setSound(fx: app.tubehaus.ui.SoundFx) { soundFx = fx; for (p in sounds) p.fx = fx }
+
+    val exo: ExoPlayer = ExoPlayer.Builder(ctx, object : androidx.media3.exoplayer.DefaultRenderersFactory(ctx) {
+        override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): androidx.media3.exoplayer.audio.AudioSink =
+            androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
+                .setEnableFloatOutput(enableFloatOutput)
+                .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                .setAudioProcessors(arrayOf(SoundProcessor().also { it.fx = soundFx; sounds += it }))
+                .build()
+    })
         .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
         .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
         .setHandleAudioBecomingNoisy(true)

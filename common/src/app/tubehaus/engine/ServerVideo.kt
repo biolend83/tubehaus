@@ -186,6 +186,7 @@ object ServerVideo {
             expiresAt = expire ?: (Sys.nowMs() / 1000 + 18000),
             client = "server",
             latency = latencyClass(d.at("latencyClass").str),
+            loudnessDb = d.at("loudnessDb").str?.toDoubleOrNull()?.toFloat(),
         )
     }
 

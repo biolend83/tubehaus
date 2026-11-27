@@ -531,6 +531,14 @@ private fun SettingsRows(
             Note(tr("Automatic picks what this device decodes best. H.264 is the most compatible, VP9 and AV1 look better for the same data but need a newer device. A video without the codec plays in another."))
         }
         // ------------------------------------------------------------------ music
+        if (app.platform.player.canSound) {
+            r.row("player", tr("Loudness matching") + " volume loudness normalize") {
+                Toggle(tr("Loudness matching"), tr("Uses the loudness YouTube gives for each video: loud videos and songs are turned down so everything plays at a similar level"), s.soundNorm) { b -> set { it.copy(soundNorm = b) } }
+            }
+            r.row("music", tr("Equalizer & effects") + " equalizer eq bass sound night stereo balance") {
+                SItem(tr("Equalizer & effects"), tr("Presets and a 10-band equalizer, stereo width, balance, night mode")) { app.playback.soundOpen = true }
+            }
+        }
         r.row("music", tr("Sound only for music") + " audio data") {
             Toggle(tr("Sound only for music"), tr("Songs from the Music tab load only their sound, which saves data. \"Watch video\" brings the picture back."), s.musicAudioOnly) { b -> set { it.copy(musicAudioOnly = b) } }
         }
