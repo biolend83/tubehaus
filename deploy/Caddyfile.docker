@@ -3,7 +3,9 @@
 # The tubehaus-web image has this file and the web app built in; TUBEHAUS_SERVER points it at the
 # TubeHaus server container when it is not called tubehaus.
 #
-# Without a login everyone who opens the address shares one library. In .env:
+# Who may come in is the TubeHaus server's to say (its settings page: no sign-in, accounts, public),
+# so every request asks it first (auth-auto). To fix it in .env instead:
+#   TUBEHAUS_AUTH=none        nobody is asked (everyone who opens the address shares one library)
 #   TUBEHAUS_AUTH=basic       one shared password:
 #     TUBEHAUS_USER=me
 #     TUBEHAUS_PASSWORD_HASH=<from: docker compose run --rm caddy caddy hash-password>  (write every $ as $)
@@ -37,7 +39,12 @@
 }
 
 (auth-accounts) {
-	# the sign-up / sign-in pages and their API stay open; everything else needs an account
+	import auth-auto
+}
+
+(auth-auto) {
+	# the sign-up / sign-in pages and their API stay open; everything else asks the server, which lets everyone
+	# in when the server has no accounts (or takes guests) and wants an account when it has them
 	@member not path /signup /login /y/* /api/p/auth/* /api/p/health /robots.txt
 	forward_auth @member {$TUBEHAUS_SERVER:tubehaus:3010} {
 		uri /api/p/auth/check
@@ -64,7 +71,7 @@
 
 {$TUBEHAUS_SITE::8080} {
 	encode zstd gzip
-	import auth-{$TUBEHAUS_AUTH:none}
+	import auth-{$TUBEHAUS_AUTH:auto}
 
 	# privacy and hardening: no referrer to other sites, no FLoC/Topics, no MIME sniffing,
 	# no framing by other sites, and keep search engines out of a private instance

@@ -1,5 +1,5 @@
 // List pages: home, search, channel, playlist, subscriptions, history, you, trending, settings
-import { $, $$, el, esc, icon, api, lib, settings, local, toast, fmtTime, fmtViews, ago, thumb, normVideo, pickThumb, localUrl, safeHtml, linkify, dropCache, PUBLIC, GUEST, localLibrary, IPHONE, IPAD, siteName, KEEP, kept } from "./util.js";
+import { $, $$, el, esc, icon, api, lib, settings, local, toast, fmtTime, fmtViews, ago, thumb, normVideo, pickThumb, localUrl, safeHtml, linkify, dropCache, PUBLIC, GUEST, localLibrary, IPHONE, IPAD, siteName, KEEP, kept, modeReady, SERVER_SETTINGS } from "./util.js";
 import { state, card, metaLine, chAvatar, channelCard, playlistCard, norm, remember, known, fillProgress, infinite, avatar, subBtn, isSub, navigate, popup, mi, videoMenu, dialog, loadLib, setList, pageCleanup, renderGuideSubs } from "./core.js";
 import { SB_CATS } from "./player.js";
 import { $t, LANG, LANGS, LOCALE, REGION, fmtShort, langLabel } from "./i18n.js";
@@ -834,6 +834,7 @@ export function settingsPage(page) {
         ${tile("sexp", "download", plain($t("{0} 내보내기", "")))}
         ${tile("unhide", "replay", $t("'관심 없음' {0}개 되돌리기", state.hidden.size))}
         ${tile("keys", "keyboard", $t("단축키"))}
+        <a class="sx-tile sx-server" href="/y/server.html" hidden><span class="sx-ic">${icon("gear")}</span><b>${$t("서버 설정")}</b></a>
       </div><input type="file" class="simpfile" hidden multiple accept=".json,.csv,.opml,.xml,.db,.txt,.html">`],
     ["about", "info", $t("면책 조항"), `
       <p class="sx-about">${esc($t("TubeHaus는 개인이 만든 무료 오픈소스 소프트웨어이고, 유튜브나 구글과 관계가 없어요. 영상을 저장하거나 배포하지 않고, 어떤 보증도 하지 않아요. 내려받은 영상은 본인이 보는 용도로만 쓰세요. 공유하거나 다시 올리는 건 그렇게 한 사람의 책임이에요. 사는 곳의 법과 연결하는 서비스의 약관에 맞게 써 주세요."))}
@@ -843,6 +844,8 @@ export function settingsPage(page) {
     <aside class="sx-nav"><h2>${$t("설정")}</h2><nav>${sections.map(([id, ic, t]) => `<button data-go="${id}">${icon(ic)}<span>${t}</span></button>`).join("")}</nav></aside>
     <div class="sx-main">${sections.map(([id, ic, t, body]) => card(id, ic, t, body)).join("")}</div>
   </div>`;
+  // the server's settings page, for its owner (known once the server has answered)
+  modeReady.then(() => { const t = $(".sx-server", page); if (t) t.hidden = !SERVER_SETTINGS; });
   let cur = "", raf = 0, held = 0;
   const nav = $(".sx-nav nav", page);
   const mark = (id) => {

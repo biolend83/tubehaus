@@ -231,13 +231,15 @@ docker compose pull         # prebuilt images, amd64 and arm64
 docker compose up -d
 ```
 
-That's it: Caddy, the TubeHaus server with its YouTube engine and Cloudflare WARP, the PO-token provider for live streams and whisper.cpp for live captions come up together. Open your domain. WARP registers itself on first start and keeps its registration in a volume.
+That's it: Caddy, the TubeHaus server with its YouTube engine and Cloudflare WARP, the PO-token provider for live streams and whisper.cpp for live captions come up together. WARP registers itself on first start and keeps its registration in a volume.
+
+Open your domain. A new server asks how it will be used — **just me**, **family** (an account each), **anyone** (a public server) or **no sign-in** (home network / VPN only) — and makes your account. It asks for a 6-digit setup code first, so a stranger who finds the address can't take it over: `docker compose logs tubehaus` shows it. Everything else (accounts, guests, the name, menu links, quality and load limits, single sign-on) is in **Settings → Server settings** and takes effect at once. A setting written in `.env` still works and wins over the page.
 
 > [!NOTE]
 > **On TrueNAS?** TubeHaus is in the TrueNAS app catalog: **Apps → Discover Apps**, search for **TubeHaus** (community train). Nothing to clone.
 
 > [!IMPORTANT]
-> **Going on a public domain? Set a login in `.env` first:** `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER` and `TUBEHAUS_PASSWORD_HASH` (the hash comes from `docker compose run --rm caddy caddy hash-password`; write every `$` as `$$`). Without it, everyone who opens the address shares the same library. More ways: [Add a login before you expose it](#add-a-login-before-you-expose-it).
+> **Going on a public domain? Pick "just me" or "family" on the first start** (or turn on accounts in Settings → Server settings). With "no sign-in", everyone who opens the address shares the same library. More ways: [Add a login before you expose it](#add-a-login-before-you-expose-it).
 
 > [!TIP]
 > **Updating from 1.5 or older?** Invidious, its companion and PostgreSQL are no longer needed. After `git pull`, run `docker compose pull && docker compose up -d --remove-orphans` to stop them; their secrets in `.env` can go. Your library is in the `tubehaus-data` volume and stays as it is. Details: [Updating and backups](#updating-and-backups).
@@ -291,8 +293,9 @@ Pick one of the two for a server, not both. Ports, volumes, updates and moving a
 
 ### Add a login before you expose it
 
-TubeHaus has no accounts by default: without a login, everyone who opens the address shares the same library.
+Without a login, everyone who opens the address shares the same library.
 
+- **Accounts (the easy way):** pick "just me" or "family" on the first start, or turn on "Sign in with accounts" in Settings → Server settings. Single sign-on is on the same page
 - **Built-in password:** `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER` and `TUBEHAUS_PASSWORD_HASH` in `.env` (hash from `docker compose run --rm caddy caddy hash-password`; every `$` as `$$`)
 - **An account for each person:** `TUBEHAUS_AUTH=accounts` gives a sign-in page and a library per person
 - **Single sign-on:** with accounts on, `TUBEHAUS_OIDC_ISSUER`, `TUBEHAUS_OIDC_CLIENT_ID` and `TUBEHAUS_OIDC_CLIENT_SECRET` add a "Continue with …" button for your OpenID Connect provider (Authentik, Authelia, Keycloak, Pocket ID, …; redirect URI `<TUBEHAUS_URL>/api/p/auth/oidc/callback`). `TUBEHAUS_OIDC_ONLY=1` turns passwords off

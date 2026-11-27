@@ -180,6 +180,8 @@ export let LIVE_CC_ENGINES = [];
 export let SERVER_VERSION = "";
 // the server keeps videos for everyone on it (#126): the download dialog offers it, kept ones play from the server
 export let KEEP = false;
+// this person may open the server's settings page (/y/server.html): its owner, or anyone on a server without sign-in
+export let SERVER_SETTINGS = false;
 // a name may come in several languages, {"ko": "홈튜브", "en": "HomeTube"}: the interface language, else English, else the first
 export const pickName = (v) => !v || typeof v === "string" ? v || "" : String(v[LANG] ?? v.en ?? Object.values(v)[0] ?? "");
 export const siteName = () => pickName(NAME) || $t("튜브하우스");
@@ -193,10 +195,15 @@ export const modeReady = fetch("/api/p/health", { credentials: "same-origin" })
     KEEP = !!h.keep_on_server;
     LIVE_CC_ENGINES = Array.isArray(h.live_caption_engines) ? h.live_caption_engines : h.live_captions ? ["whisper"] : [];
     if (h.accounts && !window.TUBEHAUS_LOGIN_URL) window.TUBEHAUS_LOGIN_URL = "/login?r=";   // sign-up required
-    return h.guests ? fetch("/api/p/auth/me", { credentials: "same-origin" }).then((r) => r.json()).then((m) => {
-      GUEST = !m.user;
-      PUBLIC = PUBLIC || GUEST;
-    }, () => { }) : null;
+    // a new server: how it will be used comes first
+    if (h.setup) { location.replace("/y/server.html"); return new Promise(() => { }); }
+    return fetch("/api/p/auth/me", { credentials: "same-origin" }).then((r) => r.json()).then((m) => {
+      if (h.guests) {
+        GUEST = !m.user;
+        PUBLIC = PUBLIC || GUEST;
+      }
+      SERVER_SETTINGS = m.settings === "ok" || m.settings === "password";
+    }, () => { });
   })
   .then(() => {
     document.documentElement.classList.toggle("public", PUBLIC);

@@ -563,6 +563,119 @@ class Guests(unittest.TestCase):
         self.assertFalse(ts.health()["guests"])
 
 
+class ServerSettings(unittest.TestCase):
+    """The first-start page and the settings page: config.json under the environment, applied at once."""
+
+    def setUp(self):
+        self.saved = (ts.ACCOUNTS, ts.GUESTS, ts.PUBLIC_MODE, ts.MAX_ACCOUNTS, ts.NAME, ts.MAX_HEIGHT, dict(ts._CFG))
+        self.env = {k: os.environ.get(k) for k in ts.SETTING_KEYS + ("TUBEHAUS_AUTH",)}
+        for k in self.env:
+            os.environ.pop(k, None)
+        for p in (ts.CONFIG, ts.USERS, ts.YTLIB, ts.SHORTS, ts.SETUP_CODE_FILE):
+            if os.path.exists(p):
+                os.remove(p)
+        ts.apply_settings()
+        ts.auth_tries.clear()
+
+    def tearDown(self):
+        for k, v in self.env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        for p in (ts.CONFIG, ts.USERS, ts.SETUP_CODE_FILE):
+            if os.path.exists(p):
+                os.remove(p)
+        ts.setup.update(needed=False, code="")
+        ts._CFG = self.saved[6]
+        ts.ACCOUNTS, ts.GUESTS, ts.PUBLIC_MODE, ts.MAX_ACCOUNTS, ts.NAME, ts.MAX_HEIGHT = self.saved[:6]
+        ts._read_oidc()
+        ts.auth_tries.clear()
+
+    def test_a_new_server_asks_for_its_code_first(self):
+        ts.setup_init()
+        self.assertTrue(ts.setup["needed"])
+        self.assertTrue(ts.health()["setup"])
+        code = ts.setup["code"]
+        with open(ts.SETUP_CODE_FILE) as fh:
+            self.assertEqual(fh.read().strip(), code)
+        wrong = "000000" if code != "000000" else "111111"
+        self.assertEqual(ts.setup_finish({"code": wrong, "mode": "open"}, "1.2.3.4")[0], 403)
+        st, d = ts.setup_finish({"code": code, "mode": "family", "username": "mom", "password": "a long secret",
+                                 "max_accounts": "4", "guests": True, "name": "Our tube"}, "1.2.3.4")
+        self.assertEqual(st, 200, d)
+        self.assertIn("cookie", d)
+        self.assertFalse(ts.setup["needed"])
+        self.assertFalse(os.path.exists(ts.SETUP_CODE_FILE))
+        # applied at once
+        self.assertTrue(ts.ACCOUNTS)
+        self.assertTrue(ts.GUESTS)
+        self.assertEqual(ts.MAX_ACCOUNTS, 4)
+        self.assertEqual(ts.NAME, "Our tube")
+        self.assertEqual(ts.settings_owner(), "mom")
+        self.assertEqual(ts.setup_finish({"code": code, "mode": "open"}, "1.2.3.4")[0], 409)
+        # a restart reads the same
+        ts.setup_init()
+        self.assertFalse(ts.setup["needed"])
+
+    def test_an_existing_server_is_not_asked(self):
+        os.environ["TUBEHAUS_AUTH"] = "none"
+        ts.setup_init()
+        self.assertFalse(ts.setup["needed"])
+
+    def test_the_environment_wins_and_is_fixed(self):
+        ts._cfg_save({"HT_MAX_HEIGHT": "720"})
+        ts.apply_settings()
+        self.assertEqual(ts.MAX_HEIGHT, 720)
+        os.environ["HT_MAX_HEIGHT"] = "1080"
+        ts.apply_settings()
+        self.assertEqual(ts.MAX_HEIGHT, 1080)
+        st, d = ts.settings_save({"values": {"HT_MAX_HEIGHT": "480", "HT_SAVED_MAX_GB": "7"}})
+        self.assertEqual(st, 200)
+        self.assertIn("HT_MAX_HEIGHT", d["fixed"])
+        self.assertEqual((ts.MAX_HEIGHT, ts.SAVED_MAX_GB), (1080, 7))
+        # docker compose passes an unset variable as "": that's the page's value, not a fixed one
+        os.environ["HT_MAX_HEIGHT"] = ""
+        ts.apply_settings()
+        self.assertEqual(ts.MAX_HEIGHT, 720)
+
+    def test_bad_values_are_refused(self):
+        self.assertEqual(ts.settings_save({"values": {"HT_MAX_HEIGHT": "9999"}})[0], 400)
+        self.assertEqual(ts.settings_save({"values": {"HT_OIDC_ISSUER": "javascript:x"}})[0], 400)
+        self.assertEqual(ts.settings_save({"values": {"HT_SUB_LANG": "<b>"}})[0], 400)
+        self.assertFalse(os.path.exists(ts.CONFIG))
+
+    def test_turning_accounts_on_makes_the_owner_first(self):
+        self.assertEqual(ts.settings_save({"values": {"HT_ACCOUNTS": True}})[0], 400)
+        self.assertFalse(ts.ACCOUNTS)
+        st, d = ts.settings_save({"values": {"HT_ACCOUNTS": True}, "owner": {"username": "dad", "password": "another secret"}})
+        self.assertEqual(st, 200, d)
+        self.assertTrue(ts.ACCOUNTS)
+        self.assertEqual(ts.settings_owner(), "dad")
+        self.assertEqual(ts.settings_access("dad", None, "1.1.1.1"), "ok")
+        self.assertEqual(ts.settings_access("kid", None, "1.1.1.1"), "owner")
+        self.assertEqual(ts.settings_access(None, None, "1.1.1.1"), "sign-in")
+
+    def test_settings_password_without_accounts(self):
+        self.assertEqual(ts.settings_access(None, None, "1.1.1.1"), "ok")     # no sign-in at all: as before
+        ts.settings_save({"admin_password": "settings pass"})
+        self.assertEqual(ts.settings_access(None, None, "1.1.1.1"), "password")
+        self.assertEqual(ts.settings_access(None, "nope", "1.1.1.1"), "wrong")
+        self.assertEqual(ts.settings_access(None, "settings pass", "1.1.1.1"), "ok")
+        # a public server never opens its settings without one
+        ts.settings_save({"admin_password": "", "values": {"HT_PUBLIC_MODE": True}})
+        self.assertTrue(ts.PUBLIC_MODE)
+        self.assertEqual(ts.settings_access(None, None, "1.1.1.1"), "password")
+
+    def test_secrets_are_never_sent_back(self):
+        ts.settings_save({"values": {"HT_OIDC_CLIENT_SECRET": "s3cret"}})
+        v = ts.settings_view()
+        self.assertEqual(v["values"]["HT_OIDC_CLIENT_SECRET"], "")
+        self.assertTrue(v["secrets"]["HT_OIDC_CLIENT_SECRET"])
+        ts.settings_save({"values": {"HT_OIDC_CLIENT_SECRET": ""}})      # left empty: kept
+        self.assertEqual(ts._CFG["HT_OIDC_CLIENT_SECRET"], "s3cret")
+
+
 class KeptOnServer(unittest.TestCase):
     """#126: a downloaded video kept on the server plays from there next time."""
 

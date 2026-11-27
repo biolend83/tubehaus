@@ -1,4 +1,6 @@
-# Everything in one go:  cp .env.example .env  (edit the top part)  &&  docker compose up -d
+# Everything in one go:  cp .env.example .env  (your address in it)  &&  docker compose up -d
+# then open TubeHaus: a new server asks how it'll be used (the setup code is in: docker compose logs tubehaus).
+# Every other setting is on the server's settings page; one written in .env wins over the page's.
 #   caddy      - serves the app and routes everything (ports 80/443)
 #   tubehaus   - TubeHaus server + Cloudflare WARP
 #   bgutil     - PO tokens for yt-dlp (live streams), shares tubehaus's network
@@ -15,7 +17,7 @@ services:
       - "${TUBEHAUS_HTTPS_BIND:-443}:443"
     environment:
       TUBEHAUS_SITE: ${TUBEHAUS_SITE}
-      TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-none}
+      TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-auto}
       TUBEHAUS_USER: ${TUBEHAUS_USER:-}
       TUBEHAUS_PASSWORD_HASH: ${TUBEHAUS_PASSWORD_HASH:-}
     volumes:
@@ -33,23 +35,24 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      HT_PUBLIC_URL: ${TUBEHAUS_URL}
-      HT_SUB_LANG: ${TUBEHAUS_SUB_LANG:-en}
-      HT_WHISPER_LANG: ${TUBEHAUS_CAPTION_LANG:-auto}
-      HT_PUBLIC_MODE: ${TUBEHAUS_PUBLIC:-0}
-      TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-none}           # "accounts": one library per person
-      HT_MAX_ACCOUNTS: ${TUBEHAUS_MAX_ACCOUNTS:-1000}
-      HT_SAVED_MAX_GB: ${TUBEHAUS_SAVED_MAX_GB:-50}       # videos kept on the server (download → "Keep on the server")
-      HT_GUESTS: ${TUBEHAUS_GUESTS:-0}              # "1": watching without an account too (accounts on)
-      # single sign-on with your own identity provider (TUBEHAUS_AUTH=accounts; see .env.example)
+      HT_SITE: ${TUBEHAUS_SITE:-}
+      HT_PUBLIC_URL: ${TUBEHAUS_URL:-}               # empty: https://<TUBEHAUS_SITE>
+      HT_VID_PREFETCH: ${TUBEHAUS_PREFETCH:-4}
+      # the rest is on the server's settings page; each one set in .env wins over the page (empty = the page's)
+      TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-}               # "accounts" / "none" / "basic": fixed here
+      HT_PUBLIC_MODE: ${TUBEHAUS_PUBLIC:-}
+      HT_MAX_ACCOUNTS: ${TUBEHAUS_MAX_ACCOUNTS:-}
+      HT_GUESTS: ${TUBEHAUS_GUESTS:-}
+      HT_SAVED_MAX_GB: ${TUBEHAUS_SAVED_MAX_GB:-}
+      HT_SUB_LANG: ${TUBEHAUS_SUB_LANG:-}
+      HT_WHISPER_LANG: ${TUBEHAUS_CAPTION_LANG:-}
       HT_OIDC_ISSUER: ${TUBEHAUS_OIDC_ISSUER:-}
       HT_OIDC_CLIENT_ID: ${TUBEHAUS_OIDC_CLIENT_ID:-}
       HT_OIDC_CLIENT_SECRET: ${TUBEHAUS_OIDC_CLIENT_SECRET:-}
       HT_OIDC_NAME: ${TUBEHAUS_OIDC_NAME:-}
-      HT_OIDC_ONLY: ${TUBEHAUS_OIDC_ONLY:-0}
-      HT_VID_PREFETCH: ${TUBEHAUS_PREFETCH:-4}
-      HT_MAX_VIEWERS: ${TUBEHAUS_MAX_VIEWERS:-0}
-      HT_MAX_HEIGHT: ${TUBEHAUS_MAX_HEIGHT:-0}
+      HT_OIDC_ONLY: ${TUBEHAUS_OIDC_ONLY:-}
+      HT_MAX_VIEWERS: ${TUBEHAUS_MAX_VIEWERS:-}
+      HT_MAX_HEIGHT: ${TUBEHAUS_MAX_HEIGHT:-}
       HT_RATE_PER_MIN: ${TUBEHAUS_RATE_PER_MIN:-}
       HT_NAME: ${TUBEHAUS_NAME:-}
       HT_LINKS: ${TUBEHAUS_LINKS:-}

@@ -21,13 +21,60 @@ import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
+# The settings a server's owner changes on its settings page (/y/server.html), kept in STATE/config.json.
+# A value in the environment (.env, docker-compose.yml) wins over the page's and shows there as fixed.
+SETTING_KEYS = ("HT_PUBLIC_MODE", "HT_ACCOUNTS", "HT_MAX_ACCOUNTS", "HT_GUESTS", "HT_SAVED_MAX_GB", "HT_MAX_HEIGHT",
+                "HT_MAX_VIEWERS", "HT_RATE_PER_MIN", "HT_NAME", "HT_LINKS", "HT_SUB_LANG", "HT_WHISPER_LANG",
+                "HT_OIDC_ISSUER", "HT_OIDC_CLIENT_ID", "HT_OIDC_CLIENT_SECRET", "HT_OIDC_NAME", "HT_OIDC_ONLY")
+_CFG = {}
+
+
 def env(key, default=""):
-    return os.environ.get(key, default)
+    v = os.environ.get(key)
+    if key in SETTING_KEYS and (v is None or not v.strip()):
+        c = _CFG.get(key)
+        return default if c is None or str(c) == "" else str(c)
+    return default if v is None else v
+
+
+def env_fixed(key):
+    """set in the environment, so the settings page can't change it"""
+    if key == "HT_ACCOUNTS" and (os.environ.get("TUBEHAUS_AUTH") or "").strip():
+        return True
+    return bool((os.environ.get(key) or "").strip())
 
 
 BIND = (env("HT_BIND", "127.0.0.1"), int(env("HT_PORT", "3010")))
 STATE = env("HT_STATE", "./state")                       # library, subtitle cache
-PUBLIC = env("HT_PUBLIC_URL", "http://localhost:8080").rstrip("/")   # where browsers open TubeHaus
+CONFIG = os.path.join(STATE, "config.json")
+
+
+def _cfg_read():
+    try:
+        with open(CONFIG, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+_CFG = _cfg_read()
+
+
+def _public_url():
+    """where browsers open TubeHaus: HT_PUBLIC_URL, else made from the site address Caddy serves (TUBEHAUS_SITE)"""
+    u = env("HT_PUBLIC_URL", "").strip()
+    if u:
+        return u.rstrip("/")
+    site = env("HT_SITE", "").split(",")[0].strip().rstrip("/")
+    if site.startswith(("http://", "https://")):
+        return site
+    if site and not site.startswith(":") and not site.startswith("localhost"):
+        return "https://" + site
+    return "http://localhost:8080"
+
+
+PUBLIC = _public_url()
 # YouTube refuses most cloud/VPS addresses ("Sign in to confirm you're not a bot").
 # Sending YouTube traffic out through Cloudflare WARP (warp-cli in proxy mode,
 # which listens on 127.0.0.1:40000 and speaks HTTP CONNECT) is what makes this work.
@@ -37,20 +84,12 @@ SABR = env("HT_SABR", "1")                               # "1": SABR when no oth
 SABR_PORT = int(env("HT_SABR_PORT", "3033"))             # the SABR helper (server/sabr/sabr.mjs, run by deno), on 127.0.0.1
 YTDLP = env("HT_YTDLP", "yt-dlp")
 LT = env("HT_LIBRETRANSLATE", "")                        # optional LibreTranslate URL (translation fallback)
-SUB_LANG = env("HT_SUB_LANG", "en")                      # default target of translated subtitles (the app asks for its own language)
 WHISPER_BIN = env("HT_WHISPER_BIN", "")                  # whisper.cpp "whisper-cli"; empty = no live captions
 WHISPER_MODEL = env("HT_WHISPER_MODEL", "")              # e.g. ggml-base-q5_1.bin
-WHISPER_LANG = env("HT_WHISPER_LANG", "auto")
 # more live-caption engines to choose from in the player, as "name=/path/to/cli,...": each takes whisper-cli's
 # arguments (-m -f -l ...) and prints its "[00:00:01.000 --> 00:00:03.000]  text" lines
 LIVECC_ALT = env("HT_LIVECC_ALT", "")
 YTDL_DIR = env("HT_DOWNLOAD_DIR", "/var/tmp/tubehaus-dl")
-# videos kept on the server (#126): saved once, they play from here on every device; at most HT_SAVED_MAX_GB
-SAVED_MAX_GB = int(env("HT_SAVED_MAX_GB", "50") or 50)
-# Public instance: every visitor keeps their own library in their browser, and the server
-# keeps none. Anything that would be shared between strangers (library, send to TV,
-# server downloads) is switched off.
-PUBLIC_MODE = env("HT_PUBLIC_MODE", "0") == "1"
 # Load limits, so a crowd can't take the server (or your YouTube access) down. 0 = no limit.
 def env_int(key, default):
     """An empty or unset variable means the default (docker compose passes unset ones as "")."""
@@ -63,24 +102,12 @@ def env_int(key, default):
 MAX_CONN = env_int("HT_MAX_CONNECTIONS", 256)            # requests handled at the same time
 # the key for the usage page (/y/admin.html, public instances); empty = no such page
 ADMIN_TOKEN = env("HT_ADMIN_TOKEN", "")
-MAX_VIEWERS = env_int("HT_MAX_VIEWERS", 0)               # people watching at once (by IP, 3 min window)
-RATE_PER_MIN = env_int("HT_RATE_PER_MIN", 120 if PUBLIC_MODE else 0)   # API requests per IP per minute
-MAX_HEIGHT = env_int("HT_MAX_HEIGHT", 0)                 # highest quality offered to players, e.g. 1080
 # The visitor's address comes from X-Forwarded-For only when the request came from this machine or a
 # private network (a reverse proxy), and it's read from the end, past the proxies' own private
 # addresses: the start of that header is whatever the visitor wrote. Proxies with public addresses in
 # front (Cloudflare's orange cloud) can't be told from visitors, so say how many there are.
 PUBLIC_PROXIES = max(0, env_int("HT_PUBLIC_PROXIES", 0))
 MAX_BODY = env_int("HT_MAX_BODY_MB", 64) * 1024 * 1024     # largest request body (a big YouTube history import fits)
-# Sign-in required: username + password only, no e-mail. The reverse proxy asks GET /api/p/auth/check
-# before letting anyone in (deploy/Caddyfile.public, or TUBEHAUS_AUTH=accounts with docker compose).
-# On a public instance libraries stay in each visitor's browser; on a household server every
-# account has a library of its own on the server.
-ACCOUNTS = env("HT_ACCOUNTS", "0") == "1" or env("TUBEHAUS_AUTH", "") == "accounts"
-MAX_ACCOUNTS = env_int("HT_MAX_ACCOUNTS", 1000)
-# HT_GUESTS=1 (with accounts, not public): anyone may watch without an account, as on a public instance
-# (their subscriptions and history stay in their browser); signing in gives them their library on the server
-GUESTS = ACCOUNTS and env("HT_GUESTS", "0") == "1" and env("HT_PUBLIC_MODE", "0") != "1"
 def _names(v, n):
     """a name, or one per language as {"ko": "홈튜브", "en": "HomeTube"} (the page picks the visitor's language)"""
     if isinstance(v, dict):
@@ -99,8 +126,6 @@ def _name(raw):
     return raw[:40] or None
 
 
-# The instance's own name in the page title and menu (empty = TubeHaus, in the visitor's language)
-NAME = _name(env("HT_NAME", ""))
 VERSION = "2.0.2"   # this server's release: health() tells it, the web app shows it at the end of its menu
 
 
@@ -122,7 +147,37 @@ def _links(raw):
     return out[:12]
 
 
-LINKS = _links(env("HT_LINKS", ""))
+def _read_settings():
+    """the settings (environment, else the settings page's config.json, else the default)"""
+    global SUB_LANG, WHISPER_LANG, SAVED_MAX_GB, PUBLIC_MODE, MAX_VIEWERS, RATE_PER_MIN, MAX_HEIGHT, ACCOUNTS, \
+        MAX_ACCOUNTS, GUESTS, NAME, LINKS
+    SUB_LANG = env("HT_SUB_LANG", "en")         # default target of translated subtitles (the app asks for its own language)
+    WHISPER_LANG = env("HT_WHISPER_LANG", "auto")
+    # videos kept on the server (#126): saved once, they play from here on every device; at most HT_SAVED_MAX_GB
+    SAVED_MAX_GB = env_int("HT_SAVED_MAX_GB", 50)
+    # Public instance: every visitor keeps their own library in their browser, and the server
+    # keeps none. Anything that would be shared between strangers (library, send to TV,
+    # server downloads) is switched off.
+    PUBLIC_MODE = env("HT_PUBLIC_MODE", "0") == "1"
+    MAX_VIEWERS = env_int("HT_MAX_VIEWERS", 0)               # people watching at once (by IP, 3 min window)
+    RATE_PER_MIN = env_int("HT_RATE_PER_MIN", 120 if PUBLIC_MODE else 0)   # API requests per IP per minute
+    MAX_HEIGHT = env_int("HT_MAX_HEIGHT", 0)                 # highest quality offered to players, e.g. 1080
+    # Sign-in required: username + password only, no e-mail. The reverse proxy asks GET /api/p/auth/check
+    # before letting anyone in (deploy/Caddyfile.docker does for every request).
+    # On a public instance libraries stay in each visitor's browser; on a household server every
+    # account has a library of its own on the server. TUBEHAUS_AUTH=none or basic in .env keeps them off.
+    auth = (os.environ.get("TUBEHAUS_AUTH") or "").strip()
+    ACCOUNTS = auth == "accounts" or (auth not in ("none", "basic") and env("HT_ACCOUNTS", "0") == "1")
+    MAX_ACCOUNTS = env_int("HT_MAX_ACCOUNTS", 1000)
+    # HT_GUESTS=1 (with accounts, not public): anyone may watch without an account, as on a public instance
+    # (their subscriptions and history stay in their browser); signing in gives them their library on the server
+    GUESTS = ACCOUNTS and env("HT_GUESTS", "0") == "1" and not PUBLIC_MODE
+    # The instance's own name in the page title and menu (empty = TubeHaus, in the visitor's language)
+    NAME = _name(env("HT_NAME", ""))
+    LINKS = _links(env("HT_LINKS", ""))
+
+
+_read_settings()
 
 lock = threading.Lock()
 LIVE_CACHE = {}
@@ -6172,6 +6227,265 @@ def _take_shared_library(user):
     log("auth", "first account: took over the shared library", every=0)
 
 
+# ---------- first start and the server settings page (/y/server.html) ----------
+# A new server (no config.json, nothing set in .env, no library or accounts yet) asks how it will be used
+# before anything else: alone, a family with accounts, anyone (public) or no sign-in at all. Whoever opens
+# it first types the setup code from the server's log, so a stranger who finds the address can't take it.
+setup = {"needed": False, "code": ""}
+SETUP_CODE_FILE = os.path.join(STATE, "setup-code.txt")
+SETTING_INTS = {"HT_MAX_ACCOUNTS": (1, 100000), "HT_SAVED_MAX_GB": (0, 1000000), "HT_MAX_HEIGHT": (0, 4320),
+                "HT_MAX_VIEWERS": (0, 1000000), "HT_RATE_PER_MIN": (0, 1000000)}
+SETTING_BOOLS = ("HT_PUBLIC_MODE", "HT_ACCOUNTS", "HT_GUESTS", "HT_OIDC_ONLY")
+SETTING_SECRETS = ("HT_OIDC_CLIENT_SECRET",)
+
+
+def _installed_before():
+    if any((os.environ.get(k) or "").strip() for k in SETTING_KEYS + ("TUBEHAUS_AUTH",)):
+        return True
+    return any(os.path.exists(x) for x in (USERS, YTLIB, SHORTS))
+
+
+def setup_init():
+    """at start: a new server makes its setup code and says it in the log"""
+    if os.path.exists(CONFIG) or _installed_before():
+        setup.update(needed=False, code="")
+        return
+    code = "".join(secrets.choice("0123456789") for _ in range(6))
+    setup.update(needed=True, code=code)
+    try:
+        os.makedirs(STATE, exist_ok=True)
+        fd = os.open(SETUP_CODE_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            fh.write(code + "\n")
+    except OSError:
+        pass
+    print("=" * 60 + "\n  TubeHaus setup code: %s\n  Open TubeHaus in a browser and type it to set the server up.\n" % code
+          + "=" * 60, flush=True)
+
+
+def _cfg_save(d):
+    global _CFG
+    os.makedirs(STATE, exist_ok=True)
+    tmp = CONFIG + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False, indent=1)
+    os.replace(tmp, CONFIG)
+    _CFG = d
+
+
+def apply_settings():
+    """config.json read again: every setting takes effect for the next request"""
+    global _CFG
+    _CFG = _cfg_read()
+    _read_settings()
+    _read_oidc()
+
+
+def settings_owner():
+    """with accounts, the account that runs the server: the one set up first (or the one config.json names)"""
+    users = jload(USERS, {})
+    o = _CFG.get("owner")
+    if o in users:
+        return o
+    return min(users, key=lambda u: (int(users[u].get("created") or 0), u)) if users else None
+
+
+def _admin_hash(pw, salt_hex):
+    return _pw_hash(pw, bytes.fromhex(salt_hex))
+
+
+def settings_access(user, password, ip):
+    """who may open the settings page: "ok", or why not ("sign-in", "owner", "password", "wrong", "busy")"""
+    if setup["needed"]:
+        return "setup"
+    if ACCOUNTS:
+        if not user:
+            return "sign-in"
+        return "ok" if user == settings_owner() else "owner"
+    h, salt = _CFG.get("admin_hash"), _CFG.get("admin_salt")
+    if h and salt:
+        if not password:
+            return "password"
+        if _too_many("admin:" + ip, 10, 600):
+            return "busy"
+        return "ok" if hmac.compare_digest(_admin_hash(password, salt), h) else "wrong"
+    if PUBLIC_MODE:
+        if ADMIN_TOKEN and password and hmac.compare_digest(password, ADMIN_TOKEN):
+            return "ok"
+        return "password"
+    return "ok"           # no sign-in at all: whoever can open the server runs it, as before
+
+
+def settings_view():
+    vals = {}
+    for k in SETTING_KEYS:
+        v = env(k, "")
+        vals[k] = "" if k in SETTING_SECRETS else v
+    return {"values": vals, "secrets": {k: bool(env(k, "")) for k in SETTING_SECRETS},
+            "fixed": [k for k in SETTING_KEYS if env_fixed(k)], "owner": settings_owner() if ACCOUNTS else None,
+            "admin_password": bool(_CFG.get("admin_hash")), "accounts": len(jload(USERS, {})), "version": VERSION}
+
+
+def _setting_value(k, v):
+    """a value from the page checked and in the form config.json keeps; ValueError with what's wrong"""
+    v = "" if v is None else v
+    if k in SETTING_BOOLS:
+        return "1" if v in (True, "1", 1, "true") else "0"
+    if k in SETTING_INTS:
+        lo, hi = SETTING_INTS[k]
+        s2 = str(v).strip()
+        if s2 == "":
+            return ""
+        if not s2.isdigit() or not lo <= int(s2) <= hi:
+            raise ValueError("That number is out of range: %d-%d" % (lo, hi))
+        return s2
+    if k == "HT_NAME":
+        if isinstance(v, dict):
+            v = json.dumps(_names(v, 40) or {}, ensure_ascii=False)
+        return str(v).strip()[:600]
+    if k == "HT_LINKS":
+        if isinstance(v, list):
+            v = json.dumps(v, ensure_ascii=False)
+        v = str(v).strip()
+        if v and not _links(v) and v != "[]":
+            raise ValueError("The menu links aren't readable")
+        return v[:6000]
+    if k in ("HT_SUB_LANG", "HT_WHISPER_LANG"):
+        v = str(v).strip()
+        if v and not re.fullmatch(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?|auto", v):
+            raise ValueError("A language is a code like en or ko")
+        return v
+    if k == "HT_OIDC_ISSUER":
+        v = str(v).strip().rstrip("/")
+        if v and not re.fullmatch(r"https://[^\s]+|http://(localhost|127\.0\.0\.1)(:\d+)?(/[^\s]*)?", v):
+            raise ValueError("The provider's address starts with https://")
+        return v[:500]
+    return str(v).strip()[:500]
+
+
+def _make_account(user, pw):
+    """an account made by the server's owner (setup, settings): the checks of a sign-up, not its limits"""
+    user = str(user or "").strip().lower()
+    pw = str(pw or "")
+    if not USERNAME.fullmatch(user):
+        raise ValueError("Use 3-24 letters, numbers or _ for the user name")
+    if len(pw) < 8 or len(pw) > 200:
+        raise ValueError("The password needs at least 8 characters")
+    if pw.lower() == user or pw in ("password", "12345678", "123456789", "qwertyui", "11111111"):
+        raise ValueError("Please choose a less guessable password")
+    salt = secrets.token_bytes(16)
+    h = _pw_hash(pw, salt)
+    with auth_lk:
+        users = jload(USERS, {})
+        if user in users:
+            raise ValueError("That user name is taken")
+        first = not users
+        users[user] = {"salt": salt.hex(), "hash": h, "gen": 1, "created": int(time.time())}
+        jsave(USERS, users)
+        os.chmod(USERS, 0o600)
+    if first:
+        _take_shared_library(user)
+    return user
+
+
+def settings_save(b):
+    """the settings page saved: config.json written, everything applied at once"""
+    vals = b.get("values") if isinstance(b.get("values"), dict) else {}
+    d = dict(_CFG)
+    try:
+        for k, v in vals.items():
+            if k not in SETTING_KEYS or env_fixed(k):
+                continue
+            if k in SETTING_SECRETS and (v is None or v == ""):
+                continue           # left empty: the one saved before stays
+            d[k] = _setting_value(k, v)
+        if "admin_password" in b:
+            pw = str(b.get("admin_password") or "")
+            if pw and len(pw) < 8:
+                raise ValueError("The password needs at least 8 characters")
+            if pw:
+                d["admin_salt"] = secrets.token_hex(16)
+                d["admin_hash"] = _admin_hash(pw, d["admin_salt"])
+            else:
+                d.pop("admin_salt", None)
+                d.pop("admin_hash", None)
+        accounts_on = (os.environ.get("TUBEHAUS_AUTH") or "").strip() == "accounts" or (
+            not env_fixed("HT_ACCOUNTS") and d.get("HT_ACCOUNTS") == "1")
+        made = None
+        # accounts turned on with none there yet: the owner's account comes with it (else a stranger could be first)
+        if accounts_on and not jload(USERS, {}):
+            o = b.get("owner") if isinstance(b.get("owner"), dict) else {}
+            if not o.get("username"):
+                raise ValueError("Make your own account first")
+            made = _make_account(o.get("username"), o.get("password"))
+            d["owner"] = made
+    except ValueError as e:
+        return 400, {"error": str(e)}
+    _cfg_save(d)
+    apply_settings()
+    log("settings", "saved: " + ",".join(sorted(k for k in vals if k in SETTING_KEYS))[:200], every=0)
+    out = settings_view()
+    if made:
+        out["cookie"] = session_make(made, 1)
+    return 200, out
+
+
+SETUP_MODES = {
+    "solo": {"HT_ACCOUNTS": "1", "HT_MAX_ACCOUNTS": "1", "HT_GUESTS": "0", "HT_PUBLIC_MODE": "0"},
+    "family": {"HT_ACCOUNTS": "1", "HT_GUESTS": "0", "HT_PUBLIC_MODE": "0"},
+    "public": {"HT_ACCOUNTS": "0", "HT_GUESTS": "0", "HT_PUBLIC_MODE": "1"},
+    "open": {"HT_ACCOUNTS": "0", "HT_GUESTS": "0", "HT_PUBLIC_MODE": "0"},
+}
+
+
+def setup_finish(b, ip):
+    """the first-start page: the code, how the server will be used, the owner's account or the settings password"""
+    if not setup["needed"]:
+        return 409, {"error": "This server is already set up"}
+    if _too_many("setup:" + ip, 10, 600) or _too_many("setup", 60, 600):
+        return 429, {"error": "Too many attempts. Please wait a few minutes"}
+    if not hmac.compare_digest(re.sub(r"\D", "", str(b.get("code") or "")), setup["code"]):
+        return 403, {"error": "That isn't the setup code. It's in the server's log"}
+    mode = str(b.get("mode") or "")
+    if mode not in SETUP_MODES:
+        return 400, {"error": "Bad request"}
+    d = dict(SETUP_MODES[mode])
+    try:
+        if mode == "family":
+            d["HT_MAX_ACCOUNTS"] = _setting_value("HT_MAX_ACCOUNTS", b.get("max_accounts") or "10")
+            d["HT_GUESTS"] = _setting_value("HT_GUESTS", b.get("guests"))
+        if b.get("name"):
+            d["HT_NAME"] = _setting_value("HT_NAME", b.get("name"))
+        pw = str(b.get("admin_password") or "")
+        if mode == "public" and len(pw) < 8:
+            raise ValueError("The password needs at least 8 characters")
+        if mode in ("public", "open") and pw:
+            if len(pw) < 8:
+                raise ValueError("The password needs at least 8 characters")
+            d["admin_salt"] = secrets.token_hex(16)
+            d["admin_hash"] = _admin_hash(pw, d["admin_salt"])
+        made = None
+        if mode in ("solo", "family"):
+            made = _make_account(b.get("username"), b.get("password"))
+            d["owner"] = made
+    except ValueError as e:
+        return 400, {"error": str(e)}
+    d["setup"] = {"mode": mode, "at": int(time.time())}
+    _cfg_save(d)
+    setup.update(needed=False, code="")
+    try:
+        os.remove(SETUP_CODE_FILE)
+    except OSError:
+        pass
+    apply_settings()
+    log("settings", "set up as " + mode, every=0)
+    out = {"ok": True, "mode": mode}
+    if made:
+        out["cookie"] = session_make(made, 1)
+    return 200, out
+
+
 def auth_signup(b, ip):
     user = str(b.get("username", "")).strip().lower()
     pw = str(b.get("password", ""))
@@ -6283,15 +6597,23 @@ def basic_account(user, pw, ip):
 # from the provider's userinfo endpoint over HTTPS, so no token signature needs checking here.
 # A first sign-in makes an account named after the provider's user name, tied to the provider's
 # "sub": never to a password account that happens to have the same name.
-OIDC_ISSUER = env("HT_OIDC_ISSUER", "").strip().rstrip("/")
-OIDC_ID = env("HT_OIDC_CLIENT_ID", "").strip()
-OIDC_SECRET = env("HT_OIDC_CLIENT_SECRET", "").strip()
-OIDC_NAME = env("HT_OIDC_NAME", "").strip()[:40] or "SSO"           # on the button: "Continue with ..."
-OIDC_CLAIM = env("HT_OIDC_USER_CLAIM", "").strip() or "preferred_username"
-OIDC_SCOPES = env("HT_OIDC_SCOPES", "").strip() or "openid profile email"
-OIDC = bool(ACCOUNTS and OIDC_ISSUER and OIDC_ID)
-OIDC_ONLY = OIDC and env("HT_OIDC_ONLY", "0") == "1"     # no passwords at all: only the provider signs people in
 oidc_meta = {}
+
+
+def _read_oidc():
+    global OIDC_ISSUER, OIDC_ID, OIDC_SECRET, OIDC_NAME, OIDC_CLAIM, OIDC_SCOPES, OIDC, OIDC_ONLY
+    OIDC_ISSUER = env("HT_OIDC_ISSUER", "").strip().rstrip("/")
+    OIDC_ID = env("HT_OIDC_CLIENT_ID", "").strip()
+    OIDC_SECRET = env("HT_OIDC_CLIENT_SECRET", "").strip()
+    OIDC_NAME = env("HT_OIDC_NAME", "").strip()[:40] or "SSO"           # on the button: "Continue with ..."
+    OIDC_CLAIM = env("HT_OIDC_USER_CLAIM", "").strip() or "preferred_username"
+    OIDC_SCOPES = env("HT_OIDC_SCOPES", "").strip() or "openid profile email"
+    OIDC = bool(ACCOUNTS and OIDC_ISSUER and OIDC_ID)
+    OIDC_ONLY = OIDC and env("HT_OIDC_ONLY", "0") == "1"     # no passwords at all: only the provider signs people in
+    oidc_meta.clear()
+
+
+_read_oidc()
 oidc_pending = {}          # state -> (PKCE verifier, where to go back to, expiry)
 
 
@@ -6486,7 +6808,8 @@ def health():
             "live_captions": bool(LIVECC_ENGINES), "live_caption_engines": list(LIVECC_ENGINES), "public": PUBLIC_MODE,
             "max_height": MAX_HEIGHT or None, "viewers": len([1 for t in list(viewers.values()) if now - t < 180]),
             "max_viewers": MAX_VIEWERS or None, "accounts": ACCOUNTS, "name": NAME or None, "links": LINKS,
-            "sso": OIDC_NAME if OIDC else None, "app_sign_in": ACCOUNTS, "guests": GUESTS, "keep_on_server": not PUBLIC_MODE, "version": VERSION}
+            "sso": OIDC_NAME if OIDC else None, "app_sign_in": ACCOUNTS, "guests": GUESTS, "keep_on_server": not PUBLIC_MODE, "version": VERSION,
+            "setup": setup["needed"]}
 
 
 viewers, rate, load_lk = {}, {}, threading.Lock()   # ip -> last seen / (tokens, time)
@@ -6812,6 +7135,10 @@ class H(BaseHTTPRequestHandler):
         proto = (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
         return not (proto == "http" or (not proto and PUBLIC.startswith("http://")))
 
+    def admin_password(self):
+        """the settings password the page sends (X-Admin-Password, percent-encoded so any letters pass)"""
+        return urllib.parse.unquote(self.headers.get("X-Admin-Password") or "")[:200] or None
+
     def cookie_user(self):
         for part in (self.headers.get("Cookie") or "").split(";"):
             k, _, v = part.strip().partition("=")
@@ -6903,8 +7230,17 @@ class H(BaseHTTPRequestHandler):
         if ACCOUNTS and p.endswith("/api/p/auth/app"):
             return self.app_page()
         if p.endswith("/api/p/auth/me"):
-            return self.send(200, {"accounts": ACCOUNTS, "user": self.cookie_user() if ACCOUNTS else None, "guests": GUESTS,
-                                   "sso": OIDC_NAME if OIDC else None, "passwords": not OIDC_ONLY})
+            who = self.cookie_user() if ACCOUNTS else None
+            # the settings page: "ok" (the owner, or a server without sign-in), "password" (it asks one), else no
+            acc = settings_access(who, None, self.client_ip()) if not setup["needed"] else "setup"
+            return self.send(200, {"accounts": ACCOUNTS, "user": who, "guests": GUESTS,
+                                   "sso": OIDC_NAME if OIDC else None, "passwords": not OIDC_ONLY,
+                                   "settings": acc if acc in ("ok", "password", "setup") else None})
+        if p.endswith("/api/p/server/settings"):
+            acc = settings_access(_req.user, self.admin_password(), self.client_ip())
+            if acc != "ok":
+                return self.send(429 if acc == "busy" else 403, {"error": "Only the server's owner can change its settings", "need": acc})
+            return self.send(200, settings_view())
         if self.over_limit(p):
             return
         if p.endswith("/api/p/admin/stats"):
@@ -7112,6 +7448,17 @@ class H(BaseHTTPRequestHandler):
         except Exception:
             body = {}
         body = body if isinstance(body, dict) else {}
+        if p.endswith("/api/p/server/setup"):
+            code, d = setup_finish(body, self.client_ip())
+            cookie = d.pop("cookie", None)
+            return self.send_cookie(code, d, cookie, SESSION_DAYS * 86400) if cookie else self.send(code, d)
+        if p.endswith("/api/p/server/settings"):
+            acc = settings_access(_req.user, self.admin_password(), self.client_ip())
+            if acc != "ok":
+                return self.send(429 if acc == "busy" else 403, {"error": "Only the server's owner can change its settings", "need": acc})
+            code, d = settings_save(body)
+            cookie = d.pop("cookie", None)
+            return self.send_cookie(code, d, cookie, SESSION_DAYS * 86400) if cookie else self.send(code, d)
         if ACCOUNTS and p.endswith("/api/p/auth/app/start"):
             if _too_many("app:" + self.client_ip(), 20, 600):
                 return self.send(429, {"error": "Too many attempts. Please wait a few minutes"})
@@ -7660,6 +8007,7 @@ if __name__ == "__main__":
     if "--doctor" in sys.argv:
         sys.exit(1 if doctor() else 0)
     os.makedirs(STATE, exist_ok=True)
+    setup_init()
     threading.Thread(target=yt_feed_loop, daemon=True).start()
     threading.Thread(target=sabr_loop, name="sabr", daemon=True).start()
     threading.Thread(target=ytdl_gc_loop, daemon=True).start()

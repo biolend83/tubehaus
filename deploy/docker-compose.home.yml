@@ -2,6 +2,7 @@
 # the app-store packages (Umbrel, CasaOS, TrueNAS, Unraid) are made from. On a home connection YouTube
 # needs no detour. If it ever does: HT_PROXY=host:port sends YouTube through a proxy of your own.
 #   docker compose -f deploy/docker-compose.home.yml up -d      then open http://<this machine>:8080
+# A new server asks how it will be used first; the setup code is in: docker compose -f ... logs tubehaus
 services:
   web:
     image: ghcr.io/biolend83/tubehaus-web:latest
@@ -9,7 +10,7 @@ services:
     ports:
       - "${TUBEHAUS_PORT:-8080}:8080"
     environment:
-      TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-none}
+      TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-auto}
     depends_on:
       - tubehaus
 
@@ -20,14 +21,14 @@ services:
     environment:
       HT_WARP: "0"
       HT_PROXY: ${HT_PROXY:-}
-      HT_SUB_LANG: ${TUBEHAUS_SUB_LANG:-en}
-      TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-none}
+      HT_SUB_LANG: ${TUBEHAUS_SUB_LANG:-}
+      TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-}
       HT_PUBLIC_URL: ${TUBEHAUS_URL:-http://localhost:8080}
       HT_OIDC_ISSUER: ${TUBEHAUS_OIDC_ISSUER:-}
       HT_OIDC_CLIENT_ID: ${TUBEHAUS_OIDC_CLIENT_ID:-}
       HT_OIDC_CLIENT_SECRET: ${TUBEHAUS_OIDC_CLIENT_SECRET:-}
       HT_OIDC_NAME: ${TUBEHAUS_OIDC_NAME:-}
-      HT_OIDC_ONLY: ${TUBEHAUS_OIDC_ONLY:-0}
+      HT_OIDC_ONLY: ${TUBEHAUS_OIDC_ONLY:-}
     volumes:
       - tubehaus-data:/data
 

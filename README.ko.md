@@ -229,13 +229,15 @@ docker compose pull         # 미리 빌드된 이미지 (amd64, arm64)
 docker compose up -d
 ```
 
-끝이에요. Caddy, 자체 유튜브 엔진과 Cloudflare WARP가 들어 있는 TubeHaus 서버, 라이브용 PO 토큰 제공기, 라이브 자막용 whisper.cpp가 한 번에 올라와요. 도메인을 열면 돼요.
+끝이에요. Caddy, 자체 유튜브 엔진과 Cloudflare WARP가 들어 있는 TubeHaus 서버, 라이브용 PO 토큰 제공기, 라이브 자막용 whisper.cpp가 한 번에 올라와요.
+
+도메인을 열면 처음 한 번 어떻게 쓸지 물어봐요: **나 혼자**, **가족** (한 사람에 계정 하나), **누구나** (공개 서버), **로그인 없이** (집 네트워크·VPN 전용). 고르면 내 계정까지 만들어져요. 주소를 찾은 남이 먼저 차지하지 못하게 6자리 설정 코드를 먼저 물어보는데, `docker compose logs tubehaus`에 나와요. 나머지(계정, 손님, 이름, 메뉴 링크, 화질·부하 제한, SSO)는 **설정 → 서버 설정**에서 바꾸고 바로 적용돼요. `.env`에 적은 값도 그대로 먹히고, 페이지보다 우선해요.
 
 > [!NOTE]
 > **TrueNAS를 쓰나요?** TubeHaus가 TrueNAS 앱 목록에 있어요. **Apps → Discover Apps**에서 **TubeHaus**를 검색하세요(community 트레인). 클론할 필요가 없어요.
 
 > [!IMPORTANT]
-> **공개 도메인에 올릴 거라면 `.env`에 로그인부터 넣으세요:** `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER`, `TUBEHAUS_PASSWORD_HASH` (해시는 `docker compose run --rm caddy caddy hash-password`로 만들고, `$`는 모두 `$$`로 써요). 이게 없으면 주소를 여는 사람 모두가 같은 보관함을 써요. 다른 방법: [외부에 열기 전에 로그인 붙이기](#외부에-열기-전에-로그인-붙이기).
+> **공개 도메인에 올릴 거라면 처음 설정에서 "나 혼자"나 "가족"을 고르세요** (나중에 설정 → 서버 설정에서 계정을 켜도 돼요). "로그인 없이"면 주소를 여는 사람 모두가 같은 보관함을 써요. 다른 방법: [외부에 열기 전에 로그인 붙이기](#외부에-열기-전에-로그인-붙이기).
 
 > [!TIP]
 > **1.5 이하에서 업데이트하나요?** 이제 Invidious, companion, PostgreSQL은 필요 없어요. `git pull` 다음에 `docker compose pull && docker compose up -d --remove-orphans`로 내리면 돼요. `.env`의 그쪽 비밀값은 지워도 돼요. 보관함은 `tubehaus-data` 볼륨에 그대로 있어요. 자세히: [업데이트와 백업](README.md#updating-and-backups)(영어).
@@ -265,8 +267,9 @@ flisk up                          # flisk status / flisk logs --service tubehaus
 
 ### 외부에 열기 전에 로그인 붙이기
 
-기본으로는 계정이 없어서, 로그인을 안 붙이면 주소를 아는 사람 모두가 같은 보관함을 봐요.
+로그인을 안 붙이면 주소를 아는 사람 모두가 같은 보관함을 봐요.
 
+- **계정 (가장 쉬움):** 처음 설정에서 "나 혼자"나 "가족"을 고르거나, 설정 → 서버 설정에서 "계정으로 로그인"을 켜요. SSO도 같은 페이지에 있어요
 - **내장 비밀번호:** `.env`에 `TUBEHAUS_AUTH=basic`, `TUBEHAUS_USER`, `TUBEHAUS_PASSWORD_HASH` (해시는 `docker compose run --rm caddy caddy hash-password`, `$`는 모두 `$$`로)
 - **사람마다 계정:** `TUBEHAUS_AUTH=accounts`면 로그인 화면이 생기고 보관함이 사람마다 따로예요
 - **통합 로그인(SSO):** 계정을 켠 상태에서 `TUBEHAUS_OIDC_ISSUER`, `TUBEHAUS_OIDC_CLIENT_ID`, `TUBEHAUS_OIDC_CLIENT_SECRET`을 넣으면 OpenID Connect 제공자(Authentik, Authelia, Keycloak, Pocket ID 등)로 "…(으)로 계속하기" 버튼이 생겨요. 리디렉션 주소는 `<TUBEHAUS_URL>/api/p/auth/oidc/callback`, `TUBEHAUS_OIDC_ONLY=1`이면 비밀번호 로그인은 꺼져요
