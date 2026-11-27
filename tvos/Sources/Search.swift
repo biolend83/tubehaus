@@ -67,6 +67,11 @@ struct SearchView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .onAppear {
+            // the keyboard, not the guide, has the remote when Search opens
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                if focus == nil { focus = "k\(mode.rawValue)0" }
+            }
             if keys.isEmpty && !initial.isEmpty {
                 keys = Array(initial)
                 search(initial)
