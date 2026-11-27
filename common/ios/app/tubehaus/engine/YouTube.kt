@@ -82,6 +82,11 @@ object YouTube {
     }
     suspend fun details(id: String): Details = details(run("details", id))
     suspend fun relatedMore(token: String): Page<Item> = itemPage(run("relatedMore", token))
+    /** the Shorts YouTube's own app plays after [seed] (engine.js shortsAfter), ids only */
+    suspend fun shortsAfter(seed: String, cont: String? = null): Page<Video> {
+        val p = itemPage(run("shortsAfter", seed, cont))
+        return Page(p.items.filterIsInstance<Video>(), p.next)
+    }
     suspend fun browseMore(token: String): Page<Item> = itemPage(run("browseMore", token))
 
     suspend fun comments(token: String): Page<Comment> {

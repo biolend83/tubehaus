@@ -763,6 +763,33 @@ async function relatedMore(token) {
   return { items: parseItems(root), next: continuationOf(root) };
 }
 
+/**
+ * The Shorts YouTube's own app plays after seed, 8 to a page (cont for the next page), from its Shorts-only
+ * list (reel_watch_sequence). Ids only: the title comes with each one's stream. The list's key is what the
+ * Shorts page carries, protobuf {1: id, 5: {3: 12}}, made here from the id.
+ */
+async function shortsAfter(seed, cont) {
+  var key = cont;
+  if (!key) {
+    var b = [0x0a, seed.length];
+    for (var i = 0; i < seed.length; i++) b.push(seed.charCodeAt(i));
+    b.push(0x2a, 2, 0x18, 12);
+    var A = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", out = "";
+    for (var j = 0; j < b.length; j += 3) {
+      var n = (b[j] << 16) | ((b[j + 1] || 0) << 8) | (b[j + 2] || 0);
+      out += A[(n >> 18) & 63] + A[(n >> 12) & 63] + (j + 1 < b.length ? A[(n >> 6) & 63] : "=") + (j + 2 < b.length ? A[n & 63] : "=");
+    }
+    key = encodeURIComponent(out);
+  }
+  var d = await call("reel/reel_watch_sequence", { sequenceParams: key }, DEFAULT_PLAYERS[0]);
+  var seen = {}, items = [];
+  arr(at(d, "entries")).forEach(function (e) {
+    var id = at(e, "command.reelWatchEndpoint.videoId");
+    if (typeof id === "string" && /^[\w-]{11}$/.test(id) && id !== seed && !seen[id]) { seen[id] = 1; items.push({ type: "video", id: id, title: "", short: true }); }
+  });
+  return { items: items, next: at(d, "continuation") || at(d, "continuationEndpoint.continuationCommand.token") || null };
+}
+
 /** one page of comments, or of replies when token is a thread's replies token */
 async function comments(token) {
   var d = await call("next", { continuation: token });
@@ -1120,7 +1147,7 @@ async function rss(channelId) {
 
 var OPS = {
   search: search, searchMore: searchMore, suggestions: suggestions, stream: stream, details: details,
-  relatedMore: relatedMore, comments: comments, channel: channel, browseMore: browseMore, playlist: playlist,
+  relatedMore: relatedMore, shortsAfter: shortsAfter, comments: comments, channel: channel, browseMore: browseMore, playlist: playlist,
   resolve: resolve, feed: feed,
   shelvesMore: shelvesMore, postsMore: postsMore, channelSearch: channelSearch, channelAbout: channelAbout,
 };
