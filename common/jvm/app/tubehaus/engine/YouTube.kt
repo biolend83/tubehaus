@@ -189,6 +189,7 @@ object YouTube {
             expiresAt = Sys.nowMs() / 1000 + (sd.at("expiresInSeconds").long ?: 18000),
             client = c.name,
             storyboard = d.at("storyboards.playerStoryboardSpecRenderer.spec").str,
+            loudnessDb = loudnessIn(d),
         )
     }
 
