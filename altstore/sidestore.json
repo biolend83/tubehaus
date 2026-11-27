@@ -37,6 +37,15 @@
       },
       "versions": [
         {
+          "version": "2.1.0",
+          "buildVersion": "60",
+          "date": "2026-11-27T10:57:06+00:00",
+          "localizedDescription": "2.1.0: loudness matching, an equalizer and sound effects; keep videos on your server.",
+          "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v2.1.0/TubeHaus-2.1.0-ipad.ipa",
+          "size": 22661056,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "2.0.3",
           "buildVersion": "59",
           "date": "2026-11-26T12:05:48+00:00",
@@ -329,11 +338,11 @@
         "entitlements": [],
         "privacy": {}
       },
-      "version": "2.0.3",
-      "versionDate": "2026-11-26T12:05:48+00:00",
-      "versionDescription": "2.0.3: the chapter list stays open while playing; private-CA servers connect.",
-      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v2.0.3/TubeHaus-2.0.3-ipad.ipa",
-      "size": 22506188
+      "version": "2.1.0",
+      "versionDate": "2026-11-27T10:57:06+00:00",
+      "versionDescription": "2.1.0: loudness matching, an equalizer and sound effects; keep videos on your server.",
+      "downloadURL": "https://github.com/biolend83/tubehaus/releases/download/app-v2.1.0/TubeHaus-2.1.0-ipad.ipa",
+      "size": 22661056
     }
   ],
   "news": [],
