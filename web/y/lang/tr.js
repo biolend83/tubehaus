@@ -1,5 +1,9 @@
 // TubeHaus interface text: tr. Key = the Korean original.
 export default {
+ "로그인하지 않았어요. 구독과 기록은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장돼서 다른 기기에서도 이어져요.": "Oturum açmadınız. Abonelikleriniz ve geçmişiniz yalnızca bu tarayıcıda tutuluyor. Hesabınızda, her cihazda tutmak için oturum açın.",
+ "이 브라우저의 라이브러리": "Bu tarayıcıdaki kitaplık",
+ "계정이 있으면 구독과 기록이 서버에 저장돼서 어느 기기에서나 이어져요. 이메일 같은 개인정보는 받지 않아요.": "Bir hesapla abonelikleriniz ve geçmişiniz sunucuda tutulur ve her cihazda sizinle olur. E-posta ya da başka kişisel bilgi gerekmez.",
+ "계정 없이 둘러보기": "Hesap olmadan devam et",
  "오디오": "Ses",
  "넣지 않음": "Yok",
  "자동 더빙": "otomatik dublaj",

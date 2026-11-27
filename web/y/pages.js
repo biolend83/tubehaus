@@ -1,5 +1,5 @@
 // List pages: home, search, channel, playlist, subscriptions, history, you, trending, settings
-import { $, $$, el, esc, icon, api, lib, settings, local, toast, fmtTime, fmtViews, ago, thumb, normVideo, pickThumb, localUrl, safeHtml, linkify, dropCache, PUBLIC, localLibrary, IPHONE, IPAD, siteName } from "./util.js";
+import { $, $$, el, esc, icon, api, lib, settings, local, toast, fmtTime, fmtViews, ago, thumb, normVideo, pickThumb, localUrl, safeHtml, linkify, dropCache, PUBLIC, GUEST, localLibrary, IPHONE, IPAD, siteName } from "./util.js";
 import { state, card, metaLine, chAvatar, channelCard, playlistCard, norm, remember, known, fillProgress, infinite, avatar, subBtn, isSub, navigate, popup, mi, videoMenu, dialog, loadLib, setList, pageCleanup, renderGuideSubs } from "./core.js";
 import { SB_CATS } from "./player.js";
 import { $t, LANG, LANGS, LOCALE, REGION, fmtShort, langLabel } from "./i18n.js";
@@ -547,7 +547,7 @@ export async function channelsMgr(page) {
       <button class="pill ghost exp">${$t("{0} 내보내기", icon("download"))}</button>
       <input type="file" class="impfile" hidden multiple accept=".json,.csv,.opml,.xml,.db,.txt,.html">
       <form class="addch"><input placeholder="${$t("채널 주소나 @핸들 (예: @MBCNEWS11)")}"><button class="pill">${$t("추가")}</button></form></div>
-      ${PUBLIC ? `<p class="sub pub-note">${$t("공개 서버예요. 구독과 기록은 이 브라우저에만 저장되고 서버에는 남지 않아요. 브라우저 데이터를 지우면 사라지니 가끔 내보내기로 백업해 두세요.")}</p>` : ""}
+      ${PUBLIC ? `<p class="sub pub-note">${GUEST ? $t("로그인하지 않았어요. 구독과 기록은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장돼서 다른 기기에서도 이어져요.") + ` <a href="/login?r=${encodeURIComponent(location.pathname + location.search)}">${$t("로그인")}</a>` : $t("공개 서버예요. 구독과 기록은 이 브라우저에만 저장되고 서버에는 남지 않아요. 브라우저 데이터를 지우면 사라지니 가끔 내보내기로 백업해 두세요.")}</p>` : ""}
       <p class="sub imp-hint">${$t("구글 Takeout (구독 CSV, 시청 기록), Invidious, NewPipe, FreeTube, OPML, TubeHaus 백업 파일을 가져올 수 있어요")}</p>
       <div class="chlist">${subs.map(([id, s]) => `<div class="chrow"><a href="/channel/${esc(id)}" data-nav>${avatar(s.thumb, "md")}<span>${esc(s.name)}</span></a>${subBtn(id, s.name, s.thumb)}</div>`).join("") || `<p class='sub'>${$t("아직 없어요")}</p>`}</div></div>`;
     $(".file", page).onclick = () => $(".impfile", page).click();
@@ -800,7 +800,7 @@ export function settingsPage(page) {
       ${tog("dearrow", "DeArrow", $t("낚시성 제목과 썸네일을 사람들이 고친 것으로 바꿔요 (dearrow.ajay.app, 영상 ID 앞 4글자만 보내요)"))}
       ${tog("dearrowThumbs", $t("DeArrow 썸네일"), $t("사람들이 고른 장면을 썸네일로 써요 (이 서버를 거쳐 받아요)"))}`],
     ["data", "libr", $t("내 데이터"), `
-      ${PUBLIC ? `<p class="sx-note">${$t("공개 서버예요. 구독과 기록은 이 브라우저에만 저장되고 서버에는 남지 않아요. 브라우저 데이터를 지우면 사라지니 가끔 내보내기로 백업해 두세요.")}</p>` : ""}
+      ${PUBLIC ? `<p class="sx-note">${$t(GUEST ? "로그인하지 않았어요. 구독과 기록은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장돼서 다른 기기에서도 이어져요." : "공개 서버예요. 구독과 기록은 이 브라우저에만 저장되고 서버에는 남지 않아요. 브라우저 데이터를 지우면 사라지니 가끔 내보내기로 백업해 두세요.")}</p>` : ""}
       <div class="sx-tiles">
         ${tile("", "subs", $t("구독 관리 · 가져오기"), "/feed/channels")}
         ${tile("simp", "upload", plain($t("{0} 파일에서 가져오기", "")))}

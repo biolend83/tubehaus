@@ -1,5 +1,5 @@
 // Entry point: header (search, notifications, account), side menu, routes, global shortcuts
-import { $, $$, esc, icon, api, lib, settings, local, toast, thumb, normVideo, ago, modeReady, siteName, pickName, LINKS, SERVER_VERSION } from "./util.js";
+import { $, $$, esc, icon, api, lib, settings, local, toast, thumb, normVideo, ago, modeReady, siteName, pickName, LINKS, SERVER_VERSION, GUEST, toGate } from "./util.js";
 import { dialog } from "./core.js";
 import { player, routes, state, loadLib, navigate, render, renderGuideSubs, popup, mi, keysDialog, initCardHover, markRestore, saveScroll, known, videoMenu, pageCleanup } from "./core.js";
 import * as P from "./pages.js";
@@ -279,12 +279,15 @@ setInterval(bell, 10 * 60000);
 
 // ---------------------------------------------------------------- account menu
 $("#acct").onclick = (e) => {
+  // watching without an account (HT_GUESTS): the menu starts with Sign in
+  const sign = GUEST ? mi("login", "account", $t("로그인")) + "<hr>" : "";
   const th = { system: $t("기기 테마 사용"), dark: $t("어두운 테마"), light: $t("밝은 테마"), spatial: $t("유리 테마"), "spatial-light": $t("밝은 유리 테마") };
-  popup(e.currentTarget, `<div class="acct-h">${icon("account")}<div><b>${esc(siteName())}</b><span>${$t("내 라이브러리")}</span></div></div><hr>` +
+  popup(e.currentTarget, `<div class="acct-h">${icon("account")}<div><b>${esc(siteName())}</b><span>${$t(GUEST ? "이 브라우저의 라이브러리" : "내 라이브러리")}</span></div></div><hr>` + sign +
     mi("you", "libr", $t("내 페이지")) + mi("history", "history", $t("시청 기록")) + mi("subs", "subs", $t("구독 관리")) + "<hr>" +
     mi("theme", "dark", $t("디자인: ") + th[settings.theme]) + mi("lang", "globe", langLabel() + ": " + LANGS.find(([c]) => c === LANG)[1]) +
     mi("settings", "gear", $t("설정")) + mi("keys", "keyboard", $t("단축키")),
     (a) => {
+      if (a === "login") toGate();
       if (a === "you") navigate("/feed/you");
       if (a === "history") navigate("/feed/history");
       if (a === "subs") navigate("/feed/channels");

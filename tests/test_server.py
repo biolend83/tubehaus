@@ -509,6 +509,60 @@ class Accounts(unittest.TestCase):
         self.assertIsNone(ts.session_user(old))
 
 
+class Guests(unittest.TestCase):
+    """#132: HT_GUESTS=1 lets people watch without an account; their library stays in the browser."""
+
+    class Fake:
+        def __init__(self, command="GET"):
+            self.command, self.sent = command, None
+
+        def send(self, code, obj):
+            self.sent = code
+
+    def setUp(self):
+        self.saved = (ts.ACCOUNTS, ts.GUESTS, ts.PUBLIC_MODE)
+        ts.ACCOUNTS, ts.GUESTS, ts.PUBLIC_MODE = True, True, False
+        ts._req.user = None
+        if os.path.exists(ts.YTLIB):
+            os.remove(ts.YTLIB)
+
+    def tearDown(self):
+        ts.ACCOUNTS, ts.GUESTS, ts.PUBLIC_MODE = self.saved
+        ts._req.user = None
+
+    def needs(self, path, command="GET"):
+        f = self.Fake(command)
+        return ts.H.needs_sign_in(f, path), f.sent
+
+    def test_guests_get_what_public_visitors_get(self):
+        self.assertTrue(ts.guest())
+        for m, p in (("GET", "/api/p/yt/feed"), ("GET", "/api/p/yt/shorts/next"), ("POST", "/api/p/yt/import"),
+                     ("POST", "/api/p/yt/export"), ("GET", "/api/p/yt/topic")):
+            self.assertEqual(self.needs(p, m), (False, None), (m, p))
+        # the server's own library, downloads and casting still need an account
+        for m, p in (("GET", "/api/p/yt/lib"), ("POST", "/api/p/yt/sub"), ("POST", "/api/p/yt/dl"),
+                     ("GET", "/api/p/yt/cast/devices")):
+            self.assertEqual(self.needs(p, m), (True, 401), (m, p))
+            self.assertTrue(ts.public_blocked(m, p), (m, p))
+
+    def test_import_is_only_parsed_for_guests(self):
+        code, p = ts.ytlib_import({"text": "Channel Id,Channel Url,Channel Title\nUC" + "b" * 22 + ",x,Dogs\n"})
+        self.assertEqual((code, p["dry"]), (200, True))
+        self.assertFalse(os.path.exists(ts.YTLIB))
+
+    def test_signed_in_people_keep_their_library(self):
+        ts._req.user = "alice"
+        self.assertFalse(ts.guest())
+        self.assertFalse(ts.public_blocked("GET", "/api/p/yt/lib"))
+        self.assertEqual(self.needs("/api/p/yt/lib"), (False, None))
+
+    def test_without_the_setting_everyone_signs_in(self):
+        ts.GUESTS = False
+        self.assertFalse(ts.guest())
+        self.assertEqual(self.needs("/api/p/yt/feed"), (True, 401))
+        self.assertFalse(ts.health()["guests"])
+
+
 class ExactPublished(unittest.TestCase):
     """Recent videos Invidious dates at 00:00 UTC get their real time from the channel's RSS feed."""
     CID = "UC" + "a" * 22
@@ -1019,6 +1073,16 @@ class OtherSites(unittest.TestCase):
         self.assertEqual(self.ask("/api/p/yt/pl/new", {"Sec-Fetch-Site": "same-site", "Origin": "https://evil.sslip.io",
                                                       "Host": "t.sslip.io"}), (True, 403))
         self.assertEqual(self.ask("/api/p/yt/pl/new", {"Origin": "null", "Host": "t.example"}), (True, 403))
+
+    def test_app_sign_in_page_opens_after_single_sign_on(self):
+        # #122: the provider's site sends the browser back, and the last hop to this page counts as cross-site
+        top = lambda h: ts.H.top_page(self.Fake(h))
+        self.assertTrue(top({"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "document"}))
+        self.assertTrue(top({}))                                                       # older browsers send none
+        self.assertFalse(top({"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "cors", "Sec-Fetch-Dest": "empty"}))
+        self.assertFalse(top({"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "iframe"}))
+        # the Allow button's post still has to come from the server's own page
+        self.assertEqual(self.ask("/api/p/auth/app/allow", {"Sec-Fetch-Site": "cross-site"}), (True, 403))
 
     def test_playback_stays_open(self):
         self.assertEqual(self.ask("/api/p/live/aaaaaaaaaaa.m3u8", {"Sec-Fetch-Site": "cross-site"}), (False, None))

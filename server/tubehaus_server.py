@@ -76,6 +76,9 @@ MAX_BODY = env_int("HT_MAX_BODY_MB", 64) * 1024 * 1024     # largest request bod
 # account has a library of its own on the server.
 ACCOUNTS = env("HT_ACCOUNTS", "0") == "1" or env("TUBEHAUS_AUTH", "") == "accounts"
 MAX_ACCOUNTS = env_int("HT_MAX_ACCOUNTS", 1000)
+# HT_GUESTS=1 (with accounts, not public): anyone may watch without an account, as on a public instance
+# (their subscriptions and history stay in their browser); signing in gives them their library on the server
+GUESTS = ACCOUNTS and env("HT_GUESTS", "0") == "1" and env("HT_PUBLIC_MODE", "0") != "1"
 def _names(v, n):
     """a name, or one per language as {"ko": "홈튜브", "en": "HomeTube"} (the page picks the visitor's language)"""
     if isinstance(v, dict):
@@ -1493,6 +1496,11 @@ _req = threading.local()          # .user: the account signed in on the request 
 _ME = object()                    # "whoever this request belongs to"
 
 
+def guest():
+    """this request comes from someone watching without an account on a server that lets them (HT_GUESTS)"""
+    return GUESTS and not getattr(_req, "user", None)
+
+
 def _uid():
     """The account whose library this request uses; None = the one shared library."""
     return getattr(_req, "user", None) if ACCOUNTS and not PUBLIC_MODE else None
@@ -2059,7 +2067,7 @@ def ytlib_import(b):
     p = ytlib_parse_import(text, str(b.get("name") or ""))
     if not p["format"] or not any((p["subs"], p["hist"], p["playlists"], p["wl"], p["likes"])):
         return 400, {"error": "Couldn't find anything to import in this file"}
-    if PUBLIC_MODE or b.get("dry"):
+    if PUBLIC_MODE or guest() or b.get("dry"):
         return 200, dict(p, dry=True)       # the browser merges it into its own library
     now = int(time.time())
     n = {"format": p["format"], "subs": 0, "hist": 0, "playlists": 0, "videos": 0}
@@ -2332,7 +2340,7 @@ def shorts_next(qs):
     region = qs.get("region", "US")
     region = region if re.fullmatch(r"[A-Z]{2}", region) else "US"
     skip = [x for x in qs.get("skip", "").split(",") if re.fullmatch(r"[\w-]{11}", x)][:300]
-    if PUBLIC_MODE:
+    if PUBLIC_MODE or guest():
         d = {"ch": {}, "kw": {}, "seen": {}, "names": {}}
     else:
         with sh_lock:
@@ -6377,7 +6385,7 @@ def health():
             "live_captions": bool(LIVECC_ENGINES), "live_caption_engines": list(LIVECC_ENGINES), "public": PUBLIC_MODE,
             "max_height": MAX_HEIGHT or None, "viewers": len([1 for t in list(viewers.values()) if now - t < 180]),
             "max_viewers": MAX_VIEWERS or None, "accounts": ACCOUNTS, "name": NAME or None, "links": LINKS,
-            "sso": OIDC_NAME if OIDC else None, "app_sign_in": ACCOUNTS, "version": VERSION}
+            "sso": OIDC_NAME if OIDC else None, "app_sign_in": ACCOUNTS, "guests": GUESTS, "version": VERSION}
 
 
 viewers, rate, load_lk = {}, {}, threading.Lock()   # ip -> last seen / (tokens, time)
@@ -6421,8 +6429,8 @@ def rate_ok(ip):
 
 
 def public_blocked(method, path):
-    """On a public instance only the stateless parts of /api/p/yt/ stay open."""
-    if not PUBLIC_MODE:
+    """On a public instance (and for guests) only the stateless parts of /api/p/yt/ stay open."""
+    if not (PUBLIC_MODE or guest()):
         return False
     if "/api/p/yt/" not in path and not path.endswith("/latest_version"):
         return False
@@ -6600,8 +6608,30 @@ class H(BaseHTTPRequestHandler):
         """True, with a 401 sent, for a household library call from someone not signed in."""
         if not (ACCOUNTS and not PUBLIC_MODE) or _req.user or not personal(p) or "/api/p/auth/" in p or "/api/p/admin/" in p:
             return False
+        # guests use what a public instance's visitors use (the library itself is in their browser)
+        if GUESTS and "/api/p/yt/" in p and not public_blocked(self.command, p):
+            return False
         self.send(401, {"error": "Please sign in"})
         return True
+
+    def top_page(self):
+        """a page the browser opens itself (an address typed, a link, a redirect), not a fetch or a frame"""
+        mode = (self.headers.get("Sec-Fetch-Mode") or "navigate").lower()
+        dest = (self.headers.get("Sec-Fetch-Dest") or "document").lower()
+        return mode == "navigate" and dest == "document"
+
+    def app_page(self):
+        """the app's sign-in page: who, which app, Allow (signing in first when nobody is)"""
+        c = self.qs().get("c", "")
+        user = self.cookie_user()
+        if not user:      # sign in first (single sign-on or password), then back here
+            c = re.sub(r"[^A-Za-z0-9]", "", c)[:8]
+            self.send_response(302)
+            self.send_header("Location", "/login?r=" + urllib.parse.quote("/api/p/auth/app?c=" + c, safe=""))
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        return self.send_page(app_pair_page(c, user))
 
     def cross_site(self, p):
         """True, with a 403 sent, when another web site's page asks for a personal part.
@@ -6685,7 +6715,7 @@ class H(BaseHTTPRequestHandler):
         if self.basic_guard(p):
             return
         if p.endswith("/api/p/auth/check"):         # asked by the reverse proxy for every request
-            if not ACCOUNTS or self.cookie_user():
+            if not ACCOUNTS or GUESTS or self.cookie_user():
                 stat("visitors", self.client_ip())
                 self.send_response(204)
                 self.send_header("Content-Length", "0")
@@ -6719,23 +6749,19 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
+        # the page that lets an app sign in: opened by hand in the browser, and at the end of a single sign-on round
+        # trip (provider → callback → here), which browsers call cross-site. It only shows who and an Allow button
+        # (no frames, the button's form posts from this same site), so a page opened in the browser is let through
+        if ACCOUNTS and p.endswith("/api/p/auth/app") and self.top_page():
+            return self.app_page()
         if self.cross_site(p) or self.needs_sign_in(p):
             return
         if ACCOUNTS and p.endswith("/api/p/auth/app/poll"):
             return self.send(*app_pair_poll(self.qs().get("c", "")))
         if ACCOUNTS and p.endswith("/api/p/auth/app"):
-            c = self.qs().get("c", "")
-            user = self.cookie_user()
-            if not user:      # sign in first (single sign-on or password), then back here
-                c = re.sub(r"[^A-Za-z0-9]", "", c)[:8]
-                self.send_response(302)
-                self.send_header("Location", "/login?r=" + urllib.parse.quote("/api/p/auth/app?c=" + c, safe=""))
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-                return
-            return self.send_page(app_pair_page(c, user))
+            return self.app_page()
         if p.endswith("/api/p/auth/me"):
-            return self.send(200, {"accounts": ACCOUNTS, "user": self.cookie_user() if ACCOUNTS else None,
+            return self.send(200, {"accounts": ACCOUNTS, "user": self.cookie_user() if ACCOUNTS else None, "guests": GUESTS,
                                    "sso": OIDC_NAME if OIDC else None, "passwords": not OIDC_ONLY})
         if self.over_limit(p):
             return
@@ -6756,7 +6782,7 @@ class H(BaseHTTPRequestHandler):
         # (a /latest_version without a title is the music player's audio, a redirect to the stream: open)
         if public_blocked("GET", p) and not (p.endswith("/latest_version") and not self.qs().get("title")):
             return self.send(403, {"error": "Not available on public instances"})
-        if PUBLIC_MODE and p.endswith("/yt/feed"):
+        if (PUBLIC_MODE or guest()) and p.endswith("/yt/feed"):
             return self.send(200, feed_for(self.qs().get("ch", "").split(",")))
         if p.endswith("/yt/party/wait"):
             return self.send(*party_wait(self.qs()))
@@ -6973,7 +6999,8 @@ class H(BaseHTTPRequestHandler):
         if public_blocked("POST", p):
             return self.send(403, {"error": "Not available on public instances"})
         if p.endswith("/yt/export"):
-            name, ctype, data = ytlib_export(str(body.get("format", "")), body.get("lib") if isinstance(body.get("lib"), dict) else {})
+            name, ctype, data = ytlib_export(str(body.get("format", "")), (body.get("lib") if isinstance(body.get("lib"), dict) else {})
+                                             if PUBLIC_MODE or guest() or isinstance(body.get("lib"), dict) else None)
             self.send_response(200)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Disposition", f'attachment; filename="{name}"')

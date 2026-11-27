@@ -1,5 +1,9 @@
 // TubeHaus interface text: en. Key = the Korean original.
 export default {
+ "로그인하지 않았어요. 구독과 기록은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장돼서 다른 기기에서도 이어져요.": "You're not signed in. Your subscriptions and history are kept only in this browser. Sign in to keep them in your account, on every device.",
+ "이 브라우저의 라이브러리": "Library in this browser",
+ "계정이 있으면 구독과 기록이 서버에 저장돼서 어느 기기에서나 이어져요. 이메일 같은 개인정보는 받지 않아요.": "With an account your subscriptions and history are kept on the server and follow you to any device. No e-mail or other personal details needed.",
+ "계정 없이 둘러보기": "Continue without an account",
  "오디오": "Audio",
  "넣지 않음": "None",
  "자동 더빙": "auto-dubbed",

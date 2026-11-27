@@ -1,5 +1,9 @@
 // TubeHaus interface text: pl. Key = the Korean original.
 export default {
+ "로그인하지 않았어요. 구독과 기록은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장돼서 다른 기기에서도 이어져요.": "Nie jesteś zalogowany. Twoje subskrypcje i historia są tylko w tej przeglądarce. Zaloguj się, aby trzymać je na koncie, na każdym urządzeniu.",
+ "이 브라우저의 라이브러리": "Biblioteka w tej przeglądarce",
+ "계정이 있으면 구독과 기록이 서버에 저장돼서 어느 기기에서나 이어져요. 이메일 같은 개인정보는 받지 않아요.": "Z kontem Twoje subskrypcje i historia są na serwerze i są dostępne na każdym urządzeniu. Nie potrzeba e-maila ani innych danych osobowych.",
+ "계정 없이 둘러보기": "Kontynuuj bez konta",
  "오디오": "Dźwięk",
  "넣지 않음": "Brak",
  "자동 더빙": "automatycznie dubbingowane",

@@ -168,6 +168,8 @@ export async function api(path, { method = "GET", body, ttl = 0, signal, quiet =
 // Public instances (server started with HT_PUBLIC_MODE=1) keep each visitor's library in their own
 // browser (locallib.js); the server only fetches feeds and parses imports for them.
 export let PUBLIC = false;
+// watching without an account on a server with accounts (HT_GUESTS): the library stays in this browser too
+export let GUEST = false;
 export let SERVER_MAX_H = Infinity;     // the operator's quality cap (HT_MAX_HEIGHT), to save bandwidth
 // the instance's own name (HT_NAME) and extra menu links (HT_LINKS)
 let NAME = "";
@@ -188,6 +190,12 @@ export const modeReady = fetch("/api/p/health", { credentials: "same-origin" })
     SERVER_VERSION = typeof h.version === "string" ? h.version : "";
     LIVE_CC_ENGINES = Array.isArray(h.live_caption_engines) ? h.live_caption_engines : h.live_captions ? ["whisper"] : [];
     if (h.accounts && !window.TUBEHAUS_LOGIN_URL) window.TUBEHAUS_LOGIN_URL = "/login?r=";   // sign-up required
+    return h.guests ? fetch("/api/p/auth/me", { credentials: "same-origin" }).then((r) => r.json()).then((m) => {
+      GUEST = !m.user;
+      PUBLIC = PUBLIC || GUEST;
+    }, () => { }) : null;
+  })
+  .then(() => {
     document.documentElement.classList.toggle("public", PUBLIC);
     return PUBLIC;
   })

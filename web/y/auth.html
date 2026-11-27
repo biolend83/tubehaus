@@ -39,6 +39,7 @@
     color: var(--fg); text-decoration: none; font-weight: 600; }
   .sso:hover, .sso:focus { border-color: var(--blue); outline: 0; }
   .or { text-align: center; color: var(--fg2); font-size: 13px; margin: 16px 0 -6px; }
+  .guest { text-align: center; margin: 14px 0 0; font-size: 14px; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -136,6 +137,17 @@
   // single sign-on (HT_OIDC_*): a button to the provider; with passwords off it's the only way in
   if (new URLSearchParams(location.search).get("sso") === "fail") $("err").textContent = $t("SSO 로그인이 되지 않았어요. 다시 해 보세요");
   fetch("/api/p/auth/me", { credentials: "same-origin" }).then((r) => r.json()).then((d) => {
+    // HT_GUESTS: an account is optional here, so say so and offer the way back
+    if (d.guests) {
+      $("sub").textContent = $t("계정이 있으면 구독과 기록이 서버에 저장돼서 어느 기기에서나 이어져요. 이메일 같은 개인정보는 받지 않아요.");
+      const g = document.createElement("p");
+      g.className = "guest";
+      const a = document.createElement("a");
+      a.href = back;
+      a.textContent = $t("계정 없이 둘러보기");
+      g.append(a);
+      $("switch").after(g);
+    }
     if (!d.sso) return;
     const a = document.createElement("a");
     a.className = "sso";
