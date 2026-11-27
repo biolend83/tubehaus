@@ -208,10 +208,14 @@ fun Avatar(url: String, size: Int = 36, modifier: Modifier = Modifier) {
 
 /** LIVE, SHORTS or the length: on the thumbnail, or before the details when thumbnails are off */
 @Composable
-fun Video.badge(): String = when {
-    live -> tr("LIVE")
-    short -> tr("SHORTS")
-    else -> duration(lengthSec)
+fun Video.badge(): String {
+    // a subscription feed video comes without its length: its channel is asked for it (#131)
+    if (lengthSec <= 0 && !live && !short) LaunchedEffect(id) { app.tubehaus.rec.Lengths.want(this@badge) }
+    return when {
+        live -> tr("LIVE")
+        short -> tr("SHORTS")
+        else -> duration(app.tubehaus.rec.Lengths.of(this))
+    }
 }
 
 /** The line under a title; with thumbnails switched off it starts with the length they would show. */
