@@ -126,7 +126,7 @@ def _name(raw):
     return raw[:40] or None
 
 
-VERSION = "2.0.2"   # this server's release: health() tells it, the web app shows it at the end of its menu
+VERSION = "2.1.0"   # this server's release: health() tells it, the web app shows it at the end of its menu
 
 
 def _links(raw):

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.1.0 — 2026-11-27
 
 ### Added
 - **Set up and change the server in the browser, not in `.env`:** a new server asks how it will be used (just me, family, anyone, no sign-in) and makes your account, after a setup code from its log. Afterwards **Settings → Server settings** changes accounts, guests, the name, menu links, quality and load limits and single sign-on, at once. `.env` needs only `TUBEHAUS_SITE`; a value written there still works and wins over the page. Existing servers aren't asked anything
@@ -9,7 +9,7 @@
 - **Home key** goes back to the top of the page in the desktop app (#128)
 - **Video lengths** on subscription-feed thumbnails in the app (#131)
 - **Loudness matching:** a loud video or song is turned down to YouTube's level, from the loudness YouTube gives for each one (on by default; Settings → Sound)
-- **Equalizer and effects** (web, Android, Windows/Linux): 12 presets and a 10-band equalizer, stereo width (down to mono), balance and a night mode, for music and, if you like, videos. The web's music player also gets a speed with or without keeping the pitch, a fade between songs and a sleep timer
+- **Equalizer and effects** (web, Android, desktop): 12 presets and a 10-band equalizer, stereo width (down to mono), balance and a night mode, for music and, if you like, videos. The web's music player also gets a speed with or without keeping the pitch, a fade between songs and a sleep timer
 
 ### Fixed
 - **App sign-in after single sign-on** (Authelia, Authentik, ...): the page that lets the app in no longer refuses the browser coming back from the provider (#122)
