@@ -138,8 +138,11 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
     /** the subtitle track inside the media item (shown or not): toggling it never reloads the video */
     private var loadedCaption: Caption? = null
     private var loadedTranslate: String? = null
-    /** a car is connected (Android Auto): no picture is loaded */
+    /** a car is connected (Android Auto): no picture is loaded while the app isn't on the phone's screen */
     private var car = false
+    /** the app is on the phone's screen (or in picture-in-picture): the picture is wanted, car or not (#129) */
+    private var onScreen = true
+    private val noPicture get() = car && !onScreen
     /** the view on screen, for [frame] */
     private var view: PlayerView? = null
     private var zoomed = false
@@ -280,7 +283,7 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             .setPreferredAudioLanguage(audioLang)      // null: the original track (the manifest's "main" one)
             .setPreferredTextLanguage(caption?.lang)
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, caption == null)
-            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, car || o.audioOnly)
+            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, noPicture || o.audioOnly)
             .build()
         exo.setMediaItem(item(s), o.startMs)
         exo.repeatMode = if (o.loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
@@ -363,10 +366,26 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
         sync()
     }
 
-    /** Android Auto: only the sound is loaded while a car is connected, as nothing shows the picture there */
+    /**
+     * Android Auto: only the sound is loaded while a car is connected, as nothing shows the picture there; but while
+     * the app is open on the phone (a passenger, or parked) the video plays as usual (#129)
+     */
     fun audioOnly(on: Boolean) {
         car = on
-        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, on || opts.audioOnly).build()
+        pictureTracks()
+    }
+
+    /** the app came onto the phone's screen or left it */
+    fun onScreen(shown: Boolean) {
+        if (onScreen == shown) return
+        onScreen = shown
+        if (car) pictureTracks()
+    }
+
+    private fun pictureTracks() {
+        val off = noPicture || opts.audioOnly
+        if (exo.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO) == off) return
+        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, off).build()
     }
 
     override fun setAudioTrack(lang: String) {
