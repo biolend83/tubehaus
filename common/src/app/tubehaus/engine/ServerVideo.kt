@@ -64,7 +64,38 @@ object ServerVideo {
         throw last ?: Exception("no answer")
     }
 
+    /** the videos the server keeps (#126), read once a minute: id -> its file's name ("<id>.mp4" or "<id>.webm") */
+    @Volatile private var kept: Map<String, String> = emptyMap()
+    @Volatile private var keptAt = 0L
+    @Volatile private var keptBase = ""
+
+    private suspend fun keptFile(id: String): String? {
+        val b = base
+        if (b != keptBase || Sys.nowMs() - keptAt > 60_000) {
+            keptBase = b
+            keptAt = Sys.nowMs()
+            kept = runCatching {
+                parse(Net.get("$b/api/p/yt/saved", headers())).at("items").arr.mapNotNull { x ->
+                    val k = x.at("id").str ?: return@mapNotNull null
+                    k to (x.at("file").str ?: "$k.mp4")
+                }.toMap()
+            }.getOrDefault(emptyMap())
+        }
+        return kept[id]
+    }
+
+    /** a server-kept file's address: one file with picture and sound, the way a downloaded video plays */
+    fun isKept(url: String?) = url != null && url.startsWith(base) && url.contains("/api/p/yt/saved/file?")
+
     suspend fun stream(id: String): Stream {
+        val s = streamFromServer(id)
+        // kept on the server (#126): that file, as long as the server still has it
+        val f = (if (s.live) null else runCatching { keptFile(id) }.getOrNull()) ?: return s
+        return s.copy(hls = "$base/api/p/yt/saved/file?id=$id", video = emptyList(), audio = emptyList(),
+            client = if (f.endsWith(".webm")) "server-kept-webm" else "server-kept")
+    }
+
+    private suspend fun streamFromServer(id: String): Stream {
         val b = base.ifEmpty { throw YtError("No server") }
         val text = try {
             fetchVideo("$b/api/v1/videos/$id")
@@ -113,7 +144,12 @@ object ServerVideo {
      */
     suspend fun streamHls(id: String): Stream {
         val s = stream(id)
-        if (s.live) return s
+        if (s.live || s.client == "server-kept") return s
+        if (s.client == "server-kept-webm") return streamHlsOf(id, streamFromServer(id))
+        return streamHlsOf(id, s)
+    }
+
+    private suspend fun streamHlsOf(id: String, s: Stream): Stream {
         val b = base
         val url = "$b/api/p/hls/$id.m3u8"
         val ok = runCatching { Net.get(url, headers()).startsWith("#EXTM3U") }.getOrDefault(false)
