@@ -96,6 +96,9 @@ const DEFAULTS = {
   trTitles: false,        // video titles written in another script, shown in the interface language (asked through the server)
   hideMusic: false,       // no Music tab
   hideLogo: false,        // no logo in the top bar and the side menu
+  soundNorm: true,        // loudness matching: loud videos and songs turned down to YouTube's level
+  soundVideo: false,      // the equalizer and effects for videos too (not only music)
+  fx: null,               // the equalizer and effects (sound.js)
 };
 let SET = {};
 try { SET = JSON.parse(localStorage.getItem("yt.settings") || "{}"); } catch { }

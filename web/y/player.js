@@ -2,6 +2,7 @@
 // Built once and reused (moving between pages continues seamlessly in the mini player).
 import { $, $$, el, esc, icon, fmtTime, settings, toast, copy, localUrl, parseT, toGate, SERVER_MAX_H, PUBLIC, IPHONE, IPAD, siteName, LIVE_CC_ENGINES, kept } from "./util.js";
 import { $t, LANG, LANGS, LOCALE } from "./i18n.js";
+import { sound } from "./sound.js";
 
 const isTouch = matchMedia("(pointer: coarse)").matches;
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
@@ -211,6 +212,8 @@ export class Player {
   <div class="ytp-ctx"></div>`;
     this.video = $("video", r);
     const v = this.video;
+    // loudness matching (and the equalizer, when it is asked for videos too)
+    this.snd = sound(v, "video");
     v.volume = settings.volume >= 0.05 ? settings.volume : 1;
     v.muted = false;
     this.autoMuted = false;
@@ -254,6 +257,7 @@ export class Player {
 
   // ------------------------------------------------------------ load
   async load(info, { start = 0, autoplay = true } = {}) {
+    this.snd?.level(info.loudnessDb ?? NaN);
     // iPhone and iPad: the device's own player (HLS) instead of Shaka. Shaka runs on ManagedMediaSource there, which starts
     // with a black picture (on iPadOS Chrome it stays black), has no Picture-in-Picture over other apps and no AirPlay
     // kept on the server (#126): the browser's own player plays that one file (Safari can't play a WebM one)

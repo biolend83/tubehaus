@@ -812,6 +812,9 @@ export function settingsPage(page) {
       ${tog("resume", $t("이어서 보기"), $t("보던 곳부터 재생 (모든 기기 공유)"))}
       ${tog("miniplayer", $t("미니 플레이어"), $t("다른 페이지로 가도 작은 화면으로 계속 재생"))}
       ${tog("heatmap", $t("가장 많이 다시 본 장면"), $t("재생바 위에 사람들이 많이 다시 본 구간을 물결 모양으로 보여줘요"))}`],
+    ["sound", "eq", $t("소리"), `
+      ${tog("soundNorm", $t("음량 맞추기"), $t("유튜브가 알려 주는 영상마다의 음량으로, 큰 영상·곡은 줄여서 비슷한 크기로 들려요"))}
+      ${row($t("이퀄라이저 · 효과"), `<button class="pill ghost sx-sound">${$t("열기")}</button>`, $t("프리셋과 10밴드 이퀄라이저, 스테레오 폭, 좌우 균형, 야간 모드"))}`],
     ...(PUBLIC ? [] : [["cast", "tv", $t("TV로 보내기"), `
       ${tog("castReceive", $t("이 기기에서 받기"), $t("다른 기기가 'TV로 보내기'로 이 화면에 영상을 보낼 수 있어요 (TV 모드면 늘 켜짐)"))}
       ${row($t("이 기기 이름"), `<input class="sx-in" data-k="deviceName" maxlength="40" placeholder="${$t("예: 거실 TV")}" value="${esc(S.deviceName || "")}">`, $t("보낼 때 목록에 이렇게 보여요"))}`]]),
@@ -940,6 +943,7 @@ export function settingsPage(page) {
       };
     };
   }).catch(() => { });
+  $(".sx-sound", page).onclick = async () => (await import("./soundui.js")).soundDialog();
   $(".simp", page).onclick = () => $(".simpfile", page).click();
   $(".simpfile", page).onchange = (e) => importFiles(e.target.files);
   $(".sexp", page).onclick = exportDialog;

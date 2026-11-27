@@ -3435,6 +3435,24 @@ def eng_tv(vid):
     return d
 
 
+def eng_loudness(*answers):
+    """how many dB louder than YouTube's target (-14 LKFS) the video is (negative: quieter), from the first
+    player answer that says; None when none does. Players turn a loud one down by this much (loudness matching)."""
+    for d in answers:
+        ac = _dig(d or {}, "playerConfig", "audioConfig") or {}
+        target = ac.get("loudnessTargetLkfs")
+        target = target if isinstance(target, (int, float)) else -14
+        for k in ("perceptualLoudnessDb", "trackAbsoluteLoudnessLkfs"):
+            if isinstance(ac.get(k), (int, float)):
+                return round(ac[k] - target, 2)
+        if isinstance(ac.get("loudnessDb"), (int, float)):
+            return round(ac["loudnessDb"], 2)
+        for f in (d or {}).get("streamingData", {}).get("adaptiveFormats") or []:
+            if str(f.get("mimeType", "")).startswith("audio") and isinstance(f.get("loudnessDb"), (int, float)):
+                return round(f["loudnessDb"], 2)
+    return None
+
+
 def _fmt(f):
     """one streamingData format as Invidious lists it"""
     mime = f.get("mimeType") or ""
@@ -3625,6 +3643,7 @@ def eng_video(vid, hl="", gl="", fast=False):
         "subCountText": re.sub(r"(?i)\s*(subscribers?|구독자|명)\s*", "", subs_text).strip(),
         "lengthSeconds": int(vd.get("lengthSeconds") or 0), "allowRatings": bool(vd.get("allowRatings", True)), "rating": 0,
         "isListed": not meta.get("isUnlisted"), "liveNow": bool(vd.get("isLive")), "isPostLiveDvr": bool(vd.get("isPostLiveDvr")), "latencyClass": vd.get("latencyClass"),
+        "loudnessDb": eng_loudness(d, web),
         "isUpcoming": bool(vd.get("isUpcoming")),
         "dashUrl": "%s/api/manifest/dash/id/%s" % (PUBLIC, vid),
         "adaptiveFormats": adaptive, "formatStreams": muxed,

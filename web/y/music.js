@@ -1,8 +1,9 @@
 // Music: the apps' Music tab on the web. Albums and artists from YouTube Music, songs from YouTube,
 // lyrics from LRCLIB, all through this server (/api/p/yt/music/*). Sound only: an <audio> element with
 // Shaka leaving the video streams out, so a song plays like in a music app and keeps going on a locked phone.
-import { $, $$, esc, icon, api, local, toast, thumb, fmtTime, el, IPHONE, siteName, modeReady } from "./util.js";
-import { player, navigate, popup, mi } from "./core.js";
+import { $, $$, esc, icon, api, local, toast, thumb, fmtTime, el, IPHONE, siteName, modeReady, settings } from "./util.js";
+import { player, navigate, popup, mi, videoInfoFast } from "./core.js";
+import { sound } from "./sound.js";
 import { loadShaka } from "./player.js";
 import { $t, LANG, REGION } from "./i18n.js";
 import { topicShelves } from "./pages.js";
@@ -58,6 +59,57 @@ const MP = { queue: [], i: -1, orig: null, shuffle: false, repeat: local.get("mu
   radioFor: "", lyrics: null, lyricsFor: "", tab: local.get("music.tab", "queue"), open: false };
 const cur = () => MP.queue[MP.i];
 let seq = 0;
+// the sound: this song's loudness, the effects, and a level for fading (between songs, the sleep timer)
+const snd = sound(audio, "music");
+const FX = { speed: +local.get("music.speed", 1) || 1, pitch: local.get("music.pitch", true) !== false, fade: +local.get("music.fade", 0) || 0,
+  sleepAt: 0, sleepEnd: false, inFrom: 0, inNext: false };
+function rate() {
+  audio.defaultPlaybackRate = audio.playbackRate = FX.speed;
+  audio.preservesPitch = audio.webkitPreservesPitch = FX.pitch;
+}
+rate();
+const SLEEP_FADE = 10000;
+// ten times a second while playing: how loud, from the fades
+function fadeTick() {
+  const now = Date.now(), d = audio.duration || cur()?.len || 0, t = audio.currentTime;
+  let v = 1;
+  const fs_ = FX.fade || (FX.sleepEnd ? 6 : 0);
+  if (FX.fade && FX.inFrom) v = Math.min(v, (now - FX.inFrom) / (FX.fade * 1000));
+  // the end of a song, unless it plays again right away
+  if (fs_ && d > fs_ * 3 && MP.repeat !== "one" && (FX.sleepEnd || MP.i + 1 < MP.queue.length || MP.repeat === "all")) v = Math.min(v, (d - t) / FX.speed / fs_);
+  if (FX.sleepAt) {
+    const left = FX.sleepAt - now;
+    if (left <= 0) { sleepNow(); return; }
+    if (left < SLEEP_FADE) v = Math.min(v, left / SLEEP_FADE);
+  }
+  snd.fade(v);
+}
+let ticker = 0;
+audio.addEventListener("playing", () => {
+  if (FX.inNext) { FX.inNext = false; FX.inFrom = Date.now(); }
+  clearInterval(ticker); ticker = setInterval(fadeTick, 100); fadeTick(); });
+audio.addEventListener("pause", () => { clearInterval(ticker); ticker = 0; });
+function sleepNow() {
+  FX.sleepAt = 0; FX.sleepEnd = false;
+  audio.pause();
+  snd.fade(1);
+  toast($t("수면 타이머로 멈췄어요"));
+}
+const musicFx = {
+  speed: () => FX.speed,
+  setSpeed(x) { FX.speed = x; local.set("music.speed", x); rate(); },
+  pitch: () => FX.pitch,
+  setPitch(on) { FX.pitch = on; local.set("music.pitch", on); rate(); },
+  fade: () => FX.fade,
+  setFade(x) { FX.fade = x; local.set("music.fade", x); if (!x) { FX.inFrom = 0; snd.fade(1); } },
+  setSleep(min) {
+    FX.sleepEnd = min === -1;
+    FX.sleepAt = min > 0 ? Date.now() + min * 60000 : 0;
+    if (!min) snd.fade(1);
+  },
+  sleepLeft: () => (FX.sleepEnd ? -1 : FX.sleepAt ? FX.sleepAt - Date.now() : null),
+};
+async function openSound() { (await import("./soundui.js")).soundDialog(musicFx); }
 // an iPad says it is a Mac; its touch screen gives it away
 const APPLE_TOUCH = IPHONE || /iPad/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
@@ -134,6 +186,10 @@ async function start(i, { at = 0 } = {}) {
   MP.direct = "";
   MP.loaded = "";
   const my = ++seq;
+  snd.level(NaN);
+  FX.inFrom = 0;
+  FX.inNext = !!FX.fade && !at;
+  snd.fade(FX.inNext ? 0 : 1);
   if (player.video && !player.video.paused) player.video.pause();
   show();
   paint();
@@ -151,6 +207,11 @@ async function start(i, { at = 0 } = {}) {
   setTimeout(() => songOf(MP.queue[MP.i + 1]), 3000);
   store.push("recent", slim(s), 80);
   if (MP.tab === "lyrics" && MP.open) loadLyrics();
+  // how loud YouTube says it is (the server has it from the same answer as the streams)
+  if (settings.soundNorm !== false) {
+    const id = s.id;
+    videoInfoFast(id).then((d) => { if (cur()?.id === id && d && !d.error) snd.level(d.loudnessDb); }, () => { });
+  }
   // iPhone and iPad: the plain file. Their MediaSource stops taking pieces when the screen is off or the app is
   // in the background, and then the song never ends: no next song, and the time runs on past its length in silence
   const plain = APPLE_TOUCH || !(window.MediaSource || window.ManagedMediaSource);
@@ -181,6 +242,7 @@ async function extend() {
   } catch { MP.radioFor = ""; }
 }
 function next(auto = false) {
+  if (auto && FX.sleepEnd) { sleepNow(); return; }
   if (auto && MP.repeat === "one") { audio.currentTime = 0; audio.play().catch(() => { }); return; }
   if (MP.i + 1 < MP.queue.length) return start(MP.i + 1);
   if (MP.repeat === "all" && MP.queue.length) return start(0);
@@ -332,7 +394,7 @@ function build() {
     <div class="mf-top">
       <button class="ib mf-down" data-mf="close" aria-label="${$t("닫기")}">${icon("down")}</button>
       <div class="mf-from"><small>${$t("재생 중")}</small><b></b></div>
-      <button class="ib" data-mf="more" aria-label="${$t("작업 메뉴")}">${icon("more")}</button>
+      <span class="mf-tr"><button class="ib" data-mf="sound" aria-label="${$t("소리")}">${icon("eq")}</button><button class="ib" data-mf="more" aria-label="${$t("작업 메뉴")}">${icon("more")}</button></span>
     </div>
     <div class="mf-body">
       <div class="mf-main">
@@ -383,6 +445,7 @@ function build() {
     else if (a === "repeat") setRepeat();
     else if (a === "like") toggleLike(cur());
     else if (a === "more" && cur()) songMenu(b, cur(), { playing: true });
+    else if (a === "sound") openSound();
   });
   const range = $(".mf-seek input", full);
   range.addEventListener("input", () => { MP.seeking = true; $(".mf-times span", full).textContent = fmtTime((range.value / 1000) * (audio.duration || 0)); paintRange(); });
@@ -547,6 +610,7 @@ function paintRange() {
   if (r) r.style.setProperty("--p", r.value / 10 + "%");
 }
 for (const ev of ["play", "pause", "playing"]) audio.addEventListener(ev, () => paint());
+audio.addEventListener("loadedmetadata", () => { if (audio.playbackRate !== FX.speed) rate(); });
 audio.addEventListener("waiting", () => $("#mbar")?.classList.add("wait"));
 audio.addEventListener("playing", () => $("#mbar")?.classList.remove("wait"));
 audio.addEventListener("ended", () => next(true));
@@ -700,6 +764,7 @@ function songMenu(anchor, s, { playing = false } = {}) {
     s.artistId && /^UC/.test(s.artistId) ? mi("artist", "person", $t("아티스트로 이동")) : "",
     mi("video", "movie", $t("동영상으로 보기")),
     mi("share", "share", $t("공유")),
+    playing ? mi("sound", "eq", $t("소리 · 이퀄라이저")) : "",
     playing ? mi("stop", "close", $t("음악 닫기")) : "",
   ].join("");
   popup(anchor, items, (a) => {
@@ -711,6 +776,7 @@ function songMenu(anchor, s, { playing = false } = {}) {
     else if (a === "artist") closeFull(() => navigate(`/feed/music/artist/${s.artistId}`));
     else if (a === "video") { audio.pause(); closeFull(() => navigate(`/watch?v=${s.id}`)); }
     else if (a === "stop") stop();
+    else if (a === "sound") openSound();
     else if (a === "share") {
       const u = `https://www.youtube.com/watch?v=${s.id}`;
       if (navigator.share) navigator.share({ title: s.title, url: u }).catch(() => { });

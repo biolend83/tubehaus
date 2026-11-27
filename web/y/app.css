@@ -1846,3 +1846,27 @@ html:not(.tv) .grow .gic { background: none; width: 26px; height: 26px; color: v
 [data-look="2"] .ytp-menu .tg { width: 40px; height: 24px; border-radius: 12px; background: rgba(255, 255, 255, .22); transition: background-color .2s; }
 [data-look="2"] .ytp-menu .tg i { left: 2px; top: 2px; width: 20px; height: 20px; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: left .22s cubic-bezier(.3, 1.4, .5, 1); }
 [data-look="2"] .ytp-menu .tg.on i { left: 18px; }
+
+/* the sound panel (soundui.js) */
+.mf-tr { display: flex; gap: 8px; }
+.dlg.snd-dlg { max-width: 600px; }
+.snd .sx-row { padding: 12px 0; min-height: 52px; }
+.snd .sx-row + .sx-row, .snd .snd-eq + .sx-row, .snd .sx-row + .snd-eq { border-top: 1px solid color-mix(in srgb, var(--line) 80%, transparent); }
+.snd .sx-range input { width: 180px; }
+.snd .sx-range output { min-width: 64px; }
+.snd-seg { flex-wrap: wrap; }
+.snd-seg span { height: 30px; padding: 0 11px; }
+.snd-eq { padding: 4px 0 14px; transition: opacity .2s; }
+.snd-eq.off { opacity: .45; }
+.snd-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.snd-presets .chip { height: 30px; padding: 0 12px; border-radius: 15px; font-size: 13px; font-weight: 600; color: var(--fg2); background: color-mix(in srgb, var(--fg) 7%, transparent); cursor: pointer; }
+.snd-presets .chip:hover { color: var(--fg); }
+.snd-presets .chip.on { background: var(--acc, var(--blue)); color: #fff; }
+.snd-bands { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; }
+.snd-band { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: var(--fg2); font-variant-numeric: tabular-nums; }
+.snd-band output { font-weight: 700; color: var(--fg); min-height: 14px; }
+.snd-band input { writing-mode: vertical-lr; direction: rtl; width: 26px; height: 130px; margin: 0; accent-color: var(--acc, var(--blue)); cursor: pointer; }
+.snd-h { margin: 18px 0 2px; font-size: 13px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--fg2); }
+.snd-sleep:empty { display: none; }
+.snd-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+@media (max-width: 520px) { .snd .sx-range input { width: 130px; } .snd-band input { height: 110px; } }

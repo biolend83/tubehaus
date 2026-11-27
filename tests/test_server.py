@@ -43,6 +43,21 @@ class BotDetection(unittest.TestCase):
         self.assertFalse(ts.yt_blocked(body=b"<html>ok</html>"))
 
 
+class Loudness(unittest.TestCase):
+    def test_perceptual_over_target(self):
+        d = {"playerConfig": {"audioConfig": {"perceptualLoudnessDb": -13.01, "loudnessTargetLkfs": -14}}}
+        self.assertAlmostEqual(ts.eng_loudness(d), 0.99)
+
+    def test_quiet_video_is_negative(self):
+        d = {"playerConfig": {"audioConfig": {"perceptualLoudnessDb": -23.67}}}
+        self.assertAlmostEqual(ts.eng_loudness(d), -9.67)
+
+    def test_format_loudness_and_fallback_answer(self):
+        web = {"streamingData": {"adaptiveFormats": [{"mimeType": "video/mp4"}, {"mimeType": "audio/mp4", "loudnessDb": 2.5}]}}
+        self.assertEqual(ts.eng_loudness({}, web), 2.5)
+        self.assertIsNone(ts.eng_loudness({}, None))
+
+
 class LiveWindow(unittest.TestCase):
     def playlist(self, last):
         lines = ["#EXTM3U", "#EXT-X-MEDIA-SEQUENCE:%d" % (last - 2)]

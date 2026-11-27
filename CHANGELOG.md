@@ -8,6 +8,8 @@
 - **Watching without an account** on a server with accounts (#132): "Let people look around without an account"; their subscriptions and history stay in their browser, and signing in gives them their library on the server
 - **Home key** goes back to the top of the page in the desktop app (#128)
 - **Video lengths** on subscription-feed thumbnails in the app (#131)
+- **Loudness matching:** a loud video or song is turned down to YouTube's level, from the loudness YouTube gives for each one (on by default; Settings → Sound)
+- **Equalizer and effects** (web, Android, Windows/Linux): 12 presets and a 10-band equalizer, stereo width (down to mono), balance and a night mode, for music and, if you like, videos. The web's music player also gets a speed with or without keeping the pitch, a fade between songs and a sleep timer
 
 ### Fixed
 - **App sign-in after single sign-on** (Authelia, Authentik, ...): the page that lets the app in no longer refuses the browser coming back from the provider (#122)
