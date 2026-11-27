@@ -1,6 +1,6 @@
 // YouTube-style player: controls, captions, storyboards, chapters and SponsorBlock drawn on top of Shaka (DASH/HLS).
 // Built once and reused (moving between pages continues seamlessly in the mini player).
-import { $, $$, el, esc, icon, fmtTime, settings, toast, copy, localUrl, parseT, toGate, SERVER_MAX_H, PUBLIC, IPHONE, IPAD, siteName, LIVE_CC_ENGINES } from "./util.js";
+import { $, $$, el, esc, icon, fmtTime, settings, toast, copy, localUrl, parseT, toGate, SERVER_MAX_H, PUBLIC, IPHONE, IPAD, siteName, LIVE_CC_ENGINES, kept } from "./util.js";
 import { $t, LANG, LANGS, LOCALE } from "./i18n.js";
 
 const isTouch = matchMedia("(pointer: coarse)").matches;
@@ -256,8 +256,11 @@ export class Player {
   async load(info, { start = 0, autoplay = true } = {}) {
     // iPhone and iPad: the device's own player (HLS) instead of Shaka. Shaka runs on ManagedMediaSource there, which starts
     // with a black picture (on iPadOS Chrome it stays black), has no Picture-in-Picture over other apps and no AirPlay
-    let native = this.native = (IPHONE || IPAD) && settings.nativeIphone && !(info.liveNow && !info.hlsUrl);
-    if (!native) await this.init();
+    // kept on the server (#126): the browser's own player plays that one file (Safari can't play a WebM one)
+    const keptFile = info.liveNow ? null : (await kept())[info.videoId];
+    this.keptFile = keptFile && !(/\.webm$/.test(keptFile.file || "") && (IPHONE || IPAD)) ? `/api/p/yt/saved/file?id=${encodeURIComponent(info.videoId)}` : null;
+    let native = this.native = !!this.keptFile || ((IPHONE || IPAD) && settings.nativeIphone && !(info.liveNow && !info.hlsUrl));
+    if (!native || this.keptFile) await this.init();
     this.info = info;
     this.live = !!(info.liveNow && info.hlsUrl);
     this.lockH = null;
@@ -284,8 +287,9 @@ export class Player {
     r.classList.add("buffering");
     if (native && !(await this.loadNative(info, start))) {
       if (this.info !== info) return;
-      // the server could not make HLS for this video: Shaka plays it
+      // the server could not make HLS for this video (or the kept file won't play here): Shaka plays it
       native = this.native = false;
+      this.keptFile = null;
       r.classList.remove("native", "buffering");
       this.hideErr();
       await this.init();
@@ -343,7 +347,7 @@ export class Player {
     this.nativeOk = false;
     // one quality (the best up to the cap): the device's player would otherwise step down on its own
     const h = this.capHeight();
-    v.src = this.live ? info.hlsUrl.replace(/^https?:\/\/[^/]+/, "") : `/api/p/hls/${info.videoId}.m3u8?h=${Number.isFinite(h) ? h : 4320}`;
+    v.src = this.keptFile || (this.live ? info.hlsUrl.replace(/^https?:\/\/[^/]+/, "") : `/api/p/hls/${info.videoId}.m3u8?h=${Number.isFinite(h) ? h : 4320}`);
     try {
       await new Promise((ok, no) => {
         const ac = new AbortController();

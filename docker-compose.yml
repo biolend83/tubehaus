@@ -39,6 +39,7 @@ services:
       HT_PUBLIC_MODE: ${TUBEHAUS_PUBLIC:-0}
       TUBEHAUS_AUTH: ${TUBEHAUS_AUTH:-none}           # "accounts": one library per person
       HT_MAX_ACCOUNTS: ${TUBEHAUS_MAX_ACCOUNTS:-1000}
+      HT_SAVED_MAX_GB: ${TUBEHAUS_SAVED_MAX_GB:-50}       # videos kept on the server (download → "Keep on the server")
       HT_GUESTS: ${TUBEHAUS_GUESTS:-0}              # "1": watching without an account too (accounts on)
       # single sign-on with your own identity provider (TUBEHAUS_AUTH=accounts; see .env.example)
       HT_OIDC_ISSUER: ${TUBEHAUS_OIDC_ISSUER:-}

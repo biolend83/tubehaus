@@ -178,6 +178,8 @@ export let LINKS = [];
 export let LIVE_CC_ENGINES = [];
 // the server's release (health), shown at the end of the menu so a self-hoster can tell what runs
 export let SERVER_VERSION = "";
+// the server keeps videos for everyone on it (#126): the download dialog offers it, kept ones play from the server
+export let KEEP = false;
 // a name may come in several languages, {"ko": "홈튜브", "en": "HomeTube"}: the interface language, else English, else the first
 export const pickName = (v) => !v || typeof v === "string" ? v || "" : String(v[LANG] ?? v.en ?? Object.values(v)[0] ?? "");
 export const siteName = () => pickName(NAME) || $t("튜브하우스");
@@ -188,6 +190,7 @@ export const modeReady = fetch("/api/p/health", { credentials: "same-origin" })
     NAME = typeof h.name === "string" || (h.name && typeof h.name === "object") ? h.name : "";
     LINKS = Array.isArray(h.links) ? h.links : [];
     SERVER_VERSION = typeof h.version === "string" ? h.version : "";
+    KEEP = !!h.keep_on_server;
     LIVE_CC_ENGINES = Array.isArray(h.live_caption_engines) ? h.live_caption_engines : h.live_captions ? ["whisper"] : [];
     if (h.accounts && !window.TUBEHAUS_LOGIN_URL) window.TUBEHAUS_LOGIN_URL = "/login?r=";   // sign-up required
     return h.guests ? fetch("/api/p/auth/me", { credentials: "same-origin" }).then((r) => r.json()).then((m) => {
@@ -200,6 +203,16 @@ export const modeReady = fetch("/api/p/health", { credentials: "same-origin" })
     return PUBLIC;
   })
   .catch(() => false);
+// the videos kept on the server (#126), read once a minute: {id: item}
+let keptAt = 0, keptP = null;
+export function kept(fresh) {
+  if (fresh || !keptP || Date.now() - keptAt > 60000) {
+    keptAt = Date.now();
+    keptP = modeReady.then((pub) => (KEEP && !pub ? api("/api/p/yt/saved", { quiet: true }) : { items: [] }))
+      .then((r) => Object.fromEntries((r.items || []).map((x) => [x.id, x])), () => ({}));
+  }
+  return keptP;
+}
 const LOCAL = /^(lib|pos|sub|subs\/import|list|pl|pl\/new|pl\/del|pl\/rename|hist|hist\/del|shorts\/sig|shorts\/reset)$/;
 export async function lib(path, opts = {}) {
   if (await modeReady) {

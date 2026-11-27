@@ -563,6 +563,89 @@ class Guests(unittest.TestCase):
         self.assertFalse(ts.health()["guests"])
 
 
+class KeptOnServer(unittest.TestCase):
+    """#126: a downloaded video kept on the server plays from there next time."""
+
+    def setUp(self):
+        import shutil
+        shutil.rmtree(ts._saved_dir(), ignore_errors=True)
+        self.tmp = tempfile.mkdtemp()
+        self.saved_jobs = dict(ts.ytdl_jobs)
+        ts.ytdl_jobs.clear()
+
+    def tearDown(self):
+        ts.ytdl_jobs.clear()
+        ts.ytdl_jobs.update(self.saved_jobs)
+
+    def file(self, data=b"0123456789"):
+        p = os.path.join(self.tmp, "out.mp4")
+        with open(p, "wb") as f:
+            f.write(data)
+        return p
+
+    def test_keep_list_play_delete(self):
+        ts.saved_add("aaaaaaaaaaa", self.file(), "mp4", {"title": "Concert", "author": "Band", "len": 300, "height": 1080, "by": "me"})
+        lst = ts.saved_list()
+        self.assertEqual([v["id"] for v in lst["items"]], ["aaaaaaaaaaa"])
+        self.assertEqual((lst["items"][0]["title"], lst["used"]), ("Concert", 10))
+        path, ctype = ts.saved_file("aaaaaaaaaaa")
+        self.assertEqual((open(path, "rb").read(), ctype), (b"0123456789", "video/mp4"))
+        self.assertIsNone(ts.saved_file("bbbbbbbbbbb"))
+        self.assertIsNone(ts.saved_file("../../etc/pa"))
+        self.assertEqual(ts.saved_del({"id": "aaaaaaaaaaa"})[0], 200)
+        self.assertFalse(os.path.exists(path))
+        self.assertEqual(ts.saved_del({"id": "aaaaaaaaaaa"})[0], 404)
+        self.assertEqual(ts.saved_del({"id": "../x"})[0], 400)
+
+    def test_keeping_a_download_that_is_already_done(self):
+        p = self.file(b"x" * 100)
+        ts.ytdl_jobs["j1"] = {"key": ("ccccccccccc", "137", "140", "", ""), "status": "done", "prog": {}, "name": "c.mp4",
+                              "t": time.time(), "path": p, "size": 100}
+        code, d = ts.ytdl_start({"id": "ccccccccccc", "v": "137", "a": "140", "keep": True,
+                                 "meta": {"title": "Skit", "authorId": "UC" + "a" * 22, "len": "61"}})
+        self.assertEqual((code, d["job"]), (200, "j1"))
+        v = ts._saved_index()["ccccccccccc"]
+        self.assertEqual((v["title"], v["authorId"], v["len"], v["size"]), ("Skit", "UC" + "a" * 22, 61, 100))
+
+    def test_ranges(self):
+        ts.saved_add("ddddddddddd", self.file(), "webm", {})
+        path, ctype = ts.saved_file("ddddddddddd")
+        self.assertEqual(ctype, "video/webm")
+
+        class Fake:
+            command = "GET"
+
+            def __init__(s, rng):
+                import io
+                s.headers, s.wfile, s.out = {"Range": rng} if rng else {}, io.BytesIO(), {}
+                s.code = None
+
+            def send_response(s, c):
+                s.code = c
+
+            def send_header(s, k, v):
+                s.out[k] = v
+
+            def end_headers(s):
+                pass
+        for rng, code, body, cr in ((None, 200, b"0123456789", None), ("bytes=2-4", 206, b"234", "bytes 2-4/10"),
+                                    ("bytes=7-", 206, b"789", "bytes 7-9/10"), ("bytes=-2", 206, b"89", "bytes 8-9/10"),
+                                    ("bytes=20-", 416, b"", "bytes */10")):
+            f = Fake(rng)
+            ts.H.send_file_range(f, path, ctype)
+            self.assertEqual((f.code, f.wfile.getvalue(), f.out.get("Content-Range")), (code, body, cr), rng)
+
+    def test_public_instances_keep_nothing(self):
+        ts.PUBLIC_MODE = True
+        try:
+            self.assertTrue(ts.public_blocked("GET", "/api/p/yt/saved"))
+            self.assertTrue(ts.public_blocked("GET", "/api/p/yt/saved/file"))
+            self.assertTrue(ts.public_blocked("POST", "/api/p/yt/saved/del"))
+            self.assertFalse(ts.health()["keep_on_server"])
+        finally:
+            ts.PUBLIC_MODE = False
+
+
 class ExactPublished(unittest.TestCase):
     """Recent videos Invidious dates at 00:00 UTC get their real time from the channel's RSS feed."""
     CID = "UC" + "a" * 22

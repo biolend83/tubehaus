@@ -1,5 +1,13 @@
 // TubeHaus interface text: en. Key = the Korean original.
 export default {
+ "서버에 보관 (모든 기기에서 서버 파일로 재생)": "Keep on the server (plays from the server's file on every device)",
+ "서버에 보관했어요": "Kept on the server",
+ "보기": "View",
+ "서버에 보관한 동영상": "Kept on the server",
+ "{0} / {1} 사용": "{0} of {1} used",
+ "동영상의 오프라인 저장에서 '서버에 보관'을 고르면 여기에 남아요": "Pick 'Keep on the server' when saving a video offline and it stays here",
+ "서버에서 이 동영상 파일을 지울까요?": "Delete this video's file from the server?",
+ "지웠어요": "Deleted",
  "로그인하지 않았어요. 구독과 기록은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장돼서 다른 기기에서도 이어져요.": "You're not signed in. Your subscriptions and history are kept only in this browser. Sign in to keep them in your account, on every device.",
  "이 브라우저의 라이브러리": "Library in this browser",
  "계정이 있으면 구독과 기록이 서버에 저장돼서 어느 기기에서나 이어져요. 이메일 같은 개인정보는 받지 않아요.": "With an account your subscriptions and history are kept on the server and follow you to any device. No e-mail or other personal details needed.",

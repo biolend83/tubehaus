@@ -70,6 +70,7 @@ routes.push(
   [/^\/feed\/history$/, P.history, { name: "history" }],
   [/^\/feed\/(you|library)$/, P.you, { name: "you" }],
   [/^\/feed\/playlists$/, P.playlists, { name: "playlists" }],
+  [/^\/feed\/saved$/, P.saved, { name: "saved" }],
   [/^\/feed\/channels$/, P.channelsMgr, { name: "channels" }],
   [/^\/feed\/trending$/, P.trending, { name: "trending" }],
   [/^\/feed\/music\/?$/, MU.musicHome, { name: "music" }],

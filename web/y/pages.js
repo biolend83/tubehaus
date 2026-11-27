@@ -1,5 +1,5 @@
 // List pages: home, search, channel, playlist, subscriptions, history, you, trending, settings
-import { $, $$, el, esc, icon, api, lib, settings, local, toast, fmtTime, fmtViews, ago, thumb, normVideo, pickThumb, localUrl, safeHtml, linkify, dropCache, PUBLIC, GUEST, localLibrary, IPHONE, IPAD, siteName } from "./util.js";
+import { $, $$, el, esc, icon, api, lib, settings, local, toast, fmtTime, fmtViews, ago, thumb, normVideo, pickThumb, localUrl, safeHtml, linkify, dropCache, PUBLIC, GUEST, localLibrary, IPHONE, IPAD, siteName, KEEP, kept } from "./util.js";
 import { state, card, metaLine, chAvatar, channelCard, playlistCard, norm, remember, known, fillProgress, infinite, avatar, subBtn, isSub, navigate, popup, mi, videoMenu, dialog, loadLib, setList, pageCleanup, renderGuideSubs } from "./core.js";
 import { SB_CATS } from "./player.js";
 import { $t, LANG, LANGS, LOCALE, REGION, fmtShort, langLabel } from "./i18n.js";
@@ -681,8 +681,9 @@ export async function history(page, m, alive) {
 // ---------------------------------------------------------------- you (library)
 export async function you(page, m, alive) {
   await state.libReady;
-  const [h] = await Promise.all([lib("hist?n=20", { ttl: 15000 }).catch(() => ({ items: [] }))]);
+  const [h, kp] = await Promise.all([lib("hist?n=20", { ttl: 15000 }).catch(() => ({ items: [] })), kept()]);
   if (!alive()) return;
+  const keptList = Object.values(kp).map(keptVideo);
   const L = state.lib;
   const pls = Object.entries(L.playlists).sort((a, b) => (b[1].updated || 0) - (a[1].updated || 0));
   // a row of the grey box: the icon in a circle, the name, a line under it, an arrow
@@ -697,6 +698,7 @@ export async function you(page, m, alive) {
       ${row("later", $t("나중에 볼 동영상"), $t("동영상 {0}개{1}{2}", L.wl.length, "", ""), "/playlist?list=WL")}
       ${row("like", $t("좋아요 표시한 동영상"), $t("동영상 {0}개{1}{2}", L.likes.length, "", ""), "/playlist?list=LL")}
       ${row("playlists", $t("재생목록"), $t("재생목록 {0}개", pls.length), "/feed/playlists")}
+      ${KEEP && !PUBLIC ? row("download", $t("서버에 보관한 동영상"), $t("동영상 {0}개{1}{2}", keptList.length, "", ""), "/feed/saved") : ""}
       ${row("subs", $t("구독 관리"), $t("구독 채널 {0}개", Object.keys(L.subs).length), "/feed/channels")}
       ${row("gear", $t("설정"), "", "/settings")}
     </div>
@@ -705,7 +707,32 @@ export async function you(page, m, alive) {
       ${pls.map(([id, p]) => playlistCard({ id, title: p.title, count: p.count, first: p.first, author: $t("비공개") })).join("")}</div></section>
     ${shelf($t("나중에 볼 동영상"), "/playlist?list=WL", remember(L.wl.map(normVideo)).slice(0, 12))}
     ${shelf($t("좋아요 표시한 동영상"), "/playlist?list=LL", remember(L.likes.map(normVideo)).slice(0, 12))}
+    ${keptList.length ? shelf($t("서버에 보관한 동영상"), "/feed/saved", remember(keptList).slice(0, 12)) : ""}
   </div>`;
+  fillProgress(page);
+}
+// a video kept on the server (#126), as a card shows it
+const keptVideo = (x) => normVideo({ videoId: x.id, title: x.title, author: x.author, authorId: x.authorId, lengthSeconds: x.len });
+// the videos kept on the server (#126): they play from the server's file on every device; deleting frees the space
+export async function saved(page, m, alive) {
+  const r = await api("/api/p/yt/saved", { quiet: true }).catch(() => ({ items: [], used: 0, max: 0 }));
+  if (!alive()) return;
+  const gb = (n) => (n / 1e9).toFixed(n >= 1e10 ? 0 : 1) + " GB";
+  page.innerHTML = `<div class="feedhead"><h2>${$t("서버에 보관한 동영상")}</h2><span class="sub">${$t("{0} / {1} 사용", gb(r.used || 0), gb(r.max || 0))}</span></div>
+    ${r.items.length ? `<div class="vgrid">${r.items.map((x) => `<div class="keptv">${card(remember([keptVideo(x)])[0], "grid")}
+      <div class="keptm"><small>${x.height ? x.height + "p · " : ""}${gb(+x.size || 0)}</small><button class="pill ghost kdel" data-id="${esc(x.id)}">${icon("trash")}${$t("삭제")}</button></div></div>`).join("")}</div>`
+      : empty("download", $t("아직 없어요"), `<p class="sub">${$t("동영상의 오프라인 저장에서 '서버에 보관'을 고르면 여기에 남아요")}</p>`)}`;
+  page.querySelectorAll(".kdel").forEach((b) => (b.onclick = async () => {
+    if (!confirm($t("서버에서 이 동영상 파일을 지울까요?"))) return;
+    b.disabled = true;
+    try {
+      await api("/api/p/yt/saved/del", { method: "POST", body: { id: b.dataset.id } });
+      kept(true);
+      b.closest(".keptv").remove();
+      if (!page.querySelector(".keptv")) navigate("/feed/saved", { replace: true });
+      toast($t("지웠어요"));
+    } catch (e) { b.disabled = false; toast(e.message); }
+  }));
   fillProgress(page);
 }
 export async function playlists(page) {

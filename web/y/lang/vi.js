@@ -1,5 +1,13 @@
 // TubeHaus interface text: vi (Tiếng Việt). Key = the Korean original.
 export default {
+ "서버에 보관 (모든 기기에서 서버 파일로 재생)": "Giữ trên máy chủ (phát từ tệp của máy chủ trên mọi thiết bị)",
+ "서버에 보관했어요": "Đã giữ trên máy chủ",
+ "보기": "Xem",
+ "서버에 보관한 동영상": "Video giữ trên máy chủ",
+ "{0} / {1} 사용": "Đã dùng {0} / {1}",
+ "동영상의 오프라인 저장에서 '서버에 보관'을 고르면 여기에 남아요": "Chọn 'Giữ trên máy chủ' khi lưu video ngoại tuyến thì video sẽ ở lại đây",
+ "서버에서 이 동영상 파일을 지울까요?": "Xóa tệp của video này khỏi máy chủ?",
+ "지웠어요": "Đã xóa",
  "로그인하지 않았어요. 구독과 기록은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장돼서 다른 기기에서도 이어져요.": "Bạn chưa đăng nhập. Kênh đăng ký và lịch sử chỉ được lưu trong trình duyệt này. Đăng nhập để lưu chúng vào tài khoản, trên mọi thiết bị.",
  "이 브라우저의 라이브러리": "Thư viện trong trình duyệt này",
  "계정이 있으면 구독과 기록이 서버에 저장돼서 어느 기기에서나 이어져요. 이메일 같은 개인정보는 받지 않아요.": "Khi có tài khoản, kênh đăng ký và lịch sử được lưu trên máy chủ và theo bạn sang mọi thiết bị. Không cần email hay thông tin cá nhân khác.",

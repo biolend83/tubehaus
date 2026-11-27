@@ -45,6 +45,8 @@ WHISPER_LANG = env("HT_WHISPER_LANG", "auto")
 # arguments (-m -f -l ...) and prints its "[00:00:01.000 --> 00:00:03.000]  text" lines
 LIVECC_ALT = env("HT_LIVECC_ALT", "")
 YTDL_DIR = env("HT_DOWNLOAD_DIR", "/var/tmp/tubehaus-dl")
+# videos kept on the server (#126): saved once, they play from here on every device; at most HT_SAVED_MAX_GB
+SAVED_MAX_GB = int(env("HT_SAVED_MAX_GB", "50") or 50)
 # Public instance: every visitor keeps their own library in their browser, and the server
 # keeps none. Anything that would be shared between strangers (library, send to TV,
 # server downloads) is switched off.
@@ -5399,6 +5401,12 @@ def _ytdl_run(jid, vid, vitag, aitag, ext, name, track="", sub="", sub_lang="", 
                 os.remove(x)
         j.update(status="done", path=out, size=os.path.getsize(out), done_at=time.time())
         log("ytdl", f"{vid} {vitag}+{aitag} done {j['size']}B", t0, every=0)
+        if j.get("keep"):
+            try:
+                saved_add(vid, out, ext, j["keep"])
+            except Exception as e:
+                j["warn"] = "It couldn't be kept on the server: " + str(e)[:100]
+                log("saved", f"{vid} keep FAIL {repr(e)[:120]}", every=0)
     except Exception as ex:
         j.update(status="error", err=str(ex)[:200], done_at=time.time())
         log("ytdl", f"{vid} {vitag}+{aitag} FAIL {repr(ex)[:160]}", t0, every=0)
@@ -5407,7 +5415,8 @@ def _ytdl_run(jid, vid, vitag, aitag, ext, name, track="", sub="", sub_lang="", 
 
 def ytdl_start(b):
     """{id, v (video itag, "" = the sound only), a (audio itag), ext, name, at (audio track id, "" = the original),
-    sub (a caption track's label to put in the video), sl (its language), al (the audio track's language)}"""
+    sub (a caption track's label to put in the video), sl (its language), al (the audio track's language),
+    keep (also keep it on the server, #126) with meta {title, author, authorId, len, height}}"""
     vid, vitag, aitag = str(b.get("id", "")), str(b.get("v") or ""), str(b.get("a", ""))
     ext = str(b.get("ext") or "")
     ext = ext if ext in (("webm", "m4a") if not vitag else ("webm",)) else "mp4" if vitag else "m4a"
@@ -5418,11 +5427,28 @@ def ytdl_start(b):
             or not re.fullmatch(r"[A-Za-z]{0,3}(-[A-Za-z0-9]{1,8})*", sl) or not re.fullmatch(r"[A-Za-z]{0,3}(-[A-Za-z0-9]{1,8})*", al):
         return 400, {"error": "Bad request"}
     name = re.sub(r'[\\/:*?"<>|\r\n]+', " ", str(b.get("name") or vid)).strip()[:120] or vid
+    keep = None
+    if b.get("keep") and vitag:
+        if saved_size() >= SAVED_MAX_GB * 1e9:
+            return 507, {"error": "The videos kept on the server already fill the space set for them (HT_SAVED_MAX_GB)"}
+        m = b.get("meta") if isinstance(b.get("meta"), dict) else {}
+        num = lambda x: int(str(x or 0)) if str(x or 0).isdigit() else 0
+        keep = {"title": str(m.get("title") or name)[:300], "author": str(m.get("author") or "")[:200],
+                "authorId": str(m.get("authorId") or "") if re.fullmatch(r"UC[\w-]{22}", str(m.get("authorId") or "")) else "",
+                "len": num(m.get("len")), "height": num(m.get("height")), "by": getattr(_req, "user", None) or ""}
     ytdl_gc()
     with ytdl_lock:
         busy = [x for x in ytdl_jobs.values() if x["status"] in ("download", "merge")]
         same = next((k for k, x in ytdl_jobs.items() if x["key"] == (vid, vitag, aitag, track, sub) and x["status"] != "error"), None)
         if same:
+            sj = ytdl_jobs[same]
+            if keep and not sj.get("keep"):
+                sj["keep"] = keep               # still downloading: kept when it's done
+                if sj["status"] == "done":      # already done (its file stays two hours): kept now
+                    try:
+                        saved_add(vid, sj["path"], sj["path"].rsplit(".", 1)[-1], keep)
+                    except Exception as e:
+                        return 500, {"error": "It couldn't be kept on the server: " + str(e)[:100]}
             return 200, {"job": same}
         if len(busy) >= 2:
             return 429, {"error": "Two other saves are in progress. Try again when they finish"}
@@ -5431,7 +5457,8 @@ def ytdl_start(b):
         if st.f_bavail * st.f_frsize < 10e9:
             return 507, {"error": "Not enough disk space on the server"}
         jid = secrets.token_hex(8)
-        ytdl_jobs[jid] = {"key": (vid, vitag, aitag, track, sub), "status": "download", "prog": {}, "name": f"{name}.{ext}", "t": time.time()}
+        ytdl_jobs[jid] = {"key": (vid, vitag, aitag, track, sub), "status": "download", "prog": {}, "name": f"{name}.{ext}", "t": time.time(),
+                          "keep": keep}
     threading.Thread(target=_ytdl_run, args=(jid, vid, vitag, aitag, ext, name, track, sub, sl, al), name="ytdl-" + jid, daemon=True).start()
     return 200, {"job": jid}
 
@@ -5444,6 +5471,80 @@ def ytdl_status(jid):
     tot = sum(x[1] for x in j["prog"].values()) or 1
     pct = 100 if j["status"] == "done" else round(got / tot * 95, 1) if j["status"] == "download" else 97
     return {"status": j["status"], "pct": pct, "name": j["name"], "size": j.get("size") or tot, "err": j.get("err"), "warn": j.get("warn")}
+
+
+# ---------- videos kept on the server (#126): one file each in STATE/saved, listed in index.json ----------
+saved_lock = threading.Lock()
+
+
+def _saved_dir():
+    return os.path.join(STATE, "saved")
+
+
+def _saved_index():
+    d = jload(os.path.join(_saved_dir(), "index.json"), {})
+    return d if isinstance(d, dict) else {}
+
+
+def saved_size():
+    return sum(int(v.get("size") or 0) for v in _saved_index().values())
+
+
+def saved_add(vid, path, ext, meta):
+    """a finished download (path) kept as <id>.<ext> (a hard link where it can, else a copy)"""
+    import shutil
+    d = _saved_dir()
+    os.makedirs(d, exist_ok=True)
+    dst = os.path.join(d, f"{vid}.{ext}")
+    tmp = dst + ".part"
+    try:
+        os.link(path, tmp)
+    except OSError:
+        shutil.copyfile(path, tmp)
+    with saved_lock:
+        idx = _saved_index()
+        old = idx.get(vid, {}).get("file")
+        os.replace(tmp, dst)
+        if old and old != os.path.basename(dst) and os.path.exists(os.path.join(d, old)):
+            os.remove(os.path.join(d, old))
+        idx[vid] = dict(meta, id=vid, file=os.path.basename(dst), size=os.path.getsize(dst), at=int(time.time()))
+        jsave(os.path.join(d, "index.json"), idx)
+    log("saved", f"{vid} kept {idx[vid]['size']}B", every=0)
+
+
+def saved_list():
+    items = sorted(_saved_index().values(), key=lambda v: -int(v.get("at") or 0))
+    return {"items": [{k: v.get(k) for k in ("id", "title", "author", "authorId", "len", "height", "size", "at", "by", "file")} for v in items],
+            "used": sum(int(v.get("size") or 0) for v in items), "max": SAVED_MAX_GB * 1_000_000_000}
+
+
+def saved_del(b):
+    vid = str(b.get("id") or "")
+    if not re.fullmatch(r"[\w-]{11}", vid):
+        return 400, {"error": "Bad request"}
+    with saved_lock:
+        idx = _saved_index()
+        v = idx.pop(vid, None)
+        if not v:
+            return 404, {"error": "Not kept on the server"}
+        f = os.path.join(_saved_dir(), os.path.basename(v.get("file") or ""))
+        if os.path.isfile(f):
+            os.remove(f)
+        jsave(os.path.join(_saved_dir(), "index.json"), idx)
+    return 200, {"ok": True}
+
+
+def saved_file(vid):
+    """(path, content type) of a kept video, or None"""
+    if not re.fullmatch(r"[\w-]{11}", vid or ""):
+        return None
+    v = _saved_index().get(vid)
+    if not v:
+        return None
+    f = os.path.join(_saved_dir(), os.path.basename(v.get("file") or ""))
+    if not os.path.isfile(f):
+        return None
+    return f, "video/webm" if f.endswith(".webm") else "video/mp4"
 
 
 def ytdl_gc():
@@ -6385,7 +6486,7 @@ def health():
             "live_captions": bool(LIVECC_ENGINES), "live_caption_engines": list(LIVECC_ENGINES), "public": PUBLIC_MODE,
             "max_height": MAX_HEIGHT or None, "viewers": len([1 for t in list(viewers.values()) if now - t < 180]),
             "max_viewers": MAX_VIEWERS or None, "accounts": ACCOUNTS, "name": NAME or None, "links": LINKS,
-            "sso": OIDC_NAME if OIDC else None, "app_sign_in": ACCOUNTS, "guests": GUESTS, "version": VERSION}
+            "sso": OIDC_NAME if OIDC else None, "app_sign_in": ACCOUNTS, "guests": GUESTS, "keep_on_server": not PUBLIC_MODE, "version": VERSION}
 
 
 viewers, rate, load_lk = {}, {}, threading.Lock()   # ip -> last seen / (tokens, time)
@@ -6510,6 +6611,47 @@ class H(BaseHTTPRequestHandler):
             self.close_connection = True
             log("http", "%s %s unhandled %s: %s" % (getattr(self, "command", "?"),
                 str(getattr(self, "path", "?"))[:60], type(ex).__name__, str(ex)[:120]), t0, every=0)
+
+    def send_file_range(self, path, ctype):
+        """a file on disk, with Range (the player seeks in it)"""
+        size = os.path.getsize(path)
+        start, end = 0, size - 1
+        m = re.fullmatch(r"bytes=(\d*)-(\d*)", (self.headers.get("Range") or "").strip())
+        partial = bool(m and (m.group(1) or m.group(2)))
+        if partial:
+            if m.group(1):
+                start = int(m.group(1))
+                end = min(int(m.group(2)), size - 1) if m.group(2) else size - 1
+            else:
+                start = max(0, size - int(m.group(2)))
+            if start > end or start >= size:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+        self.send_response(206 if partial else 200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Cache-Control", "private, max-age=3600")
+        if partial:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.send_header("Content-Length", str(end - start + 1))
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            with open(path, "rb") as f:
+                f.seek(start)
+                left = end - start + 1
+                while left > 0:
+                    chunk = f.read(min(1 << 20, left))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    left -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
 
     def send_page(self, page):
         b = page.encode()
@@ -6792,6 +6934,13 @@ class H(BaseHTTPRequestHandler):
             if p.endswith("/cast/wait"):
                 d = cast_wait(self.qs())
                 return self.send(400 if d.get("error") else 200, d)
+        if p.endswith("/yt/saved"):
+            return self.send(200, saved_list())
+        if p.endswith("/yt/saved/file"):
+            got = saved_file(self.qs().get("id", ""))
+            if not got:
+                return self.send(404, {"error": "Not kept on the server"})
+            return self.send_file_range(*got)
         if p.endswith("/yt/dl") or p.endswith("/yt/dl/file"):
             jid = self.qs().get("job", "")
             if p.endswith("/yt/dl"):
@@ -7018,6 +7167,8 @@ class H(BaseHTTPRequestHandler):
             return self.send(*party_update(body))
         if p.endswith("/yt/dl"):
             return self.send(*ytdl_start(body))
+        if p.endswith("/yt/saved/del"):
+            return self.send(*saved_del(body))
         if p.endswith("/yt/import"):
             return self.send(*ytlib_import(body))
         if p.endswith("/yt/shorts/sig"):

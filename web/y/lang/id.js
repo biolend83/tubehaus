@@ -1,5 +1,13 @@
 // TubeHaus interface text: id. Key = the Korean original.
 export default {
+ "서버에 보관 (모든 기기에서 서버 파일로 재생)": "Simpan di server (diputar dari berkas server di semua perangkat)",
+ "서버에 보관했어요": "Disimpan di server",
+ "보기": "Lihat",
+ "서버에 보관한 동영상": "Disimpan di server",
+ "{0} / {1} 사용": "{0} dari {1} terpakai",
+ "동영상의 오프라인 저장에서 '서버에 보관'을 고르면 여기에 남아요": "Pilih 'Simpan di server' saat menyimpan video offline dan video itu akan ada di sini",
+ "서버에서 이 동영상 파일을 지울까요?": "Hapus berkas video ini dari server?",
+ "지웠어요": "Dihapus",
  "로그인하지 않았어요. 구독과 기록은 이 브라우저에만 저장돼요. 로그인하면 계정에 저장돼서 다른 기기에서도 이어져요.": "Anda belum masuk. Langganan dan riwayat Anda hanya disimpan di browser ini. Masuk untuk menyimpannya di akun Anda, di semua perangkat.",
  "이 브라우저의 라이브러리": "Pustaka di browser ini",
  "계정이 있으면 구독과 기록이 서버에 저장돼서 어느 기기에서나 이어져요. 이메일 같은 개인정보는 받지 않아요.": "Dengan akun, langganan dan riwayat Anda disimpan di server dan ikut ke perangkat mana pun. Tidak perlu email atau data pribadi lain.",

@@ -1,5 +1,5 @@
 // App skeleton: router, shared state (my library), cards, popup menus, dialogs
-import { $, $$, el, esc, icon, api, lib, settings, local, toast, copy, fmtTime, fmtViews, ago, exactTime, thumb, normVideo, metaOf, pickThumb, dropCache, PUBLIC, siteName } from "./util.js";
+import { $, $$, el, esc, icon, api, lib, settings, local, toast, copy, fmtTime, fmtViews, ago, exactTime, thumb, normVideo, metaOf, pickThumb, dropCache, PUBLIC, siteName, KEEP, kept } from "./util.js";
 import { Player, audioName } from "./player.js";
 import { knownAvatar } from "./avatars.js";
 import { $t, $tMsg, fmtShort, LANG, LOCALE } from "./i18n.js";
@@ -346,7 +346,8 @@ export async function downloadDialog(v) {
   let tr = tracks[0], hd = [], direct = [];
   const picks = (tracks.length > 1 ? `<label>${$t("오디오 트랙")}<select class="dl-at">${tracks.map((t, i) => `<option value="${i}">${esc(t.label)}</option>`).join("")}</select></label>` : "") +
     (caps.length ? `<label>${$t("자막")}<select class="dl-cc"><option value="">${$t("넣지 않음")}</option>${caps.map((c, i) => `<option value="${i}">${esc(c.label)}</option>`).join("")}</select></label>` : "");
-  body.innerHTML = (picks ? `<div class="dlpick">${picks}</div>` : "") + `<div class="dlopts"></div>` +
+  const keepBox = KEEP && !PUBLIC ? `<label class="dlkeep"><input type="checkbox" class="dl-keep">${$t("서버에 보관 (모든 기기에서 서버 파일로 재생)")}</label>` : "";
+  body.innerHTML = (picks ? `<div class="dlpick">${picks}</div>` : "") + keepBox + `<div class="dlopts"></div>` +
     `<div class="dlprog" hidden><div class="dlbar"><i></i></div><div class="dltxt"></div></div>` +
     `<p class="hint">${$t("영상과 소리를 서버가 받아서 한 파일로 합친 다음 내려줘요. 창을 닫아도 서버에서 계속 준비하고, 다 되면 알려줘요.")}</p>`;
   const opts = body.querySelector(".dlopts");
@@ -386,12 +387,14 @@ export async function downloadDialog(v) {
     const cc = caps[box.querySelector(".dl-cc")?.value ?? ""];
     const o = b.dataset.i != null ? hd[+b.dataset.i] : { ...direct[+b.dataset.m], v: "", a: direct[+b.dataset.m].itag, label: "" };
     const what = [o.label, tr && !tr.orig ? tr.label : "", o.v && cc ? cc.label : ""].filter(Boolean).join(", ");
+    const keep = !!(o.v && box.querySelector(".dl-keep")?.checked);
     btns().forEach((x) => (x.disabled = true));
     try {
       const r = await api("/api/p/yt/dl", { method: "POST", body: {
         id: v.id, v: o.v, a: o.a, ext: o.ext, name: what ? `${name} (${what})` : name,
-        at: tr && !tr.orig ? tr.id : "", al: tr?.lang || "", sub: o.v && cc ? cc.label : "", sl: o.v && cc ? cc.language_code : "" } });
-      watchDl(r.job, box);
+        at: tr && !tr.orig ? tr.id : "", al: tr?.lang || "", sub: o.v && cc ? cc.label : "", sl: o.v && cc ? cc.language_code : "",
+        ...(keep ? { keep: true, meta: { title: info.title, author: info.author, authorId: info.authorId, len: info.lengthSeconds, height: o.h } } : {}) } });
+      watchDl(r.job, box, keep);
     } catch (err) { toast(err.message); btns().forEach((x) => (x.disabled = false)); }
   });
   box.querySelector(".dl-at")?.addEventListener("change", (e) => { tr = tracks[+e.target.value]; draw(); });
@@ -408,7 +411,7 @@ function atrack(f) {
   return { id: t.id || (lang ? `${lang}.${kind}` : ""), lang, kind, orig: kind === "original" || !!t.isDefault || !lang, drc: x.drc === "1", name: t.displayName || "" };
 }
 // follow the server job and download the file when it is done (keeps going if the dialog is closed)
-function watchDl(job, box) {
+function watchDl(job, box, keep) {
   const prog = box.querySelector(".dlprog");
   prog.hidden = false;
   const tick = async () => {
@@ -416,11 +419,17 @@ function watchDl(job, box) {
     try { s = await api(`/api/p/yt/dl?job=${job}`, { quiet: true }); } catch { return setTimeout(tick, 3000); }
     if (box.isConnected) {
       box.querySelector(".dlbar i").style.width = s.pct + "%";
-      box.querySelector(".dltxt").textContent = s.status === "merge" ? $t("영상과 소리를 합치는 중...") : s.status === "done" ? $t("완료! 저장을 시작해요") : s.status === "error" ? $tMsg(s.err) : `${$t("서버가 받는 중 {0}%", Math.floor(s.pct))}`;
+      box.querySelector(".dltxt").textContent = s.status === "merge" ? $t("영상과 소리를 합치는 중...") : s.status === "done" ? (keep ? $t("서버에 보관했어요") : $t("완료! 저장을 시작해요")) : s.status === "error" ? $tMsg(s.err) : `${$t("서버가 받는 중 {0}%", Math.floor(s.pct))}`;
     }
     if (s.status === "error") { toast($t("저장 실패: ") + $tMsg(s.err || "")); return; }
     if (s.status === "done" && s.warn) toast($tMsg(s.warn));
     if (s.status !== "done") return setTimeout(tick, 1500);
+    if (keep) {
+      kept(true);
+      if (!s.warn) toast($t("서버에 보관했어요"), $t("보기"), () => navigate("/feed/saved"), 8000);
+      if (box.isConnected) setTimeout(() => $("#modal").className === "show" && box.isConnected && ($("#modal").className = ""), 800);
+      return;
+    }
     const a = el(`<a href="/api/p/yt/dl/file?job=${job}" download="${esc(s.name)}" hidden></a>`);
     document.body.append(a);
     a.click();
