@@ -218,6 +218,7 @@ fun App(app: AppState) {
                     app.whatsNew?.let { WhatsNewDialog(app, it) }
                     app.reminder?.let { ReminderDialog(app, it) }
                     app.offline.asking?.let { OfflineDialog(app, it) }
+                    if (app.playback.soundOpen) SoundDialog(app) { app.playback.soundOpen = false }
                 }
             }
         }

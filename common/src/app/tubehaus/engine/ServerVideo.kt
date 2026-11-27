@@ -64,7 +64,90 @@ object ServerVideo {
         throw last ?: Exception("no answer")
     }
 
+    /** the videos the server keeps (#126), read once a minute: id -> its file's name ("<id>.mp4" or "<id>.webm") */
+    @Volatile private var kept: Map<String, String> = emptyMap()
+    @Volatile private var keptAt = 0L
+    @Volatile private var keptBase = ""
+
+    private suspend fun keptFile(id: String): String? {
+        val b = base
+        if (b != keptBase || Sys.nowMs() - keptAt > 60_000) {
+            keptBase = b
+            keptAt = Sys.nowMs()
+            kept = runCatching {
+                parse(Net.get("$b/api/p/yt/saved", headers())).at("items").arr.mapNotNull { x ->
+                    val k = x.at("id").str ?: return@mapNotNull null
+                    k to (x.at("file").str ?: "$k.mp4")
+                }.toMap()
+            }.getOrDefault(emptyMap())
+        }
+        return kept[id]
+    }
+
+    /**
+     * Keeps [v] on the server (#126): the server saves it once, picture and sound in one file (H.264 up to
+     * [height] where it has it, else AV1, else VP9), and from then on every device plays that file. Waits until
+     * it's done; the error is the reason to show.
+     */
+    suspend fun keep(v: Video, height: Int) {
+        val b = base.ifEmpty { throw YtError("No server") }
+        val s = streamFromServer(v.id)
+        if (s.live) throw YtError("A live stream can't be kept")
+        val fit = s.video.filter { it.height in 1..height }.ifEmpty { s.video }
+        fun best(family: String) = fit.filter { it.codecs.startsWith(family) }
+            .maxWithOrNull(compareBy<Format>({ it.height }, { it.fps }, { it.bitrate }))
+        val pic = best("avc1") ?: best("av01") ?: best("vp") ?: throw YtError("No playable streams")
+        val webm = pic.mime.endsWith("webm")
+        val original = s.audio.filter { it.audioDefault }.ifEmpty { s.audio }
+        val snd = original.filter { it.mime.endsWith(if (webm) "webm" else "mp4") }.maxByOrNull { it.bitrate }
+            ?: throw YtError("No playable streams")
+        val body = kotlinx.serialization.json.buildJsonObject {
+            put("id", kotlinx.serialization.json.JsonPrimitive(v.id))
+            put("v", kotlinx.serialization.json.JsonPrimitive(pic.itag.toString()))
+            put("a", kotlinx.serialization.json.JsonPrimitive(snd.itag.toString()))
+            put("ext", kotlinx.serialization.json.JsonPrimitive(if (webm) "webm" else "mp4"))
+            put("name", kotlinx.serialization.json.JsonPrimitive(s.title.ifEmpty { v.id }.take(120)))
+            put("keep", kotlinx.serialization.json.JsonPrimitive(true))
+            put("meta", kotlinx.serialization.json.buildJsonObject {
+                put("title", kotlinx.serialization.json.JsonPrimitive(s.title))
+                put("author", kotlinx.serialization.json.JsonPrimitive(s.author))
+                put("authorId", kotlinx.serialization.json.JsonPrimitive(s.channelId))
+                put("len", kotlinx.serialization.json.JsonPrimitive(s.lengthSec))
+                put("height", kotlinx.serialization.json.JsonPrimitive(pic.height))
+            })
+        }
+        val job = try {
+            parse(Net.post("$b/api/p/yt/dl", body.toString(), headers())).at("job").str ?: throw YtError("The server sent something unreadable")
+        } catch (e: HttpError) {
+            throw YtError(when (e.code) {
+                507 -> "The server has no room for more kept videos"
+                429 -> "The server is busy saving other videos. Try again when they finish"
+                401, 403 -> "This server doesn't keep videos (or didn't accept the login)"
+                else -> serverError(e.code)
+            })
+        }
+        while (true) {
+            kotlinx.coroutines.delay(2000)
+            val st = runCatching { parse(Net.get("$b/api/p/yt/dl?job=$job", headers())) }.getOrNull() ?: continue
+            when (st.at("status").str) {
+                "done" -> { keptAt = 0L; st.at("warn").str?.let { throw YtError(it) }; return }
+                "error" -> throw YtError(st.at("err").str ?: "The server couldn't save it")
+            }
+        }
+    }
+
+    /** a server-kept file's address: one file with picture and sound, the way a downloaded video plays */
+    fun isKept(url: String?) = url != null && url.startsWith(base) && url.contains("/api/p/yt/saved/file?")
+
     suspend fun stream(id: String): Stream {
+        val s = streamFromServer(id)
+        // kept on the server (#126): that file, as long as the server still has it
+        val f = (if (s.live) null else runCatching { keptFile(id) }.getOrNull()) ?: return s
+        return s.copy(hls = "$base/api/p/yt/saved/file?id=$id", video = emptyList(), audio = emptyList(),
+            client = if (f.endsWith(".webm")) "server-kept-webm" else "server-kept")
+    }
+
+    private suspend fun streamFromServer(id: String): Stream {
         val b = base.ifEmpty { throw YtError("No server") }
         val text = try {
             fetchVideo("$b/api/v1/videos/$id")
@@ -103,6 +186,7 @@ object ServerVideo {
             expiresAt = expire ?: (Sys.nowMs() / 1000 + 18000),
             client = "server",
             latency = latencyClass(d.at("latencyClass").str),
+            loudnessDb = d.at("loudnessDb").str?.toDoubleOrNull()?.toFloat(),
         )
     }
 
@@ -113,7 +197,12 @@ object ServerVideo {
      */
     suspend fun streamHls(id: String): Stream {
         val s = stream(id)
-        if (s.live) return s
+        if (s.live || s.client == "server-kept") return s
+        if (s.client == "server-kept-webm") return streamHlsOf(id, streamFromServer(id))
+        return streamHlsOf(id, s)
+    }
+
+    private suspend fun streamHlsOf(id: String, s: Stream): Stream {
         val b = base
         val url = "$b/api/p/hls/$id.m3u8"
         val ok = runCatching { Net.get(url, headers()).startsWith("#EXTM3U") }.getOrDefault(false)

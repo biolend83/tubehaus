@@ -234,6 +234,14 @@ data class Settings(
     /** extra CA / server certificates (PEM) trusted when connecting to a TubeHaus server over HTTPS,
      *  for self-hosted instances with their own certificate authority (internal / local SSL) */
     val serverCerts: List<String> = emptyList(),
+    /** the sound (ui/Sound.kt): loudness matching; the equalizer and effects, for music and (with [soundVideo]) videos */
+    val soundNorm: Boolean = true,
+    val soundVideo: Boolean = false,
+    val eqOn: Boolean = false,
+    val eqGains: List<Float> = emptyList(),
+    val soundWidth: Int = 100,
+    val soundBalance: Int = 0,
+    val nightSound: Boolean = false,
 )
 
 /** One day of watching, kept on this device only: seconds of video and music, per channel and artist. */

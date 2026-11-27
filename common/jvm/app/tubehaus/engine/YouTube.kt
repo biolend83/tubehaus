@@ -238,6 +238,7 @@ object YouTube {
             client = c.name,
             storyboard = d.at("storyboards.playerStoryboardSpecRenderer.spec").str,
             latency = latencyClass(vd.at("latencyClass").str),
+            loudnessDb = loudnessIn(d),
         )
     }
 

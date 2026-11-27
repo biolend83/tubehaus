@@ -200,6 +200,10 @@ interface VideoPlayer {
     suspend fun frame(): androidx.compose.ui.graphics.ImageBitmap? = null
     fun stop()
 
+    /** players that apply a [SoundFx] (loudness matching, the equalizer and effects) */
+    val canSound: Boolean get() = false
+    fun setSound(fx: SoundFx) {}
+
     /** phones use the system volume; the desktop has a slider of its own */
     val hasVolume: Boolean get() = false
     fun setVolume(v: Float) {}
