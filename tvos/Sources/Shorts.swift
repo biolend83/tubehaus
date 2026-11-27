@@ -149,7 +149,8 @@ struct ShortsView: View {
                             }
                         VStack(spacing: 28) {
                             round("chevron.up", enabled: model.index > 0) { model.move(-1) }
-                            let liked = Library.shared.isLiked(v.id), disliked = Library.shared.isDisliked(v.id)
+                            let liked = Library.shared.isLiked(v.id)
+                            let disliked = Library.shared.isDisliked(v.id)
                             side(liked ? "hand.thumbsup.fill" : "hand.thumbsup", "Like") { Library.shared.toggleLike(v, keywords: []) }
                             side(disliked ? "hand.thumbsdown.fill" : "hand.thumbsdown", "Dislike") { Library.shared.toggleDislike(v) }
                             side(Library.shared.isLater(v.id) ? "checkmark" : "clock", "Save") { Library.shared.toggleLater(v) }

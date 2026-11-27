@@ -53,7 +53,7 @@ final class PlayerModel {
     private(set) var turnedDown: Double = 0
 
     @ObservationIgnored private var cues: [Subtitles.Cue] = []
-    private let layers =NSHashTable<CaptionLayer>.weakObjects()
+    @ObservationIgnored private let layers = NSHashTable<CaptionLayer>.weakObjects()
     @ObservationIgnored private var tick: Any?
     @ObservationIgnored private var status: NSKeyValueObservation?
     @ObservationIgnored private var itemStatus: NSKeyValueObservation?
@@ -64,7 +64,7 @@ final class PlayerModel {
     @ObservationIgnored private var last: Double = 0
     @ObservationIgnored private var saved: Double = 0
     @ObservationIgnored private var keywords: [String] = []
-    @ObservationIgnored private var nowPlaying = NowPlaying()
+    @ObservationIgnored private var nowPlaying = RemoteInfo()
 
     private init() {
         tick = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 10), queue: .main) { [weak self] t in
@@ -531,7 +531,7 @@ final class PlayerModel {
 
 /// What the TV's Control Center and the Remote app on a phone show and can do.
 @MainActor
-private struct NowPlaying {
+private struct RemoteInfo {
     private var wired = false
 
     mutating func commands(_ m: PlayerModel) {

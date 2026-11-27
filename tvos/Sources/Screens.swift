@@ -727,7 +727,7 @@ struct SettingsView: View {
                             Spacer()
                         }
                         .padding(.horizontal, 24).frame(height: 80)
-                        .background(group == g && focusedGroup == nil ? RoundedRectangle(cornerRadius: 16).fill(Theme.chip) : nil)
+                        .background(RoundedRectangle(cornerRadius: 16).fill(group == g && focusedGroup == nil ? Theme.chip : Color.clear))
                     }
                     .buttonStyle(.glow(radius: 16))
                     .focused($focusedGroup, equals: g)

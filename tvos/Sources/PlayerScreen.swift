@@ -172,7 +172,7 @@ struct WatchView: View {
 
     private func isShelf(_ f: Spot?) -> Bool {
         switch f {
-        case .chapter, .related, .queued: return ui.shown
+        case .some(.chapter), .some(.related), .some(.queued): return ui.shown
         default: return false
         }
     }
@@ -249,7 +249,7 @@ struct WatchView: View {
 
     /// how far everything moves up when the remote goes down into the shelves
     private var shelfLift: CGFloat {
-        if case .related = focus, !(model.details?.chapters.isEmpty ?? true) || !model.queue.isEmpty { return 900 }
+        if case .some(.related) = focus, !(model.details?.chapters.isEmpty ?? true) || !model.queue.isEmpty { return 900 }
         return 520
     }
 
@@ -608,10 +608,10 @@ struct WatchView: View {
     private var statsBox: some View {
         TimelineView(.periodic(from: .now, by: 1)) { _ in
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(model.statsLines, id: \.0) { k, v in
+                ForEach(Array(model.statsLines.enumerated()), id: \.offset) { _, line in
                     HStack(spacing: 20) {
-                        Text(k).foregroundStyle(Theme.sub).frame(width: 260, alignment: .leading)
-                        Text(v)
+                        Text(line.0).foregroundStyle(Theme.sub).frame(width: 260, alignment: .leading)
+                        Text(line.1)
                     }
                 }
             }
@@ -671,6 +671,7 @@ struct WatchView: View {
     private var settingsPanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 6) {
+                let _ = refresh
                 panelTitle("Settings")
                 PanelRow(icon: "slider.horizontal.3", title: "Quality", value: PlayerModel.qualityName(model.quality)) { ui.panel = .quality }
                     .focused($focus, equals: .panel)
@@ -687,10 +688,11 @@ struct WatchView: View {
                 if model.round.count > 1 {
                     PanelToggle(icon: "repeat", title: "Repeat playlist", on: model.loopList) { model.loopList.toggle() }
                 }
-                PanelToggle(icon: "play.square.stack", title: "Autoplay", on: Settings.autoplayNext) { Settings.autoplayNext.toggle(); ui.poke() }
+                PanelToggle(icon: "play.square.stack", title: "Autoplay", on: Settings.autoplayNext) { Settings.autoplayNext.toggle(); refresh += 1 }
                 PanelToggle(icon: "speaker.wave.2", title: "Loudness matching", on: Settings.soundNorm) {
                     Settings.soundNorm.toggle()
                     model.retryVolume()
+                    refresh += 1
                 }
                 PanelToggle(icon: "chart.bar.xaxis", title: "Stats for nerds", on: model.stats) { model.stats.toggle() }
             }
@@ -885,6 +887,8 @@ struct WatchView: View {
     }
 
     @State private var sortIndex = 0
+    /// the panels' switches kept in Settings, drawn again when changed
+    @State private var refresh = 0
 
     private func sortComments(_ i: Int, _ token: String) async {
         sortIndex = i

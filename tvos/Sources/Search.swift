@@ -27,7 +27,7 @@ struct SearchView: View {
         HStack(alignment: .top, spacing: 0) {
             VStack(alignment: .leading, spacing: 20) {
                 queryBox
-                Keyboard(mode: $mode, focus: $focus) { k in type(k) }
+                Keyboard(mode: $mode, focus: $focus) { k in typeKey(k) }
                     .focusSection()
                 suggestionList
                 Spacer(minLength: 0)
@@ -113,7 +113,7 @@ struct SearchView: View {
         .focusSection()
     }
 
-    private func type(_ k: Keyboard.Key) {
+    private func typeKey(_ k: Keyboard.Key) {
         switch k {
         case .char(let c): keys.append(c)
         case .space: if keys.last != " " && !keys.isEmpty { keys.append(" ") }
