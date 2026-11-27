@@ -1,13 +1,13 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
 PackageIdentifier: biolend83.TubeHaus
-PackageVersion: 2.0.3
+PackageVersion: 2.1.0
 MinimumOSVersion: 10.0.17763.0
 InstallerType: wix
 UpgradeBehavior: install
-ReleaseDate: 2026-11-26
+ReleaseDate: 2026-11-27
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/biolend83/tubehaus/releases/download/app-v2.0.3/TubeHaus-2.0.3.msi
-  InstallerSha256: A127899816EAB0FF9C32797D37A0764E19C4B1BBD88C9BCBF5B253EB58378F21
+  InstallerUrl: https://github.com/biolend83/tubehaus/releases/download/app-v2.1.0/TubeHaus-2.1.0.msi
+  InstallerSha256: 86D79DFBAB5630831FEE5BB2782DC69D7B8DEE0F59289D27A1F98A56047281FA
 ManifestType: installer
 ManifestVersion: 1.9.0
