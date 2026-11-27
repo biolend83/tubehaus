@@ -303,6 +303,12 @@ private fun AppWindow(state: AppState, platform: DesktopPlatform, ws: WindowStat
                     }
                 }
             },
+            // Home takes the page's list back to the top (#128); here, after the page had its turn,
+            // so in a text box it still moves the cursor, and on the watch page it still seeks to the start
+            onKeyEvent = { e ->
+                if (e.type == KeyEventType.KeyDown && (e.key == Key.MoveHome || e.key == Key.Home) && !platform.tv &&
+                    !state.fullscreen && state.current !is Screen.Watch && state.current !is Screen.Shorts) { state.homeKey++; true } else false
+            },
         ) {
             if (platform.frame !== window) {
                 platform.frame = window

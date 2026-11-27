@@ -97,6 +97,18 @@ fun originalFirst(audio: List<Format>): List<Format> = when {
 }
 
 /** YouTube's latencyClass ("MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_LOW") as "LOW"; null when there is none */
+/** a player answer's loudness over YouTube's target in dB (see [Stream.loudnessDb]) */
+fun loudnessIn(d: kotlinx.serialization.json.JsonElement?): Float? {
+    val ac = d.at("playerConfig.audioConfig")
+    val target = ac.at("loudnessTargetLkfs").str?.toDoubleOrNull() ?: -14.0
+    for (k in listOf("perceptualLoudnessDb", "trackAbsoluteLoudnessLkfs"))
+        ac.at(k).str?.toDoubleOrNull()?.let { return (it - target).toFloat() }
+    ac.at("loudnessDb").str?.toDoubleOrNull()?.let { return it.toFloat() }
+    return d.at("streamingData.adaptiveFormats").arr
+        .firstOrNull { it.at("mimeType").str?.startsWith("audio") == true && it.at("loudnessDb").str?.toDoubleOrNull() != null }
+        ?.at("loudnessDb").str?.toDoubleOrNull()?.toFloat()
+}
+
 fun latencyClass(s: String?): String? = s?.substringAfter("LATENCY_", "")?.takeIf { it.isNotEmpty() }
 
 data class Caption(val lang: String, val name: String, val url: String, val auto: Boolean)
@@ -122,6 +134,8 @@ data class Stream(
     val storyboard: String? = null,
     /** a live stream's latency class from YouTube: "ULTRA_LOW" (1 s segments), "LOW" (2 s), "NORMAL" (5 s), or null */
     val latency: String? = null,
+    /** how many dB louder than YouTube's loudness target (-14 LKFS) it is, negative when quieter; null when unknown */
+    val loudnessDb: Float? = null,
 ) {
     fun asVideo() = Video(id, title, author, channelId, lengthSec, views = views, live = live)
 }

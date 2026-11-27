@@ -96,7 +96,7 @@ val UNDER_PARTS = listOf(
     "next" to "Next", "description" to "Description",
 )
 
-const val VERSION = "2.0.3"
+const val VERSION = "2.1.0"
 
 /** Settings' categories, as cards on its first page: key, icon, title, what is inside */
 private class Cat(val key: String, val icon: Symbol, val title: String, val sub: String)
@@ -531,6 +531,14 @@ private fun SettingsRows(
             Note(tr("Automatic picks what this device decodes best. H.264 is the most compatible, VP9 and AV1 look better for the same data but need a newer device. A video without the codec plays in another."))
         }
         // ------------------------------------------------------------------ music
+        if (app.platform.player.canSound) {
+            r.row("player", tr("Loudness matching") + " volume loudness normalize") {
+                Toggle(tr("Loudness matching"), tr("Uses the loudness YouTube gives for each video: loud videos and songs are turned down so everything plays at a similar level"), s.soundNorm) { b -> set { it.copy(soundNorm = b) } }
+            }
+            r.row("music", tr("Equalizer & effects") + " equalizer eq bass sound night stereo balance") {
+                SItem(tr("Equalizer & effects"), tr("Presets and a 10-band equalizer, stereo width, balance, night mode")) { app.playback.soundOpen = true }
+            }
+        }
         r.row("music", tr("Sound only for music") + " audio data") {
             Toggle(tr("Sound only for music"), tr("Songs from the Music tab load only their sound, which saves data. \"Watch video\" brings the picture back."), s.musicAudioOnly) { b -> set { it.copy(musicAudioOnly = b) } }
         }
@@ -649,6 +657,7 @@ private fun SettingsRows(
                         "↑ / ↓" to tr("Volume"), "M" to tr("Mute"), "F" to tr("Full screen"), "C" to tr("Captions"),
                         ", / ." to tr("Slower / faster"), "N / P" to tr("Next / previous video"), "0–9" to tr("Jump to 0–90%"),
                         "F5" to tr("Refresh the page"), "F11" to tr("Full screen window"), "Esc" to tr("Back"), "Alt+← / Alt+→" to tr("Back / forward"), tr("Middle click") to tr("Open a video in a new window"),
+                        "Home" to tr("Back to the top of the page"),
                     )) Row(Modifier.padding(vertical = 3.dp)) {
                         Text(k, Modifier.width(150.dp), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                         Text(d, style = MaterialTheme.typography.bodyMedium)

@@ -59,15 +59,17 @@ class CarLibrary(private val ctx: Context) : MediaLibrarySession.Callback {
 
     /** the last list shown for each folder: a picked video plays on with the ones after it */
     val shown = ConcurrentHashMap<String, List<Video>>()
-    private var cars = 0
-
     override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
-        if (isCar(session, controller) && cars++ == 0) ctx.tube.platform.androidPlayer.audioOnly(true)
+        if (isCar(session, controller)) ctx.tube.platform.androidPlayer.audioOnly(true)
         return super.onConnect(session, controller)
     }
 
+    // whether a car is still there is read from the controllers connected now, not counted: a count could stay
+    // above zero when a car went without saying so, and the picture stayed off until the app was closed (#129)
     override fun onDisconnected(session: MediaSession, controller: MediaSession.ControllerInfo) {
-        if (isCar(session, controller) && cars > 0 && --cars == 0) ctx.tube.platform.androidPlayer.audioOnly(false)
+        if (!isCar(session, controller)) return
+        val still = session.connectedControllers.any { it != controller && isCar(session, it) }
+        if (!still) ctx.tube.platform.androidPlayer.audioOnly(false)
     }
 
     private fun isCar(s: MediaSession, c: MediaSession.ControllerInfo) = s.isAutoCompanionController(c) || s.isAutomotiveController(c)
