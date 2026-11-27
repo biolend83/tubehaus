@@ -300,7 +300,9 @@ class AndroidPlayer(private val ctx: Context) : VideoPlayer {
             )
         if (s.live || s.video.isEmpty()) {
             // a downloaded video: one file, opened as it is
-            if (s.hls?.startsWith("file:") == true) b.setUri(s.hls) else b.setUri(s.hls).setMimeType(MimeTypes.APPLICATION_M3U8)
+            // (or one the connected server keeps, #126)
+            if (s.hls?.startsWith("file:") == true || app.tubehaus.engine.ServerVideo.isKept(s.hls)) b.setUri(s.hls)
+            else b.setUri(s.hls).setMimeType(MimeTypes.APPLICATION_M3U8)
             // close to the edge, as far behind it as the stream's segments allow (1 s in an ultra-low-latency one, 2 s in a
             // low one, 5 s otherwise), and a little faster or slower to stay there
             if (s.live) {
