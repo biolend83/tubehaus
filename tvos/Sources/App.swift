@@ -1,16 +1,15 @@
 import SwiftUI
 
-/// TubeHaus for Apple TV: the same YouTube engine as the iPad app, with the screens of the
-/// Android TV app (common/src/app/tubehaus/ui): the TubeHaus bar along the top, the side menu on
-/// the left, two big cards across, the video playing on its page with Up next beside it.
-/// Everything stays on the TV.
+/// TubeHaus for Apple TV: the same YouTube engine as the iPad app, laid out as YouTube's own TV
+/// app: the guide down the left (it opens when the remote goes onto it), shelves of videos, and
+/// videos full screen with the controls over them. Everything stays on the TV.
 @main
 struct TubeHausTV: App {
     var body: some Scene {
         WindowGroup {
             RootView()
                 .preferredColorScheme(.dark)
-                .tint(Theme.teal)
+                .tint(Theme.red)
                 .task { await Engine.shared.update() }
                 .task {
                     // `-pick Music,Science` at launch: topics picked as on the first start (the CI check)
@@ -52,11 +51,11 @@ enum Route: Hashable {
 }
 
 enum Tab: String, Hashable {
-    case home, shorts, subscriptions, music, library, settings
+    case search, home, shorts, subscriptions, music, library, settings
 }
 
-/// Where the app is: the tab picked in the side menu and the pages opened on top of it. Opening
-/// another tab starts it afresh, as on Android.
+/// Where the app is: the place picked in the guide and the pages opened on top of it. Opening
+/// another place starts it afresh.
 @MainActor
 @Observable
 final class Nav {
@@ -64,28 +63,36 @@ final class Nav {
 
     var tab: Tab
     var path: [Route] = []
+    /// what the Search page starts with (`-tab search -q …`, a search pushed from elsewhere)
+    var query = ""
 
     private init() {
         // `-tab library` at launch opens that tab, `-tab search -q …` searches (the CI check)
         let d = UserDefaults.standard
         let t = d.string(forKey: "tab") ?? ""
         tab = Tab(rawValue: t) ?? .home
-        if t == "search" { path = [.search(d.string(forKey: "q") ?? "")] }
+        if t == "search" { query = d.string(forKey: "q") ?? "" }
         if let id = d.string(forKey: "open") {
             path = [.video(Video(id: id, title: "", author: "", channelId: "", lengthSec: 0))]
         } else if let id = d.string(forKey: "channel") {
             path = [.channel(id)]
+        } else if let id = d.string(forKey: "playlist") {
+            path = [.playlist(id)]
         } else if d.bool(forKey: "import") {
             path.append(.importSubs)
         }
     }
 
-    func go(_ t: Tab) {
+    func go(_ t: Tab, start: Video? = nil) {
+        if let start { ShortsModel.shared.begin(with: start) }
         tab = t
         path = []
     }
 
-    func push(_ r: Route) { path.append(r) }
+    func push(_ r: Route) {
+        if case .search(let q) = r { query = q; go(.search); return }
+        path.append(r)
+    }
 
     func open(_ v: Video) { push(.video(v)) }
 
@@ -98,25 +105,27 @@ final class Nav {
 
     var top: Route? { path.last }
     var watching: Bool { top?.isVideo ?? false }
+}
 
-    /// the TubeHaus bar is left out where the page needs the whole height
-    var showsTopBar: Bool {
-        if let top { return !(top.isVideo || top.isSearch) }
-        return tab != .shorts
-    }
+/// a place in the guide
+enum GuideItem: Hashable {
+    case profile
+    case tab(Tab)
 }
 
 struct RootView: View {
     @State private var nav = Nav.shared
     @State private var player = PlayerModel.shared
-    @State private var folded = Settings.railFolded
+    @State private var server = Server.shared
     /// "Who's watching?" is asked once each time the app opens (not when a launch argument opens a page: the CI check)
     @State private var asked = Self.skipWho
+    @FocusState private var guide: GuideItem?
 
     private static var skipWho: Bool {
         let d = UserDefaults.standard
         if d.bool(forKey: "who") { return false }
-        return ["tab", "open", "channel"].contains { d.string(forKey: $0) != nil } || d.bool(forKey: "import")
+        return ["tab", "open", "channel", "playlist"].contains { d.string(forKey: $0) != nil } || d.bool(forKey: "import")
+            || People.everyone.count < 2
     }
 
     var body: some View {
@@ -127,39 +136,52 @@ struct RootView: View {
         }
     }
 
+    private var showsGuide: Bool { !nav.watching && nav.top != .nowPlaying }
+    private var guideOpen: Bool { guide != nil }
+
     private var main: some View {
-        VStack(spacing: 0) {
-            if nav.showsTopBar {
-                TopBar(folded: folded) { setFolded(false) }
-                    .focusSection()
+        ZStack(alignment: .leading) {
+            NavigationStack(path: $nav.path) {
+                tabRoot
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .background(Theme.bg)
+                    .navigationDestination(for: Route.self) { destination($0) }
             }
-            HStack(spacing: 0) {
-                if !folded {
-                    Rail { setFolded(true) }
-                        .focusSection()
-                }
-                NavigationStack(path: $nav.path) {
-                    tabRoot
-                        .navigationDestination(for: Route.self) { destination($0) }
-                }
-                .id(nav.tab)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                // Back on a tab's first page goes Home; on Home it leaves the app
-                .onExitCommand(perform: nav.path.isEmpty && nav.tab != .home ? { nav.go(.home) } : nil)
+            .id(nav.tab)
+            .padding(.leading, showsGuide ? Metrics.guide : 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            if showsGuide {
+                LinearGradient(stops: [.init(color: .black.opacity(0.95), location: 0), .init(color: .black.opacity(0.75), location: 0.45),
+                                       .init(color: .clear, location: 1)],
+                               startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 1200)
+                    .opacity(guideOpen ? 1 : 0)
+                    .allowsHitTesting(false)
+                Guide(focus: $guide, open: guideOpen, music: server.connected) { asked = false }
+                    .focusSection()
             }
         }
         .background(Theme.bg)
         .foregroundStyle(Theme.text)
         .ignoresSafeArea()
-        .fullScreenCover(isPresented: $player.fullscreen, onDismiss: { player.leftFullscreen() }) {
-            FullPlayer(model: player).ignoresSafeArea()
-        }
+        .animation(.easeOut(duration: 0.2), value: guideOpen)
+        // Back on a place's first page goes to the guide, then Home; on Home's guide it leaves the app
+        .onExitCommand(perform: exitAction)
         .onChange(of: nav.path) { player.follow(nav.path) }
         .onChange(of: nav.tab) { player.follow(nav.path) }
     }
 
+    private var exitAction: (() -> Void)? {
+        guard nav.path.isEmpty else { return nil }
+        if guide == nil { return { guide = .tab(nav.tab) } }
+        if nav.tab != .home { return { nav.go(.home); guide = .tab(.home) } }
+        return nil
+    }
+
     @ViewBuilder private var tabRoot: some View {
         switch nav.tab {
+        case .search: SearchView(initial: nav.query)
         case .home: HomeView()
         case .shorts: ShortsView()
         case .subscriptions: SubscriptionsView()
@@ -192,119 +214,130 @@ struct RootView: View {
         .background(Theme.bg)
         .toolbar(.hidden, for: .navigationBar)
     }
-
-    private func setFolded(_ f: Bool) {
-        withAnimation(.easeOut(duration: 0.2)) { folded = f }
-        Settings.railFolded = f
-    }
 }
 
-/// The bar along the top: ← when a page is open, the TubeHaus logo, and search (and settings,
-/// when the side menu is folded away).
-struct TopBar: View {
-    let folded: Bool
-    let unfold: () -> Void
+/// The guide down the left: icons only, and their names too while the remote is on it.
+struct Guide: View {
+    var focus: FocusState<GuideItem?>.Binding
+    let open: Bool
+    let music: Bool
+    let switchPerson: () -> Void
     @State private var nav = Nav.shared
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                if folded { IconButton(icon: "line.3.horizontal", action: unfold) }
-                if !nav.path.isEmpty { IconButton(icon: "arrow.left") { nav.back() } }
-                Button { nav.go(.home) } label: { Logo().padding(.horizontal, 12).frame(height: 84) }
-                    .buttonStyle(.glow(radius: 16))
-                Spacer()
-                IconButton(icon: "magnifyingglass") { nav.push(.search("")) }
-                if folded { IconButton(icon: "gearshape") { nav.go(.settings) } }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 18) {
+                HouseMark().frame(width: 56, height: 48)
+                if open { Text("TubeHaus").font(.system(size: 34, weight: .bold)).tracking(-1).transition(.opacity) }
             }
-            .padding(.leading, 16).padding(.trailing, 16)
-            .frame(height: 104)
-            Rectangle().fill(Theme.outline).frame(height: 2)
-        }
-    }
-}
-
-/// The side menu (Android's NavigationRail): fold, the four places, then Resume, Settings and
-/// (where the top bar is hidden) Search.
-struct Rail: View {
-    let fold: () -> Void
-    @State private var nav = Nav.shared
-    @State private var library = Library.shared
-
-    var body: some View {
-        VStack(spacing: 12) {
-            IconButton(icon: MenuOpen.name, action: fold)
-                .padding(.top, 16).padding(.bottom, 24)
-            RailItem(icon: "house.fill", label: "Home", selected: nav.tab == .home && nav.path.isEmpty) { nav.go(.home) }
-            if !Settings.hideShorts {
-                RailItem(icon: "bolt.fill", label: "Shorts", selected: nav.tab == .shorts && nav.path.isEmpty) { nav.go(.shorts) }
+            .padding(.leading, 38).padding(.top, 52).padding(.bottom, 30)
+            if People.everyone.count > 1 || People.list.names.count > 0 {
+                item(.profile, icon: "person.crop.circle", label: People.name(People.everyone.first { People.id($0) == People.current } ?? ""), letter: true)
             }
-            RailItem(icon: "play.square.stack", label: "Subscriptions", selected: nav.tab == .subscriptions && nav.path.isEmpty) { nav.go(.subscriptions) }
-            RailItem(icon: "music.note", label: "Music", selected: nav.tab == .music && nav.path.isEmpty) { nav.go(.music) }
-            RailItem(icon: "play.rectangle.on.rectangle", label: "Library", selected: nav.tab == .library && nav.path.isEmpty) { nav.go(.library) }
-            Rectangle().fill(Theme.outline).frame(width: 80, height: 2).padding(.vertical, 12)
-            if let last = library.continueWatching.first?.video, !nav.watching {
-                RailItem(icon: "play.circle", label: "Resume", small: true, selected: false) { nav.open(last) }
-            }
-            RailItem(icon: "gearshape", label: "Settings", small: true, selected: nav.tab == .settings && nav.path.isEmpty) { nav.go(.settings) }
-            if !nav.showsTopBar {
-                RailItem(icon: "magnifyingglass", label: "Search", small: true, selected: nav.top?.isSearch ?? false) { nav.push(.search("")) }
-            }
+            item(.tab(.search), icon: "magnifyingglass", label: "Search")
+            item(.tab(.home), icon: "house", selectedIcon: "house.fill", label: "Home")
+            if !Settings.hideShorts { item(.tab(.shorts), icon: "bolt", selectedIcon: "bolt.fill", label: "Shorts") }
+            item(.tab(.subscriptions), icon: "play.square.stack", selectedIcon: "play.square.stack.fill", label: "Subscriptions")
+            if music { item(.tab(.music), icon: "music.note", label: "Music") }
+            item(.tab(.library), icon: "play.rectangle.on.rectangle", selectedIcon: "play.rectangle.on.rectangle.fill", label: "You")
             Spacer()
+            if let last = Library.shared.continueWatching.first?.video, open {
+                Button { nav.open(last) } label: {
+                    HStack(spacing: 18) {
+                        Thumb(urls: last.cardPictures, progress: Library.shared.progress(last.id), radius: 10).frame(width: 150)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Resume").font(.system(size: 22, weight: .semibold)).dim()
+                            Text(last.title).font(.system(size: 24, weight: .semibold)).lineLimit(2)
+                        }
+                    }
+                    .padding(14)
+                    .frame(width: 360, alignment: .leading)
+                }
+                .buttonStyle(.glow(radius: 18))
+                .padding(.leading, 20)
+                .transition(.opacity)
+            }
+            item(.tab(.settings), icon: "gearshape", selectedIcon: "gearshape.fill", label: "Settings")
+                .padding(.bottom, 48)
         }
-        .frame(width: 160)
-    }
-}
-
-struct RailItem: View {
-    let icon: String
-    let label: String
-    var small = false
-    let selected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) { EmptyView() }
-            .buttonStyle(Look(icon: icon, label: label, small: small, selected: selected))
+        .frame(width: open ? 420 : Metrics.guide, alignment: .leading)
+        .frame(maxHeight: .infinity)
     }
 
-    /// the icon in its pill (purple when it's where you are, teal when the remote is on it) and the name under it
-    private struct Look: ButtonStyle {
+    private func selected(_ i: GuideItem) -> Bool {
+        if case .tab(let t) = i { return nav.tab == t }
+        return false
+    }
+
+    private func item(_ i: GuideItem, icon: String, selectedIcon: String? = nil, label: String, letter: Bool = false) -> some View {
+        let sel = selected(i)
+        return Button {
+            switch i {
+            case .profile: switchPerson()
+            case .tab(let t): nav.go(t)
+            }
+        } label: {
+            Face(icon: sel ? (selectedIcon ?? icon) : icon, label: label, letter: letter ? String(label.prefix(1)).uppercased() : nil,
+                 selected: sel, open: open)
+        }
+        .buttonStyle(GuideStyle(open: open))
+        .focused(focus, equals: i)
+        .padding(.leading, 20)
+    }
+
+    private struct GuideStyle: ButtonStyle {
+        let open: Bool
+        func makeBody(configuration: Configuration) -> some View { Lit(configuration: configuration, open: open) }
+
+        private struct Lit: View {
+            let configuration: ButtonStyleConfiguration
+            let open: Bool
+            @Environment(\.isFocused) private var focused
+
+            var body: some View {
+                configuration.label
+                    .environment(\.lit, focused)
+                    .background { Capsule().fill(focused ? Theme.focus : .clear) }
+                    .scaleEffect(configuration.isPressed ? 0.96 : 1)
+                    .animation(.easeOut(duration: 0.15), value: focused)
+            }
+        }
+    }
+
+    private struct Face: View {
         let icon: String
         let label: String
-        let small: Bool
+        let letter: String?
         let selected: Bool
-
-        func makeBody(configuration: Configuration) -> some View {
-            Focused(icon: icon, label: label, small: small, selected: selected, pressed: configuration.isPressed)
-        }
-    }
-
-    private struct Focused: View {
-        let icon: String
-        let label: String
-        let small: Bool
-        let selected: Bool
-        let pressed: Bool
-        @Environment(\.isFocused) private var focused
+        let open: Bool
+        @Environment(\.lit) private var lit
 
         var body: some View {
-            VStack(spacing: 8) {
-                ZStack {
-                    Capsule().fill(selected ? Theme.pill : Color.clear)
-                    Capsule().fill(focused ? Theme.glow : Color.clear)
-                    Image(systemName: icon).font(.system(size: small ? 36 : 44))
-                        .foregroundStyle(selected ? Theme.onPill : (focused ? Theme.text : Theme.sub))
+            HStack(spacing: 26) {
+                Group {
+                    if let letter {
+                        Text(letter.isEmpty ? "?" : letter).font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(lit ? Theme.focus : Theme.onFocus)
+                            .frame(width: 48, height: 48)
+                            .background(Circle().fill(lit ? Theme.onFocus : Theme.teal))
+                    } else {
+                        Image(systemName: icon).font(.system(size: 36, weight: selected ? .bold : .regular))
+                    }
                 }
-                .frame(width: 112, height: 64)
-                Text(label).font(.system(size: 22, weight: selected ? .semibold : .medium))
-                    .foregroundStyle(selected || focused ? Theme.text : Theme.sub)
-                    .lineLimit(1).minimumScaleFactor(0.8)
+                .frame(width: 52)
+                if open {
+                    Text(label).font(.system(size: 30, weight: selected ? .bold : .medium)).lineLimit(1)
+                        .transition(.opacity)
+                }
             }
-            .frame(width: 160)
-            .contentShape(Rectangle())
-            .scaleEffect(pressed ? 0.95 : focused ? 1.06 : 1)
-            .animation(.easeOut(duration: 0.15), value: focused)
+            .foregroundStyle(lit ? Theme.onFocus : selected ? Theme.text : Theme.sub)
+            .padding(.horizontal, 18)
+            .frame(width: open ? 360 : 92, height: 84, alignment: .leading)
+            .overlay(alignment: .leading) {
+                if selected && !open && !lit {
+                    Capsule().fill(Theme.red).frame(width: 6, height: 36).offset(x: -10)
+                }
+            }
         }
     }
 }

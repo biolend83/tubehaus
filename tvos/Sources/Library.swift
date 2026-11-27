@@ -397,4 +397,40 @@ enum Settings {
         get { UserDefaults.standard.bool(forKey: "railFolded") }
         set { UserDefaults.standard.set(newValue, forKey: "railFolded") }
     }
+
+    /// the most lines a video is shown in (0: as many as the connection allows)
+    static var quality: Int {
+        get { UserDefaults.standard.integer(forKey: "quality") }
+        set { UserDefaults.standard.set(newValue, forKey: "quality") }
+    }
+
+    /// loud videos turned down to the level YouTube aims for
+    static var soundNorm: Bool {
+        get { UserDefaults.standard.object(forKey: "soundNorm") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "soundNorm") }
+    }
+
+    /// the speed videos start at
+    static var speed: Float {
+        get { (UserDefaults.standard.object(forKey: "speed") as? NSNumber)?.floatValue ?? 1 }
+        set { UserDefaults.standard.set(newValue, forKey: "speed") }
+    }
+
+    /// seconds the "Up next" card counts down before the next video plays
+    static var countdown: Int {
+        get { UserDefaults.standard.object(forKey: "countdown") as? Int ?? 8 }
+        set { UserDefaults.standard.set(newValue, forKey: "countdown") }
+    }
+
+    /// how far left and right on the remote skip in a video
+    static var seekStep: Int {
+        get { UserDefaults.standard.object(forKey: "seekStep") as? Int ?? 10 }
+        set { UserDefaults.standard.set(newValue, forKey: "seekStep") }
+    }
+
+    /// a video's own preview plays on Home's big card after a moment on it
+    static var previews: Bool {
+        get { UserDefaults.standard.object(forKey: "previews") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "previews") }
+    }
 }

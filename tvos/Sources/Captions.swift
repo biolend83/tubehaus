@@ -102,9 +102,12 @@ final class CaptionLayer: UIView {
     private let box = UIView()
     private let label = UILabel()
     private var cues: [Subtitles.Cue] = []
+    private let compact: Bool
+    private var bottom: NSLayoutConstraint?
 
     /// `compact`: the smaller lines for the video playing on its page
     init(compact: Bool = false) {
+        self.compact = compact
         super.init(frame: .zero)
         isUserInteractionEnabled = false
         box.backgroundColor = UIColor.black.withAlphaComponent(0.72)
@@ -113,8 +116,7 @@ final class CaptionLayer: UIView {
         label.numberOfLines = 0
         label.textAlignment = .center
         label.textColor = .white
-        let size: CGFloat = [38, 48, 60][max(0, min(2, Settings.captionSize))] * (compact ? 0.55 : 1)
-        label.font = .systemFont(ofSize: size, weight: .medium)
+        label.font = Self.font(compact)
         box.translatesAutoresizingMaskIntoConstraints = false
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(box)
@@ -125,12 +127,29 @@ final class CaptionLayer: UIView {
             label.topAnchor.constraint(equalTo: box.topAnchor, constant: 10),
             label.bottomAnchor.constraint(equalTo: box.bottomAnchor, constant: -10),
             box.centerXAnchor.constraint(equalTo: centerXAnchor),
-            box.bottomAnchor.constraint(equalTo: bottomAnchor, constant: compact ? -24 : -80),
             box.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.8),
         ])
+        bottom = box.bottomAnchor.constraint(equalTo: bottomAnchor, constant: compact ? -24 : -80)
+        bottom?.isActive = true
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    private static func font(_ compact: Bool) -> UIFont {
+        let size: CGFloat = [38, 48, 60][max(0, min(2, Settings.captionSize))] * (compact ? 0.55 : 1)
+        return .systemFont(ofSize: size, weight: .medium)
+    }
+
+    /// the size changed in Settings
+    func resize() { label.font = Self.font(compact) }
+
+    /// up out of the way of the player's controls, or back down
+    func lift(_ up: Bool) {
+        let c: CGFloat = compact ? -24 : (up ? -360 : -80)
+        guard bottom?.constant != c else { return }
+        bottom?.constant = c
+        UIView.animate(withDuration: 0.2) { self.layoutIfNeeded() }
+    }
 
     func set(_ cues: [Subtitles.Cue]) {
         self.cues = cues

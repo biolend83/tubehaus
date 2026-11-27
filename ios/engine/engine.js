@@ -670,7 +670,22 @@ function parsePlayer(id, d, c, unlocked) {
     audio: formats.filter(function (f) { return f.mime.indexOf("video") !== 0; }),
     captions: caps, expiresAt: nowSec() + (num(at(sd, "expiresInSeconds")) || 18000), client: c.name,
     storyboard: str(at(d, "storyboards.playerStoryboardSpecRenderer.spec")),
+    loudnessDb: loudness(d),
   };
+}
+
+/** how many dB louder than YouTube's target (-14 LKFS) the video is; null when the answer doesn't say */
+function loudness(d) {
+  var ac = at(d, "playerConfig.audioConfig") || {};
+  var target = typeof ac.loudnessTargetLkfs === "number" ? ac.loudnessTargetLkfs : -14;
+  var keys = ["perceptualLoudnessDb", "trackAbsoluteLoudnessLkfs"];
+  for (var i = 0; i < keys.length; i++) if (typeof ac[keys[i]] === "number") return Math.round((ac[keys[i]] - target) * 100) / 100;
+  if (typeof ac.loudnessDb === "number") return Math.round(ac.loudnessDb * 100) / 100;
+  var list = arr(at(d, "streamingData.adaptiveFormats"));
+  for (var j = 0; j < list.length; j++) {
+    if ((str(at(list[j], "mimeType")) || "").indexOf("audio") === 0 && typeof list[j].loudnessDb === "number") return Math.round(list[j].loudnessDb * 100) / 100;
+  }
+  return null;
 }
 
 async function details(id) {

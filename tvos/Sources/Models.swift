@@ -35,8 +35,10 @@ struct Video: Codable, Hashable, Identifiable {
     var badge: String { live ? "LIVE" : short ? "SHORTS" : duration(lengthSec) }
 
     /// "Channel · 1.2M views · 3 days ago"
-    var byline: String {
-        [author, viewsText, publishedText.isEmpty ? ago(publishedAt) : publishedText].filter { !$0.isEmpty }.joined(separator: " · ")
+    var byline: String { byline(withAuthor: true) }
+
+    func byline(withAuthor: Bool) -> String {
+        [withAuthor ? author : "", viewsText, publishedText.isEmpty ? ago(publishedAt) : publishedText].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     init?(_ o: [String: Any]) {
@@ -176,6 +178,10 @@ struct StreamInfo {
     var hls: URL?
     var captions: [Caption]
     var originalAudioLanguage: String? = nil
+    /// YouTube's seek-bar pictures ("storyboard" spec), when it has them
+    var storyboard: Storyboard? = nil
+    /// how many dB louder than YouTube's target the video is (loudness matching turns it down)
+    var loudnessDb: Double? = nil
 }
 
 struct Details {
@@ -190,6 +196,11 @@ struct Details {
     var related: [Item]
     var relatedNext: String?
     var commentsToken: String?
+    var chapters: [Chapter] = []
+    var heat: Heat? = nil
+    var commentsCount = ""
+    /// "Top comments" / "Newest first": (title, token)
+    var commentSorts: [(String, String)] = []
 }
 
 struct Comment: Identifiable, Hashable {
@@ -234,6 +245,10 @@ enum YT {
         case all = "", videos = "EgIQAQ%3D%3D", channels = "EgIQAg%3D%3D", playlists = "EgIQAw%3D%3D"
         /// videos under 4 minutes (where Shorts are found)
         case short = "EgIYAQ%3D%3D"
+        /// live now
+        case live = "EgJAAQ%3D%3D"
+        /// uploaded today, this week; the longest first
+        case today = "EgIIAg%3D%3D", week = "EgIIAw%3D%3D", long = "EgIYAg%3D%3D"
     }
 
     static func search(_ q: String, videosOnly: Bool = false) async throws -> Page {
@@ -269,7 +284,9 @@ enum YT {
                           description: o["description"] as? String ?? "", keywords: o["keywords"] as? [String] ?? [],
                           live: o["live"] as? Bool ?? false,
                           hls: (o["hls"] as? String).flatMap(URL.init(string:)), captions: caps,
-                          originalAudioLanguage: originalLanguage)
+                          originalAudioLanguage: originalLanguage,
+                          storyboard: Storyboard(spec: o["storyboard"] as? String ?? ""),
+                          loudnessDb: (o["loudnessDb"] as? NSNumber)?.doubleValue)
     }
 
     static func details(_ id: String) async throws -> Details {
@@ -279,7 +296,10 @@ enum YT {
                        avatar: o["avatar"] as? String ?? "", publishedText: o["publishedText"] as? String ?? "",
                        viewsText: o["viewsText"] as? String ?? "",
                        related: (o["related"] as? [[String: Any]] ?? []).compactMap(Item.init),
-                       relatedNext: o["relatedNext"] as? String, commentsToken: o["commentsToken"] as? String)
+                       relatedNext: o["relatedNext"] as? String, commentsToken: o["commentsToken"] as? String,
+                       chapters: Chapter.list(o["chapters"]), heat: Heat(o["heat"]),
+                       commentsCount: o["commentsCount"] as? String ?? "",
+                       commentSorts: (o["commentSorts"] as? [[String]] ?? []).compactMap { $0.count == 2 ? ($0[0], $0[1]) : nil })
     }
 
     static func comments(_ token: String) async throws -> (items: [Comment], next: String?) {

@@ -24,3 +24,28 @@ targets:
         # set DEVELOPMENT_TEAM (and turn signing on) in Xcode to install on your own Apple TV
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
+  # the CI check: the Siri Remote pressed through the app in a simulator, a picture after each step
+  TubeHausTVUITests:
+    type: bundle.ui-testing
+    platform: tvOS
+    sources:
+      - uitests
+    dependencies:
+      - target: TubeHausTV
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.biolend83.tubehaus.tv.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: TubeHausTV
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+schemes:
+  TubeHausTV:
+    build:
+      targets:
+        TubeHausTV: all
+        TubeHausTVUITests: [test]
+    test:
+      targets:
+        - TubeHausTVUITests

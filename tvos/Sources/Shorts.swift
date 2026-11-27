@@ -32,7 +32,22 @@ final class ShortsModel {
         }
     }
 
+    /// a Short picked from a shelf plays first, the usual ones after it
+    func begin(with v: Video) {
+        items.removeAll { $0.id == v.id }
+        items.insert(v, at: 0)
+        starting = true
+    }
+
+    @ObservationIgnored private var starting = false
+
     func start() async {
+        if starting {
+            starting = false
+            go(0)
+            if items.count < 3 { await more() }
+            return
+        }
         guard items.isEmpty else { player.play(); return }
         loading = true
         error = nil
@@ -132,8 +147,15 @@ struct ShortsView: View {
                             .onMoveCommand { d in
                                 if d == .up { model.move(-1) } else if d == .down { model.move(1) }
                             }
-                        VStack(spacing: 32) {
+                        VStack(spacing: 28) {
                             round("chevron.up", enabled: model.index > 0) { model.move(-1) }
+                            let liked = Library.shared.isLiked(v.id), disliked = Library.shared.isDisliked(v.id)
+                            side(liked ? "hand.thumbsup.fill" : "hand.thumbsup", "Like") { Library.shared.toggleLike(v, keywords: []) }
+                            side(disliked ? "hand.thumbsdown.fill" : "hand.thumbsdown", "Dislike") { Library.shared.toggleDislike(v) }
+                            side(Library.shared.isLater(v.id) ? "checkmark" : "clock", "Save") { Library.shared.toggleLater(v) }
+                            if !v.channelId.isEmpty {
+                                side("person.crop.circle", "Channel") { Nav.shared.push(.channel(v.channelId)) }
+                            }
                             round("chevron.down", enabled: model.index < model.items.count - 1) { model.move(1) }
                         }
                         .focusSection()
@@ -192,6 +214,17 @@ struct ShortsView: View {
         }
         .frame(width: height * 9 / 16, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 24))
+    }
+
+    private func side(_ icon: String, _ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: icon).font(.system(size: 34, weight: .semibold)).frame(width: 88, height: 88)
+                    .background(Circle().fill(Color.white.opacity(0.12)))
+                Text(label).font(.system(size: 20, weight: .semibold))
+            }
+        }
+        .buttonStyle(Glow(shape: RoundedRectangle(cornerRadius: 20), scale: 1.08))
     }
 
     private func round(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {

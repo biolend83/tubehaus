@@ -240,7 +240,9 @@ final class Server {
                           channelId: o["authorId"] as? String ?? "", lengthSec: (o["lengthSeconds"] as? NSNumber)?.intValue ?? 0,
                           views: (o["viewCount"] as? NSNumber)?.intValue ?? 0,
                           description: o["description"] as? String ?? "", keywords: o["keywords"] as? [String] ?? [],
-                          live: live, hls: hls, captions: caps)
+                          live: live, hls: hls, captions: caps,
+                          storyboard: Storyboard(server: o["storyboards"], base: base),
+                          loudnessDb: (o["loudnessDb"] as? NSNumber)?.doubleValue)
     }
 
     /// the player's item for a URL on the server: its login goes with every request of it

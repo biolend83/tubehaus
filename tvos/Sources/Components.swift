@@ -2,26 +2,29 @@ import ImageIO
 import SwiftUI
 import UIKit
 
-/// The look of the Android TV app (common/src/app/tubehaus/ui/Theme.kt, its dark scheme), at the
-/// same size: Android TV draws 1 dp as 2 pixels on a 1080p screen, and an Apple TV screen is
-/// 1920×1080 points, so every size here is the Android one in dp times two.
+/// The look of YouTube on a TV: near-black, white text, grey for the rest, and whatever the remote
+/// is on turns white (a white frame around a picture, a white pill behind a button). Red is for the
+/// progress bars. The Apple TV screen is 1920×1080 points.
 enum Theme {
     static let bg = Color(hex: 0x0F0F0F)
+    static let raised = Color(hex: 0x1F1F1F)        // panels over the video, the expanded guide
     static let text = Color(hex: 0xF1F1F1)
     static let sub = Color(hex: 0xAAAAAA)
-    static let chip = Color(hex: 0x272727)          // surfaceVariant
-    static let outline = Color(hex: 0x303030)
+    static let chip = Color(hex: 0x272727)
+    static let outline = Color(hex: 0x3A3A3A)
     static let container = Color(hex: 0x212121)
-    static let pill = Color(hex: 0x4A4458)          // the selected item in the side menu
-    static let onPill = Color(hex: 0xE8DEF8)
-    static let teal = Color(hex: 0x2DD4BF)
+    static let pill = Color(hex: 0x3F3F3F)
+    static let onPill = Color.white
+    static let focus = Color.white
+    static let onFocus = Color(hex: 0x0F0F0F)
+    static let teal = Color(hex: 0x2DD4BF)          // the TubeHaus house
     static let red = Color(hex: 0xFF0033)
-    static let blue = Color(hex: 0x065FD4)
+    static let blue = Color(hex: 0x3EA6FF)
     static let link = Color(hex: 0x3EA6FF)
     static let error = Color(hex: 0xFF4E45)
     static let placeholder = Color.white.opacity(0.08)
-    /// how strongly what the remote is on lights up (buttons, chips, the side menu)
-    static let glow = teal.opacity(0.34)
+    /// kept for older screens: what the remote is on
+    static let glow = Color.white
 }
 
 extension Color {
@@ -30,23 +33,43 @@ extension Color {
     }
 }
 
-/// Material's type scale, doubled
 enum Fonts {
-    static let titleLarge = Font.system(size: 40, weight: .bold)
-    static let titleMedium = Font.system(size: 32, weight: .medium)
+    static let hero = Font.system(size: 64, weight: .bold)
+    static let titleLarge = Font.system(size: 44, weight: .bold)
+    static let titleMedium = Font.system(size: 34, weight: .semibold)
     static let titleSmall = Font.system(size: 28, weight: .medium)
     static let bodyLarge = Font.system(size: 32)
     static let bodyMedium = Font.system(size: 28)
     static let bodySmall = Font.system(size: 24)
+    static let caption = Font.system(size: 22)
     static let labelLarge = Font.system(size: 28, weight: .medium)
+    static let shelf = Font.system(size: 34, weight: .bold)
+}
+
+/// how far everything sits from the left edge: the guide's width when folded, and a gap
+enum Metrics {
+    static let guide: CGFloat = 132
+    static let side: CGFloat = 64
+    /// a card in a shelf: four and a bit across
+    static let card: CGFloat = 400
 }
 
 // MARK: focus
 
-/// A card the remote is on gets a teal frame and grows a little, as on Android TV (tvFocus).
+/// whether the button this is inside is the one the remote is on (set by the styles below)
+private struct LitKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+    var lit: Bool {
+        get { self[LitKey.self] }
+        set { self[LitKey.self] = newValue }
+    }
+}
+
+/// A card the remote is on grows and gets a white frame.
 struct CardFocus: ButtonStyle {
-    var radius: CGFloat = 24
-    var scale: CGFloat = 1.04
+    var radius: CGFloat = 20
+    var scale: CGFloat = 1.06
 
     func makeBody(configuration: Configuration) -> some View { Focused(configuration: configuration, radius: radius, scale: scale) }
 
@@ -58,36 +81,42 @@ struct CardFocus: ButtonStyle {
 
         var body: some View {
             configuration.label
+                .environment(\.lit, focused)
                 .contentShape(RoundedRectangle(cornerRadius: radius))
                 .overlay {
-                    RoundedRectangle(cornerRadius: radius).strokeBorder(Theme.teal, lineWidth: focused ? 6 : 0)
+                    RoundedRectangle(cornerRadius: radius).strokeBorder(Theme.focus, lineWidth: focused ? 6 : 0)
                 }
+                .shadow(color: .black.opacity(focused ? 0.6 : 0), radius: 24, y: 12)
                 .scaleEffect(configuration.isPressed ? 1 : focused ? scale : 1)
-                .animation(.easeOut(duration: 0.15), value: focused)
+                .animation(.easeOut(duration: 0.18), value: focused)
         }
     }
 }
 
-/// A button, chip or menu item the remote is on glows teal behind its label (Android's ripple
-/// on focus). `fill` is its colour when not focused.
+/// A button, chip or menu line the remote is on turns white with dark writing. `fill` is its
+/// colour when not focused.
 struct Glow<S: Shape>: ButtonStyle {
     var shape: S
     var fill: Color = .clear
+    var scale: CGFloat = 1.05
 
-    func makeBody(configuration: Configuration) -> some View { Focused(configuration: configuration, shape: shape, fill: fill) }
+    func makeBody(configuration: Configuration) -> some View { Focused(configuration: configuration, shape: shape, fill: fill, scale: scale) }
 
     private struct Focused: View {
         let configuration: ButtonStyleConfiguration
         let shape: S
         let fill: Color
+        let scale: CGFloat
         @Environment(\.isFocused) private var focused
 
         var body: some View {
             configuration.label
-                .background { shape.fill(fill) }
-                .overlay { shape.fill(focused ? Theme.glow : Color.clear).allowsHitTesting(false) }
+                .environment(\.lit, focused)
+                .foregroundStyle(focused ? Theme.onFocus : Theme.text)
+                .background { shape.fill(focused ? Theme.focus : fill) }
                 .contentShape(shape)
-                .scaleEffect(configuration.isPressed ? 0.97 : focused ? 1.05 : 1)
+                .shadow(color: .black.opacity(focused ? 0.45 : 0), radius: 16, y: 8)
+                .scaleEffect(configuration.isPressed ? 0.97 : focused ? scale : 1)
                 .animation(.easeOut(duration: 0.15), value: focused)
         }
     }
@@ -101,6 +130,16 @@ extension ButtonStyle where Self == Glow<RoundedRectangle> {
     static func glow(radius: CGFloat, fill: Color = .clear) -> Glow<RoundedRectangle> {
         Glow(shape: RoundedRectangle(cornerRadius: radius), fill: fill)
     }
+}
+
+/// grey writing that turns dark with the white behind it when focused
+struct Dim: ViewModifier {
+    @Environment(\.lit) private var lit
+    func body(content: Content) -> some View { content.foregroundStyle(lit ? Theme.onFocus.opacity(0.75) : Theme.sub) }
+}
+
+extension View {
+    func dim() -> some View { modifier(Dim()) }
 }
 
 // MARK: pictures
@@ -245,7 +284,7 @@ struct Logo: View {
 
 // MARK: buttons and chips
 
-/// Material's text button: a label that glows when the remote is on it
+/// a word (and an icon) that turns into a white pill when the remote is on it
 struct TextButton: View {
     let title: String
     var icon: String?
@@ -257,19 +296,28 @@ struct TextButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        Button(action: action) { Face(title: title, icon: icon, color: color) }
+            .buttonStyle(.glow)
+    }
+
+    private struct Face: View {
+        let title: String
+        let icon: String?
+        let color: Color
+        @Environment(\.lit) private var lit
+
+        var body: some View {
             HStack(spacing: 12) {
                 if let icon { Image(systemName: icon).font(.system(size: 28, weight: .medium)) }
                 Text(title).font(Fonts.labelLarge).lineLimit(1)
             }
-            .foregroundStyle(color)
-            .padding(.horizontal, 28).frame(height: 80)
+            .foregroundStyle(lit ? Theme.onFocus : color)
+            .padding(.horizontal, 32).frame(height: 76)
         }
-        .buttonStyle(.glow)
     }
 }
 
-/// Material's filled button (white on the dark theme)
+/// the main button of a page: grey, white when the remote is on it
 struct FilledButton: View {
     let title: String
     var icon: String?
@@ -282,59 +330,35 @@ struct FilledButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                if let icon { Image(systemName: icon).font(.system(size: 28, weight: .medium)) }
+            HStack(spacing: 14) {
+                if let icon { Image(systemName: icon).font(.system(size: 28, weight: .semibold)) }
                 Text(title).font(Fonts.labelLarge).lineLimit(1)
             }
-            .foregroundStyle(enabled ? Theme.bg : Theme.sub)
-            .padding(.horizontal, 48).frame(height: 80)
+            .padding(.horizontal, 44).frame(height: 80)
+            .opacity(enabled ? 1 : 0.4)
         }
-        .buttonStyle(Glow(shape: Capsule(), fill: enabled ? Theme.text : Theme.chip))
+        .buttonStyle(Glow(shape: Capsule(), fill: Theme.chip))
         .disabled(!enabled)
     }
 }
 
-/// a round button with one icon (the search and settings icons in the top bar, ✕ on a row)
+/// a round button with one icon
 struct IconButton: View {
     let icon: String
     var size: CGFloat = 48
+    var fill: Color = .clear
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Group {
-                if icon == MenuOpen.name {
-                    MenuOpen().fill(Theme.text).frame(width: size * 0.75, height: size * 0.75)
-                } else {
-                    Image(systemName: icon).font(.system(size: size * 0.75, weight: .regular))
-                }
-            }
-            .foregroundStyle(Theme.text)
-            .frame(width: size * 1.75, height: size * 1.75)
+            Image(systemName: icon).font(.system(size: size * 0.7, weight: .medium))
+                .frame(width: size * 1.75, height: size * 1.75)
         }
-        .buttonStyle(Glow(shape: Circle()))
+        .buttonStyle(Glow(shape: Circle(), fill: fill, scale: 1.1))
     }
 }
 
-/// Android's "menu open" icon (three lines and a ‹) for folding the side menu away; SF Symbols
-/// has nothing like it. Drawn on Material's 24 grid.
-struct MenuOpen: Shape {
-    static let name = "menu.open"
-
-    func path(in r: CGRect) -> Path {
-        let k = min(r.width, r.height) / 24
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: r.minX + x * k, y: r.minY + y * k) }
-        var path = Path()
-        path.addRect(CGRect(origin: p(3, 6), size: CGSize(width: 13 * k, height: 2 * k)))
-        path.addRect(CGRect(origin: p(3, 11), size: CGSize(width: 10 * k, height: 2 * k)))
-        path.addRect(CGRect(origin: p(3, 16), size: CGSize(width: 13 * k, height: 2 * k)))
-        path.addLines([p(21, 8.41), p(19.59, 7), p(14.59, 12), p(19.59, 17), p(21, 15.59), p(17.42, 12)])
-        path.closeSubpath()
-        return path
-    }
-}
-
-/// Material's chips: an assist chip (outlined, with an icon) or a filter chip (filled with a ✓ when on)
+/// a chip: grey, white with dark writing when picked or when the remote is on it
 struct Chip: View {
     let title: String
     var icon: String?
@@ -347,59 +371,65 @@ struct Chip: View {
     }
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 16) {
-                if filter && selected {
-                    Image(systemName: "checkmark").font(.system(size: 28, weight: .semibold))
-                } else if let icon {
-                    Image(systemName: icon).font(.system(size: 30))
-                }
+        Button(action: action) { Face(title: title, icon: icon, selected: selected) }
+            .buttonStyle(Glow(shape: RoundedRectangle(cornerRadius: 14), fill: selected ? Theme.text : Theme.chip))
+    }
+
+    private struct Face: View {
+        let title: String
+        let icon: String?
+        let selected: Bool
+        @Environment(\.lit) private var lit
+
+        var body: some View {
+            HStack(spacing: 12) {
+                if let icon { Image(systemName: icon).font(.system(size: 26)) }
                 Text(title).font(Fonts.labelLarge).lineLimit(1)
             }
-            .foregroundStyle(selected ? Theme.onPill : (filter ? Theme.sub : Theme.text))
+            .foregroundStyle(lit || selected ? Theme.onFocus : Theme.text)
             .padding(.horizontal, 28).frame(height: 64)
-            .overlay {
-                RoundedRectangle(cornerRadius: 16).strokeBorder(selected ? Color.clear : Theme.outline, lineWidth: 2)
-            }
         }
-        .buttonStyle(.glow(radius: 16, fill: selected ? Theme.pill : .clear))
     }
 }
 
-/// Subscribe (white) / Subscribed (grey), as in the Android app
+/// Subscribe (white) / Subscribed (grey)
 struct SubscribeButton: View {
     let channel: Channel
+    var compact = false
     @State private var library = Library.shared
 
     var body: some View {
         let on = library.isSubscribed(channel.id)
         Button { library.toggleSubscription(channel) } label: {
-            Text(on ? "Subscribed" : "Subscribe")
-                .font(Fonts.labelLarge)
-                .foregroundStyle(on ? Theme.text : Theme.bg)
-                .padding(.horizontal, 40).frame(height: 72)
+            Face(on: on, compact: compact)
         }
         .buttonStyle(Glow(shape: Capsule(), fill: on ? Theme.chip : Theme.text))
     }
-}
 
-/// the ⋮ at the end of a card; holding OK on the card opens what it stands for
-struct MoreDots: View {
-    var body: some View {
-        Image(systemName: "ellipsis").rotationEffect(.degrees(90))
-            .font(.system(size: 30, weight: .bold)).foregroundStyle(Theme.text)
-            .frame(width: 48, height: 72)
+    private struct Face: View {
+        let on: Bool
+        let compact: Bool
+        @Environment(\.lit) private var lit
+
+        var body: some View {
+            HStack(spacing: 10) {
+                if on { Image(systemName: "bell").font(.system(size: 24, weight: .semibold)) }
+                Text(on ? "Subscribed" : "Subscribe").font(Fonts.labelLarge)
+            }
+            .foregroundStyle(lit ? Theme.onFocus : on ? Theme.text : Theme.onFocus)
+            .padding(.horizontal, compact ? 28 : 40).frame(height: compact ? 64 : 72)
+        }
     }
 }
 
-// MARK: cards and rows
+// MARK: cards
 
 /// a picture with the length (or LIVE) in the corner and how much was watched along the bottom
 struct Thumb: View {
     let urls: [URL]
     var badge: String = ""
     var progress: Double? = nil
-    var radius: CGFloat = 24
+    var radius: CGFloat = 16
 
     var body: some View {
         Color.clear
@@ -408,11 +438,11 @@ struct Thumb: View {
             .overlay(alignment: .bottomTrailing) {
                 if !badge.isEmpty {
                     Text(badge)
-                        .font(.system(size: 24, weight: .medium).monospacedDigit())
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                        .background(badge == "LIVE" ? Theme.red : Color.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 8))
+                        .font(.system(size: 22, weight: .semibold).monospacedDigit())
+                        .padding(.horizontal, 10).padding(.vertical, 3)
+                        .background(badge == "LIVE" ? Theme.red : Color.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 6))
                         .foregroundStyle(.white)
-                        .padding(12)
+                        .padding(10)
                 }
             }
             .overlay(alignment: .bottom) {
@@ -430,7 +460,7 @@ struct Thumb: View {
     }
 }
 
-/// what holding OK on a video offers (Android's ⋮ menu)
+/// what holding OK on a video offers
 struct VideoMenu: ViewModifier {
     let video: Video
     var history = false
@@ -438,15 +468,23 @@ struct VideoMenu: ViewModifier {
 
     func body(content: Content) -> some View {
         content.contextMenu {
+            Button("Play", systemImage: "play.fill") { Nav.shared.open(video) }
             Button(library.isLater(video.id) ? "Remove from Watch later" : "Save to Watch later", systemImage: "clock") {
                 library.toggleLater(video)
+            }
+            Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") {
+                PlayerModel.shared.queue.insert(video, at: 0)
+            }
+            Button("Add to queue", systemImage: "text.badge.plus") { PlayerModel.shared.queue.append(video) }
+            if !video.channelId.isEmpty {
+                Button("Go to channel", systemImage: "person.crop.square") { Nav.shared.push(.channel(video.channelId)) }
             }
             if history {
                 Button("Remove from history", systemImage: "trash") { library.forget(video.id) }
             }
             Button("Not interested", systemImage: "hand.thumbsdown") { library.notInterested(video) }
             if !video.channelId.isEmpty {
-                Button("Don't recommend this channel", systemImage: "nosign") { library.hideChannel(video) }
+                Button("Don't recommend channel", systemImage: "nosign") { library.hideChannel(video) }
             }
         }
     }
@@ -456,66 +494,228 @@ extension View {
     func videoMenu(_ v: Video, history: Bool = false) -> some View { modifier(VideoMenu(video: v, history: history)) }
 }
 
-/// The big card of Home and Subscriptions: the picture, then the channel's picture, the title
-/// (two lines) and "Channel · views · when" (two lines) and ⋮.
-struct VideoCard: View {
+/// The card of every shelf and grid: the picture (the white frame goes round it), then the
+/// title (two lines) and "Channel · views · when".
+struct VideoTile: View {
     let video: Video
-    @State private var library = Library.shared
-
-    var body: some View {
-        Button { Nav.shared.open(video) } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                Thumb(urls: video.cardPictures, badge: video.badge, progress: library.progress(video.id))
-                HStack(alignment: .top, spacing: 24) {
-                    // a channel's own page leaves its name off its videos; an empty circle would stand in for nothing
-                    let avatar = video.avatarURL ?? library.avatar(of: video.channelId)
-                    if avatar != nil || !video.author.isEmpty {
-                        Avatar(url: avatar, name: video.author, size: 72)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(video.title).font(Fonts.titleSmall).foregroundStyle(Theme.text).lineLimit(2)
-                        Text(video.byline).font(Fonts.bodySmall).foregroundStyle(Theme.sub).lineLimit(2)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    MoreDots()
-                }
-                .padding(.leading, 24).padding(.top, 20).padding(.trailing, 8).padding(.bottom, 24)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(CardFocus(radius: 24))
-        .videoMenu(video, history: library.progress(video.id) != nil)
-    }
-}
-
-/// a video as a line of a list: the picture on the left, the words on the right
-struct VideoRow: View {
-    let video: Video
-    var thumb: CGFloat = 336
+    var width: CGFloat? = Metrics.card
     var history = false
-    var dots = true
+    var showAuthor = true
     var action: (() -> Void)? = nil
     @State private var library = Library.shared
 
     var body: some View {
         Button { if let action { action() } else { Nav.shared.open(video) } } label: {
-            HStack(alignment: .top, spacing: 24) {
-                Thumb(urls: video.cardPictures, badge: video.badge, progress: library.progress(video.id), radius: 16)
-                    .frame(width: thumb)
+            Face(video: video, progress: library.progress(video.id), showAuthor: showAuthor)
+                .frame(width: width)
+        }
+        .buttonStyle(TileStyle())
+        .videoMenu(video, history: history || library.progress(video.id) != nil)
+    }
+
+    struct Face: View {
+        let video: Video
+        let progress: Double?
+        var showAuthor = true
+        @Environment(\.lit) private var lit
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 14) {
+                Thumb(urls: video.cardPictures, badge: video.badge, progress: progress, radius: 16)
+                    .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.focus, lineWidth: lit ? 6 : 0) }
+                    .shadow(color: .black.opacity(lit ? 0.7 : 0), radius: 22, y: 12)
+                    .scaleEffect(lit ? 1.06 : 1, anchor: .bottom)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(video.title).font(Fonts.titleSmall).foregroundStyle(Theme.text).lineLimit(2)
-                    Text(video.author).font(Fonts.bodySmall).foregroundStyle(Theme.sub).lineLimit(1)
-                    if !rest.isEmpty {
-                        Text(rest).font(Fonts.bodySmall).foregroundStyle(Theme.sub).lineLimit(1)
-                    }
+                    Text(video.title.isEmpty ? " " : video.title)
+                        .font(.system(size: 26, weight: .semibold)).foregroundStyle(Theme.text)
+                        .lineLimit(2).multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, minHeight: 66, alignment: .topLeading)
+                    Text(showAuthor ? video.byline : video.byline(withAuthor: false))
+                        .font(Fonts.caption).foregroundStyle(Theme.sub).lineLimit(1)
+                }
+                .offset(y: lit ? 10 : 0)
+            }
+            .animation(.easeOut(duration: 0.18), value: lit)
+        }
+    }
+}
+
+/// a tile's focus: nothing of its own, it tells the face (which draws the frame round the picture)
+struct TileStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { Lit(configuration: configuration) }
+
+    private struct Lit: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.isFocused) private var focused
+
+        var body: some View {
+            configuration.label
+                .environment(\.lit, focused)
+                .scaleEffect(configuration.isPressed ? 0.98 : 1)
+        }
+    }
+}
+
+/// a Short in a shelf: tall
+struct ShortTile: View {
+    let video: Video
+
+    var body: some View {
+        Button { Nav.shared.go(.shorts, start: video) } label: { Face(video: video) }
+            .buttonStyle(TileStyle())
+    }
+
+    private struct Face: View {
+        let video: Video
+        @Environment(\.lit) private var lit
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                Picture([URL(string: "https://i.ytimg.com/vi/\(video.id)/oar2.jpg"), video.thumb].compactMap { $0 })
+                    .frame(width: 260, height: 462)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.focus, lineWidth: lit ? 6 : 0) }
+                    .scaleEffect(lit ? 1.06 : 1, anchor: .bottom)
+                Text(video.title).font(.system(size: 24, weight: .semibold)).lineLimit(2)
+                    .frame(width: 260, alignment: .leading)
+                    .offset(y: lit ? 12 : 0)
+            }
+            .animation(.easeOut(duration: 0.18), value: lit)
+        }
+    }
+}
+
+/// a channel as a round picture with its name under it
+struct ChannelTile: View {
+    let channel: Channel
+    var size: CGFloat = 200
+
+    var body: some View {
+        Button { Nav.shared.push(.channel(channel.id)) } label: { Face(channel: channel, size: size) }
+            .buttonStyle(TileStyle())
+    }
+
+    private struct Face: View {
+        let channel: Channel
+        let size: CGFloat
+        @Environment(\.lit) private var lit
+
+        var body: some View {
+            VStack(spacing: 18) {
+                Avatar(url: channel.avatarURL, name: channel.name, size: size)
+                    .overlay { Circle().strokeBorder(Theme.focus, lineWidth: lit ? 6 : 0) }
+                    .scaleEffect(lit ? 1.08 : 1)
+                Text(channel.name).font(.system(size: 26, weight: .semibold)).lineLimit(1)
+                if !channel.subsText.isEmpty { Text(channel.subsText).font(Fonts.caption).foregroundStyle(Theme.sub).lineLimit(1) }
+            }
+            .frame(width: max(size, 240))
+            .animation(.easeOut(duration: 0.18), value: lit)
+        }
+    }
+}
+
+/// a playlist's picture, with the list mark and how many videos it has
+struct PlaylistThumb: View {
+    let playlist: Playlist
+    var radius: CGFloat = 16
+
+    var body: some View {
+        Thumb(urls: playlist.thumbURL.map { [$0] } ?? [], radius: radius)
+            .overlay(alignment: .trailing) {
+                VStack(spacing: 8) {
+                    Image(systemName: "list.bullet").font(.system(size: 34, weight: .semibold))
+                    Text(playlist.countText.replacingOccurrences(of: " videos", with: "")).font(.system(size: 24, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxHeight: .infinity)
+                .frame(width: 140)
+                .background(Color.black.opacity(0.7))
+            }
+            .clipShape(RoundedRectangle(cornerRadius: radius))
+    }
+}
+
+struct PlaylistTile: View {
+    let playlist: Playlist
+    var width: CGFloat? = Metrics.card
+
+    var body: some View {
+        Button { Nav.shared.push(.playlist(playlist.id)) } label: { Face(playlist: playlist).frame(width: width) }
+            .buttonStyle(TileStyle())
+    }
+
+    private struct Face: View {
+        let playlist: Playlist
+        @Environment(\.lit) private var lit
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 14) {
+                PlaylistThumb(playlist: playlist)
+                    .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.focus, lineWidth: lit ? 6 : 0) }
+                    .scaleEffect(lit ? 1.06 : 1, anchor: .bottom)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(playlist.title).font(.system(size: 26, weight: .semibold)).lineLimit(2)
+                        .frame(maxWidth: .infinity, minHeight: 66, alignment: .topLeading)
+                    Text([playlist.author, "Playlist"].filter { !$0.isEmpty }.joined(separator: " · "))
+                        .font(Fonts.caption).foregroundStyle(Theme.sub).lineLimit(1)
+                }
+                .offset(y: lit ? 10 : 0)
+            }
+            .animation(.easeOut(duration: 0.18), value: lit)
+        }
+    }
+}
+
+struct ItemTile: View {
+    let item: Item
+    var width: CGFloat? = Metrics.card
+
+    var body: some View {
+        switch item {
+        case .video(let v): VideoTile(video: v, width: width)
+        case .channel(let c): ChannelTile(channel: c, size: 200).frame(width: width)
+        case .playlist(let p): PlaylistTile(playlist: p, width: width)
+        }
+    }
+}
+
+/// kept names: the cards of the older screens
+typealias VideoCard = VideoTile
+
+struct SmallCard: View {
+    let video: Video
+    var body: some View { VideoTile(video: video, width: 340, history: true) }
+}
+
+/// a video as a line of a list: the picture on the left, the words on the right
+struct VideoRow: View {
+    let video: Video
+    var thumb: CGFloat = 400
+    var history = false
+    var dots = true
+    var index: Int? = nil
+    var action: (() -> Void)? = nil
+    @State private var library = Library.shared
+
+    var body: some View {
+        Button { if let action { action() } else { Nav.shared.open(video) } } label: {
+            HStack(alignment: .center, spacing: 32) {
+                if let index {
+                    Text("\(index)").font(Fonts.bodyMedium.monospacedDigit()).dim().frame(width: 56)
+                }
+                Thumb(urls: video.cardPictures, badge: video.badge, progress: library.progress(video.id), radius: 14)
+                    .frame(width: thumb)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(video.title).font(.system(size: 28, weight: .semibold)).lineLimit(2).multilineTextAlignment(.leading)
+                    Text(video.author).font(Fonts.bodySmall).dim().lineLimit(1)
+                    if !rest.isEmpty { Text(rest).font(Fonts.bodySmall).dim().lineLimit(1) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                if dots { MoreDots() }
             }
-            .padding(.horizontal, 24).padding(.vertical, 12)
+            .padding(.horizontal, 20).padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(CardFocus(radius: 20, scale: 1.02))
+        .buttonStyle(.glow(radius: 20))
         .videoMenu(video, history: history)
     }
 
@@ -525,121 +725,44 @@ struct VideoRow: View {
     }
 }
 
-/// a channel in a list: its picture, name and subscribers, and Subscribe
 struct ChannelRow: View {
     let channel: Channel
 
     var body: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: 32) {
             Button { Nav.shared.push(.channel(channel.id)) } label: {
-                HStack(spacing: 24) {
-                    Avatar(url: channel.avatarURL, name: channel.name, size: 176)
-                        .frame(width: 336)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(channel.name).font(Fonts.titleMedium).foregroundStyle(Theme.text).lineLimit(1)
-                        if !channel.subsText.isEmpty {
-                            Text(channel.subsText).font(Fonts.bodySmall).foregroundStyle(Theme.sub).lineLimit(1)
-                        }
+                HStack(spacing: 32) {
+                    Avatar(url: channel.avatarURL, name: channel.name, size: 160).frame(width: 400)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(channel.name).font(Fonts.titleMedium).lineLimit(1)
+                        if !channel.subsText.isEmpty { Text(channel.subsText).font(Fonts.bodySmall).dim().lineLimit(1) }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, 24).padding(.vertical, 12)
+                .padding(.horizontal, 20).padding(.vertical, 14)
             }
-            .buttonStyle(CardFocus(radius: 20, scale: 1.02))
-            SubscribeButton(channel: channel)
-                .padding(.trailing, 24)
+            .buttonStyle(.glow(radius: 20))
+            SubscribeButton(channel: channel).padding(.trailing, 20)
         }
     }
 }
 
 struct PlaylistRow: View {
     let playlist: Playlist
-    var thumb: CGFloat = 336
 
     var body: some View {
         Button { Nav.shared.push(.playlist(playlist.id)) } label: {
-            HStack(alignment: .top, spacing: 24) {
-                PlaylistThumb(playlist: playlist, radius: 16).frame(width: thumb)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(playlist.title).font(Fonts.titleSmall).foregroundStyle(Theme.text).lineLimit(2)
-                    Text([playlist.author, "Playlist"].filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(Fonts.bodySmall).foregroundStyle(Theme.sub).lineLimit(1)
+            HStack(alignment: .center, spacing: 32) {
+                PlaylistThumb(playlist: playlist, radius: 14).frame(width: 400)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(playlist.title).font(.system(size: 28, weight: .semibold)).lineLimit(2)
+                    Text([playlist.author, "Playlist"].filter { !$0.isEmpty }.joined(separator: " · ")).font(Fonts.bodySmall).dim().lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 24).padding(.vertical, 12)
+            .padding(.horizontal, 20).padding(.vertical, 14)
         }
-        .buttonStyle(CardFocus(radius: 20, scale: 1.02))
-    }
-}
-
-/// a playlist's picture, with the list mark and how many videos it has
-struct PlaylistThumb: View {
-    let playlist: Playlist
-    var radius: CGFloat = 24
-
-    var body: some View {
-        Thumb(urls: playlist.thumbURL.map { [$0] } ?? [], radius: radius)
-            .overlay(alignment: .bottomTrailing) {
-                Label(playlist.countText, systemImage: "list.bullet")
-                    .font(.system(size: 24, weight: .medium))
-                    .padding(.horizontal, 12).padding(.vertical, 4)
-                    .background(Color.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 8))
-                    .foregroundStyle(.white)
-                    .padding(12)
-            }
-    }
-}
-
-/// a channel or playlist in the grid of cards (search results shown as a grid)
-struct ChannelCard: View {
-    let channel: Channel
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Button { Nav.shared.push(.channel(channel.id)) } label: {
-                VStack(spacing: 20) {
-                    Avatar(url: channel.avatarURL, name: channel.name, size: 240)
-                    Text(channel.name).font(Fonts.titleMedium).foregroundStyle(Theme.text).lineLimit(1)
-                    if !channel.subsText.isEmpty { Text(channel.subsText).font(Fonts.bodySmall).foregroundStyle(Theme.sub).lineLimit(1) }
-                }
-                .padding(24)
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(CardFocus(radius: 24))
-            SubscribeButton(channel: channel)
-        }
-    }
-}
-
-struct PlaylistCard: View {
-    let playlist: Playlist
-
-    var body: some View {
-        Button { Nav.shared.push(.playlist(playlist.id)) } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                PlaylistThumb(playlist: playlist)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(playlist.title).font(Fonts.titleSmall).foregroundStyle(Theme.text).lineLimit(2)
-                    Text([playlist.author, "Playlist"].filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(Fonts.bodySmall).foregroundStyle(Theme.sub).lineLimit(1)
-                }
-                .padding(.horizontal, 24).padding(.top, 20).padding(.bottom, 24)
-            }
-        }
-        .buttonStyle(CardFocus(radius: 24))
-    }
-}
-
-struct ItemCard: View {
-    let item: Item
-
-    var body: some View {
-        switch item {
-        case .video(let v): VideoCard(video: v)
-        case .channel(let c): ChannelCard(channel: c)
-        case .playlist(let p): PlaylistCard(playlist: p)
-        }
+        .buttonStyle(.glow(radius: 20))
     }
 }
 
@@ -655,49 +778,107 @@ struct ItemRow: View {
     }
 }
 
-/// Cards two across (at least 640 points wide each, like Android's Adaptive(320.dp)), asking for
-/// more as the end comes into view. `header` sits above them, inside the same scrolling page.
+// MARK: shelves and grids
+
+/// A row of cards with its title above, scrolling sideways. `more` is asked for near its end.
+struct Shelf<Content: View>: View {
+    let title: String
+    var subtitle: String = ""
+    var icon: String? = nil
+    var spacing: CGFloat = 40
+    let content: Content
+
+    init(_ title: String, subtitle: String = "", icon: String? = nil, spacing: CGFloat = 40, @ViewBuilder content: () -> Content) {
+        self.title = title; self.subtitle = subtitle; self.icon = icon; self.spacing = spacing; self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if !title.isEmpty {
+                HStack(alignment: .firstTextBaseline, spacing: 16) {
+                    if let icon { Image(systemName: icon).font(.system(size: 30, weight: .semibold)).foregroundStyle(Theme.sub) }
+                    Text(title).font(Fonts.shelf).foregroundStyle(Theme.text)
+                    if !subtitle.isEmpty { Text(subtitle).font(Fonts.bodySmall).foregroundStyle(Theme.sub) }
+                }
+                .padding(.leading, Metrics.side)
+            }
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: spacing) { content }
+                    .padding(.horizontal, Metrics.side).padding(.top, 28).padding(.bottom, 36)
+            }
+            .scrollClipDisabled()
+        }
+        .focusSection()
+    }
+}
+
+/// a shelf of videos
+struct VideoShelf: View {
+    let title: String
+    var subtitle: String = ""
+    var icon: String? = nil
+    let videos: [Video]
+    var history = false
+    var more: (() async -> Void)? = nil
+
+    var body: some View {
+        if !videos.isEmpty {
+            Shelf(title, subtitle: subtitle, icon: icon) {
+                ForEach(videos) { v in
+                    VideoTile(video: v, history: history)
+                        .onAppear {
+                            if let more, videos.suffix(3).contains(where: { $0.id == v.id }) { Task { await more() } }
+                        }
+                }
+            }
+        }
+    }
+}
+
+/// Cards four across, asking for more as the end comes into view. `header` sits above them,
+/// inside the same scrolling page.
 struct ItemGrid<Header: View>: View {
     let items: [Item]
     let more: (() async -> Void)?
     let focusFirst: Bool
+    var columns: Int = 4
     let header: Header
     @FocusState private var focused: String?
 
-    init(items: [Item], more: (() async -> Void)? = nil, focusFirst: Bool = false, @ViewBuilder header: () -> Header) {
-        self.items = items; self.more = more; self.focusFirst = focusFirst; self.header = header()
+    init(items: [Item], more: (() async -> Void)? = nil, focusFirst: Bool = false, columns: Int = 4, @ViewBuilder header: () -> Header) {
+        self.items = items; self.more = more; self.focusFirst = focusFirst; self.columns = columns; self.header = header()
     }
-
-    private let columns = [GridItem(.adaptive(minimum: 640), spacing: 32, alignment: .top)]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 40, alignment: .top), count: columns),
+                          alignment: .leading, spacing: 56) {
                     ForEach(items) { item in
-                        ItemCard(item: item)
+                        ItemTile(item: item, width: nil)
                             .focused($focused, equals: item.id)
                             .onAppear { nearEnd(item) }
                     }
                 }
-                .padding(.horizontal, 32).padding(.vertical, 16)
+                .padding(.horizontal, Metrics.side).padding(.top, 28).padding(.bottom, 80)
                 .focusSection()
             }
         }
+        .scrollClipDisabled()
         .onAppear { if focusFirst, focused == nil { focused = items.first?.id } }
         .onChange(of: items.first?.id) { if focusFirst, focused == nil { focused = items.first?.id } }
     }
 
     private func nearEnd(_ item: Item) {
-        guard let more, items.suffix(4).contains(where: { $0.id == item.id }) else { return }
+        guard let more, items.suffix(columns * 2).contains(where: { $0.id == item.id }) else { return }
         Task { await more() }
     }
 }
 
 extension ItemGrid where Header == EmptyView {
-    init(items: [Item], more: (() async -> Void)? = nil, focusFirst: Bool = false) {
-        self.init(items: items, more: more, focusFirst: focusFirst) { EmptyView() }
+    init(items: [Item], more: (() async -> Void)? = nil, focusFirst: Bool = false, columns: Int = 4) {
+        self.init(items: items, more: more, focusFirst: focusFirst, columns: columns) { EmptyView() }
     }
 }
 
@@ -706,35 +887,37 @@ struct ItemList<Header: View>: View {
     let items: [Item]
     let more: (() async -> Void)?
     let focusFirst: Bool
+    var numbered = false
     let header: Header
     @FocusState private var focused: String?
 
-    init(items: [Item], more: (() async -> Void)? = nil, focusFirst: Bool = false, @ViewBuilder header: () -> Header) {
-        self.items = items; self.more = more; self.focusFirst = focusFirst; self.header = header()
+    init(items: [Item], more: (() async -> Void)? = nil, focusFirst: Bool = false, numbered: Bool = false, @ViewBuilder header: () -> Header) {
+        self.items = items; self.more = more; self.focusFirst = focusFirst; self.numbered = numbered; self.header = header()
     }
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 8) {
+            LazyVStack(alignment: .leading, spacing: 6) {
                 header
-                ForEach(items) { item in
-                    ItemRow(item: item)
-                        .focused($focused, equals: item.id)
-                        .onAppear {
-                            if let more, items.suffix(4).contains(where: { $0.id == item.id }) { Task { await more() } }
-                        }
+                ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
+                    Group {
+                        if numbered, let v = item.video { VideoRow(video: v, index: i + 1) } else { ItemRow(item: item) }
+                    }
+                    .focused($focused, equals: item.id)
+                    .onAppear {
+                        if let more, items.suffix(4).contains(where: { $0.id == item.id }) { Task { await more() } }
+                    }
                 }
             }
-            .padding(.horizontal, 32).padding(.vertical, 16)
+            .padding(.horizontal, Metrics.side - 20).padding(.vertical, 24)
         }
         .onAppear { if focusFirst, focused == nil { focused = items.first?.id } }
         .onChange(of: items.first?.id) { if focusFirst, focused == nil { focused = items.first?.id } }
     }
 }
 
-/// Where the remote starts when a page opens. Left alone, tvOS starts at the top left - the
-/// TubeHaus logo or the side menu - where Android starts on the page itself. Only the first time:
-/// coming back to the page keeps the remote where it was.
+/// Where the remote starts when a page opens. Only the first time: coming back to the page keeps
+/// the remote where it was.
 struct FirstFocus: ViewModifier {
     @FocusState private var focused: Bool
     @State private var done = false
@@ -753,16 +936,32 @@ struct FirstFocus: ViewModifier {
 
 extension View {
     func firstFocus() -> some View { modifier(FirstFocus()) }
+    @ViewBuilder func firstFocus(_ on: Bool) -> some View { if on { modifier(FirstFocus()) } else { self } }
 }
 
-/// a section's title (Library)
+/// a section's title
 struct SectionTitle: View {
     let text: String
     init(_ text: String) { self.text = text }
 
     var body: some View {
-        Text(text).font(Fonts.titleMedium).foregroundStyle(Theme.text)
-            .padding(.horizontal, 32).padding(.top, 24).padding(.bottom, 8)
+        Text(text).font(Fonts.shelf).foregroundStyle(Theme.text)
+            .padding(.horizontal, Metrics.side).padding(.top, 32).padding(.bottom, 8)
+    }
+}
+
+/// a page's big title, with what's under it
+struct PageTitle: View {
+    let title: String
+    var sub: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(Fonts.titleLarge).lineLimit(2)
+            if !sub.isEmpty { Text(sub).font(Fonts.bodySmall).foregroundStyle(Theme.sub).lineLimit(2) }
+        }
+        .padding(.horizontal, Metrics.side).padding(.top, 48).padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -819,14 +1018,37 @@ struct Status: View {
     var body: some View {
         VStack(spacing: 32) {
             if let error {
+                Image(systemName: "sparkles.tv").font(.system(size: 72)).foregroundStyle(Theme.sub)
                 Text(error).font(Fonts.bodyLarge).multilineTextAlignment(.center).foregroundStyle(Theme.sub).frame(maxWidth: 1000)
-                if let retry { TextButton("Try again", action: retry) }
+                if let retry { FilledButton("Try again", icon: "arrow.clockwise", action: retry) }
             } else {
-                ProgressView().scaleEffect(1.4)
+                ProgressView().scaleEffect(1.6)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(64)
+    }
+}
+
+/// grey boxes where cards will be, while a page loads
+struct ShelfPlaceholder: View {
+    var count = 5
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            RoundedRectangle(cornerRadius: 8).fill(Theme.placeholder).frame(width: 320, height: 34)
+            HStack(spacing: 40) {
+                ForEach(0..<count, id: \.self) { _ in
+                    VStack(alignment: .leading, spacing: 14) {
+                        RoundedRectangle(cornerRadius: 16).fill(Theme.placeholder).frame(width: Metrics.card, height: Metrics.card * 9 / 16)
+                        RoundedRectangle(cornerRadius: 6).fill(Theme.placeholder).frame(width: Metrics.card * 0.85, height: 26)
+                        RoundedRectangle(cornerRadius: 6).fill(Theme.placeholder).frame(width: Metrics.card * 0.5, height: 22)
+                    }
+                }
+            }
+        }
+        .padding(.leading, Metrics.side).padding(.vertical, 24)
+        .opacity(0.8)
     }
 }
 
@@ -866,5 +1088,23 @@ final class Feed {
     static func keep(_ i: Item) -> Bool {
         if case .video(let v) = i, v.short, Settings.hideShorts { return false }
         return true
+    }
+}
+
+/// Material's switch, dark theme: white track when on, grey outline when off
+struct Switch: View {
+    let on: Bool
+    @Environment(\.lit) private var lit
+
+    var body: some View {
+        ZStack(alignment: on ? .trailing : .leading) {
+            Capsule().fill(on ? (lit ? Theme.onFocus : Theme.text) : Theme.chip)
+            Capsule().strokeBorder(on ? Color.clear : Theme.sub, lineWidth: 4)
+            Circle().fill(on ? (lit ? Theme.focus : Theme.bg) : Theme.sub)
+                .frame(width: on ? 44 : 30, height: on ? 44 : 30)
+                .padding(.horizontal, on ? 8 : 14)
+        }
+        .frame(width: 100, height: 60)
+        .animation(.easeOut(duration: 0.15), value: on)
     }
 }

@@ -40,55 +40,44 @@ jobs:
           path: out/TubeHaus-AppleTV.ipa
           if-no-files-found: error
 
+
   simulator:
     runs-on: macos-15
-    timeout-minutes: 40
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
-      - name: Build for the simulator
+      - name: Build the app and its walk-through for the simulator
         run: |
           brew install xcodegen
           (cd tvos && xcodegen generate)
-          xcodebuild -project tvos/TubeHausTV.xcodeproj -scheme TubeHausTV -sdk appletvsimulator -configuration Debug             -derivedDataPath build/xcode CODE_SIGNING_ALLOWED=NO build
-      - name: Run it on an Apple TV
-        timeout-minutes: 15
+          udid=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k,v in sorted(d.items(), reverse=True) if 'tvOS' in k for x in v if 'Apple TV' in x['name']))")
+          echo "UDID=$udid" >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"; xcrun simctl bootstatus "$udid" -b
+          xcodebuild build-for-testing -project tvos/TubeHausTV.xcodeproj -scheme TubeHausTV -destination "id=$udid" \
+            -derivedDataPath build/xcode
+      - name: Walk through it with the remote
+        timeout-minutes: 30
         run: |
           set -x
-          app=build/xcode/Build/Products/Debug-appletvsimulator/TubeHaus.app
-          id=io.github.biolend83.tubehaus.tv
-          udid=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k,v in sorted(d.items(), reverse=True) if 'tvOS' in k for x in v if 'Apple TV' in x['name']))")
-          xcrun simctl boot "$udid"; xcrun simctl bootstatus "$udid" -b
-          xcrun simctl install "$udid" "$app"
           mkdir -p shots
-          shot() { xcrun simctl io "$udid" screenshot "shots/$1.png"; }
-          run() { xcrun simctl terminate "$udid" $id 2>/dev/null || true; xcrun simctl launch "$udid" $id "$@"; }
-          # first start: topics to pick
-          run; sleep 25; shot 01-topics
-          # Home from picked topics
-          run -pick Music,Science; sleep 45; shot 02-home
-          # the import screen, then a YouTube Takeout file sent to it as a phone would
-          run -tab subscriptions -import YES; sleep 15; shot 03-import
-          curl -sS --max-time 60 -X POST -H "Content-Type: text/plain" --data-binary @tvos/ci/subscriptions.csv http://127.0.0.1:8080/import || echo "import failed"
-          echo; sleep 10; shot 04-imported
-          run -tab subscriptions; sleep 40; shot 05-subscriptions
-          run -tab search -q "lofi hip hop"; sleep 30; shot 06-search
-          run -tab library; sleep 8; shot 07-library
-          run -tab settings; sleep 8; shot 08-settings
-          # one video page: it plays on the page, Up next beside it (streams, details, related videos
-          # and comments all come from engine.js; the runner's datacenter IP may get YouTube's bot check)
-          run -open jNQXAC9IVRw; sleep 35; shot 09-video
-          # OK on the video: the same player full screen
-          run -open aqz-KE-bpKQ -fullscreen YES; sleep 40; shot 10-fullscreen
-          sleep 20; shot 11-still-playing
-          run -channel UCX6OQ3DkcsbYNE6H8uQQuVA; sleep 30; shot 12-channel
-          run -tab shorts; sleep 45; shot 13-shorts
-          run -tab library; sleep 10; shot 14-library-after
-          xcrun simctl terminate "$udid" $id || true
-          xcrun simctl spawn "$udid" log show --last 15m --style compact --predicate 'process == "TubeHaus"' > shots/app.log 2>&1 || true
+          # the import screen, when the walk-through opens it, gets a YouTube Takeout file as a phone would send it
+          ( for i in $(seq 1 200); do
+              curl -sf --max-time 5 -X POST -H "Content-Type: text/plain" --data-binary @tvos/ci/subscriptions.csv http://127.0.0.1:8080/import && break
+              sleep 3
+            done ) &
+          TEST_RUNNER_SHOTS="$PWD/shots" xcodebuild test-without-building -project tvos/TubeHausTV.xcodeproj -scheme TubeHausTV \
+            -destination "id=$UDID" -derivedDataPath build/xcode -resultBundlePath shots/run.xcresult || echo "the walk-through failed"
+          xcrun xcresulttool export attachments --path shots/run.xcresult --output-path shots/attachments || true
+          ls -la shots shots/attachments || true
+          xcrun simctl spawn "$UDID" log show --last 30m --style compact --predicate 'process == "TubeHaus"' > shots/app.log 2>&1 || true
           grep -i engine shots/app.log | tail -40; tail -60 shots/app.log
           ls ~/Library/Logs/DiagnosticReports/ | grep -i tubehaus && cp ~/Library/Logs/DiagnosticReports/*TubeHaus* shots/ || echo "no crash report"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: AppleTV-simulator-check
-          path: shots/
+          path: |
+            shots/*.png
+            shots/attachments/
+            shots/app.log
+            shots/*.ips

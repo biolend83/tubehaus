@@ -1,11 +1,12 @@
 import AVKit
+import MediaPlayer
 import SwiftUI
 
-/// The one player of the app. The video plays on its page (WatchView), and OK opens the same
-/// player full screen in Apple's own player view (so the Siri Remote, AirPlay and the audio track
-/// menu work as in any Apple TV app); Back returns to the page and it goes on playing. Subtitles
-/// are YouTube's own tracks, drawn on top (Captions.swift). Where it stopped is saved every few
-/// seconds; when a video ends, the next one in the queue or in Up next plays (Settings).
+/// The one player of the app. A video plays full screen, as on YouTube: OK or any arrow brings
+/// up the controls (the seek bar with its pictures, the buttons, chapters and more videos under
+/// them), left and right skip, Back hides the controls and then leaves. Subtitles are YouTube's
+/// own tracks, drawn on top (Captions.swift). Where it stopped is saved every few seconds; when a
+/// video ends, the next one in the queue plays, or Up next counts down to the next suggestion.
 @MainActor
 @Observable
 final class PlayerModel {
@@ -20,33 +21,42 @@ final class PlayerModel {
     private(set) var error: String?
     private(set) var loading = false
     private(set) var paused = true
+    private(set) var buffering = false
     private(set) var ended = false
-    var fullscreen = false
-    /// what plays after this video, before Up next ("Play all")
+    /// where the video is, a few times a second
+    private(set) var time: Double = 0
+    private(set) var length: Double = 0
+    private(set) var buffered: Double = 0
+    /// what plays after this video, before Up next ("Play all", "Play next")
     var queue: [Video] = []
     /// the whole list "Play all" started, for "Repeat playlist": after the last one it starts again
     private(set) var round: [Video] = []
     var loopList = false
-
-    /// [list] from its first video, in order
-    func playAll(_ list: [Video]) {
-        guard let first = list.first else { return }
-        MusicPlayer.shared.stop()
-        queue = Array(list.dropFirst())
-        round = list
-        Nav.shared.open(first)
-    }
+    var loopVideo = false
+    /// the suggestion the end screen counts down to
+    private(set) var upNext: Video?
 
     private(set) var choices: [Subtitles.Choice] = []
     private(set) var choice: Subtitles.Choice?
     /// "This video at a glance", once its captions are in (Glance.swift)
     private(set) var glance: Glance.Result?
+    private(set) var rate: Float = Settings.speed
+    private(set) var quality: Int = Settings.quality
+    private(set) var audioOptions: [AVMediaSelectionOption] = []
+    private(set) var audioOption: AVMediaSelectionOption?
+    /// the sleep timer: when it pauses (nil: off); `sleepAtEnd` pauses when this video ends
+    private(set) var sleepAt: Date?
+    private(set) var sleepAtEnd = false
+    /// "Stats for nerds"
+    var stats = false
+    /// how much the video was turned down (loudness matching), for the stats
+    private(set) var turnedDown: Double = 0
 
     @ObservationIgnored private var cues: [Subtitles.Cue] = []
-    private let layers = NSHashTable<CaptionLayer>.weakObjects()
+    private let layers =NSHashTable<CaptionLayer>.weakObjects()
     @ObservationIgnored private var tick: Any?
     @ObservationIgnored private var status: NSKeyValueObservation?
-    @ObservationIgnored private var audioStatus: NSKeyValueObservation?
+    @ObservationIgnored private var itemStatus: NSKeyValueObservation?
     @ObservationIgnored private var endObserver: NSObjectProtocol?
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var captionTask: Task<Void, Never>?
@@ -54,8 +64,7 @@ final class PlayerModel {
     @ObservationIgnored private var last: Double = 0
     @ObservationIgnored private var saved: Double = 0
     @ObservationIgnored private var keywords: [String] = []
-    @ObservationIgnored weak var screen: AVPlayerViewController?
-    @ObservationIgnored private var rate: Float = 1
+    @ObservationIgnored private var nowPlaying = NowPlaying()
 
     private init() {
         tick = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 10), queue: .main) { [weak self] t in
@@ -63,14 +72,33 @@ final class PlayerModel {
         }
         status = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] p, _ in
             let paused = p.timeControlStatus == .paused
-            Task { @MainActor in if self?.paused != paused { self?.paused = paused } }
+            let waiting = p.timeControlStatus == .waitingToPlayAtSpecifiedRate
+            Task { @MainActor in
+                guard let self else { return }
+                if self.paused != paused { self.paused = paused }
+                if self.buffering != waiting { self.buffering = waiting }
+                self.nowPlaying.update(self)
+            }
         }
+        sponsorBlock.attach(player)
+        nowPlaying.commands(self)
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
     }
 
-    /// the page of `v` opened (or came back into view)
+    /// [list] from its first video, in order
+    func playAll(_ list: [Video], shuffled: Bool = false) {
+        let list = shuffled ? list.shuffled() : list
+        guard let first = list.first else { return }
+        MusicPlayer.shared.stop()
+        queue = Array(list.dropFirst())
+        round = list
+        Nav.shared.open(first)
+    }
+
+    /// the player of `v` opened (or came back into view)
     func open(_ v: Video) {
         if video?.id == v.id {
-            if !ended && error == nil && player.currentItem != nil && !fullscreen { player.play() }
+            if !ended && error == nil && player.currentItem != nil { player.play() }
             return
         }
         leave()
@@ -82,8 +110,15 @@ final class PlayerModel {
         error = nil
         loading = true
         ended = false
+        upNext = nil
+        time = 0
+        length = Double(v.lengthSec)
+        buffered = 0
         choices = []
         choice = nil
+        audioOptions = []
+        audioOption = nil
+        loopVideo = false
         setCues([])
         task?.cancel()
         task = Task { await load(v) }
@@ -98,15 +133,23 @@ final class PlayerModel {
     func toggle() {
         guard player.currentItem != nil else { return }
         if ended {
-            ended = false
-            sponsorBlock.replay()
-            player.seek(to: .zero)
-            player.play()
+            replay()
         } else if player.timeControlStatus == .paused {
             player.play()
         } else {
             player.pause()
         }
+    }
+
+    func play() { if player.currentItem != nil && !ended { player.play() } }
+    func pause() { player.pause() }
+
+    func replay() {
+        ended = false
+        upNext = nil
+        sponsorBlock.replay()
+        player.seek(to: .zero)
+        player.play()
     }
 
     /// the pages open changed: no video page left, the player stops; one under another page, it pauses
@@ -126,15 +169,11 @@ final class PlayerModel {
         details = nil
         related = Feed()
         error = nil
-        fullscreen = false
         queue = []
         round = []
         loopList = false
-    }
-
-    /// back from full screen: the page goes on playing
-    func leftFullscreen() {
-        if video != nil && !ended && error == nil { player.play() }
+        upNext = nil
+        nowPlaying.clear()
     }
 
     private func load(_ v: Video) async {
@@ -152,6 +191,7 @@ final class PlayerModel {
             if video?.lengthSec == 0 { video?.lengthSec = s.lengthSec }
             if video?.views == 0 { video?.views = s.views }
             if s.live { video?.live = true }
+            if length == 0 { length = Double(s.lengthSec) }
             if let url = s.hls { start(url, s) } else { error = "This video has no stream the Apple TV can play" }
         } catch {
             guard video?.id == id else { return }
@@ -167,6 +207,8 @@ final class PlayerModel {
         if video?.channelId.isEmpty == true { video?.channelId = det.channelId }
         related.items = det.related.filter { Feed.keep($0) && $0.id != "v" + id }
         related.next = det.relatedNext
+        related.loaded = true
+        nowPlaying.update(self)
     }
 
     private func start(_ url: URL, _ s: StreamInfo) {
@@ -174,14 +216,20 @@ final class PlayerModel {
         MusicPlayer.shared.stop()
         let item = AVPlayerItem(asset: Server.shared.asset(url))
         item.externalMetadata = [meta(.commonIdentifierTitle, v.title), meta(.iTunesMetadataTrackSubTitle, v.author)]
+        applyQuality(item)
         let originalAudio = Settings.originalAudio
         player.appliesMediaSelectionCriteriaAutomatically = !originalAudio
         player.replaceCurrentItem(with: item)
-        if originalAudio { pickOriginalAudio(item, language: s.originalAudioLanguage) }
+        watchItem(item, originalLanguage: originalAudio ? s.originalAudioLanguage : nil, pickOriginal: originalAudio)
+        // loudness matching: a loud video turned down (never up), as YouTube does
+        let db = s.loudnessDb ?? 0
+        turnedDown = Settings.soundNorm && db > 0 ? min(20, db) : 0
+        player.volume = Float(pow(10, -turnedDown / 20))
         let at = Library.shared.resumeAt(v.id, length: v.lengthSec)
         if at > 0 { player.seek(to: CMTime(seconds: at, preferredTimescale: 600)) }
         last = at
         saved = at
+        time = at
         keywords = s.keywords
         player.defaultRate = rate
         if !UserDefaults.standard.bool(forKey: "noAutoplay") { player.play() }
@@ -192,65 +240,126 @@ final class PlayerModel {
         choice = Subtitles.pick(choices, tracks: s.captions, lang: Settings.captions)
         loadCaptions()
         loadGlance(s.captions, length: Double(v.lengthSec))
-        menu()
+        nowPlaying.update(self)
     }
 
-    /// Choose once when the list is ready, so the listener can still change tracks in the player.
-    private func pickOriginalAudio(_ item: AVPlayerItem, language: String?) {
-        audioStatus = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
+    /// once the item is ready: its length, its audio tracks (the original one picked when asked)
+    private func watchItem(_ item: AVPlayerItem, originalLanguage: String?, pickOriginal: Bool) {
+        itemStatus = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
             guard item.status == .readyToPlay else { return }
             Task { @MainActor in
-                guard let self, self.player.currentItem === item, self.audioStatus != nil else { return }
-                self.audioStatus = nil
+                guard let self, self.player.currentItem === item, self.itemStatus != nil else { return }
+                self.itemStatus = nil
+                let d = item.duration.seconds
+                if d.isFinite, d > 0 { self.length = d }
                 guard let group = try? await item.asset.loadMediaSelectionGroup(for: .audible),
                       self.player.currentItem === item else { return }
-                let original = group.options.first { $0.displayName.lowercased().hasSuffix(" - original") }
-                let tag = language?.lowercased()
-                let exact = tag.flatMap { tag in group.options.first { $0.extendedLanguageTag?.lowercased() == tag } }
-                let matches = tag.map { tag in
-                    group.options.filter {
-                        $0.extendedLanguageTag?.lowercased().split(separator: "-").first
-                            == tag.split(separator: "-").first
+                self.audioOptions = group.options
+                if pickOriginal {
+                    let original = group.options.first { $0.displayName.lowercased().hasSuffix(" - original") }
+                    let tag = originalLanguage?.lowercased()
+                    let exact = tag.flatMap { tag in group.options.first { $0.extendedLanguageTag?.lowercased() == tag } }
+                    let matches = tag.map { tag in
+                        group.options.filter {
+                            $0.extendedLanguageTag?.lowercased().split(separator: "-").first == tag.split(separator: "-").first
+                        }
+                    } ?? []
+                    if let option = original ?? exact ?? (matches.count == 1 ? matches.first : nil) ?? group.defaultOption {
+                        item.select(option, in: group)
                     }
-                } ?? []
-                if let option = original ?? exact ?? (matches.count == 1 ? matches.first : nil) ?? group.defaultOption {
-                    item.select(option, in: group)
                 }
+                self.audioOption = item.currentMediaSelection.selectedMediaOption(in: group)
             }
         }
     }
 
-    /// the words and moments under the video, from a track in the TV's language (one made by people
-    /// first), else the first track; nothing when the video has no captions
-    private func loadGlance(_ tracks: [Caption], length: Double) {
-        glance = nil
-        glanceTask?.cancel()
-        guard Settings.glance, !tracks.isEmpty else { return }
-        let mine = String((Locale.preferredLanguages.first ?? "en").prefix(2))
-        let t = tracks.first { $0.lang.hasPrefix(mine) && !$0.auto } ?? tracks.first { $0.lang.hasPrefix(mine) }
-            ?? tracks.first { !$0.auto } ?? tracks[0]
-        let id = video?.id
-        glanceTask = Task { [weak self] in
-            let cues = await Subtitles.load(t.url + "&fmt=vtt")
-            guard !Task.isCancelled, let self, self.video?.id == id else { return }
-            self.glance = Glance.analyze(cues, length: length)
+    func selectAudio(_ o: AVMediaSelectionOption) {
+        guard let item = player.currentItem else { return }
+        Task {
+            guard let group = try? await item.asset.loadMediaSelectionGroup(for: .audible) else { return }
+            item.select(o, in: group)
+            audioOption = o
         }
     }
 
-    /// to `s` seconds and playing (a moment under the video)
-    func seek(_ s: Double) {
-        player.seek(to: CMTime(seconds: s, preferredTimescale: 600))
-        ended = false
+    // MARK: quality, speed, sleep
+
+    static let qualities = [0, 2160, 1440, 1080, 720, 480, 360, 240]
+
+    static func qualityName(_ q: Int) -> String { q == 0 ? "Auto" : q >= 2160 ? "\(q)p 4K" : "\(q)p" }
+
+    func setQuality(_ q: Int) {
+        quality = q
+        Settings.quality = q
+        if let item = player.currentItem { applyQuality(item) }
+    }
+
+    private func applyQuality(_ item: AVPlayerItem) {
+        if quality == 0 {
+            item.preferredMaximumResolution = .zero
+            item.preferredPeakBitRate = 0
+        } else {
+            item.preferredMaximumResolution = CGSize(width: Double(quality) * 16 / 9, height: Double(quality))
+            item.preferredPeakBitRate = 0
+        }
+    }
+
+    static let speeds: [Float] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+
+    static func speedName(_ r: Float) -> String { r == 1 ? "Normal" : String(format: "%g×", r) }
+
+    func setRate(_ r: Float) {
+        rate = r
+        Settings.speed = r
+        player.defaultRate = r
+        if player.rate != 0 { player.rate = r }
+        nowPlaying.update(self)
+    }
+
+    /// minutes until it pauses (0: off, -1: at the end of this video)
+    func setSleep(_ minutes: Int) {
+        sleepAtEnd = minutes == -1
+        sleepAt = minutes > 0 ? Date().addingTimeInterval(Double(minutes) * 60) : nil
+    }
+
+    // MARK: moving about
+
+    /// to `s` seconds and playing
+    func seek(_ s: Double, play: Bool = true) {
+        let target = max(0, length > 0 ? min(s, length - 0.5) : s)
+        player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        time = target
+        if ended { ended = false; upNext = nil }
+        if play { player.play() }
+        nowPlaying.update(self)
+    }
+
+    func skip(_ by: Double) { seek(time + by, play: !paused) }
+
+    /// to the live edge of a live video
+    func toLive() {
+        guard let r = player.currentItem?.seekableTimeRanges.last?.timeRangeValue else { return }
+        player.seek(to: r.end)
         player.play()
     }
 
     private func ticked(_ t: Double) {
-        guard t.isFinite, t > 0, let v = video else { return }
+        guard t.isFinite, t >= 0, let v = video else { return }
         for l in layers.allObjects { l.update(t) }
+        if abs(t - time) >= 0.25 { time = t }
+        if let r = player.currentItem?.loadedTimeRanges.last?.timeRangeValue {
+            let b = r.end.seconds
+            if b.isFinite, abs(b - buffered) > 1 { buffered = b }
+        }
+        if let s = sleepAt, Date() >= s {
+            sleepAt = nil
+            player.pause()
+        }
         last = t
-        if abs(t - saved) >= 5 {
+        if t > 0, abs(t - saved) >= 5 {
             saved = t
             Library.shared.watched(v, at: t)
+            nowPlaying.update(self)
         }
     }
 
@@ -258,28 +367,49 @@ final class PlayerModel {
         guard let v = video else { return }
         if let d = player.currentItem?.duration.seconds, d.isFinite { last = d }
         Library.shared.watched(v, at: last)
-        if let n = next() {
-            if queue.first?.id == n.id { queue.removeFirst() }
-            else if queue.isEmpty && loopList && round.first?.id == n.id { queue = Array(round.dropFirst()) }
-            Nav.shared.replace(with: n)     // its page opens it (WatchView)
+        if loopVideo {
+            sponsorBlock.replay()
+            player.seek(to: .zero)
+            player.play()
+            return
+        }
+        if sleepAtEnd {
+            sleepAtEnd = false
+            ended = true
+            return
+        }
+        if let q = queue.first {
+            queue.removeFirst()
+            Nav.shared.replace(with: q)     // its page opens it (WatchView)
+        } else if loopList, round.count > 1, let first = round.first {
+            queue = Array(round.dropFirst())
+            Nav.shared.replace(with: first)
         } else {
             ended = true
-            fullscreen = false
+            upNext = Settings.autoplayNext ? suggestion() : nil
         }
     }
 
-    /// what plays when this one ends: the queue, then (with Autoplay) the first of Up next not seen yet
-    func next() -> Video? {
-        if let q = queue.first { return q }
-        if loopList, round.count > 1, let first = round.first { return first }
-        guard Settings.autoplayNext else { return nil }
-        return related.items.compactMap(\.video).first { !$0.live && !Library.shared.finished($0.id) }
+    /// the first of Up next not seen yet
+    func suggestion() -> Video? {
+        related.items.compactMap(\.video).first { !$0.live && !Library.shared.finished($0.id) && $0.id != video?.id }
     }
+
+    /// what Next plays: the queue, then Up next
+    func next() -> Video? { queue.first ?? suggestion() }
+
+    func playNext() {
+        guard let n = next() else { return }
+        if queue.first?.id == n.id { queue.removeFirst() }
+        Nav.shared.replace(with: n)
+    }
+
+    func cancelUpNext() { upNext = nil }
 
     /// the video before (if any) is done with: remember it and learn from it
     private func leave() {
         sponsorBlock.close()
-        audioStatus = nil
+        itemStatus = nil
         guard let v = video else { return }
         let t = player.currentTime().seconds
         if t.isFinite && t > 0 { last = t }
@@ -302,7 +432,7 @@ final class PlayerModel {
 
     // MARK: subtitles
 
-    /// a subtitle layer drawn over a view of the player (the page's, the full screen one)
+    /// a subtitle layer drawn over the video
     func attach(_ l: CaptionLayer) {
         layers.add(l)
         l.set(cues)
@@ -328,37 +458,66 @@ final class PlayerModel {
         choice = c
         Settings.captions = c?.lang ?? ""
         loadCaptions()
-        menu()
     }
 
-    /// Subtitles and Speed in the full screen player's top bar
-    func menu() {
-        guard let vc = screen else { return }
-        var items: [UIMenuElement] = []
-        if !choices.isEmpty {
-            let off = UIAction(title: "Off", state: choice == nil ? .on : .off) { [weak self] _ in
-                MainActor.assumeIsolated { self?.select(nil) }
-            }
-            let tracks = choices.map { c in
-                UIAction(title: c.title, state: c == choice ? .on : .off) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.select(c) }
-                }
-            }
-            items.append(UIMenu(title: "Subtitles", image: UIImage(systemName: "captions.bubble"), children: [off] + tracks))
+    /// CC: the language used last, else the TV's, else the first track; off when on
+    func toggleCaptions() {
+        if choice != nil { select(nil); return }
+        let mine = String((Locale.preferredLanguages.first ?? "en").prefix(2))
+        let pick = choices.first { $0.lang == Settings.captions } ?? choices.first { $0.lang.hasPrefix(mine) } ?? choices.first
+        select(pick)
+    }
+
+    func setCaptionSize(_ i: Int) {
+        Settings.captionSize = i
+        for l in layers.allObjects { l.resize() }
+    }
+
+    /// the subtitles move up while the controls are shown
+    func liftCaptions(_ up: Bool) {
+        for l in layers.allObjects { l.lift(up) }
+    }
+
+    /// the words and moments of the video, from a track in the TV's language (one made by people
+    /// first), else the first track; nothing when the video has no captions
+    private func loadGlance(_ tracks: [Caption], length: Double) {
+        glance = nil
+        glanceTask?.cancel()
+        guard Settings.glance, !tracks.isEmpty else { return }
+        let mine = String((Locale.preferredLanguages.first ?? "en").prefix(2))
+        let t = tracks.first { $0.lang.hasPrefix(mine) && !$0.auto } ?? tracks.first { $0.lang.hasPrefix(mine) }
+            ?? tracks.first { !$0.auto } ?? tracks[0]
+        let id = video?.id
+        glanceTask = Task { [weak self] in
+            let cues = await Subtitles.load(t.url + "&fmt=vtt")
+            guard !Task.isCancelled, let self, self.video?.id == id else { return }
+            self.glance = Glance.analyze(cues, length: length)
         }
-        let speeds: [(String, Float)] = [("0.5×", 0.5), ("0.75×", 0.75), ("Normal", 1), ("1.25×", 1.25), ("1.5×", 1.5), ("2×", 2)]
-        items.append(UIMenu(title: "Speed", image: UIImage(systemName: "gauge.with.dots.needle.67percent"), children: speeds.map { name, r in
-            UIAction(title: name, state: r == rate ? .on : .off) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.rate = r
-                    self.player.defaultRate = r
-                    if self.player.rate != 0 { self.player.rate = r }
-                    self.menu()
-                }
-            }
-        }))
-        vc.transportBarCustomMenuItems = items
+    }
+
+    // MARK: stats for nerds
+
+    var statsLines: [(String, String)] {
+        guard let item = player.currentItem else { return [] }
+        let e = item.accessLog()?.events.last
+        let size = item.presentationSize
+        var out: [(String, String)] = [
+            ("Video ID", video?.id ?? ""),
+            ("Picture", size.width > 0 ? "\(Int(size.width))×\(Int(size.height))" : "–"),
+            ("Most lines allowed", Self.qualityName(quality)),
+        ]
+        if let e {
+            out.append(("Stream bitrate", e.indicatedBitrate > 0 ? String(format: "%.2f Mbps", e.indicatedBitrate / 1e6) : "–"))
+            out.append(("Connection", e.observedBitrate > 0 ? String(format: "%.1f Mbps", e.observedBitrate / 1e6) : "–"))
+            out.append(("Dropped frames", "\(max(0, e.numberOfDroppedVideoFrames))"))
+            out.append(("Stalls", "\(max(0, e.numberOfStalls))"))
+            out.append(("Media requests","\(max(0, e.numberOfMediaRequests))"))
+        }
+        out.append(("Buffer", String(format: "%.0f s", max(0, buffered - time))))
+        out.append(("Volume", turnedDown > 0 ? String(format: "−%.1f dB (loudness)", turnedDown) : "100%"))
+        out.append(("Speed", Self.speedName(rate)))
+        out.append(("Through", Server.shared.connected ? "TubeHaus server" : "YouTube directly"))
+        return out
     }
 
     private func meta(_ id: AVMetadataIdentifier, _ value: String) -> AVMetadataItem {
@@ -370,11 +529,59 @@ final class PlayerModel {
     }
 }
 
-/// the player drawn on the page
+/// What the TV's Control Center and the Remote app on a phone show and can do.
+@MainActor
+private struct NowPlaying {
+    private var wired = false
+
+    mutating func commands(_ m: PlayerModel) {
+        guard !wired else { return }
+        wired = true
+        let c = MPRemoteCommandCenter.shared()
+        c.playCommand.addTarget { _ in Task { @MainActor in m.play() }; return .success }
+        c.pauseCommand.addTarget { _ in Task { @MainActor in m.pause() }; return .success }
+        c.togglePlayPauseCommand.addTarget { _ in Task { @MainActor in m.toggle() }; return .success }
+        c.skipForwardCommand.preferredIntervals = [NSNumber(value: Settings.seekStep)]
+        c.skipBackwardCommand.preferredIntervals = [NSNumber(value: Settings.seekStep)]
+        c.skipForwardCommand.addTarget { _ in Task { @MainActor in m.skip(Double(Settings.seekStep)) }; return .success }
+        c.skipBackwardCommand.addTarget { _ in Task { @MainActor in m.skip(-Double(Settings.seekStep)) }; return .success }
+        c.nextTrackCommand.addTarget { _ in Task { @MainActor in m.playNext() }; return .success }
+        c.changePlaybackPositionCommand.addTarget { e in
+            if let e = e as? MPChangePlaybackPositionCommandEvent {
+                let t = e.positionTime
+                Task { @MainActor in m.seek(t, play: !m.paused) }
+            }
+            return .success
+        }
+    }
+
+    func update(_ m: PlayerModel) {
+        guard let v = m.video, MusicPlayer.shared.song == nil else { return }
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: v.title,
+            MPMediaItemPropertyArtist: v.author,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: m.time,
+            MPNowPlayingInfoPropertyPlaybackRate: m.paused ? 0 : Double(m.rate),
+            MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.video.rawValue,
+        ]
+        if m.length > 0 { info[MPMediaItemPropertyPlaybackDuration] = m.length }
+        if v.live { info[MPNowPlayingInfoPropertyIsLiveStream] = true }
+        if let img = Images.cached(v.cardPictures) {
+            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: img.size) { _ in img }
+        }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    func clear() {
+        if MusicPlayer.shared.song == nil { MPNowPlayingInfoCenter.default().nowPlayingInfo = nil }
+    }
+}
+
+/// the video itself, with the subtitles over it
 final class PlayerSurface: UIView {
     override class var layerClass: AnyClass { AVPlayerLayer.self }
     var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
-    let captions = CaptionLayer(compact: true)
+    let captions = CaptionLayer()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -394,7 +601,7 @@ final class PlayerSurface: UIView {
     required init?(coder: NSCoder) { fatalError() }
 }
 
-struct InlineVideo: UIViewRepresentable {
+struct VideoSurface: UIViewRepresentable {
     let model: PlayerModel
 
     func makeUIView(context: Context) -> PlayerSurface {
@@ -411,418 +618,11 @@ struct InlineVideo: UIViewRepresentable {
     }
 }
 
-/// the same player, full screen, in Apple's player view
-struct FullPlayer: UIViewControllerRepresentable {
-    let model: PlayerModel
-
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let vc = AVPlayerViewController()
-        vc.player = model.player
-        if let overlay = vc.contentOverlayView {
-            let captions = CaptionLayer()
-            captions.translatesAutoresizingMaskIntoConstraints = false
-            overlay.addSubview(captions)
-            NSLayoutConstraint.activate([
-                captions.leadingAnchor.constraint(equalTo: overlay.leadingAnchor),
-                captions.trailingAnchor.constraint(equalTo: overlay.trailingAnchor),
-                captions.topAnchor.constraint(equalTo: overlay.topAnchor),
-                captions.bottomAnchor.constraint(equalTo: overlay.bottomAnchor),
-            ])
-            model.attach(captions)
-        }
-        model.screen = vc
-        model.menu()
-        model.sponsorBlock.attach(to: vc)
-        model.player.play()
-        return vc
-    }
-
-    func updateUIViewController(_ vc: AVPlayerViewController, context: Context) {}
-
-    static func dismantleUIViewController(_ vc: AVPlayerViewController, coordinator: ()) {
-        PlayerModel.shared.sponsorBlock.detach(from: vc)
-        vc.player = nil
-    }
-}
-
 /// a long text opened full screen (the description, a comment)
 struct Reading: Identifiable {
     var title: String
     var text: String
     var id: String { title + text.prefix(40) }
-}
-
-/// One video (WatchScreen.kt on a TV): it plays at the top of its page, with the title, the
-/// channel and the buttons under it, and Up next or the comments in a column on the right.
-/// OK on the video: full screen. Play/Pause on the remote: pause.
-struct WatchView: View {
-    let video: Video
-    @State private var model = PlayerModel.shared
-    @State private var library = Library.shared
-    @State private var side: Side = Settings.hideRelated ? .comments : .next
-    @State private var comments: [Comment] = []
-    @State private var commentsNext: String?
-    @State private var commentsLoaded = false
-    @State private var replies: [String: [Comment]] = [:]
-    @State private var reading: Reading?
-    @FocusState private var playerFocused: Bool
-
-    enum Side { case next, comments }
-
-    var body: some View {
-        GeometryReader { g in
-            HStack(alignment: .top, spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        playerBox
-                        info
-                    }
-                    .padding(32)
-                }
-                .focusSection()
-                if showsSide {
-                    sidePanel
-                        .frame(width: min(760, 0.32 * g.size.width))
-                        .focusSection()
-                }
-            }
-        }
-        .task(id: video.id) {
-            model.open(video)
-            playerFocused = true
-            // `-open <id> -fullscreen YES`: straight to full screen (the CI check)
-            if UserDefaults.standard.bool(forKey: "fullscreen"), !openedFullscreen {
-                openedFullscreen = true
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                model.fullscreen = true
-            }
-        }
-        .task(id: commentsKey) { await firstComments() }
-        .onPlayPauseCommand { model.toggle() }
-        .sheet(item: $reading) { ReadingView(reading: $0) }
-    }
-
-    private var current: Video { model.video?.id == video.id ? model.video! : video }
-    private var mine: Bool { model.video?.id == video.id }
-    private var showsSide: Bool { !(Settings.hideRelated && Settings.hideComments) }
-    private var commentsKey: String { "\(video.id)|\(side == .comments)|\(model.details?.commentsToken != nil)" }
-
-    // MARK: the player
-
-    @ViewBuilder private var playerBox: some View {
-        if mine, let e = model.error {
-            ZStack {
-                Picture(current.pictures).overlay(Color.black.opacity(0.75))
-                VStack(spacing: 24) {
-                    Text(e).font(Fonts.bodyMedium).multilineTextAlignment(.center).foregroundStyle(Theme.text).frame(maxWidth: 800)
-                    TextButton("Try again") { model.retry() }
-                        .focused($playerFocused)
-                }
-            }
-            .aspectRatio(16 / 9, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 24))
-        } else {
-            Button { model.fullscreen = true } label: {
-                ZStack {
-                    Color.black
-                    InlineVideo(model: model)
-                    if !mine || model.loading || model.stream == nil {
-                        Picture(current.pictures)
-                        ProgressView().scaleEffect(1.5)
-                    } else if model.paused {
-                        Image(systemName: model.ended ? "arrow.counterclockwise" : "play.fill")
-                            .font(.system(size: 64)).foregroundStyle(.white)
-                            .frame(width: 140, height: 140)
-                            .background(Color.black.opacity(0.6), in: Circle())
-                    }
-                }
-                .aspectRatio(16 / 9, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 24))
-            }
-            .buttonStyle(CardFocus(radius: 24, scale: 1.02))
-            .focused($playerFocused)
-        }
-    }
-
-    // MARK: under the player
-
-    private var info: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text(current.title).font(.system(size: 32, weight: .bold)).lineLimit(2)
-            HStack(spacing: 8) {
-                Text(meta).font(Fonts.bodySmall).foregroundStyle(Theme.sub).lineLimit(1)
-                if let d = model.stream?.description, mine, !d.isEmpty {
-                    TextButton("...more", color: Theme.text) { reading = Reading(title: current.title, text: d) }
-                }
-            }
-            if !current.channelId.isEmpty {
-                HStack(spacing: 24) {
-                    Button { Nav.shared.push(.channel(current.channelId)) } label: {
-                        HStack(spacing: 24) {
-                            Avatar(url: avatarURL, name: current.author, size: 72)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(current.author).font(Fonts.titleSmall).foregroundStyle(Theme.text).lineLimit(1)
-                                if let s = model.details?.subsText, mine, !s.isEmpty {
-                                    Text(s).font(Fonts.bodySmall).foregroundStyle(Theme.sub).lineLimit(1)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 16).padding(.vertical, 8)
-                    }
-                    .buttonStyle(.glow(radius: 20))
-                    SubscribeButton(channel: Channel(id: current.channelId, name: current.author,
-                                                     avatar: mine ? (model.details?.avatar ?? current.avatar) : current.avatar))
-                }
-                .focusSection()
-            }
-            ScrollView(.horizontal) {
-                HStack(spacing: 16) {
-                    likePill
-                    ActionChip(library.isLater(current.id) ? "Saved" : "Watch later",
-                               icon: library.isLater(current.id) ? "checkmark" : "clock") { library.toggleLater(current) }
-                    if mine && model.round.count > 1 {
-                        ActionChip(model.loopList ? "Repeating playlist" : "Repeat playlist",
-                                   icon: model.loopList ? "repeat.circle.fill" : "repeat") { model.loopList.toggle() }
-                    }
-                    if mine, let n = model.next() {
-                        ActionChip("Next", icon: "forward.end.fill") {
-                            if model.queue.first?.id == n.id { model.queue.removeFirst() }
-                            Nav.shared.replace(with: n)
-                        }
-                    }
-                }
-                .padding(.vertical, 12)
-            }
-            .scrollClipDisabled()
-            .focusSection()
-            if mine, let g = model.glance {
-                glanceBox(g)
-            }
-        }
-        .padding(.top, 24)
-    }
-
-    /// "This video at a glance": the words it keeps coming back to, then its key moments (OK plays from there)
-    private func glanceBox(_ g: Glance.Result) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 12) {
-                Image(systemName: "sparkles").font(.system(size: 28)).foregroundStyle(Theme.teal)
-                Text("This video at a glance").font(Fonts.titleSmall).foregroundStyle(Theme.text)
-            }
-            Text("Made on this TV from the captions").font(Fonts.bodySmall).foregroundStyle(Theme.sub)
-            if !g.keywords.isEmpty {
-                Text(g.keywords.map { "#" + $0 }.joined(separator: "   "))
-                    .font(Fonts.bodyMedium).foregroundStyle(Theme.text).lineLimit(2)
-            }
-            ForEach(g.moments) { m in
-                Button { model.seek(m.start) } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 20) {
-                        Text(duration(Int(m.start))).font(Fonts.labelLarge).foregroundStyle(Theme.teal)
-                            .frame(width: 110, alignment: .leading)
-                        Text(m.text).font(Fonts.bodySmall).foregroundStyle(Theme.text).lineLimit(2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .padding(.horizontal, 20).padding(.vertical, 14)
-                }
-                .buttonStyle(.glow(radius: 16))
-            }
-        }
-        .padding(24)
-        .background(Theme.chip.opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
-        .padding(.top, 8)
-        .focusSection()
-    }
-
-    private var likePill: some View {
-        let liked = library.isLiked(current.id), disliked = library.isDisliked(current.id)
-        return HStack(spacing: 0) {
-            Button { library.toggleLike(current, keywords: model.stream?.keywords ?? []) } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: liked ? "hand.thumbsup.fill" : "hand.thumbsup").font(.system(size: 36))
-                    Text(likes).font(Fonts.labelLarge)
-                }
-                .foregroundStyle(Theme.text)
-                .padding(.leading, 32).padding(.trailing, 24).frame(height: 72)
-            }
-            .buttonStyle(Glow(shape: UnevenRoundedRectangle(topLeadingRadius: 36, bottomLeadingRadius: 36)))
-            Rectangle().fill(Theme.sub.opacity(0.5)).frame(width: 2, height: 40)
-            Button { library.toggleDislike(current) } label: {
-                Image(systemName: disliked ? "hand.thumbsdown.fill" : "hand.thumbsdown").font(.system(size: 36))
-                    .foregroundStyle(Theme.text)
-                    .padding(.leading, 24).padding(.trailing, 32).frame(height: 72)
-            }
-            .buttonStyle(Glow(shape: UnevenRoundedRectangle(bottomTrailingRadius: 36, topTrailingRadius: 36)))
-        }
-        .background(Theme.chip, in: Capsule())
-    }
-
-    private var likes: String {
-        if mine, let l = model.details?.likesText, !l.isEmpty { return l }
-        return "Like"
-    }
-
-    private var avatarURL: URL? {
-        if mine, let a = model.details?.avatar, !a.isEmpty { return imageURL(a) }
-        return current.avatarURL
-    }
-
-    private var meta: String {
-        let d = mine ? model.details : nil
-        let views = d?.viewsText.isEmpty == false ? d!.viewsText : current.viewsText
-        let when = d?.publishedText.isEmpty == false ? d!.publishedText : (current.publishedText.isEmpty ? ago(current.publishedAt) : current.publishedText)
-        return [views, when].filter { !$0.isEmpty }.joined(separator: " · ")
-    }
-
-    // MARK: beside the player
-
-    private var sidePanel: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 16) {
-                if !Settings.hideRelated { Chip("Up next", selected: side == .next, filter: true) { side = .next } }
-                if !Settings.hideComments { Chip("Comments", selected: side == .comments, filter: true) { side = .comments } }
-            }
-            .padding(.horizontal, 16).padding(.top, 32).padding(.bottom, 16)
-            .focusSection()
-            if side == .next {
-                upNext
-            } else {
-                commentList
-            }
-        }
-    }
-
-    private var upNext: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 4) {
-                let items = mine ? model.related.items : []
-                if items.isEmpty {
-                    Status(error: mine && model.details != nil ? "Nothing to show" : nil).frame(height: 400)
-                }
-                ForEach(items) { item in
-                    Group {
-                        if let v = item.video {
-                            VideoRow(video: v, thumb: 256, dots: false) { Nav.shared.replace(with: v) }
-                        } else {
-                            ItemRow(item: item)
-                        }
-                    }
-                    .onAppear {
-                        if items.suffix(3).contains(where: { $0.id == item.id }) { Task { await model.related.more(YT.relatedMore) } }
-                    }
-                }
-            }
-            .padding(.horizontal, 8).padding(.bottom, 32)
-        }
-    }
-
-    private var commentList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 8) {
-                if comments.isEmpty {
-                    Status(error: commentsLoaded ? "No comments" : nil).frame(height: 400)
-                }
-                ForEach(comments) { c in
-                    VStack(alignment: .leading, spacing: 4) {
-                        CommentView(comment: c, creator: c.channelId == current.channelId && !c.channelId.isEmpty) {
-                            reading = Reading(title: c.author, text: c.text)
-                        }
-                        if c.replies > 0, c.repliesToken != nil {
-                            TextButton(replies[c.id] == nil ? "\(c.replies) replies" : "Hide replies", color: Theme.link) {
-                                Task { await toggleReplies(c) }
-                            }
-                            .padding(.leading, 96)
-                        }
-                        ForEach(replies[c.id] ?? []) { r in
-                            CommentView(comment: r, creator: r.channelId == current.channelId && !r.channelId.isEmpty) {
-                                reading = Reading(title: r.author, text: r.text)
-                            }
-                            .padding(.leading, 80)
-                        }
-                    }
-                    .onAppear { if c.id == comments.last?.id { Task { await moreComments() } } }
-                }
-            }
-            .padding(.horizontal, 8).padding(.bottom, 32)
-        }
-    }
-
-    private func firstComments() async {
-        guard side == .comments, mine, comments.isEmpty, let token = model.details?.commentsToken else {
-            if mine && model.details != nil && model.details?.commentsToken == nil { commentsLoaded = true }
-            return
-        }
-        commentsNext = token
-        await moreComments()
-        commentsLoaded = true
-    }
-
-    private func moreComments() async {
-        guard let token = commentsNext else { return }
-        commentsNext = nil
-        guard let page = try? await YT.comments(token) else { return }
-        let seen = Set(comments.map(\.id))
-        comments += page.items.filter { !seen.contains($0.id) }
-        commentsNext = page.next
-    }
-
-    private func toggleReplies(_ c: Comment) async {
-        if replies[c.id] != nil { replies[c.id] = nil; return }
-        guard let token = c.repliesToken, let page = try? await YT.comments(token) else { return }
-        replies[c.id] = page.items
-    }
-}
-
-/// launch option `-fullscreen YES` is acted on once
-@MainActor private var openedFullscreen = false
-
-/// a rounded grey button with an icon and a word (Watch later, Next)
-struct ActionChip: View {
-    let title: String
-    let icon: String
-    let action: () -> Void
-
-    init(_ title: String, icon: String, action: @escaping () -> Void) {
-        self.title = title; self.icon = icon; self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                Image(systemName: icon).font(.system(size: 34))
-                Text(title).font(Fonts.labelLarge).lineLimit(1)
-            }
-            .foregroundStyle(Theme.text)
-            .padding(.horizontal, 32).frame(height: 72)
-        }
-        .buttonStyle(Glow(shape: Capsule(), fill: Theme.chip))
-    }
-}
-
-struct CommentView: View {
-    let comment: Comment
-    var creator = false
-    let open: () -> Void
-
-    var body: some View {
-        Button(action: open) {
-            HStack(alignment: .top, spacing: 24) {
-                Avatar(url: comment.avatarURL, name: comment.author, size: 64)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text([comment.pinned ? "📌" : "", comment.author, comment.published].filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(.system(size: 24, weight: creator ? .bold : .regular))
-                        .foregroundStyle(creator ? Theme.text : Theme.sub).lineLimit(1)
-                    Text(comment.text).font(Fonts.bodyMedium).foregroundStyle(Theme.text).lineLimit(6)
-                        .multilineTextAlignment(.leading)
-                    if !comment.likes.isEmpty {
-                        Label(comment.likes, systemImage: "hand.thumbsup").font(Fonts.bodySmall).foregroundStyle(Theme.sub)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(16)
-        }
-        .buttonStyle(.glow(radius: 16))
-    }
 }
 
 /// a long text, a paragraph at a time so the remote can scroll through it
@@ -849,123 +649,5 @@ struct ReadingView: View {
     }
 }
 
-/// A channel: its banner, picture, name, handle and subscribers, Subscribe, then Videos /
-/// Shorts / Live / Playlists as cards.
-struct ChannelView: View {
-    let id: String
-    @State private var library = Library.shared
-    @State private var page: ChannelPage?
-    @State private var videos = Feed()
-    @State private var tab = YT.videosTab
-    @State private var error: String?
-
-    var body: some View {
-        if page == nil {
-            Status(error: error) { Task { await load() } }
-                .task(id: id) { await load() }
-        } else if let p = page {
-            ItemGrid(items: videos.items, more: { await videos.more(YT.browseMore) }, focusFirst: true) {
-                if !p.banner.isEmpty {
-                    Picture(imageURL(p.banner))
-                        .aspectRatio(6.2, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
-                        .padding(.horizontal, 32).padding(.top, 24)
-                }
-                HStack(spacing: 32) {
-                    Avatar(url: imageURL(p.avatar), name: p.name, size: 144)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(p.name).font(Fonts.titleLarge).lineLimit(1)
-                        Text([p.handle, p.subsText].filter { !$0.isEmpty }.joined(separator: " · "))
-                            .font(Fonts.bodySmall).foregroundStyle(Theme.sub)
-                    }
-                    Spacer()
-                    SubscribeButton(channel: Channel(id: id, name: p.name, avatar: p.avatar))
-                }
-                .padding(32)
-                .focusSection()
-                HStack(spacing: 16) {
-                    ForEach(YT.channelTabs.filter { !(Settings.hideShorts && $0.name == "Shorts") }) { t in
-                        Chip(t.name, selected: tab == t.params, filter: true) {
-                            guard tab != t.params else { return }
-                            tab = t.params
-                            Task { await loadTab() }
-                        }
-                    }
-                }
-                .padding(.horizontal, 32)
-                .focusSection()
-                if videos.items.isEmpty {
-                    Status(error: videos.loaded ? (videos.error ?? "Nothing here") : nil).frame(height: 400)
-                }
-            }
-        }
-    }
-
-    private func load() async {
-        error = nil
-        do {
-            let p = try await YT.channel(id)
-            page = p
-            videos.items = p.videos.items.filter(Feed.keep)
-            videos.next = p.videos.next
-            videos.loaded = true
-            library.refresh(Channel(id: id, name: p.name, avatar: p.avatar))   // keeps the saved name and picture up to date
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    private func loadTab() async {
-        let f = Feed()
-        videos = f
-        let t = tab
-        let channel = id
-        await f.load { try await YT.channel(channel, tab: t).videos }
-    }
-}
-
-/// A playlist: its title, who made it and how many videos, Play all, then the videos as a list.
-struct PlaylistView: View {
-    let id: String
-    @State private var page: PlaylistPage?
-    @State private var videos = Feed()
-    @State private var error: String?
-
-    var body: some View {
-        if let p = page {
-            ItemList(items: videos.items, more: { await videos.more(YT.browseMore) }, focusFirst: true) {
-                HStack(alignment: .center, spacing: 32) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(p.title).font(Fonts.titleLarge).lineLimit(2)
-                        Text([p.author, p.countText].filter { !$0.isEmpty }.joined(separator: " · "))
-                            .font(Fonts.bodySmall).foregroundStyle(Theme.sub)
-                    }
-                    Spacer()
-                    let list = videos.items.compactMap(\.video)
-                    if let first = list.first {
-                        FilledButton("Play all", icon: "play.fill") {
-                            _ = first
-                            PlayerModel.shared.playAll(list)
-                        }
-                    }
-                }
-                .padding(.horizontal, 24).padding(.vertical, 16)
-            }
-        } else {
-            Status(error: error) { Task { await load() } }
-                .task(id: id) { await load() }
-        }
-    }
-
-    private func load() async {
-        error = nil
-        do {
-            let p = try await YT.playlist(id)
-            page = p
-            videos.items = p.videos.items
-            videos.next = p.videos.next
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-}
+/// launch option `-fullscreen YES` is kept for the CI check (the player is always full screen now)
+@MainActor var openedFullscreen = false
