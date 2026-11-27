@@ -1,0 +1,6 @@
+- Loudness matching: loud videos and songs are turned down to YouTube's level
+- Equalizer (12 presets, 10 bands), stereo width, balance and night mode, for music and optionally videos
+- Keep a video on your TubeHaus server from the download dialog; every device plays it from there
+- Android Auto: the picture plays again with a car connected (#129)
+- Video lengths on subscription-feed thumbnails (#131)
+- Desktop: the Home key goes to the top of the page (#128); theater-mode buttons answer over their whole area (#130)
