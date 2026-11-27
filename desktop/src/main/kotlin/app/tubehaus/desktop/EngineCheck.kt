@@ -40,10 +40,21 @@ fun main() = runBlocking {
             .use { r -> require(r.code == 206) { "HTTP ${r.code} $url" }; "${r.body!!.bytes().size} B ${r.header("Content-Type")}" }
         check("server stream") {
             val s = YouTube.stream("jNQXAC9IVRw")
+            // kept on that server (#126): its one file
+            if (s.client.startsWith("server-kept")) return@check "${s.title}: kept on the server, ${first(s.hls!!)}"
             require(s.client == "server") { "came from ${s.client}" }
             val v = s.video.maxBy { it.height }
             val a = s.audio.maxBy { it.bitrate }
             "${s.title} | ${s.author} ${s.lengthSec}s, ${s.video.size}v/${s.audio.size}a, top ${v.height}p ${v.codecs} (init ${v.initRange}); video ${first(v.url)}; audio ${first(a.url)}"
+        }
+        // TH_SERVER_KEEP=<id>: that video kept on the server (#126), then played from its file
+        System.getenv("TH_SERVER_KEEP")?.let { id ->
+            check("server keep") {
+                app.tubehaus.engine.ServerVideo.keep(Video(id, ""), 144)
+                val s = YouTube.stream(id)
+                require(s.client.startsWith("server-kept")) { "came from ${s.client}" }
+                "${s.title}: ${first(s.hls!!)}"
+            }
         }
         // a video with dubs: one track per language, the original the default
         check("server dubs") {

@@ -44,6 +44,15 @@ fun tr(s: String): String {
 fun textOverride(key: String, lang: String): String = ""
 
 private val KO by lazy { mapOf(
+    "Keep on the server instead" to "대신 서버에 보관",
+    "Every device then plays it from the server" to "그러면 모든 기기가 서버에서 재생해요",
+    "Keeping it on the server..." to "서버에 보관하는 중...",
+    "Kept on the server" to "서버에 보관했어요",
+    "A live stream can't be kept" to "라이브는 보관할 수 없어요",
+    "The server has no room for more kept videos" to "서버에 보관할 공간이 더 없어요",
+    "The server is busy saving other videos. Try again when they finish" to "서버가 다른 동영상을 저장하는 중이에요. 끝나면 다시 해 보세요",
+    "This server doesn't keep videos (or didn't accept the login)" to "이 서버는 동영상을 보관하지 않아요 (또는 로그인을 받지 않았어요)",
+    "The server couldn't save it" to "서버가 저장하지 못했어요",
     "Back to the top of the page" to "페이지 맨 위로",
     "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "서버 인증서를 믿을 수 없어요. 인증서 추가로 그 서버의 CA 인증서를 넣으세요",
     "Custom certificates (internal / local SSL):" to "사설 인증서 (내부 / 로컬 SSL):",
@@ -815,6 +824,15 @@ private val KO by lazy { mapOf(
 
 // Español. Machine-made, not yet read by a native speaker: corrections welcome
 private val ES by lazy { mapOf(
+    "Keep on the server instead" to "Guardar en el servidor en su lugar",
+    "Every device then plays it from the server" to "Así todos los dispositivos lo reproducen desde el servidor",
+    "Keeping it on the server..." to "Guardándolo en el servidor...",
+    "Kept on the server" to "Guardado en el servidor",
+    "A live stream can't be kept" to "Un directo no se puede guardar",
+    "The server has no room for more kept videos" to "El servidor no tiene espacio para más videos guardados",
+    "The server is busy saving other videos. Try again when they finish" to "El servidor está guardando otros videos. Inténtalo cuando terminen",
+    "This server doesn't keep videos (or didn't accept the login)" to "Este servidor no guarda videos (o no aceptó el inicio de sesión)",
+    "The server couldn't save it" to "El servidor no pudo guardarlo",
     "Back to the top of the page" to "Volver al principio de la página",
     "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "No se confía en el certificado del servidor. Añade el certificado de su CA con Añadir certificado",
     "Custom certificates (internal / local SSL):" to "Certificados propios (SSL interno / local):",
@@ -1492,6 +1510,15 @@ private val ES by lazy { mapOf(
 
 // 日本語. Machine-made, not yet read by a native speaker: corrections welcome
 private val JA by lazy { mapOf(
+    "Keep on the server instead" to "代わりにサーバーに保管",
+    "Every device then plays it from the server" to "どの端末でもサーバーから再生されます",
+    "Keeping it on the server..." to "サーバーに保管しています...",
+    "Kept on the server" to "サーバーに保管しました",
+    "A live stream can't be kept" to "ライブは保管できません",
+    "The server has no room for more kept videos" to "サーバーにこれ以上保管する容量がありません",
+    "The server is busy saving other videos. Try again when they finish" to "サーバーがほかの動画を保存中です。終わってからもう一度試してください",
+    "This server doesn't keep videos (or didn't accept the login)" to "このサーバーは動画を保管しません（またはログインが受け付けられませんでした）",
+    "The server couldn't save it" to "サーバーが保存できませんでした",
     "Back to the top of the page" to "ページの先頭へ",
     "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "サーバーの証明書を信頼できません。「証明書を追加」でそのサーバーの CA 証明書を追加してください",
     "Custom certificates (internal / local SSL):" to "独自の証明書(内部 / ローカル SSL):",
@@ -2169,6 +2196,15 @@ private val JA by lazy { mapOf(
 
 // Deutsch. Machine-made, not yet read by a native speaker: corrections welcome
 private val DE by lazy { mapOf(
+    "Keep on the server instead" to "Stattdessen auf dem Server behalten",
+    "Every device then plays it from the server" to "Dann spielt jedes Gerät es vom Server",
+    "Keeping it on the server..." to "Wird auf dem Server behalten...",
+    "Kept on the server" to "Auf dem Server behalten",
+    "A live stream can't be kept" to "Ein Livestream lässt sich nicht behalten",
+    "The server has no room for more kept videos" to "Auf dem Server ist kein Platz für weitere Videos",
+    "The server is busy saving other videos. Try again when they finish" to "Der Server speichert gerade andere Videos. Versuch es, wenn sie fertig sind",
+    "This server doesn't keep videos (or didn't accept the login)" to "Dieser Server behält keine Videos (oder hat die Anmeldung nicht angenommen)",
+    "The server couldn't save it" to "Der Server konnte es nicht speichern",
     "Back to the top of the page" to "Zum Seitenanfang",
     "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "Dem Zertifikat des Servers wird nicht vertraut. Füge mit „Zertifikat hinzufügen“ das Zertifikat seiner CA hinzu",
     "Custom certificates (internal / local SSL):" to "Eigene Zertifikate (internes / lokales SSL):",
@@ -2846,6 +2882,15 @@ private val DE by lazy { mapOf(
 
 // 简体中文 (Simplified Chinese). Machine-made, not yet read by a native speaker: corrections welcome
 private val ZH by lazy { mapOf(
+    "Keep on the server instead" to "改为保存在服务器上",
+    "Every device then plays it from the server" to "之后所有设备都从服务器播放",
+    "Keeping it on the server..." to "正在保存到服务器...",
+    "Kept on the server" to "已保存在服务器上",
+    "A live stream can't be kept" to "直播无法保存",
+    "The server has no room for more kept videos" to "服务器没有空间再保存视频了",
+    "The server is busy saving other videos. Try again when they finish" to "服务器正在保存其他视频。完成后再试",
+    "This server doesn't keep videos (or didn't accept the login)" to "此服务器不保存视频（或未接受登录）",
+    "The server couldn't save it" to "服务器无法保存",
     "Back to the top of the page" to "回到页面顶部",
     "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "服务器的证书不受信任。请用“添加证书”添加其 CA 证书",
     "Custom certificates (internal / local SSL):" to "自定义证书(内部 / 本地 SSL):",
@@ -3523,6 +3568,15 @@ private val ZH by lazy { mapOf(
 
 // Português (Portuguese). Machine-made, not yet read by a native speaker: corrections welcome
 private val PT by lazy { mapOf(
+    "Keep on the server instead" to "Guardar no servidor em vez disso",
+    "Every device then plays it from the server" to "Assim todos os dispositivos tocam do servidor",
+    "Keeping it on the server..." to "Guardando no servidor...",
+    "Kept on the server" to "Guardado no servidor",
+    "A live stream can't be kept" to "Uma live não pode ser guardada",
+    "The server has no room for more kept videos" to "O servidor não tem espaço para mais vídeos guardados",
+    "The server is busy saving other videos. Try again when they finish" to "O servidor está salvando outros vídeos. Tente quando terminarem",
+    "This server doesn't keep videos (or didn't accept the login)" to "Este servidor não guarda vídeos (ou não aceitou o login)",
+    "The server couldn't save it" to "O servidor não conseguiu salvar",
     "Back to the top of the page" to "Voltar ao topo da página",
     "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "O certificado do servidor não é confiável. Adicione o certificado da CA dele em Adicionar certificado",
     "Custom certificates (internal / local SSL):" to "Certificados próprios (SSL interno / local):",
@@ -4200,6 +4254,15 @@ private val PT by lazy { mapOf(
 
 // Français (French). Machine-made, not yet read by a native speaker: corrections welcome
 private val FR by lazy { mapOf(
+    "Keep on the server instead" to "Garder plutôt sur le serveur",
+    "Every device then plays it from the server" to "Chaque appareil la lira alors depuis le serveur",
+    "Keeping it on the server..." to "Enregistrement sur le serveur...",
+    "Kept on the server" to "Gardée sur le serveur",
+    "A live stream can't be kept" to "Un direct ne peut pas être gardé",
+    "The server has no room for more kept videos" to "Le serveur n'a plus de place pour d'autres vidéos",
+    "The server is busy saving other videos. Try again when they finish" to "Le serveur enregistre d'autres vidéos. Réessayez quand elles sont finies",
+    "This server doesn't keep videos (or didn't accept the login)" to "Ce serveur ne garde pas de vidéos (ou n'a pas accepté la connexion)",
+    "The server couldn't save it" to "Le serveur n'a pas pu l'enregistrer",
     "Back to the top of the page" to "Revenir en haut de la page",
     "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "Le certificat du serveur n'est pas approuvé. Ajoutez le certificat de son autorité (CA) avec Ajouter un certificat",
     "Custom certificates (internal / local SSL):" to "Certificats personnalisés (SSL interne / local) :",
@@ -4877,6 +4940,15 @@ private val FR by lazy { mapOf(
 
 // Русский (Russian). Machine-made, not yet read by a native speaker: corrections welcome
 private val RU by lazy { mapOf(
+    "Keep on the server instead" to "Вместо этого хранить на сервере",
+    "Every device then plays it from the server" to "Тогда все устройства будут воспроизводить с сервера",
+    "Keeping it on the server..." to "Сохраняется на сервере...",
+    "Kept on the server" to "Сохранено на сервере",
+    "A live stream can't be kept" to "Трансляцию нельзя сохранить",
+    "The server has no room for more kept videos" to "На сервере нет места для новых видео",
+    "The server is busy saving other videos. Try again when they finish" to "Сервер сохраняет другие видео. Попробуйте, когда они закончатся",
+    "This server doesn't keep videos (or didn't accept the login)" to "Этот сервер не хранит видео (или не принял вход)",
+    "The server couldn't save it" to "Сервер не смог сохранить",
     "Back to the top of the page" to "В начало страницы",
     "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "Сертификату сервера нет доверия. Добавьте сертификат его центра (CA) кнопкой «Добавить сертификат»",
     "Custom certificates (internal / local SSL):" to "Свои сертификаты (внутренний / локальный SSL):",
@@ -5554,6 +5626,15 @@ private val RU by lazy { mapOf(
 
 // हिन्दी (Hindi). Machine-made, not yet read by a native speaker: corrections welcome
 private val HI by lazy { mapOf(
+    "Keep on the server instead" to "इसके बजाय सर्वर पर रखें",
+    "Every device then plays it from the server" to "फिर हर डिवाइस इसे सर्वर से चलाएगा",
+    "Keeping it on the server..." to "सर्वर पर रखा जा रहा है...",
+    "Kept on the server" to "सर्वर पर रखा गया",
+    "A live stream can't be kept" to "लाइव स्ट्रीम नहीं रखी जा सकती",
+    "The server has no room for more kept videos" to "सर्वर पर और वीडियो रखने की जगह नहीं है",
+    "The server is busy saving other videos. Try again when they finish" to "सर्वर दूसरे वीडियो सेव कर रहा है। उनके पूरे होने पर फिर कोशिश करें",
+    "This server doesn't keep videos (or didn't accept the login)" to "यह सर्वर वीडियो नहीं रखता (या उसने लॉगिन स्वीकार नहीं किया)",
+    "The server couldn't save it" to "सर्वर इसे सेव नहीं कर सका",
     "Back to the top of the page" to "पेज में सबसे ऊपर जाएँ",
     "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "सर्वर के प्रमाणपत्र पर भरोसा नहीं है। \"प्रमाणपत्र जोड़ें\" से उसका CA प्रमाणपत्र जोड़ें",
     "Custom certificates (internal / local SSL):" to "अपने प्रमाणपत्र (आंतरिक / लोकल SSL):",
@@ -6231,6 +6312,15 @@ private val HI by lazy { mapOf(
 
 // Bahasa Indonesia (Indonesian). Machine-made, not yet read by a native speaker: corrections welcome
 private val ID by lazy { mapOf(
+    "Keep on the server instead" to "Simpan di server saja",
+    "Every device then plays it from the server" to "Lalu semua perangkat memutarnya dari server",
+    "Keeping it on the server..." to "Menyimpan di server...",
+    "Kept on the server" to "Disimpan di server",
+    "A live stream can't be kept" to "Siaran langsung tidak bisa disimpan",
+    "The server has no room for more kept videos" to "Server tidak punya ruang untuk video lagi",
+    "The server is busy saving other videos. Try again when they finish" to "Server sedang menyimpan video lain. Coba lagi setelah selesai",
+    "This server doesn't keep videos (or didn't accept the login)" to "Server ini tidak menyimpan video (atau tidak menerima login)",
+    "The server couldn't save it" to "Server tidak bisa menyimpannya",
     "Back to the top of the page" to "Kembali ke atas halaman",
     "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "Sertifikat server tidak dipercaya. Tambahkan sertifikat CA-nya lewat Tambah sertifikat",
     "Custom certificates (internal / local SSL):" to "Sertifikat sendiri (SSL internal / lokal):",
@@ -6908,6 +6998,15 @@ private val ID by lazy { mapOf(
 
 // Türkçe (Turkish). Machine-made, not yet read by a native speaker: corrections welcome
 private val TR by lazy { mapOf(
+    "Keep on the server instead" to "Bunun yerine sunucuda sakla",
+    "Every device then plays it from the server" to "Sonra her cihaz onu sunucudan oynatır",
+    "Keeping it on the server..." to "Sunucuda saklanıyor...",
+    "Kept on the server" to "Sunucuda saklandı",
+    "A live stream can't be kept" to "Canlı yayın saklanamaz",
+    "The server has no room for more kept videos" to "Sunucuda başka video için yer yok",
+    "The server is busy saving other videos. Try again when they finish" to "Sunucu başka videoları kaydediyor. Bitince tekrar deneyin",
+    "This server doesn't keep videos (or didn't accept the login)" to "Bu sunucu video saklamıyor (ya da girişi kabul etmedi)",
+    "The server couldn't save it" to "Sunucu kaydedemedi",
     "Back to the top of the page" to "Sayfanın başına dön",
     "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "Sunucunun sertifikasına güvenilmiyor. CA sertifikasını Sertifika ekle ile ekleyin",
     "Custom certificates (internal / local SSL):" to "Özel sertifikalar (dahili / yerel SSL):",
@@ -7585,6 +7684,15 @@ private val TR by lazy { mapOf(
 
 // বাংলা (Bengali). Machine-made, not yet read by a native speaker: corrections welcome
 private val BN by lazy { mapOf(
+    "Keep on the server instead" to "বরং সার্ভারে রাখুন",
+    "Every device then plays it from the server" to "তখন সব ডিভাইস সার্ভার থেকে চালাবে",
+    "Keeping it on the server..." to "সার্ভারে রাখা হচ্ছে...",
+    "Kept on the server" to "সার্ভারে রাখা হয়েছে",
+    "A live stream can't be kept" to "লাইভ স্ট্রিম রাখা যায় না",
+    "The server has no room for more kept videos" to "সার্ভারে আর ভিডিও রাখার জায়গা নেই",
+    "The server is busy saving other videos. Try again when they finish" to "সার্ভার অন্য ভিডিও সেভ করছে। শেষ হলে আবার চেষ্টা করুন",
+    "This server doesn't keep videos (or didn't accept the login)" to "এই সার্ভার ভিডিও রাখে না (বা লগইন গ্রহণ করেনি)",
+    "The server couldn't save it" to "সার্ভার এটি সেভ করতে পারেনি",
     "Back to the top of the page" to "পেজের একদম উপরে যান",
     "The server's certificate isn't trusted. Add its CA certificate with Add certificate" to "সার্ভারের সার্টিফিকেট বিশ্বস্ত নয়। \"সার্টিফিকেট যোগ করুন\" দিয়ে তার CA সার্টিফিকেট যোগ করুন",
     "Custom certificates (internal / local SSL):" to "নিজস্ব সার্টিফিকেট (অভ্যন্তরীণ / লোকাল SSL):",
