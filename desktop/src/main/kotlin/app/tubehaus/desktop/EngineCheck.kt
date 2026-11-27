@@ -22,7 +22,10 @@ fun main() = runBlocking {
     val failed = ArrayList<String>()
     app.tubehaus.engine.InnerTube.identityFile = okio.Path.Companion.run { java.io.File(System.getProperty("java.io.tmpdir"), "tubehaus-check-identity.json").toOkioPath() }
     var fails = 0
+    // TH_ONLY=shorts: only the checks whose name has that in it
+    val only = System.getenv("TH_ONLY")?.takeIf { it.isNotBlank() }
     suspend fun check(name: String, f: suspend () -> String) {
+        if (only != null && only !in name) return
         val t = System.currentTimeMillis()
         try {
             val r = f()
@@ -103,6 +106,12 @@ fun main() = runBlocking {
         val tracks = s.audio.distinctBy { it.audioTrack }
         val main = tracks.filter { it.audioDefault }.map { "${it.audioLang}/${it.audioContent}" }
         "${tracks.size} tracks, default $main, others ${tracks.filter { !it.audioDefault }.take(4).map { "${it.audioLang}/${it.audioContent}" }}"
+    }
+    check("shorts after") {
+        val p = YouTube.shortsAfter("SxEAxK_Eb3Q")
+        val p2 = YouTube.shortsAfter("SxEAxK_Eb3Q", p.next ?: error("no next page"))
+        check(p.items.size >= 4 && p2.items.any { it !in p.items }) { "only ${p.items.size} + ${p2.items.size}" }
+        "${p.items.size} + ${p2.items.size} new: ${p.items.take(3).joinToString { it.id }}"
     }
     check("stream short") { YouTube.stream("SxEAxK_Eb3Q").let { "${it.client}: ${it.title} ${it.lengthSec}s ${it.keywords.take(3)}" } }
     check("stream zoo") {

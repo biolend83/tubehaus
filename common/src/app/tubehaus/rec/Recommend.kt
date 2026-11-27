@@ -410,10 +410,16 @@ class Recommender(private val store: Store, private val feed: Feed) {
         rank(cands, n, skip, Taste(), store.lib.value.hist.associate { it.id to it }, shorts = false)
     }
 
-    suspend fun shorts(n: Int = 10, skip: Set<String> = emptySet()): List<Video> = withContext(Dispatchers.Default) {
+    /**
+     * [seeds]: Shorts just watched to the end or liked. YouTube's own Shorts list after each of them
+     * (what its app plays next) joins the pools; without any, the Shorts liked last start it.
+     */
+    suspend fun shorts(n: Int = 10, skip: Set<String> = emptySet(), seeds: List<String> = emptyList()): List<Video> = withContext(Dispatchers.Default) {
         val t = store.taste.value
         val lib = store.lib.value
         val cands = ArrayList<Cand>()
+        val from = seeds.ifEmpty { lib.likes.filter { it.len in 1..SHORT_MAX }.map { it.id } }.distinct().take(2)
+        val reels = from.map { id -> async { pool("reel:$id", 1800) { YouTube.shortsAfter(id).items.map { Cand(it, "reel") } } } }
         cands += feed.cached().filter { it.short }.map { Cand(it, "sub") }
         val likedCh = t.ch.entries.sortedByDescending { it.value }.filter { it.value > 0.5 && it.key !in lib.subs }.map { it.key }.take(6)
         val likedKw = t.kw.entries.sortedByDescending { it.value }.filter { it.value > 0.5 }.map { it.key }.take(5)
@@ -421,6 +427,7 @@ class Recommender(private val store: Store, private val feed: Feed) {
             likedKw.map { kw -> async { pool("skw:$kw", 1800) { search("$kw #shorts", "kw", kw, true) } } } +
             listOf(async { pool("spop", 1800) { search("#shorts", "pop", null, true) } })
         cands += jobs.awaitAll().flatten()
+        cands += reels.awaitAll().flatten()
         val seen = t.seen.filterValues { now() - it < 30 * 86400 }.keys
         rank(cands.filter { it.v.id !in seen }, n, skip, t, emptyMap(), shorts = true)
     }
@@ -431,7 +438,7 @@ class Recommender(private val store: Store, private val feed: Feed) {
         val hiddenC = t.hiddenChannels.toSet()
         // in a profile of its own, a subscription counts only as much as the profile likes its channel
         val subBonus = if (Profiles.active(store).isEmpty()) 0.6 else 0.0
-        val bonus = mapOf("sub" to subBonus, "rel" to 0.5, "chan" to 0.4, "near" to 0.35, "kw" to 0.25, "pop" to 0.0)
+        val bonus = mapOf("sub" to subBonus, "rel" to 0.5, "reel" to 0.5, "chan" to 0.4, "near" to 0.35, "kw" to 0.25, "pop" to 0.0)
         // the words you favour at this time of the week
         val nowKw = t.kwTime[Learn.bucket()].orEmpty()
         // enough watched to know: popular videos with nothing to do with you sink (subscriptions never)

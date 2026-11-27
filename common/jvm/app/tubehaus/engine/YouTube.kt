@@ -343,6 +343,24 @@ object YouTube {
         return Page(parseItems(root), continuationOf(root))
     }
 
+    /**
+     * The Shorts YouTube's own app plays after [seed], 8 to a page ([cont] for the next page), from its
+     * Shorts-only list (reel_watch_sequence). They come as ids only: the title arrives with each one's stream.
+     * The list's key is what the Shorts page itself carries, {1: id, 5: {3: 12}}, made here from the id.
+     */
+    suspend fun shortsAfter(seed: String, cont: String? = null): Page<Video> {
+        val key = cont ?: run {
+            val id = seed.encodeToByteArray()
+            val b = byteArrayOf(0x0a, id.size.toByte()) + id + byteArrayOf(0x2a, 2, 0x18, 12)
+            @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+            urlEncode(kotlin.io.encoding.Base64.encode(b))      // as the page has it: "...GAw%3D"
+        }
+        val d = InnerTube.call("reel/reel_watch_sequence", mapOf("sequenceParams" to key), Clients.VISIONOS)
+        val ids = d.at("entries").arr.mapNotNull { it.at("command.reelWatchEndpoint.videoId").str }
+            .filter { it != seed && Regex("[\\w-]{11}").matches(it) }.distinct()
+        return Page(ids.map { Video(it, "", short = true) }, d.at("continuation").str ?: d.at("continuationEndpoint.continuationCommand.token").str)
+    }
+
     /** One page of comments, or of replies when [token] is a thread's replies token. */
     suspend fun comments(token: String): Page<Comment> {
         val d = InnerTube.call("next", mapOf("continuation" to token))

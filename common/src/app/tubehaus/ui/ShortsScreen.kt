@@ -91,11 +91,13 @@ fun ShortsScreen(app: AppState) {
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val player = app.player
+    // the Shorts watched to the end or liked, newest first: what YouTube's Shorts list goes on from
+    val seeds = remember { mutableStateListOf<String>() }
     suspend fun more() {
         if (loading) return
         loading = true
         try {
-            val got = app.rec.shorts(10, list.map { it.id }.toSet())
+            val got = app.rec.shorts(10, list.map { it.id }.toSet(), seeds.toList())
             list.addAll(got.filter { g -> list.none { it.id == g.id } })
             error = if (list.isEmpty()) tr("No Shorts found") else null
         } catch (e: Exception) {
@@ -103,7 +105,7 @@ fun ShortsScreen(app: AppState) {
         } finally { loading = false }
     }
     LaunchedEffect(Unit) {
-        app.shortFirst?.let { list.add(it); app.shortFirst = null }
+        app.shortFirst?.let { list.add(it); seeds.add(it.id); app.shortFirst = null }
         more()
     }
     val pager = rememberPagerState { list.size }
@@ -133,10 +135,13 @@ fun ShortsScreen(app: AppState) {
         if (st.videoId != v.id) return
         // time actually spent on it, which counts the loops
         val spent = (Sys.nowMs() - watchStart) / 1000.0
+        val liked = app.store.inList("likes", v.id)
+        // (one from YouTube's Shorts list comes without its title: the stream has it)
         Learn.learn(
-            app.store, v.copy(channelId = s.channelId, author = s.author), s.keywords, spent, s.lengthSec.toDouble().coerceAtLeast(1.0),
-            liked = app.store.inList("likes", v.id), disliked = app.store.inList("dislikes", v.id), short = true,
+            app.store, v.copy(title = v.title.ifEmpty { s.title }, channelId = s.channelId, author = s.author), s.keywords, spent, s.lengthSec.toDouble().coerceAtLeast(1.0),
+            liked = liked, disliked = app.store.inList("dislikes", v.id), short = true,
         )
+        if (liked || spent >= 0.8 * s.lengthSec) { seeds.remove(v.id); seeds.add(0, v.id) }
     }
 
     fun go(by: Int) {
