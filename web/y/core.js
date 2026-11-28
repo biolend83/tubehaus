@@ -60,6 +60,20 @@ export async function setList(list, v, on, quiet) {
 
 // ---------------------------------------------------------------- current queue (this tab only)
 export const queue = {
+  // only what's still to come stays queued (as on YouTube), so a finished queue doesn't come back later.
+  // Called as each video starts on the watch page.
+  started(v, fromQueue) {
+    const q = this.get(), was = sessionStorage.getItem("yt.queueCur");
+    if (fromQueue) {
+      const i = q.findIndex((x) => x.id === v.id);
+      if (i > 0) this.set(q.slice(i));   // the ones before it were played or skipped
+      else if (i < 0) this.set([metaOf(v), ...q]);   // back to one already played (Back button): it leads again
+      sessionStorage.setItem("yt.queueCur", v.id);
+    } else if (was) {                      // left the queue: the one that was playing from it is done
+      if (q[0]?.id === was) this.set(q.slice(1));
+      sessionStorage.removeItem("yt.queueCur");
+    }
+  },
   get() { try { return JSON.parse(sessionStorage.getItem("yt.queue") || "[]"); } catch { return []; } },
   set(a) { sessionStorage.setItem("yt.queue", JSON.stringify(a)); },
   add(v) { const q = this.get().filter((x) => x.id !== v.id); q.push(metaOf(v)); this.set(q); toast($t("현재 재생목록에 추가됨")); },
