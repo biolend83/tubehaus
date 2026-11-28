@@ -3,6 +3,7 @@
 import { $, $$, el, esc, icon, fmtTime, settings, toast, copy, localUrl, parseT, toGate, SERVER_MAX_H, PUBLIC, IPHONE, IPAD, siteName, LIVE_CC_ENGINES, kept } from "./util.js";
 import { $t, LANG, LANGS, LOCALE } from "./i18n.js";
 import { sound } from "./sound.js";
+import { sha256Prefix } from "./sha256.js";
 
 const isTouch = matchMedia("(pointer: coarse)").matches;
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
@@ -87,10 +88,9 @@ export function parseChapters(desc, dur) {
 
 // ---------------------------------------------------------------- SponsorBlock (only the first 4 hash characters are sent)
 async function sponsorSegments(id) {
-  if (!settings.sponsor || !crypto.subtle) return [];
+  if (!settings.sponsor) return [];
   try {
-    const h = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(id)))]
-      .map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 4);
+    const h = sha256Prefix(id);
     // 'filler' is so frequent that it is fetched only when chosen for auto-skip
     // and the highlight: a point to jump to, not a part to skip
     const cats = encodeURIComponent(JSON.stringify([...Object.keys(SB_CATS).filter((c) => c !== "filler" || settings.sponsorCats.includes(c)), HIGHLIGHT]));

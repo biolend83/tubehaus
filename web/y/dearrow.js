@@ -5,6 +5,7 @@
 // server and not the viewer. Cards are changed in place as they appear, the original title kept as a tooltip.
 import { settings } from "./util.js";
 import { $t } from "./i18n.js";
+import { sha256Prefix } from "./sha256.js";
 
 const byPrefix = new Map();   // hash prefix -> Promise<{videoID: branding}>
 const brands = new Map();     // video id -> {title, time} | null
@@ -17,11 +18,6 @@ function limited(fn) {
     const go = () => { running++; fn().then(ok, () => ok({})).finally(() => { running--; waiting.shift()?.(); }); };
     running < 4 ? go() : waiting.push(go);
   });
-}
-
-async function prefixOf(id) {
-  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(id));
-  return [...new Uint8Array(h)].slice(0, 2).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // DeArrow marks a word to keep as written with ">" ("the >iPhone"): that mark is not for showing
@@ -39,8 +35,7 @@ export function pickBranding(b) {
 
 export async function branding(id) {
   if (brands.has(id)) return brands.get(id);
-  if (!crypto.subtle) return null;
-  const p = await prefixOf(id);
+  const p = sha256Prefix(id);
   if (!byPrefix.has(p)) {
     byPrefix.set(p, limited(() => fetch(`https://sponsor.ajay.app/api/branding/${p}`, { referrerPolicy: "no-referrer" })
       .then((r) => (r.ok ? r.json() : {}))));

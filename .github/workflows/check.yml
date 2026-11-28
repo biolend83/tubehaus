@@ -32,6 +32,9 @@ jobs:
       - name: Search filter tests
         run: node tests/test_search_filters.mjs
 
+      - name: SHA-256 tests
+        run: node tests/test_sha256.mjs
+
       - name: Python syntax
         run: python3 -m py_compile server/tubehaus_server.py
 
