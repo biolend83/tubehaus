@@ -60,6 +60,20 @@ export async function setList(list, v, on, quiet) {
 
 // ---------------------------------------------------------------- current queue (this tab only)
 export const queue = {
+  // only what's still to come stays queued (as on YouTube), so a finished queue doesn't come back later.
+  // Called as each video starts on the watch page; without session storage it does nothing and the video still plays.
+  started(v, fromQueue) {
+    try {
+      const q = this.get(), was = sessionStorage.getItem("yt.queueCur");
+      if (fromQueue) sessionStorage.setItem("yt.queueCur", v.id); else sessionStorage.removeItem("yt.queueCur");
+      if (sessionStorage.getItem("yt.plloop") === "QUEUE") return;   // a looping queue goes round again: nothing leaves it
+      const i = q.findIndex((x) => x.id === v.id), left = was && was !== v.id && q.some((x) => x.id === was);
+      if (!fromQueue) { if (left) this.set(q.filter((x) => x.id !== was)); return; }   // left the queue: the one playing from it is done
+      if (i < 0) this.set([metaOf(v), ...q]);              // back to one already played (Back button): it leads again
+      else if (sessionStorage.getItem("yt.shuffle") === "QUEUE") { if (left) this.set(q.filter((x) => x.id !== was)); }   // shuffled: only the one just played goes, the rest may still come
+      else if (i > 0) this.set(q.slice(i));                // in order: the ones before it were played or skipped
+    } catch { }
+  },
   get() { try { return JSON.parse(sessionStorage.getItem("yt.queue") || "[]"); } catch { return []; } },
   set(a) { sessionStorage.setItem("yt.queue", JSON.stringify(a)); },
   add(v) { const q = this.get().filter((x) => x.id !== v.id); q.push(metaOf(v)); this.set(q); toast($t("현재 재생목록에 추가됨")); },

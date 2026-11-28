@@ -232,6 +232,7 @@ export async function watch(page, m, alive) {
 
   // playlist context
   W.pl = null;
+  queue.started(W.v, listId === "QUEUE");
   if (listId) {
     try { W.pl = await loadPlaylist(listId); } catch { }
     if (W.pl) {
