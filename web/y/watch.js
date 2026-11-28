@@ -651,6 +651,16 @@ export async function shorts(page, m, alive) {
     lastT = t;
   };
   player.video.addEventListener("timeupdate", onTime);
+  // every slide has its own volume control, all showing the one player's volume
+  const syncShortVolume = (slide) => {
+    const v = player.video, range = $(".ss-volrange", slide), mute = $(".ss-mute", slide);
+    const value = v.muted ? 0 : v.volume;
+    range.value = value;
+    range.style.setProperty("--p", value * 100 + "%");
+    mute.innerHTML = icon(v.muted || v.volume === 0 ? "mute" : v.volume < 0.5 ? "vollow" : "vol");
+  };
+  const onVolume = () => slides.forEach((s) => syncShortVolume(s));
+  player.video.addEventListener("volumechange", onVolume);
   const report = () => {
     if (!cur) return;
     const { id, info } = cur;
@@ -662,7 +672,9 @@ export async function shorts(page, m, alive) {
   };
   const addSlide = (id) => {
     if (slides.has(id)) return;
-    const s = el(`<section class="short-slide" data-id="${esc(id)}"><div class="ss-media" style="background-image:url('${thumb(id)}')"></div>
+    const s = el(`<section class="short-slide" data-id="${esc(id)}"><div class="ss-media" style="background-image:url('${thumb(id)}')">
+        <div class="ss-volume"><button class="ss-mute" title="${$t("음소거 (m)")}">${icon("vol")}</button><div class="ss-volbar"><input class="ss-volrange" type="range" min="0" max="1" step="0.01" aria-label="${$t("볼륨")}"></div></div>
+      </div>
       <div class="ss-meta"><div class="ss-ch"></div><div class="ss-t"></div></div>
       <div class="ss-act">
         <button class="sa like">${icon("like")}<span>${$t("좋아요")}</span></button>
@@ -671,6 +683,15 @@ export async function shorts(page, m, alive) {
         <button class="sa shr">${icon("share")}<span>${$t("공유")}</span></button>
         <button class="sa more">${icon("moreh")}</button>
       </div></section>`);
+    const range = $(".ss-volrange", s);
+    range.addEventListener("input", () => { player.video.volume = +range.value; player.video.muted = +range.value === 0; });
+    // let go after a drag or tap: a focused slider would keep ↑/↓ and the shortcuts from reaching the Shorts
+    range.addEventListener("pointerup", () => range.blur());
+    $(".ss-mute", s).onclick = () => {
+      player.video.muted = !player.video.muted;
+      if (!player.video.muted && player.video.volume === 0) player.video.volume = 0.5;
+    };
+    syncShortVolume(s);
     slides.set(id, s);
     sc.append(s);
     io.observe(s);
@@ -706,7 +727,7 @@ export async function shorts(page, m, alive) {
     player.mode = "shorts";
     player.root.classList.add("shorts");
     player.root.classList.remove("mini", "theater");
-    media.append(player.root);
+    media.prepend(player.root);   // before the volume control, which shows with the player's controls (app.css)
     player.video.loop = true;
     const all = [...slides.keys()];
     if (all.indexOf(id) > all.length - 4) moreShorts();
@@ -753,6 +774,7 @@ export async function shorts(page, m, alive) {
   pageCleanup.push(() => {
     report();
     player.video.removeEventListener("timeupdate", onTime);
+    player.video.removeEventListener("volumechange", onVolume);
     removeEventListener("keydown", onKey, true);
     io.disconnect();
     saveProgress(true);
