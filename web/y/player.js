@@ -871,6 +871,7 @@ export class Player {
     });
     v.addEventListener("ended", () => {
       if (v.loop) return;
+      this.setBuffering(false);   // a "waiting" right at the end would otherwise leave the spinner up for good
       this.ended = true;
       r.classList.add("ended");
       this.setIcons();
@@ -887,6 +888,7 @@ export class Player {
   setBuffering(on) {
     // a spinner shown for every tiny wait (segment boundaries etc.) looks like flicker -> only after 0.4 s
     clearTimeout(this.bufT);
+    if (on && (this.ended || this.video.ended)) on = false;   // nothing left to load once the video is over
     if (on) this.bufT = setTimeout(() => this.root.classList.add("buffering"), 400);
     else this.root.classList.remove("buffering");
   }
