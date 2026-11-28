@@ -472,6 +472,13 @@ export class Player {
     if (!a || a.id !== t.id) this.sp.selectVariantTrack(t, true, 4);
     this.syncQualityLabel();
   }
+  // a quality picked in the player's menu becomes the preferred one (Settings), so the next videos keep it:
+  // this video's best saves "best quality", a lower one is saved as the "up to" height of Settings' list
+  rememberQuality(h) {
+    const top = this.heights()[0]?.height || 0, cap = settings.quality === "auto" || settings.quality === "max" ? Infinity : +settings.quality;
+    if (h >= top) { if (top > cap) settings.quality = "auto"; return; }   // this video's best: a cap it was over goes, one it fits in stays
+    settings.quality = String([144, 240, 360, 480, 720, 1080, 1440, 2160, 4320].find((x) => x >= h) || 4320);
+  }
   fitBuffer(t) {
     // The browser's media buffer (MSE) is capped at about 150 MB. Buffering 120 s of 8K (~58 Mbps) overflows it
     // and it stutters, appending and evicting over and over. So size the buffer from the chosen track's bitrate.
@@ -1183,7 +1190,7 @@ export class Player {
     if (a === "loop") { v.loop = !v.loop; this.flash(v.loop ? $t("반복 재생 켜짐") : $t("반복 재생 꺼짐")); return this.openMenu("main"); }
     if (a === "stats") { this.statsOn = !this.statsOn; this.q(".ytp-stats").classList.toggle("show", this.statsOn); return this.closeMenu(); }
     if (a === "speed") { v.playbackRate = +val; this.flash(val + "x"); return this.closeMenu(); }
-    if (a === "quality") { this.setQuality(+val); return this.closeMenu(); }
+    if (a === "quality") { this.setQuality(+val); this.rememberQuality(+val); return this.closeMenu(); }
     if (a === "cc") {
       const c = val === "" ? null : this.captionList()[+val];
       settings.captions = !!c;
