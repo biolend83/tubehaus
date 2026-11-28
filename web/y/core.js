@@ -67,6 +67,7 @@ export const queue = {
   next(v) {
     const q = this.get().filter((x) => x.id !== v.id), i = q.findIndex((x) => x.id === player.info?.videoId);
     q.splice(i + 1, 0, metaOf(v));
+    try { sessionStorage.setItem("yt.queueNext", v.id); } catch { }   // so a shuffled queue plays it next too (watch.js nextItem)
     this.set(q);
     toast($t("다음에 재생해요"));
   },
