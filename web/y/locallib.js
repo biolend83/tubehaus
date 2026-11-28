@@ -111,6 +111,10 @@ export function libPost(path, b) {
   } else if (path === "hist/del") {
     if (b.all) { d.hist = []; d.pos = {}; }
     else { d.hist = d.hist.filter((x) => x.id !== String(b.id || "")); delete d.pos[String(b.id || "")]; }
+  } else if (path === "pos/del") {    // resume points only: the history stays
+    if (b.all) d.pos = {};
+    else if (Array.isArray(b.ids)) b.ids.forEach((id) => delete d.pos[String(id)]);
+    else fail(400, "bad ids");
   } else if (path === "shorts/sig" || path === "shorts/reset") {
     return res;                       // no learning on public instances
   } else fail(404, "not found");

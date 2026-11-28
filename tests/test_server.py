@@ -159,6 +159,17 @@ class Library(unittest.TestCase):
         ts.ytlib_post("/api/p/yt/hist/del", {"id": "aaaaaaaaaaa"})
         self.assertEqual([x["id"] for x in ts.ytlib_query("/api/p/yt/hist", {})["items"]], ["bbbbbbbbbbb"])
 
+    def test_resume_points_clear_without_the_history(self):
+        for vid in ("aaaaaaaaaaa", "bbbbbbbbbbb", "ccccccccccc"):
+            ts.ytlib_post("/api/p/yt/pos", {"id": vid, "t": 90, "len": 600, "meta": {"id": vid, "title": vid}})
+        ids = "aaaaaaaaaaa,bbbbbbbbbbb,ccccccccccc"
+        self.assertEqual(ts.ytlib_post("/api/p/yt/pos/del", {"ids": ["aaaaaaaaaaa"]})[0], 200)
+        self.assertEqual(sorted(ts.ytlib_query("/api/p/yt/pos", {"ids": ids})), ["bbbbbbbbbbb", "ccccccccccc"])
+        self.assertEqual(ts.ytlib_post("/api/p/yt/pos/del", {"ids": "aaaaaaaaaaa"})[0], 400)
+        ts.ytlib_post("/api/p/yt/pos/del", {"all": True})
+        self.assertEqual(ts.ytlib_query("/api/p/yt/pos", {"ids": ids}), {})
+        self.assertEqual(ts.ytlib_query("/api/p/yt/hist", {})["total"], 3)
+
 
     def test_music_state(self):
         song = {"id": "aaaaaaaaaaa", "title": "Song", "artist": "Band", "len": 200}

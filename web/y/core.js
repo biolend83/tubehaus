@@ -86,6 +86,11 @@ export async function fillProgress(root) {
   }
 }
 export function setPosCache(id, t, len) { posCache.set(id, [t, len]); }
+// resume points were cleared (one video, or all with no id): forget them and take their bars off the cards on screen
+export function dropPos(id) {
+  if (id) posCache.delete(id); else posCache.clear();
+  $$(id ? `[data-vid="${CSS.escape(id)}"] .resume` : "[data-vid] .resume").forEach((b) => b.remove());
+}
 export function getPos(id) { return posCache.get(id); }
 
 // ---------------------------------------------------------------- cards

@@ -1695,6 +1695,16 @@ html.tv .sx-nav { display: none; }
 .h2-c b { font-size: 14px; font-weight: 700; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .h2-c small { color: var(--fg2); font-size: 12px; }
 @media (max-width: 640px) { .h2-cont-row { grid-auto-columns: 70%; } }
+/* clearing the row: all from the heading, one from the × on its thumbnail (shown on hover, always on touch) */
+.h2-cont-clear { margin-left: auto; display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 16px; font-size: 14px; font-weight: 500; letter-spacing: 0; color: var(--fg2); transition: background .15s, color .15s; }
+.h2-cont-clear:hover { background: var(--hover); color: var(--fg); }
+.h2-cont-clear .ic { width: 18px; height: 18px; }
+.h2-ci { position: relative; }
+.h2-c-x { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.6); color: #fff; opacity: 0; transition: opacity .15s, background .15s; }
+.h2-c-x .ic { width: 18px; height: 18px; }
+.h2-ci:hover .h2-c-x, .h2-c-x:focus-visible { opacity: 1; }
+.h2-c-x:hover { background: rgba(0,0,0,.85); }
+@media (hover: none) { .h2-c-x { opacity: 1; } }
 
 /* under a video: this video at a glance */
 .glance { margin: 14px 0 4px; padding: 16px; border-radius: 20px; background: linear-gradient(135deg, var(--acc-soft), var(--box) 55%); }
