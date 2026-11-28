@@ -552,7 +552,8 @@ body[data-route="shorts"] { overflow: hidden; }
 .ss-media { position: relative; height: 100%; aspect-ratio: 9/16; max-width: calc(100vw - 100px); background: #000 center/cover; border-radius: 12px; overflow: hidden; }
 .ss-media .ytp { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
 /* a Short's volume: shows with the player's controls (the player comes first in .ss-media for the ~), the
-   slider opens on hover like the player's own; on a touch screen only the mute button, as in the player.
+   slider opens on hover like the player's own. On a touch screen only the mute button, as in the player, and
+   always showing: a tap on a Short pauses it, so a button that appeared only after a tap couldn't be reached.
    Top left as on YouTube: "tap to unmute" takes its place while autoplay is muted, stats move below it */
 .ss-volume { position: absolute; top: 12px; left: 12px; z-index: 20; display: flex; align-items: center; border-radius: 20px; background: rgba(0,0,0,.5); color: #fff; opacity: 0; transition: opacity .25s; }
 .ytp.ctl ~ .ss-volume, .ytp.paused ~ .ss-volume, .ss-volume:hover, .ss-volume:focus-within { opacity: 1; }
@@ -560,7 +561,14 @@ body[data-route="shorts"] { overflow: hidden; }
 .ss-volume .ic { width: 24px; height: 24px; }
 .ss-volbar { width: 0; overflow: hidden; transition: width .2s; display: flex; align-items: center; }
 .ss-volume:hover .ss-volbar, .ss-volbar:focus-within { width: 84px; }
-@media (pointer: coarse) { .ss-volbar { display: none; } .ytp:not(.ctl):not(.paused) ~ .ss-volume { pointer-events: none; } }
+/* on touch it looks and gives under the finger like the like/share buttons next to it (.sa) */
+@media (pointer: coarse) {
+  .ss-volbar { display: none; }
+  .ss-volume { opacity: 1; background: none; }
+  .ss-volume button { width: 48px; height: 48px; border-radius: 50%; background: rgba(0,0,0,.35); transition: transform .16s var(--e-out), background-color .15s; }
+  .ss-volume button:active { transform: scale(.94); }
+}
+@media (pointer: coarse) and (max-height: 720px) { .ss-volume button { width: 40px; height: 40px; } .ss-volume .ic { width: 22px; height: 22px; } }
 .ytp.automuted ~ .ss-volume { display: none; }
 .ytp.shorts .ytp-stats { top: 60px; }
 .ss-meta { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); width: min(calc((100vh - var(--mast) - 32px) * 9 / 16), calc(100vw - 100px)); padding: 0 16px; color: #fff; z-index: 5; pointer-events: none; margin-left: -36px; }
