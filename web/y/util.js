@@ -68,7 +68,7 @@ const DEFAULTS = {
   themeDark: "dark",      // ... and the dark one (dark | spatial)
   autoplay: true,         // autoplay the next video
   calm: false,            // calm mode: subscriptions only, no Shorts, trending or recommendations, no autoplay
-  quality: "auto",        // auto | 4320 | 2160 | 1440 | 1080 | 720 | 480 | 360
+  quality: "auto",        // auto | 4320 | 2160 | 1440 | 1080 | 720 | 480 | 360 | 240 | 144
   dataSaver: false,
   audioLang: "",           // the dubbed language picked last (e.g. "ko"); "" = the original
   buffer: 0,              // seconds to buffer ahead; 0 = automatic
