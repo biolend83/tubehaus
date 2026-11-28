@@ -551,6 +551,26 @@ body[data-route="shorts"] { overflow: hidden; }
 .short-slide { height: 100%; scroll-snap-align: start; scroll-snap-stop: always; display: flex; justify-content: center; align-items: flex-end; gap: 16px; padding: 16px 0; position: relative; }
 .ss-media { position: relative; height: 100%; aspect-ratio: 9/16; max-width: calc(100vw - 100px); background: #000 center/cover; border-radius: 12px; overflow: hidden; }
 .ss-media .ytp { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+/* a Short's volume: shows with the player's controls (the player comes first in .ss-media for the ~), the
+   slider opens on hover like the player's own. On a touch screen only the mute button, as in the player, and
+   always showing: a tap on a Short pauses it, so a button that appeared only after a tap couldn't be reached.
+   Top left as on YouTube: "tap to unmute" takes its place while autoplay is muted, stats move below it */
+.ss-volume { position: absolute; top: 12px; left: 12px; z-index: 20; display: flex; align-items: center; border-radius: 20px; background: rgba(0,0,0,.5); color: #fff; opacity: 0; transition: opacity .25s; }
+.ytp.ctl ~ .ss-volume, .ytp.paused ~ .ss-volume, .ss-volume:hover, .ss-volume:focus-within { opacity: 1; }
+.ss-volume button { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+.ss-volume .ic { width: 24px; height: 24px; }
+.ss-volbar { width: 0; overflow: hidden; transition: width .2s; display: flex; align-items: center; }
+.ss-volume:hover .ss-volbar, .ss-volbar:focus-within { width: 84px; }
+/* on touch it looks and gives under the finger like the like/share buttons next to it (.sa) */
+@media (pointer: coarse) {
+  .ss-volbar { display: none; }
+  .ss-volume { opacity: 1; background: none; }
+  .ss-volume button { width: 48px; height: 48px; border-radius: 50%; background: rgba(0,0,0,.35); transition: transform .16s var(--e-out), background-color .15s; }
+  .ss-volume button:active { transform: scale(.94); }
+}
+@media (pointer: coarse) and (max-height: 720px) { .ss-volume button { width: 40px; height: 40px; } .ss-volume .ic { width: 22px; height: 22px; } }
+.ytp.automuted ~ .ss-volume { display: none; }
+.ytp.shorts .ytp-stats { top: 60px; }
 .ss-meta { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); width: min(calc((100vh - var(--mast) - 32px) * 9 / 16), calc(100vw - 100px)); padding: 0 16px; color: #fff; z-index: 5; pointer-events: none; margin-left: -36px; }
 .ss-meta * { pointer-events: auto; }
 .ss-ch { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -663,13 +683,13 @@ body[data-route="shorts"] { overflow: hidden; }
 .ytp-volbar { width: 0; overflow: hidden; transition: width .2s; display: flex; align-items: center; }
 .ytp-vol:hover .ytp-volbar, .ytp-volbar:focus-within { width: 84px; }
 /* the bar is thin but the whole 32px-tall strip around it takes clicks and drags (#32) */
-.ytp-volbar input { appearance: none; width: 72px; height: 32px; background: transparent; margin: 0 6px; cursor: pointer; }
-.ytp-volbar input::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, #fff var(--p, 100%), rgba(255,255,255,.25) var(--p, 100%)); }
-.ytp-volbar input::-moz-range-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, #fff var(--p, 100%), rgba(255,255,255,.25) var(--p, 100%)); }
-.ytp-volbar input::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #fff; transition: transform .1s; }
-.ytp-volbar input::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; transition: transform .1s; }
-.ytp-volbar input:hover::-webkit-slider-thumb, .ytp-volbar input:active::-webkit-slider-thumb { transform: scale(1.25); }
-.ytp-volbar input:hover::-moz-range-thumb, .ytp-volbar input:active::-moz-range-thumb { transform: scale(1.25); }
+.ytp-volbar input, .ss-volrange { appearance: none; width: 72px; height: 32px; background: transparent; margin: 0 6px; cursor: pointer; }
+.ytp-volbar input::-webkit-slider-runnable-track, .ss-volrange::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, #fff var(--p, 100%), rgba(255,255,255,.25) var(--p, 100%)); }
+.ytp-volbar input::-moz-range-track, .ss-volrange::-moz-range-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, #fff var(--p, 100%), rgba(255,255,255,.25) var(--p, 100%)); }
+.ytp-volbar input::-webkit-slider-thumb, .ss-volrange::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #fff; transition: transform .1s; }
+.ytp-volbar input::-moz-range-thumb, .ss-volrange::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; transition: transform .1s; }
+.ytp-volbar input:hover::-webkit-slider-thumb, .ytp-volbar input:active::-webkit-slider-thumb, .ss-volrange:hover::-webkit-slider-thumb, .ss-volrange:active::-webkit-slider-thumb { transform: scale(1.25); }
+.ytp-volbar input:hover::-moz-range-thumb, .ytp-volbar input:active::-moz-range-thumb, .ss-volrange:hover::-moz-range-thumb, .ss-volrange:active::-moz-range-thumb { transform: scale(1.25); }
 .ytp-time { font-size: 13px; padding: 0 8px; white-space: nowrap; text-shadow: 0 0 2px rgba(0,0,0,.5); }
 .ytp.live .ytp-time { display: none; }
 .ytp-livebadge { display: none !important; width: auto !important; padding: 0 8px; gap: 6px; font-size: 13px; font-weight: 500; text-transform: uppercase; }
