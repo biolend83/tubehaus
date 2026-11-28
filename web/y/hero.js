@@ -1,6 +1,7 @@
 // The 2.0 home's top, as in the apps: a greeting for the time of day, then the videos left half-watched.
-import { el, esc, fmtTime, thumb, lib } from "./util.js";
+import { el, esc, fmtTime, thumb, lib, icon } from "./util.js";
 import { $t } from "./i18n.js";
+import { dropPos } from "./core.js";
 
 function greeting() {
   const h = new Date().getHours();
@@ -26,9 +27,26 @@ export async function continueRow(before) {
   try { pos = await lib("pos?ids=" + items.map((h) => h.id).join(","), { quiet: true }); } catch { return; }
   const left = items.map((h) => ({ h, p: pos[h.id] })).filter(({ p }) => p && p[1] && p[0] > 30 && p[0] / p[1] < 0.93).slice(0, 10);
   if (left.length < 1 || !before.isConnected) return;
-  const row = el(`<section class="h2-cont"><div class="shelf-h"><b>${$t("이어서 보기")}</b></div><div class="h2-cont-row">${left.map(({ h, p }) => `
-    <a class="h2-c" href="/watch?v=${h.id}&t=${Math.floor(p[0])}" data-nav>
+  const row = el(`<section class="h2-cont"><div class="shelf-h"><b>${$t("이어서 보기")}</b>
+      <button class="h2-cont-clear">${icon("trash")}<span>${$t("지우기")}</span></button></div><div class="h2-cont-row">${left.map(({ h, p }) => `
+    <div class="h2-ci" data-id="${esc(h.id)}"><a class="h2-c" href="/watch?v=${esc(h.id)}&t=${Math.floor(p[0])}" data-nav>
       <span class="h2-c-th"><img src="${thumb(h.id, "mqdefault")}" alt="" loading="lazy"><i style="width:${(p[0] / p[1]) * 100}%"></i></span>
-      <b>${esc(h.title)}</b><small>${$t("{0} 남음", fmtTime(p[1] - p[0]))}</small></a>`).join("")}</div></section>`);
+      <b>${esc(h.title)}</b><small>${$t("{0} 남음", fmtTime(p[1] - p[0]))}</small></a>
+      <button class="h2-c-x" title="${$t("삭제")}" aria-label="${$t("삭제")}">${icon("close")}</button></div>`).join("")}</div></section>`);
+  // clearing drops only the resume points: the videos stay in the watch history
+  const forget = (body) => lib("pos/del", { method: "POST", body });
+  row.querySelectorAll(".h2-c-x").forEach((b) => b.onclick = async () => {
+    const it = b.closest(".h2-ci"), id = it.dataset.id;
+    try { await forget({ ids: [id] }); } catch { return; }
+    dropPos(id);
+    it.remove();
+    if (!row.querySelector(".h2-ci")) row.remove();
+  });
+  row.querySelector(".h2-cont-clear").onclick = async () => {
+    if (!confirm($t("모든 기기의 이어보기 위치를 지울까요? (시청 기록은 그대로예요)"))) return;
+    try { await forget({ all: true }); } catch { return; }
+    dropPos();
+    row.remove();
+  };
   before.before(row);
 }

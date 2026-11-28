@@ -1784,6 +1784,15 @@ def ytlib_post(path, b):
                 vid = str(b.get("id", ""))
                 d["hist"] = [x for x in d["hist"] if x["id"] != vid]
                 d["pos"].pop(vid, None)
+        elif path.endswith("/yt/pos/del"):          # resume points only (Home's "Resume playback"): the history stays
+            if b.get("all"):
+                d["pos"] = {}
+            else:
+                ids = b.get("ids")
+                if not isinstance(ids, list):
+                    return 400, {"error": "bad ids"}
+                for vid in ids:
+                    d["pos"].pop(str(vid), None)
         else:
             return 404, {"error": "not found"}
         jsave(_ytlib_file(), d)

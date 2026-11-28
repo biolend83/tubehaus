@@ -735,5 +735,6 @@ export default {
  "또는": "lub",
  "SSO 로그인이 되지 않았어요. 다시 해 보세요": "Logowanie jednokrotne nie powiodło się. Spróbuj ponownie",
  "이 서버를 쓰려면 로그인해야 해요": "Zaloguj się, aby korzystać z tego serwera",
- "비밀번호 로그인은 이 서버에서 꺼져 있어요": "Logowanie hasłem jest wyłączone na tym serwerze"
+ "비밀번호 로그인은 이 서버에서 꺼져 있어요": "Logowanie hasłem jest wyłączone na tym serwerze",
+ "모든 기기의 이어보기 위치를 지울까요? (시청 기록은 그대로예요)": "Usunąć miejsca wznowienia na wszystkich urządzeniach? (Historia oglądania zostanie)"
 };

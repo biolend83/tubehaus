@@ -735,5 +735,6 @@ export default {
  "또는": "ou",
  "SSO 로그인이 되지 않았어요. 다시 해 보세요": "O login único não funcionou. Tente novamente",
  "이 서버를 쓰려면 로그인해야 해요": "Entre para usar este servidor",
- "비밀번호 로그인은 이 서버에서 꺼져 있어요": "As senhas estão desativadas neste servidor"
+ "비밀번호 로그인은 이 서버에서 꺼져 있어요": "As senhas estão desativadas neste servidor",
+ "모든 기기의 이어보기 위치를 지울까요? (시청 기록은 그대로예요)": "Apagar os pontos de retomada em todos os aparelhos? (O histórico continua)"
 };

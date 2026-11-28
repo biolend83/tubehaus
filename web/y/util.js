@@ -223,7 +223,7 @@ export function kept(fresh) {
   }
   return keptP;
 }
-const LOCAL = /^(lib|pos|sub|subs\/import|list|pl|pl\/new|pl\/del|pl\/rename|hist|hist\/del|shorts\/sig|shorts\/reset)$/;
+const LOCAL = /^(lib|pos|sub|subs\/import|list|pl|pl\/new|pl\/del|pl\/rename|hist|hist\/del|pos\/del|shorts\/sig|shorts\/reset)$/;
 export async function lib(path, opts = {}) {
   if (await modeReady) {
     const [p, q] = path.split("?");

@@ -735,5 +735,6 @@ export default {
  "또는": "or",
  "SSO 로그인이 되지 않았어요. 다시 해 보세요": "Single sign-on didn't work. Please try again",
  "이 서버를 쓰려면 로그인해야 해요": "Sign in to use this server",
- "비밀번호 로그인은 이 서버에서 꺼져 있어요": "Passwords are turned off on this server"
+ "비밀번호 로그인은 이 서버에서 꺼져 있어요": "Passwords are turned off on this server",
+ "모든 기기의 이어보기 위치를 지울까요? (시청 기록은 그대로예요)": "Clear the resume points on all devices? (The watch history stays)"
 };

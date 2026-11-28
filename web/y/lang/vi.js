@@ -735,5 +735,6 @@ export default {
  "또는": "hoặc",
  "SSO 로그인이 되지 않았어요. 다시 해 보세요": "Đăng nhập một lần (SSO) không thành công. Vui lòng thử lại",
  "이 서버를 쓰려면 로그인해야 해요": "Đăng nhập để dùng máy chủ này",
- "비밀번호 로그인은 이 서버에서 꺼져 있어요": "Máy chủ này đã tắt đăng nhập bằng mật khẩu"
+ "비밀번호 로그인은 이 서버에서 꺼져 있어요": "Máy chủ này đã tắt đăng nhập bằng mật khẩu",
+ "모든 기기의 이어보기 위치를 지울까요? (시청 기록은 그대로예요)": "Xóa vị trí xem tiếp trên tất cả thiết bị? (Lịch sử xem vẫn được giữ)"
 };
