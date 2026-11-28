@@ -38,6 +38,11 @@ player.on.progress = (force) => saveProgress(force);
 
 // ---------------------------------------------------------------- next / previous
 function nextItem() {
+  if (W.pl?.id === "QUEUE") {   // "Play next" or "Add to queue" may have changed the queue while this video played
+    W.pl.videos = queue.get().map(normVideo);
+    const i = W.pl.videos.findIndex((x) => x.id === W.id);
+    if (i >= 0) W.plIndex = i;
+  }
   if (W.pl && W.pl.videos.length) {
     const shuffle = sessionStorage.getItem("yt.shuffle") === W.pl.id;
     let i;
@@ -240,6 +245,7 @@ export async function watch(page, m, alive) {
       W.plIndex = Math.max(0, i);
     }
   }
+  queue.otherList = !!W.pl && W.pl.id !== "QUEUE";   // a playlist plays its own order: no "Play next" (core.js)
   if (!alive()) return;
 
   // start position: ?t= > resume point > beginning
@@ -424,6 +430,14 @@ function renderRelated(page) {
   box.querySelector(".autosw input").onchange = (e) => { settings.autoplay = e.target.checked; player.setIcons(); };
   fillProgress(box);
 }
+
+// the queue changed (Play next, Add to queue): the next-video button, and the queue's panel when it's showing, follow it
+addEventListener("queuechange", () => {
+  if (!W.id || player.info?.videoId !== W.id || player.mode === "shorts") return;
+  player.next = nextItem()?.v || null;
+  player.setIcons();
+  if (W.pl?.id === "QUEUE" && $(".w-plpanel")) renderPlaylistPanel(document);
+});
 
 function renderPlaylistPanel(page) {
   const box = $(".w-plpanel", page);

@@ -61,8 +61,15 @@ export async function setList(list, v, on, quiet) {
 // ---------------------------------------------------------------- current queue (this tab only)
 export const queue = {
   get() { try { return JSON.parse(sessionStorage.getItem("yt.queue") || "[]"); } catch { return []; } },
-  set(a) { sessionStorage.setItem("yt.queue", JSON.stringify(a)); },
+  set(a) { sessionStorage.setItem("yt.queue", JSON.stringify(a)); dispatchEvent(new Event("queuechange")); },
   add(v) { const q = this.get().filter((x) => x.id !== v.id); q.push(metaOf(v)); this.set(q); toast($t("현재 재생목록에 추가됨")); },
+  // right after the video playing now (the queue's first if that one isn't in it), ahead of the rest
+  next(v) {
+    const q = this.get().filter((x) => x.id !== v.id), i = q.findIndex((x) => x.id === player.info?.videoId);
+    q.splice(i + 1, 0, metaOf(v));
+    this.set(q);
+    toast($t("다음에 재생해요"));
+  },
 };
 
 // ---------------------------------------------------------------- resume positions
@@ -225,6 +232,7 @@ export const mi = (a, ic, label) => `<div class="mi" data-a="${a}">${icon(ic)}<s
 
 export function videoMenu(anchor, v, ctx = {}) {
   const items = [
+    player.info && player.info.videoId !== v.id && player.mode !== "shorts" && !queue.otherList ? mi("next", "next", $t("다음에 재생")) : "",
     mi("queue", "playlists", $t("현재 재생목록에 추가")),
     mi("wl", "later", inList("wl", v.id) ? $t("나중에 볼 동영상에서 삭제") : $t("나중에 볼 동영상에 저장")),
     mi("save", "save", $t("재생목록에 저장")),
@@ -239,6 +247,7 @@ export function videoMenu(anchor, v, ctx = {}) {
   ].join("");
   popup(anchor, items, async (a) => {
     if (a === "queue") queue.add(v);
+    if (a === "next") queue.next(v);
     if (a === "wl") setList("wl", v, !inList("wl", v.id));
     if (a === "save") saveDialog(v);
     if (a === "dl") downloadDialog(v);
